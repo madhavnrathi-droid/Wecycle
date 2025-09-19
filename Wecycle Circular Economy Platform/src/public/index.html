@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <!-- Primary Meta Tags -->
+  <title>Wecycle - Sustainable Material Sharing Community</title>
+  <meta name="title" content="Wecycle - Sustainable Material Sharing Community" />
+  <meta name="description" content="Connect with your community to share, discover and reuse materials. Build a circular economy through sustainable material sharing on Wecycle." />
+  <meta name="keywords" content="circular economy, sustainability, material sharing, community, reuse, recycle, environment, waste reduction" />
+  <meta name="author" content="Wecycle Team" />
+  <meta name="robots" content="index, follow" />
+  <meta name="language" content="English" />
+  
+  <!-- Theme and Color -->
+  <meta name="theme-color" content="#22c55e" />
+  <meta name="msapplication-navbutton-color" content="#22c55e" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  
+  <!-- Mobile App Capabilities -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Wecycle" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://wecycle.app/" />
+  <meta property="og:title" content="Wecycle - Sustainable Material Sharing Community" />
+  <meta property="og:description" content="Connect with your community to share, discover and reuse materials. Build a circular economy through sustainable material sharing." />
+  <meta property="og:image" content="https://wecycle.app/og-image.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:site_name" content="Wecycle" />
+  <meta property="og:locale" content="en_US" />
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://wecycle.app/" />
+  <meta property="twitter:title" content="Wecycle - Sustainable Material Sharing Community" />
+  <meta property="twitter:description" content="Connect with your community to share, discover and reuse materials. Build a circular economy through sustainable material sharing." />
+  <meta property="twitter:image" content="https://wecycle.app/og-image.jpg" />
+  <meta property="twitter:creator" content="@WecycleApp" />
+  
+  <!-- Favicon and Icons -->
+  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicon-16x16.png" />
+  
+  <!-- Web App Manifest -->
+  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+  
+  <!-- Preconnect to external domains -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://supabase.co" />
+  
+  <!-- Structured Data for SEO -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Wecycle",
+    "url": "https://wecycle.app",
+    "description": "A platform for sharing and discovering reusable materials in your community",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "All",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "creator": {
+      "@type": "Organization",
+      "name": "Wecycle Team"
+    },
+    "screenshot": "https://wecycle.app/screenshot.jpg",
+    "featureList": [
+      "Share materials with your community",
+      "Discover reusable items nearby",
+      "Request specific materials",
+      "Track material lifecycle",
+      "Real-time notifications",
+      "Community building"
+    ]
+  }
+  </script>
+  
+  <!-- Security Headers -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+  
+  <!-- Performance Hints -->
+  <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="//supabase.co" />
+  
+  <style>
+    /* Critical CSS for loading state */
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .loading-content {
+      text-align: center;
+      color: #166534;
+    }
+    
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #bbf7d0;
+      border-top: 4px solid #22c55e;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-title {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+    }
+    
+    .loading-subtitle {
+      font-size: 16px;
+      opacity: 0.8;
+      margin: 0;
+    }
+    
+    /* Hide loading screen when app loads */
+    .app-loaded .loading-screen {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <noscript>
+    <div style="padding: 40px; text-align: center; font-family: sans-serif;">
+      <h1 style="color: #dc2626;">JavaScript Required</h1>
+      <p>Wecycle requires JavaScript to function properly. Please enable JavaScript in your browser settings and reload the page.</p>
+      <p>Wecycle is a modern web application that helps communities share and reuse materials sustainably.</p>
+    </div>
+  </noscript>
+  
+  <!-- Loading screen shown while app initializes -->
+  <div class="loading-screen" id="loading-screen">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <h1 class="loading-title">Wecycle</h1>
+      <p class="loading-subtitle">Loading your sustainable marketplace...</p>
+    </div>
+  </div>
+  
+  <!-- React app root -->
+  <div id="root"></div>
+  
+  <!-- Hide loading screen when React app mounts -->
+  <script>
+    // Hide loading screen once React has mounted
+    window.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+          loadingScreen.style.opacity = '0';
+          loadingScreen.style.transition = 'opacity 0.5s ease-out';
+          setTimeout(function() {
+            loadingScreen.style.display = 'none';
+          }, 500);
+        }
+      }, 1000); // Minimum loading time for branding
+    });
+    
+    // Performance monitoring
+    if ('performance' in window) {
+      window.addEventListener('load', function() {
+        const loadTime = performance.now();
+        console.log('App loaded in', Math.round(loadTime), 'ms');
+      });
+    }
+    
+    // Service Worker Registration (optional for PWA)
+    if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(registration) {
+            console.log('SW registered: ', registration);
+          })
+          .catch(function(registrationError) {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+  </script>
+</body>
+</html>

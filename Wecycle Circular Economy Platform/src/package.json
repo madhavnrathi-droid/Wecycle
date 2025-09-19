@@ -1,0 +1,118 @@
+{
+  "name": "wecycle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A circular economy platform for sharing and acquiring reusable materials",
+  "author": "Wecycle Team",
+  "license": "MIT",
+  "homepage": "https://wecycle.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/madhavnrathi-droid/Wecycle.git"
+  },
+  "keywords": [
+    "circular-economy",
+    "sustainability",
+    "material-sharing",
+    "community",
+    "react",
+    "typescript",
+    "supabase"
+  ],
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "next": "^13.5.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^4.9.5",
+    "@types/node": "^16.18.68",
+    "@types/react": "^18.2.42",
+    "@types/react-dom": "^18.2.17",
+    "lucide-react": "^0.294.0",
+    "tailwindcss": "^4.0.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.1.0",
+    "sonner": "^1.3.1",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-separator": "^1.0.3",
+    "@radix-ui/react-switch": "^1.0.3",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-toast": "^1.1.5",
+    "@radix-ui/react-tooltip": "^1.0.7",
+    "@radix-ui/react-accordion": "^1.1.2",
+    "@radix-ui/react-alert-dialog": "^1.0.5",
+    "@radix-ui/react-aspect-ratio": "^1.0.3",
+    "@radix-ui/react-avatar": "^1.0.4",
+    "@radix-ui/react-checkbox": "^1.0.4",
+    "@radix-ui/react-collapsible": "^1.0.3",
+    "@radix-ui/react-context-menu": "^2.1.5",
+    "@radix-ui/react-hover-card": "^1.0.7",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-menubar": "^1.0.4",
+    "@radix-ui/react-navigation-menu": "^1.1.4",
+    "@radix-ui/react-progress": "^1.0.3",
+    "@radix-ui/react-radio-group": "^1.1.3",
+    "@radix-ui/react-scroll-area": "^1.0.5",
+    "@radix-ui/react-slider": "^1.1.2",
+    "@radix-ui/react-toggle": "^1.0.3",
+    "@radix-ui/react-toggle-group": "^1.0.4",
+    "cmdk": "^0.2.0",
+    "embla-carousel-react": "^8.0.0",
+    "react-day-picker": "^8.10.0",
+    "recharts": "^2.8.0",
+    "react-resizable-panels": "^0.0.55",
+    "vaul": "^0.9.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ext .js,.ts,.jsx,.tsx",
+    "lint:fix": "eslint . --ext .js,.ts,.jsx,.tsx --fix",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "preview": "next build && next start",
+    "clean": "rm -rf .next node_modules/.cache",
+    "postinstall": "echo 'Welcome to Wecycle! Run npm run dev to begin development.'",
+    "deploy:vercel": "vercel --prod",
+    "deploy:netlify": "netlify deploy --prod --dir=.next"
+  },
+  "eslintConfig": {
+    "extends": [
+      "next",
+      "next/core-web-vitals"
+    ],
+    "rules": {
+      "no-console": "warn",
+      "no-debugger": "error",
+      "@typescript-eslint/no-unused-vars": "warn"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
