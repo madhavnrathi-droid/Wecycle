@@ -8,6 +8,7 @@ import {
 import type { CommunityEvent } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
 import { getEventMetrics } from '../lib/metrics';
+import OnlineBadge from './OnlineBadge';
 import PhotoCarousel from './PhotoCarousel';
 
 interface EventDetailScreenProps {
@@ -282,8 +283,14 @@ export default function EventDetailScreen({
             />
           </div>
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-              {event.organizer.name}
+            <p style={{
+              margin: 0, display: 'flex', alignItems: 'center', gap: 8,
+              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+            }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {event.organizer.name}
+              </span>
+              <OnlineBadge isOnline={event.organizer.isOnline} />
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
               {event.organizer.role}

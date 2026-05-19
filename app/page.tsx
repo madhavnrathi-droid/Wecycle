@@ -30,7 +30,7 @@ import { MY_EVENT_IDS } from '../lib/mockData';
 import type { WecycleAlert } from '../lib/alerts';
 import {
   getSettings, onSettingsChange, applyTheme, watchSystemTheme,
-  saveSettings, type ThemeMode,
+  applyLargerText, saveSettings, type ThemeMode,
 } from '../lib/settings';
 
 type ModalKind =
@@ -86,11 +86,13 @@ export default function WecycleApp() {
     const s = getSettings();
     setThemeMode(s.appearance.theme);
     applyTheme(s.appearance.theme);
+    applyLargerText(s.appearance.largerText);
     syncDarkFromDOM();
     /* Listen for in-app changes (Settings toggle) */
     const off = onSettingsChange(next => {
       setThemeMode(next.appearance.theme);
       applyTheme(next.appearance.theme);
+      applyLargerText(next.appearance.largerText);
       syncDarkFromDOM();
     });
     return off;

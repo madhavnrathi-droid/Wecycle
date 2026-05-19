@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Sun, Moon, Monitor,
-  Bell, Shield, Database, Tag, Info,
-  MessageSquare, Globe, Eye, EyeOff, Trash2,
+  Bell, Shield, Tag, Info,
+  MessageSquare, Globe, EyeOff, Trash2,
 } from 'lucide-react';
 import {
-  getSettings, saveSettings, onSettingsChange,
-  type ThemeMode, type UserSettings, type Privacy,
+  getSettings, saveSettings, onSettingsChange, applyLargerText,
+  type ThemeMode, type UserSettings,
 } from '../lib/settings';
 import { useAuth } from '../lib/AuthContext';
 
@@ -34,12 +34,14 @@ export default function SettingsScreen({
 
   if (!mounted) return null;
 
-  const setAppearance = (patch: Partial<UserSettings['appearance']>) =>
+  const setAppearance = (patch: Partial<UserSettings['appearance']>) => {
     saveSettings({ appearance: { ...settings.appearance, ...patch } });
+    /* Apply text-size change instantly so the screen reflows under the user's
+       finger — they don't have to wait for the next paint or close the tab. */
+    if (patch.largerText !== undefined) applyLargerText(patch.largerText);
+  };
   const setPrivacy = (patch: Partial<UserSettings['privacy']>) =>
     saveSettings({ privacy: { ...settings.privacy, ...patch } });
-  const setData = (patch: Partial<UserSettings['data']>) =>
-    saveSettings({ data: { ...settings.data, ...patch } });
   const setMarketplace = (patch: Partial<UserSettings['marketplace']>) =>
     saveSettings({ marketplace: { ...settings.marketplace, ...patch } });
 
@@ -108,11 +110,7 @@ export default function SettingsScreen({
             <ThemeSwitcher value={settings.appearance.theme} onChange={(v) => setAppearance({ theme: v })} />
           </Row>
           <Divider />
-          <Row label="Reduce motion" hint="Soften screen transitions and parallax effects.">
-            <Toggle on={settings.appearance.reduceMotion} onChange={(v) => setAppearance({ reduceMotion: v })} />
-          </Row>
-          <Divider />
-          <Row label="Larger text" hint="Bump up readable body copy across the app.">
+          <Row label="Larger text" hint="Bump readable body copy across the app.">
             <Toggle on={settings.appearance.largerText} onChange={(v) => setAppearance({ largerText: v })} />
           </Row>
         </Card>
@@ -128,14 +126,13 @@ export default function SettingsScreen({
         />
       </Section>
 
-      {/* ── PRIVACY ── */}
-      <Section title="Privacy" hint="Control who can see your profile and reach you.">
+      {/* ── PRIVACY ──
+         Profiles are always public for community safety — that's not configurable.
+         Email is always visible too (people need a way to reach you).
+         What stays private: phone, presence, and your listings while you tidy up. */}
+      <Section title="Privacy" hint="Profiles and email are always visible to your community. These tune the rest.">
         <Card>
-          <Row label="Profile visibility" hint="Who can find and view your profile.">
-            <PrivacySwitcher value={settings.privacy.profile} onChange={(v) => setPrivacy({ profile: v })} />
-          </Row>
-          <Divider />
-          <Row label="Show I'm online" hint="Display a green dot when you're active.">
+          <Row label="Show I'm online" hint="Display a green “Online” label on your posts and profile.">
             <Toggle on={settings.privacy.showOnlineStatus} onChange={(v) => setPrivacy({ showOnlineStatus: v })} />
           </Row>
           <Divider />
@@ -145,17 +142,10 @@ export default function SettingsScreen({
           <Divider />
           <Row
             label="Show phone on profile"
-            hint="Off keeps it private; we route messages instead."
-            icon={settings.privacy.showPhone ? <Eye size={13} /> : <EyeOff size={13} />}
+            hint="Off keeps it private; messages route through Wecycle instead."
+            icon={!settings.privacy.showPhone ? <EyeOff size={13} /> : undefined}
           >
             <Toggle on={settings.privacy.showPhone} onChange={(v) => setPrivacy({ showPhone: v })} />
-          </Row>
-          <Divider />
-          <Row
-            label="Show email on profile"
-            icon={settings.privacy.showEmail ? <Eye size={13} /> : <EyeOff size={13} />}
-          >
-            <Toggle on={settings.privacy.showEmail} onChange={(v) => setPrivacy({ showEmail: v })} />
           </Row>
           <Divider />
           <Row label="Hide my listings from search" hint="Useful while you're cleaning up your inventory.">
@@ -168,45 +158,19 @@ export default function SettingsScreen({
       </Section>
 
       {/* ── MARKETPLACE ── */}
-      <Section title="Marketplace" hint="Defaults for posting and browsing items.">
+      <Section title="Marketplace" hint="How the marketplace feels day to day.">
         <Card>
-          <Row label="Default pickup radius" hint={`${settings.marketplace.defaultPickupRadiusKm} km from your location`}>
-            <input
-              type="range" min={1} max={25} step={1}
-              value={settings.marketplace.defaultPickupRadiusKm}
-              onChange={(e) => setMarketplace({ defaultPickupRadiusKm: Number(e.target.value) })}
-              style={{ width: 120 }}
-              aria-label="Pickup radius"
-            />
-          </Row>
-          <Divider />
-          <Row label="Preferred currency">
-            <select
-              className="form-input"
-              value={settings.marketplace.preferredCurrency}
-              onChange={(e) => setMarketplace({ preferredCurrency: e.target.value as 'INR' | 'USD' | 'EUR' | 'GBP' })}
-              style={{ minWidth: 90, padding: '6px 8px', fontSize: 13 }}
-            >
-              <option value="INR">INR ₹</option>
-              <option value="USD">USD $</option>
-              <option value="EUR">EUR €</option>
-              <option value="GBP">GBP £</option>
-            </select>
-          </Row>
-          <Divider />
           <Row label="Hide prices on feed" hint="See items by need, not budget.">
             <Toggle on={settings.marketplace.hidePriceOnFeed} onChange={(v) => setMarketplace({ hidePriceOnFeed: v })} />
           </Row>
         </Card>
       </Section>
 
-      {/* ── DATA & STORAGE ── */}
-      <Section title="Data & storage" hint="Trim bandwidth and clear caches.">
+      {/* ── DATA & STORAGE ──
+         We auto-compress all uploads before sending them to Supabase storage —
+         not a toggle, just a default. No "Data saver" row needed. */}
+      <Section title="Data & storage" hint="Photos are auto-compressed before upload to save space.">
         <Card>
-          <Row label="Data saver" hint="Compress images before uploading.">
-            <Toggle on={settings.data.dataSaver} onChange={(v) => setData({ dataSaver: v })} />
-          </Row>
-          <Divider />
           <Row label="Clear local cache" hint="Wipe cached images and recently-viewed lists.">
             <button onClick={clearCache} className="settings-btn-ghost">
               <Trash2 size={13} strokeWidth={1.8} /> Clear
@@ -438,24 +402,6 @@ function ThemeSwitcher({ value, onChange }: { value: ThemeMode; onChange: (v: Th
         </button>
       ))}
     </div>
-  );
-}
-
-function PrivacySwitcher({ value, onChange }: { value: Privacy; onChange: (v: Privacy) => void }) {
-  const options: Array<{ v: Privacy; label: string }> = [
-    { v: 'public',    label: 'Public' },
-    { v: 'community', label: 'Community' },
-    { v: 'private',   label: 'Private' },
-  ];
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as Privacy)}
-      className="form-input"
-      style={{ minWidth: 120, padding: '6px 8px', fontSize: 13 }}
-    >
-      {options.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-    </select>
   );
 }
 

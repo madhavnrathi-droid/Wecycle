@@ -717,6 +717,7 @@ export const CATEGORIES = [
   { id: 'tools', label: 'Tools', icon: '🔧' },
   { id: 'kitchen', label: 'Kitchen', icon: '☕' },
   { id: 'clothing', label: 'Clothing', icon: '👕' },
+  { id: 'services', label: 'Services', icon: '🤝' },
 ];
 
 export const LISTING_TYPES = [

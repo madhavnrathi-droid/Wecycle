@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Trash2, RefreshCw, MapPin, Gift, Tag, Eye, EyeOff, AlertTriangle, Plus, X, Camera } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Trash2, RefreshCw, MapPin, Gift, Tag, Eye, EyeOff, AlertTriangle, Camera } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoCarousel from '../PhotoCarousel';
+import PhotoPicker from '../PhotoPicker';
 import type { MarketplaceItem } from '../../lib/mockData';
 import { getItemPhotos } from '../../lib/photos';
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
-  'Tools', 'Kitchen', 'Lab', 'Art', 'Clothing', 'Other',
+  'Tools', 'Kitchen', 'Lab', 'Art', 'Clothing', 'Services', 'Other',
 ];
 const CONDITIONS = [
   { value: 'like_new', label: 'Like new' },
@@ -53,7 +54,6 @@ export default function EditItemModal({
   const [errors, setErrors] = useState<Partial<Record<keyof EditItemForm, string>>>({});
   const [submitting, setSubmitting] = useState<'save' | 'repost' | 'delete' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* Hydrate form from item when modal opens */
   useEffect(() => {
@@ -72,19 +72,6 @@ export default function EditItemModal({
     setErrors({});
     setConfirmDelete(false);
   }, [open, item, initiallyHidden]);
-
-  const handleAddPhoto = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const remaining = MAX_PHOTOS - form.photos.length;
-    const toAdd = Array.from(files).slice(0, remaining);
-    const urls = toAdd.map(f => URL.createObjectURL(f));
-    setForm(f => ({ ...f, photos: [...f.photos, ...urls] }));
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleRemovePhoto = (idx: number) => {
-    setForm(f => ({ ...f, photos: f.photos.filter((_, i) => i !== idx) }));
-  };
 
   const update = <K extends keyof EditItemForm>(key: K, value: EditItemForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -194,44 +181,10 @@ export default function EditItemModal({
             </div>
           ) : null}
 
-          <div className="photo-picker">
-            {form.photos.map((src, i) => (
-              <div key={src + i} className="photo-picker-tile photo-picker-tile--filled">
-                <img src={src} alt="" />
-                {i === 0 && <span className="photo-picker-cover">Cover</span>}
-                <button
-                  type="button"
-                  className="photo-picker-remove"
-                  aria-label={`Remove photo ${i + 1}`}
-                  onClick={() => handleRemovePhoto(i)}
-                >
-                  <X size={12} strokeWidth={2.5} />
-                </button>
-              </div>
-            ))}
-
-            {form.photos.length < MAX_PHOTOS && (
-              <button
-                type="button"
-                className="photo-picker-tile"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Add photo"
-              >
-                <Plus size={20} strokeWidth={1.8} />
-                <span style={{ fontSize: 11, fontWeight: 500 }}>
-                  {form.photos.length === 0 ? 'Add' : 'More'}
-                </span>
-              </button>
-            )}
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            style={{ display: 'none' }}
-            onChange={e => handleAddPhoto(e.target.files)}
+          <PhotoPicker
+            photos={form.photos}
+            onChange={next => update('photos', next)}
+            max={MAX_PHOTOS}
           />
         </section>
 

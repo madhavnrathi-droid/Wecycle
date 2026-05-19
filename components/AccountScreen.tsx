@@ -205,10 +205,15 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               <input
                 id="acc-collegeid"
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
                 className="form-input"
                 placeholder="e.g. 230905123"
                 value={collegeId}
-                onChange={e => setCollegeId(e.target.value)}
+                /* Strip any non-digit on the fly so paste, autofill, and
+                   wrong keystrokes can't slip a letter in. */
+                onChange={e => setCollegeId(e.target.value.replace(/\D+/g, ''))}
                 required
               />
             </div>

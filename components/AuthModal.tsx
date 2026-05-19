@@ -235,10 +235,14 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 <input
                   id="auth-collegeid"
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="form-input"
                   placeholder="e.g. 230905123"
                   value={collegeId}
-                  onChange={e => setCollegeId(e.target.value)}
+                  /* Strip non-digits as the user types — keeps the numeric
+                     keyboard on iOS and rejects accidental letters from autofill. */
+                  onChange={e => setCollegeId(e.target.value.replace(/\D+/g, ''))}
                   autoComplete="off"
                   required
                 />

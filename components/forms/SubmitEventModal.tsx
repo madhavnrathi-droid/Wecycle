@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { MapPin, Plus, X } from 'lucide-react';
+import { useState } from 'react';
+import { MapPin } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoCarousel from '../PhotoCarousel';
+import PhotoPicker from '../PhotoPicker';
 
 const EVENT_TYPES = [
   { value: 'swap',      label: '🔄 Swap Drive' },
@@ -39,24 +40,10 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
   });
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const update = <K extends keyof EventForm>(key: K, value: EventForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
     setErrors(e => ({ ...e, [key]: undefined }));
-  };
-
-  const addPhotos = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const remaining = MAX_PHOTOS - form.photos.length;
-    const toAdd = Array.from(files).slice(0, remaining);
-    const urls = toAdd.map(f => URL.createObjectURL(f));
-    setForm(f => ({ ...f, photos: [...f.photos, ...urls] }));
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const removePhoto = (idx: number) => {
-    setForm(f => ({ ...f, photos: f.photos.filter((_, i) => i !== idx) }));
   };
 
   const validate = () => {
@@ -225,15 +212,11 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           />
         </div>
 
-        {/* ── Event photos (up to 3) ── */}
+        {/* ── Event photos (up to 3, drag-reorder, camera or library, auto-compressed) ── */}
         <section>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-            <label className="field-label" style={{ margin: 0 }}>
-              Photos
-              <span className="field-hint" style={{ fontWeight: 400, marginLeft: 4 }}>
-                ({form.photos.length} / {MAX_PHOTOS} · optional)
-              </span>
-            </label>
+            <label className="field-label" style={{ margin: 0 }}>Photos</label>
+            <span className="field-hint">Optional — first is cover</span>
           </div>
 
           {form.photos.length > 0 && (
@@ -250,45 +233,10 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
             </div>
           )}
 
-          <div className="photo-picker">
-            {form.photos.map((src, i) => (
-              <div key={src + i} className="photo-picker-tile photo-picker-tile--filled">
-                <img src={src} alt="" />
-                {i === 0 && <span className="photo-picker-cover">Cover</span>}
-                <button
-                  type="button"
-                  className="photo-picker-remove"
-                  aria-label={`Remove photo ${i + 1}`}
-                  onClick={() => removePhoto(i)}
-                >
-                  <X size={12} strokeWidth={2.5} />
-                </button>
-              </div>
-            ))}
-
-            {form.photos.length < MAX_PHOTOS && (
-              <button
-                type="button"
-                className="photo-picker-tile"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Add photo"
-              >
-                <Plus size={20} strokeWidth={1.8} />
-                <span style={{ fontSize: 11, fontWeight: 500 }}>
-                  {form.photos.length === 0 ? 'Add' : 'More'}
-                </span>
-              </button>
-            )}
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            style={{ display: 'none' }}
-            onChange={e => addPhotos(e.target.files)}
+          <PhotoPicker
+            photos={form.photos}
+            onChange={next => update('photos', next)}
+            max={MAX_PHOTOS}
           />
         </section>
       </form>

@@ -11,7 +11,7 @@ import {
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
-  'Tools', 'Kitchen', 'Lab', 'Art', 'Clothing', 'Other',
+  'Tools', 'Kitchen', 'Lab', 'Art', 'Clothing', 'Services', 'Other',
 ];
 
 const CONDITIONS: { value: NonNullable<WecycleAlert['condition']>; label: string }[] = [

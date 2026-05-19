@@ -6,11 +6,6 @@
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-export type Privacy =
-  | 'public'      /* visible to anyone */
-  | 'community'   /* visible to your community only */
-  | 'private';    /* hidden — opt-in to share contact */
-
 export type EmailFrequency = 'realtime' | 'daily' | 'weekly' | 'never';
 
 export interface NotifChannels {
@@ -38,16 +33,18 @@ export interface QuietHours {
 
 export interface AppearanceSettings {
   theme: ThemeMode;
-  reduceMotion: boolean;
   largerText: boolean;
 }
 
 export interface PrivacySettings {
-  profile: Privacy;
+  /* Profiles are always public for community safety. We still let users:
+     - hide their phone number from the public profile,
+     - opt out of DMs entirely,
+     - hide their own listings from search while cleaning up,
+     - and broadcast presence ("Online") to others. */
   showOnlineStatus: boolean;
   allowDMs: boolean;
   showPhone: boolean;
-  showEmail: boolean;
   hideListingsFromSearch: boolean;
 }
 
@@ -59,15 +56,11 @@ export interface NotificationSettings {
 }
 
 export interface DataSettings {
-  /* If true, image uploads are auto-downscaled before posting to save bandwidth */
-  dataSaver: boolean;
   /* Auto-clear viewed items from local cache after N days */
   cacheDays: number;
 }
 
 export interface MarketplaceSettings {
-  defaultPickupRadiusKm: number;
-  preferredCurrency: 'INR' | 'USD' | 'EUR' | 'GBP';
   hidePriceOnFeed: boolean;
 }
 
@@ -82,15 +75,12 @@ export interface UserSettings {
 export const DEFAULT_SETTINGS: UserSettings = {
   appearance: {
     theme: 'system',
-    reduceMotion: false,
     largerText: false,
   },
   privacy: {
-    profile: 'community',
     showOnlineStatus: true,
     allowDMs: true,
     showPhone: false,
-    showEmail: false,
     hideListingsFromSearch: false,
   },
   notifications: {
@@ -108,12 +98,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     quietHours: { enabled: false, from: '22:00', to: '07:00' },
   },
   data: {
-    dataSaver: false,
     cacheDays: 30,
   },
   marketplace: {
-    defaultPickupRadiusKm: 5,
-    preferredCurrency: 'INR',
     hidePriceOnFeed: false,
   },
 };
@@ -193,6 +180,13 @@ export function applyTheme(mode: ThemeMode) {
   /* Also expose the chosen mode + resolved for CSS that wants it */
   document.documentElement.dataset.theme = resolved;
   document.documentElement.dataset.themeMode = mode;
+}
+
+/** Apply the "larger text" preference by toggling a root class. CSS keys off
+ *  `.text-larger` to bump base font sizes globally. */
+export function applyLargerText(on: boolean) {
+  if (!isBrowser()) return;
+  document.documentElement.classList.toggle('text-larger', on);
 }
 
 /** Build a once-per-app effect: applies the theme and reacts to OS changes
