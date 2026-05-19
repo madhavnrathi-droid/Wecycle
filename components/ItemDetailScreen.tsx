@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronLeft, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee } from 'lucide-react';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { getItemPhotos, getAvatar } from '../lib/photos';
+import { getPostMetrics } from '../lib/metrics';
 import PhotoCarousel from './PhotoCarousel';
 import OnlineBadge from './OnlineBadge';
 import CommentsSection from './CommentsSection';
@@ -226,15 +227,28 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         )}
       </section>
 
-      {/* ── OWNER ── */}
+      {/* ── OWNER ──
+         The whole row is a button so tapping anywhere (avatar, name, role,
+         chevron) opens the storefront. Adds a chevron-right hint at the end
+         so the affordance is obvious. */}
       <section style={{ padding: '20px 20px 0' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '14px 14px',
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 16,
-        }}>
+        <button
+          type="button"
+          onClick={() => onOpenStorefront?.(item.user)}
+          aria-label={`View ${item.user.name}'s profile`}
+          disabled={!onOpenStorefront}
+          style={{
+            all: 'unset',
+            cursor: onOpenStorefront ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '14px 14px',
+            width: '100%',
+            boxSizing: 'border-box',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 16,
+          }}
+        >
           <div style={{
             width: 40, height: 40, borderRadius: '50%',
             overflow: 'hidden',
@@ -262,23 +276,19 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               <OnlineBadge isOnline={item.user.isOnline} />
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-              {item.user.role}
+              {item.user.role} · View profile
             </p>
           </div>
-          {/* Tappable owner row → storefront. Wrapped as a button for keyboard a11y. */}
           {onOpenStorefront && (
-            <button
-              type="button"
-              onClick={() => onOpenStorefront(item.user)}
-              aria-label={`View ${item.user.name}'s profile`}
-              className="theme-toggle"
-              style={{ marginRight: -4 }}
-            >
-              <MessageCircle size={16} strokeWidth={1.8} />
-            </button>
+            <ChevronRight size={16} strokeWidth={1.8} color="var(--text-muted)" />
           )}
-        </div>
+        </button>
       </section>
+
+      {/* ── ACTIVITY METRICS ──
+         Visible to everyone, not just the owner. Matches the event-detail
+         pattern so the social proof story stays consistent. */}
+      <ItemMetrics item={item} />
 
       {/* ── COMMENTS (mobile) ── */}
       <section style={{ padding: '20px 20px 0' }}>
@@ -598,9 +608,10 @@ function DesktopLayout({
                 <OnlineBadge isOnline={item.user.isOnline} />
               </p>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-                {item.user.role}
+                {item.user.role} · View profile
               </p>
             </div>
+            <ChevronRight size={18} strokeWidth={1.8} color="var(--text-muted)" />
           </button>
 
           {/* Action buttons — inline on desktop, no fixed bar.
@@ -707,11 +718,67 @@ function DesktopLayout({
             ))}
           </ul>
 
+          {/* Activity metrics — visible to everyone */}
+          <div style={{ marginTop: 12 }}>
+            <ItemMetrics item={item} />
+          </div>
+
           {/* Comments thread — full width below the right column on desktop */}
           <div style={{ marginTop: 8 }}>
             <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} />
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── ItemMetrics ───────────────────────────────────
+   Compact 4-stat strip showing how a listing is performing. We render it on
+   both mobile and desktop layouts, owner or not — viewers get social proof
+   ("this has 312 views, 18 saves"), and owners get a quick health check
+   without bouncing to the Activity tab. */
+function ItemMetrics({ item }: { item: MarketplaceItem }) {
+  const m = getPostMetrics(item.id);
+  return (
+    <section style={{ padding: '24px 20px 0' }}>
+      <h3 style={{
+        margin: '0 0 10px',
+        fontSize: 11, fontWeight: 700,
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: 'var(--text-muted)',
+      }}>
+        Activity on this post
+      </h3>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 16,
+        padding: '14px 12px',
+        gap: 8,
+      }}>
+        <MiniStat label="Views"     value={m.views}     />
+        <MiniStat label="Saves"     value={m.saves}     />
+        <MiniStat label="Shares"    value={m.shares}    />
+        <MiniStat label="Inquiries" value={m.inquiries} />
+      </div>
+    </section>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div style={{ textAlign: 'center', minWidth: 0 }}>
+      <div style={{
+        fontSize: 18, fontWeight: 700,
+        letterSpacing: '-0.02em',
+        color: 'var(--text-primary)',
+        fontVariantNumeric: 'tabular-nums',
+        lineHeight: 1.15,
+      }}>{value}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, letterSpacing: '0.02em' }}>
+        {label.toUpperCase()}
       </div>
     </div>
   );

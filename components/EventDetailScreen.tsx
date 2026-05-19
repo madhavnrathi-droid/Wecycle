@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import {
-  ChevronLeft, CalendarDays, Clock, MapPin, Users,
+  ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
   Heart, Share2, MessageCircle, Mail, Check, Edit3, Tag,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
@@ -309,13 +309,22 @@ export default function EventDetailScreen({
         }}>
           Organized by
         </h3>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '12px 14px',
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 16,
-        }}>
+        {/* Whole card is tappable — opens the organizer's storefront. */}
+        <button
+          type="button"
+          onClick={() => onOpenStorefront?.(event.organizer)}
+          disabled={!onOpenStorefront}
+          aria-label={`View ${event.organizer.name}'s profile`}
+          style={{
+            all: 'unset',
+            cursor: onOpenStorefront ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 14px', width: '100%', boxSizing: 'border-box',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 16,
+          }}
+        >
           <div style={{
             width: 40, height: 40, borderRadius: '50%',
             overflow: 'hidden', flexShrink: 0,
@@ -339,21 +348,13 @@ export default function EventDetailScreen({
               <OnlineBadge isOnline={event.organizer.isOnline} />
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-              {event.organizer.role}
+              {event.organizer.role} · View profile
             </p>
           </div>
-          {!isOwner && onOpenStorefront && (
-            <button
-              type="button"
-              onClick={() => onOpenStorefront(event.organizer)}
-              aria-label={`View ${event.organizer.name}'s profile`}
-              className="theme-toggle"
-              style={{ marginRight: -4 }}
-            >
-              <MessageCircle size={16} strokeWidth={1.8} />
-            </button>
+          {onOpenStorefront && (
+            <ChevronRight size={16} strokeWidth={1.8} color="var(--text-muted)" />
           )}
-        </div>
+        </button>
       </section>
 
       {/* ── COMMENTS ── */}
@@ -364,32 +365,33 @@ export default function EventDetailScreen({
         />
       </section>
 
-      {/* ── OWNER METRICS ── */}
-      {isOwner && (
-        <section style={{ padding: '24px 20px 0' }}>
-          <h3 style={{
-            margin: '0 0 10px',
-            fontSize: 11, fontWeight: 700,
-            letterSpacing: '0.08em', textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-          }}>
-            Your event metrics
-          </h3>
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 16,
-            padding: '14px 12px',
-            gap: 8,
-          }}>
-            <MiniStat label="Views"    value={metrics.views} />
-            <MiniStat label="RSVPs"    value={metrics.rsvps} />
-            <MiniStat label="Shares"   value={metrics.shares} />
-            <MiniStat label="Questions" value={metrics.questions} />
-          </div>
-        </section>
-      )}
+      {/* ── METRICS ──
+         Surfaced on every event page now (not gated by ownership) — viewers
+         get social proof from the same numbers the organizer sees. Label
+         shifts from "Your event metrics" to "Event activity" for non-owners. */}
+      <section style={{ padding: '24px 20px 0' }}>
+        <h3 style={{
+          margin: '0 0 10px',
+          fontSize: 11, fontWeight: 700,
+          letterSpacing: '0.08em', textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+        }}>
+          {isOwner ? 'Your event metrics' : 'Event activity'}
+        </h3>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 16,
+          padding: '14px 12px',
+          gap: 8,
+        }}>
+          <MiniStat label="Views"    value={metrics.views} />
+          <MiniStat label="RSVPs"    value={metrics.rsvps} />
+          <MiniStat label="Shares"   value={metrics.shares} />
+          <MiniStat label="Questions" value={metrics.questions} />
+        </div>
+      </section>
 
       {/* ── BOTTOM CTA ── */}
       <section style={{

@@ -87,6 +87,31 @@ export function getItemPhoto(id: string): string | undefined {
   return ITEM_PHOTO_SETS[id]?.[0] ?? ITEM_PHOTOS[id];
 }
 
+/* Lost & Found cards used to render an emoji on a coloured square; now they
+   use real Unsplash imagery just like Marketplace. Falls back through the
+   keyed map → category-by-emoji guess → a generic L&F shot. */
+const LF_EMOJI_FALLBACKS: Record<string, string> = {
+  /* keyed by the seed emoji we used on the LostItem record so unseeded items
+     still pick a reasonable photo */
+  '🔌': u('1583394838336-acd977736f90'),  // charger
+  '⌚': u('1542496658-e33a6d0d50f6'),     // watch
+  '🎧': u('1606220945770-b5b6c2c55bf1'),  // earphones
+  '👜': u('1627123424574-724758594e93'),  // wallet/bag
+  '🎒': u('1581605405669-fcdf81165afa'),  // backpack
+  '🔑': u('1572021335469-31706a17aaef'),  // keys
+  '📱': u('1592899677977-9c10ca588bbd'),  // phone
+  '👓': u('1577803645773-f96470509666'),  // glasses
+  '💼': u('1606312619070-d48b4c652a52'),  // laptop case
+};
+
+export function getLostFoundPhoto(id: string, photoIcon?: string): string {
+  return (
+    ITEM_PHOTOS[id]              ??
+    (photoIcon ? LF_EMOJI_FALLBACKS[photoIcon] : undefined) ??
+    u('1583394838336-acd977736f90')   // generic lost-stuff fallback
+  );
+}
+
 /* Returns 1+ photo URLs for an item.
    Falls back to a single URL → wrapped in an array → category photo. */
 export function getItemPhotos(id: string, category?: string): string[] {

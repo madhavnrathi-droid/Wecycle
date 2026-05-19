@@ -19,7 +19,7 @@ import {
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
-import { getAvatar } from '../lib/photos';
+import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 
 interface LostFoundScreenProps {
@@ -284,15 +284,19 @@ function LostFoundCard({
       style={{ aspectRatio: RATIOS[variant], padding: 0 }}
       aria-label={`Open ${item.title}`}
     >
-      {/* Emoji-on-color hero, mirrors how LF items have been seeded */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: item.photoColor,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'clamp(48px, 30%, 96px)',
-      }}>
-        {item.photoIcon}
-      </div>
+      {/* Real photo hero — same Marketplace card look. The lower gradient is
+          baked into .feed-card-overlay so titles stay legible. */}
+      <img
+        src={getLostFoundPhoto(item.id, item.photoIcon)}
+        alt=""
+        loading="lazy"
+        style={{
+          position: 'absolute', inset: 0,
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          display: 'block',
+        }}
+      />
       <span style={{
         position: 'absolute', top: 8, left: 8,
         background: bg,
@@ -363,7 +367,11 @@ function LostFoundDetailSheet({
     viewerName,
   }), [item, viewerName, isLost]);
 
-  const claimLabel = isLost ? 'I found this' : "It's mine";
+  /* No standalone "claim" button anymore — viewers route their claim through
+     email or WhatsApp so the reporter can verify identity off-platform. */
+  const introLine = isLost
+    ? `If you've spotted this, reach out to ${item.user.name.split(' ')[0]} so they can collect it.`
+    : `If this is yours, message ${item.user.name.split(' ')[0]} below with a quick detail only you'd know.`;
 
   const handleContact = (link: ContactLink) => {
     if (!user) { onRequireAuth(); return; }
@@ -423,10 +431,15 @@ function LostFoundDetailSheet({
 
         <div style={{
           aspectRatio: '4 / 3', borderRadius: 16, overflow: 'hidden',
-          background: item.photoColor,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 96, marginBottom: 14,
-        }}>{item.photoIcon}</div>
+          background: 'var(--bg-inset)',
+          marginBottom: 14,
+        }}>
+          <img
+            src={getLostFoundPhoto(item.id, item.photoIcon)}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        </div>
 
         <p style={{
           margin: '0 0 14px', fontSize: 14, lineHeight: 1.55, color: 'var(--text-secondary)',
@@ -478,42 +491,62 @@ function LostFoundDetailSheet({
           )}
         </div>
 
-        {/* Custom action row */}
+        {/* Intro line — explains why you're contacting, status-aware. */}
+        <p style={{
+          margin: '0 0 12px',
+          fontSize: 13, lineHeight: 1.5,
+          color: 'var(--text-secondary)',
+          letterSpacing: '-0.005em',
+        }}>
+          {introLine}
+        </p>
+
+        {/* Just two buttons: Email and WhatsApp. We use a consistent visual
+            language (primary dark button for the email path, WhatsApp brand
+            green for the messaging path) so the choice is obvious. When the
+            reporter only enabled one channel we still show only that one. */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            onClick={() => contactLinks[0] && handleContact(contactLinks[0])}
-            disabled={contactLinks.length === 0}
-            style={{
-              flex: '1 1 200px', minWidth: 0, height: 48, borderRadius: 14,
-              background: 'var(--text-primary)',
-              color: 'var(--bg-base)',
-              border: 'none', cursor: contactLinks.length ? 'pointer' : 'not-allowed',
-              fontSize: 14, fontWeight: 600,
-              opacity: contactLinks.length ? 1 : 0.6,
-              letterSpacing: '-0.01em',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            {claimLabel}
-          </button>
-          {contactLinks.length >= 2 ? contactLinks.map(link => (
-            <button
-              key={link.channel}
-              onClick={() => handleContact(link)}
-              aria-label={link.ariaLabel}
-              style={{
-                flex: '0 0 auto', height: 48, padding: '0 14px', borderRadius: 14,
-                background: link.channel === 'whatsapp' ? '#25D366' : 'transparent',
-                color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-primary)',
-                border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-default)',
-                cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-              }}
-            >
-              {link.channel === 'whatsapp' ? <WhatsAppGlyph /> : <Mail size={14} strokeWidth={2} />}
-              {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
-            </button>
-          )) : null}
+          {(() => {
+            /* Sort so email is always shown first when both exist. */
+            const ordered = [...contactLinks].sort((a, b) =>
+              a.channel === 'email' ? -1 : b.channel === 'email' ? 1 : 0,
+            );
+            if (ordered.length === 0) {
+              return (
+                <p style={{
+                  margin: 0, padding: 12,
+                  background: 'var(--bg-inset)', borderRadius: 12,
+                  fontSize: 12, color: 'var(--text-muted)',
+                  width: '100%',
+                }}>
+                  This reporter hasn't enabled any contact channel yet.
+                </p>
+              );
+            }
+            return ordered.map(link => {
+              const isWa = link.channel === 'whatsapp';
+              return (
+                <button
+                  key={link.channel}
+                  onClick={() => handleContact(link)}
+                  aria-label={link.ariaLabel}
+                  style={{
+                    flex: '1 1 160px', minWidth: 0,
+                    height: 48, borderRadius: 14,
+                    background: isWa ? '#25D366' : 'var(--text-primary)',
+                    color: isWa ? '#0B141A' : 'var(--bg-base)',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: 14, fontWeight: 600,
+                    letterSpacing: '-0.01em',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  {isWa ? <WhatsAppGlyph size={16} /> : <Mail size={16} strokeWidth={2} />}
+                  {isWa ? 'WhatsApp' : 'Email'}
+                </button>
+              );
+            });
+          })()}
         </div>
       </div>
     </>
