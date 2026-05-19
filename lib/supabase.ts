@@ -14,10 +14,17 @@ import type { Database } from './database.types';
 
 let _client: ReturnType<typeof createBrowserClient<Database>> | null = null;
 
-/** True when both env vars are present and we can talk to Supabase. */
+/* Accept either the new "publishable" key (sb_publishable_…) or the legacy
+   anon JWT — both work for browser-side access; deployments built before the
+   key rotation may still set ANON_KEY, and Supabase's dashboard still surfaces
+   both formats. We prefer publishable when present. */
+const SUPABASE_BROWSER_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+/** True when the URL + at least one browser key is present. */
 export const hasSupabaseEnv = !!(
-  process.env.NEXT_PUBLIC_SUPABASE_URL &&
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL && SUPABASE_BROWSER_KEY
 );
 
 /**
@@ -79,7 +86,7 @@ export function getSupabase() {
   if (_client) return _client;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const key = SUPABASE_BROWSER_KEY;
 
   if (!url || !key) {
     if (typeof window !== 'undefined') {
