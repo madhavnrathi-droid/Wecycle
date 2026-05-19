@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
-  Heart, Share2, MessageCircle, Mail, Check, Edit3, Tag,
+  Heart, Share2, Mail, Check, Edit3, Tag,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
