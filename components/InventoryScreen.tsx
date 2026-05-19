@@ -6,7 +6,9 @@ import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type Com
 import { getItemPhotos, getEventPhoto, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { getPostMetrics, getEventMetrics } from '../lib/metrics';
+import { isDemoMode } from '../lib/demoMode';
 import PhotoCarousel from './PhotoCarousel';
+import EmptyState from './EmptyState';
 
 type Tab = 'requests' | 'uploads' | 'saved';
 
@@ -38,8 +40,13 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
   const [activeTab, setActiveTab] = useState<Tab>('uploads');
   const [query, setQuery] = useState('');
 
-  /* Items + events as a unified list for the active tab. */
+  /* Items + events as a unified list for the active tab. In demo mode we
+     mock my-own posts via the MY_*_IDS lists; in production, the seeded
+     catalogue is gone so all three tabs start at zero and grow as the user
+     posts. */
   const entries = useMemo<UploadEntry[]>(() => {
+    if (!mounted || !isDemoMode()) return [];
+
     const itemIds =
       activeTab === 'uploads'  ? MY_UPLOAD_IDS  :
       activeTab === 'requests' ? MY_REQUEST_IDS :
@@ -58,10 +65,10 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       .map(event => ({ kind: 'event', event }));
 
     return [...itemEntries, ...eventEntries];
-  }, [activeTab, query]);
+  }, [activeTab, query, mounted]);
 
-  const uploadItemCount  = MY_UPLOAD_IDS.length;
-  const uploadEventCount = MY_EVENT_IDS.length;
+  const uploadItemCount  = mounted && isDemoMode() ? MY_UPLOAD_IDS.length : 0;
+  const uploadEventCount = mounted && isDemoMode() ? MY_EVENT_IDS.length  : 0;
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -203,7 +210,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       {/* ── GRID ── */}
       <section style={{ padding: '0 12px' }}>
         {entries.length === 0 ? (
-          <EmptyState tab={activeTab} onPostNew={onPostNew} />
+          <InventoryEmpty tab={activeTab} onPostNew={onPostNew} />
         ) : (
           <div className="masonry-2">
             {entries.map((entry, idx) => {
@@ -384,35 +391,34 @@ function InventoryEventCard({
   );
 }
 
-function EmptyState({ tab, onPostNew }: { tab: Tab; onPostNew: () => void }) {
+function InventoryEmpty({ tab, onPostNew }: { tab: Tab; onPostNew: () => void }) {
+  /* Per-tab copy lives here because each tab has a different verb and CTA. */
   const copy =
-    tab === 'uploads' ? { emoji: '📦', title: 'Nothing uploaded yet', body: 'Share something with your community.', cta: 'Share an item' } :
-    tab === 'requests' ? { emoji: '🙋', title: 'No requests yet', body: 'Ask the community for what you need.', cta: 'Post a request' } :
-                         { emoji: '🔖', title: 'Nothing saved yet', body: 'Tap the heart on items you want to revisit.', cta: null };
+    tab === 'uploads'  ? {
+      icon: '📦',
+      prompt: 'Your shelves are empty for now.',
+      sub: 'Drop the first thing you no longer use — someone next door is looking for it.',
+      ctaLabel: 'Share an item',
+    } :
+    tab === 'requests' ? {
+      icon: '🙋',
+      prompt: 'No requests open yet.',
+      sub: 'Need something? Asking the community is usually faster (and cheaper) than buying new.',
+      ctaLabel: 'Post a request',
+    } :
+    {
+      icon: '🔖',
+      prompt: 'Nothing saved yet.',
+      sub: 'Tap the heart on anything you want to come back to.',
+      ctaLabel: null as null | string,
+    };
 
   return (
-    <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-      <div style={{ fontSize: 36, marginBottom: 12 }}>{copy.emoji}</div>
-      <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
-        {copy.title}
-      </p>
-      <p style={{ margin: '4px 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
-        {copy.body}
-      </p>
-      {copy.cta && (
-        <button
-          onClick={onPostNew}
-          style={{
-            background: 'var(--text-primary)', color: 'var(--bg-base)',
-            border: 'none', borderRadius: 999,
-            padding: '10px 18px',
-            fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          {copy.cta}
-        </button>
-      )}
-    </div>
+    <EmptyState
+      icon={copy.icon}
+      prompt={copy.prompt}
+      sub={copy.sub}
+      cta={copy.ctaLabel ? { label: copy.ctaLabel, onClick: onPostNew } : undefined}
+    />
   );
 }

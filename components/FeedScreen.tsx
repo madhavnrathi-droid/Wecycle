@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X } from 'lucide-react';
 import { MARKETPLACE_ITEMS, CATEGORIES, type MarketplaceItem } from '../lib/mockData';
 import { getItemMedia, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
+import { isDemoMode } from '../lib/demoMode';
+import { getSettings, onSettingsChange } from '../lib/settings';
 import PhotoCarousel from './PhotoCarousel';
+import EmptyState from './EmptyState';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -14,7 +17,7 @@ interface FeedScreenProps {
   onOpenItem: (item: MarketplaceItem) => void;
 }
 
-export default function FeedScreen({ onOpenMenu, onOpenAccount, onOpenItem }: FeedScreenProps) {
+export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenItem }: FeedScreenProps) {
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -22,9 +25,26 @@ export default function FeedScreen({ onOpenMenu, onOpenAccount, onOpenItem }: Fe
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeType, setActiveType] = useState<'all' | 'requests' | 'uploads'>('uploads');
   const [query, setQuery] = useState('');
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set(['m2']));
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
-  const filtered = MARKETPLACE_ITEMS.filter(item => {
+  /* Settings: hide-prices toggle (Settings → Marketplace). We subscribe so
+     flipping the switch updates every card on the feed live, without reload. */
+  const [hidePrice, setHidePrice] = useState(false);
+  useEffect(() => {
+    setHidePrice(getSettings().marketplace.hidePriceOnFeed);
+    return onSettingsChange(s => setHidePrice(s.marketplace.hidePriceOnFeed));
+  }, []);
+
+  /* Source of truth for the marketplace cards: real Supabase reads in prod
+     (which return [] until people start posting), the mock catalogue in
+     demo mode. Both paths run through the same filter pipeline so the UI
+     doesn't branch. */
+  const items: MarketplaceItem[] = useMemo(
+    () => (mounted && isDemoMode() ? MARKETPLACE_ITEMS : []),
+    [mounted],
+  );
+
+  const filtered = items.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
     if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
@@ -217,6 +237,7 @@ export default function FeedScreen({ onOpenMenu, onOpenAccount, onOpenItem }: Fe
                  has the irregular puzzle-piece flow instead of a 2-state stripe. */
               variant={(['xtall','tall','portrait','square','landscape'] as const)[idx % 5]}
               isSaved={savedIds.has(item.id)}
+              hidePrice={hidePrice}
               onToggleSave={() => {
                 setSavedIds(prev => {
                   const next = new Set(prev);
@@ -230,15 +251,23 @@ export default function FeedScreen({ onOpenMenu, onOpenAccount, onOpenItem }: Fe
         </div>
 
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '64px 24px' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-              No items match
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-              Try a different search or category
-            </p>
-          </div>
+          items.length === 0 ? (
+            /* Truly empty community — first-mover prompt. */
+            <EmptyState
+              icon="🌱"
+              prompt="Looks like the feed's just sprouting. Be the first to share something!"
+              sub="Post a free find, a borrow request, or an event — your community's waiting."
+              cta={{ label: 'Post the first thing', onClick: onPost }}
+            />
+          ) : (
+            /* Filter / search returned no rows — softer "no match" copy. */
+            <EmptyState
+              icon="🔍"
+              prompt="No matches for that search."
+              sub="Try a different keyword or clear the category filter."
+              compact
+            />
+          )
         )}
       </section>
     </div>
@@ -258,13 +287,16 @@ const VARIANT_RATIOS: Record<FeedCardVariant, string> = {
 };
 
 function FeedCard({
-  item, variant, isSaved, onToggleSave, onClick,
+  item, variant, isSaved, onToggleSave, onClick, hidePrice,
 }: {
   item: MarketplaceItem;
   variant: FeedCardVariant;
   isSaved: boolean;
   onToggleSave: () => void;
   onClick: () => void;
+  /** Settings → Marketplace → "Hide prices on feed" — when true we still
+   *  show the listing type chip (Free / Borrow / Swap) but suppress numbers. */
+  hidePrice: boolean;
 }) {
   /* Use the media (photo+video) gallery so cards autoplay videos inline
      when the user swipes to a video slide. */
@@ -304,7 +336,15 @@ function FeedCard({
                   {item.location}
                 </span>
                 <span className="feed-card-price">
-                  {isPriced ? `₹${item.price}` : item.listingType === 'free' ? 'Free' : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+                  {isPriced && hidePrice
+                    /* User opted to hide prices — surface just "Sell" so they
+                       still know the listing isn't free, without the rupee figure. */
+                    ? 'Sell'
+                    : isPriced
+                      ? `₹${item.price}`
+                      : item.listingType === 'free'
+                        ? 'Free'
+                        : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
                 </span>
               </div>
             </div>

@@ -28,6 +28,7 @@ import AuthModal from '../components/AuthModal';
 import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
+import { isDemoMode } from '../lib/demoMode';
 import type { WecycleAlert } from '../lib/alerts';
 import {
   getSettings, onSettingsChange, applyTheme, watchSystemTheme,
@@ -307,7 +308,10 @@ export default function WecycleApp() {
 
   /* Event detail screen takes over the viewport */
   if (openEvent) {
-    const isOwner = MY_EVENT_IDS.includes(openEvent.id);
+    /* Ownership: demo flag relies on MY_EVENT_IDS; live mode trusts the
+       organizer.id matching the signed-in user. */
+    const isOwner = (isDemoMode() && MY_EVENT_IDS.includes(openEvent.id))
+      || (!!user && openEvent.organizer.id === user.id);
     return (
       <>
         <a href="#main" className="skip-link">Skip to main content</a>

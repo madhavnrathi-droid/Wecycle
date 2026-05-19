@@ -27,6 +27,7 @@ import {
 import { getAvatar, getItemPhotos, getEventPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
+import { isDemoMode } from '../lib/demoMode';
 
 interface StorefrontScreenProps {
   user: User;
@@ -45,23 +46,27 @@ export default function StorefrontScreen({
 
   /* Slice the global data by author. In production this becomes a Supabase
      query (`select … from listings where owner_id = …`) but the shape stays
-     identical so the views below don't need to change. */
+     identical so the views below don't need to change. Demo mode keeps the
+     seeded catalogue so demo storefronts feel populated. */
+  const demo = isDemoMode();
   const uploads = useMemo(
-    () => MARKETPLACE_ITEMS.filter(i => i.user.id === user.id),
-    [user.id],
+    () => (demo ? MARKETPLACE_ITEMS.filter(i => i.user.id === user.id) : []),
+    [user.id, demo],
   );
   const requests = useMemo(
-    () => FEED_ITEMS.filter(f => f.type === 'request' && f.user.id === user.id),
-    [user.id],
+    () => (demo ? FEED_ITEMS.filter(f => f.type === 'request' && f.user.id === user.id) : []),
+    [user.id, demo],
   );
   const events = useMemo(
     /* `MY_EVENT_IDS` carries demo-user ownership for the current user
        (id u1). For other users we fall back to `organizer.id` matching. */
-    () => EVENTS.filter(e =>
-      e.organizer.id === user.id ||
-      (user.id === 'u1' && MY_EVENT_IDS.includes(e.id))
-    ),
-    [user.id],
+    () => demo
+      ? EVENTS.filter(e =>
+          e.organizer.id === user.id ||
+          (user.id === 'u1' && MY_EVENT_IDS.includes(e.id))
+        )
+      : [],
+    [user.id, demo],
   );
 
   /* Decide which tabs to surface. Events is conditional. */

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Search, SlidersHorizontal, Heart, MapPin, MessageCircle,
   X, Check, ArrowUpDown, Grid3X3, List, Clock, ArrowRight,
 } from 'lucide-react';
 import { MARKETPLACE_ITEMS, CATEGORIES, LISTING_TYPES, type MarketplaceItem } from '../lib/mockData';
+import { isDemoMode } from '../lib/demoMode';
+import EmptyState from './EmptyState';
 
 type ViewMode = 'grid' | 'list';
 
@@ -38,7 +40,13 @@ export default function MarketplaceScreen() {
     });
   };
 
-  const filtered = MARKETPLACE_ITEMS.filter(item => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const items = useMemo<MarketplaceItem[]>(
+    () => (mounted && isDemoMode() ? MARKETPLACE_ITEMS : []),
+    [mounted],
+  );
+  const filtered = items.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
     if (activeType !== 'all' && item.listingType !== activeType) return false;
     if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -171,15 +179,20 @@ export default function MarketplaceScreen() {
 
       {/* ── CONTENT ── */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '64px 16px' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 700 }}>
-            No items match your search
-          </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>
-            Try adjusting your filters
-          </p>
-        </div>
+        items.length === 0 ? (
+          <EmptyState
+            icon="🛍️"
+            prompt="The marketplace is wide open."
+            sub="Be the one who breaks the seal — share or sell something your community could use."
+          />
+        ) : (
+          <EmptyState
+            icon="🔍"
+            prompt="No items match those filters."
+            sub="Try a different category or clear the search."
+            compact
+          />
+        )
       ) : viewMode === 'grid' ? (
         <>
           {/* Featured — full bleed */}

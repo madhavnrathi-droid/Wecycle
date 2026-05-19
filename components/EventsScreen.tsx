@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
 import { EVENTS, type CommunityEvent } from '../lib/mockData';
+import { isDemoMode } from '../lib/demoMode';
+import EmptyState from './EmptyState';
 import { getEventPhoto, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 
@@ -81,19 +83,26 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
   const [type, setType] = useState<string>('all');
   const rsvpd = rsvpdEvents;
 
+  /* Single source of truth — flips between mock catalogue (demo) and an
+     empty array (real-data deploys, until the first event lands). */
+  const allEvents: CommunityEvent[] = useMemo(
+    () => (mounted && isDemoMode() ? EVENTS : []),
+    [mounted],
+  );
+
   const filtered = useMemo(() => {
-    return EVENTS.filter(e => {
+    return allEvents.filter(e => {
       if (query && !`${e.title} ${e.location}`.toLowerCase().includes(query.toLowerCase())) return false;
       if (type !== 'all' && e.eventType !== type) return false;
       if (!withinTimeFilter(e.date, time)) return false;
       return true;
     });
-  }, [query, time, type]);
+  }, [allEvents, query, time, type]);
 
   /* Events the user has RSVP'd to — sorted by upcoming date.
      Powers the carousel that used to be the single featured card. */
   const upcomingRsvps = useMemo(() => {
-    return EVENTS
+    return allEvents
       .filter(e => rsvpd.has(e.id))
       .map(e => ({ e, d: parseEventDate(e.date) }))
       .sort((a, b) => {
@@ -335,21 +344,24 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
       )}
 
       {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 24px' }}>
-          <div style={{ fontSize: 36, marginBottom: 10 }}>📅</div>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
-            No events match your filters
-          </p>
-          <p style={{ margin: '4px 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
-            Try a different time or category
-          </p>
-          <button
-            onClick={() => { setTime('all'); setType('all'); setQuery(''); }}
-            className="btn btn-secondary btn-sm"
-          >
-            Clear filters
-          </button>
-        </div>
+        allEvents.length === 0 ? (
+          /* No events yet anywhere — invite the first organizer. */
+          <EmptyState
+            icon="📅"
+            prompt="No events on the calendar yet. Plant a flag — start one?"
+            sub="Repair café, swap drive, cleanup — every great community has someone who goes first."
+            cta={{ label: 'Create an event', onClick: onCreate }}
+          />
+        ) : (
+          /* Filter mismatch — keep the gentle "clear filters" path. */
+          <EmptyState
+            icon="📅"
+            prompt="No events match those filters."
+            sub="Try a different time, category, or clear the search."
+            compact
+            cta={{ label: 'Clear filters', onClick: () => { setTime('all'); setType('all'); setQuery(''); } }}
+          />
+        )
       )}
     </div>
   );

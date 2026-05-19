@@ -11,12 +11,14 @@
  * Cards are clickable and open a lightweight detail sheet. Contact actions
  * gate behind auth via the shared onRequireAuth + onOpenStorefront props. */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Menu, Search, Plus, MapPin, AlertCircle, CheckCircle,
   Mail, X,
 } from 'lucide-react';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
+import { isDemoMode } from '../lib/demoMode';
+import EmptyState from './EmptyState';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 import { getAvatar, getLostFoundPhoto } from '../lib/photos';
@@ -49,8 +51,17 @@ export default function LostFoundScreen({
   const [query, setQuery] = useState('');
   const [openItem, setOpenItem] = useState<LostItem | null>(null);
 
+  /* In production the L&F pool starts empty and grows as people report
+     things. Demo mode keeps the seeded items so screenshots stay full. */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const allItems: LostItem[] = useMemo(
+    () => (mounted && isDemoMode() ? LOST_FOUND_ITEMS : []),
+    [mounted],
+  );
+
   const filtered = useMemo(() => {
-    return LOST_FOUND_ITEMS.filter(it => {
+    return allItems.filter(it => {
       if (filter !== 'all' && it.status !== filter) return false;
       if (query) {
         const q = query.toLowerCase();
@@ -58,12 +69,12 @@ export default function LostFoundScreen({
       }
       return true;
     });
-  }, [filter, query]);
+  }, [allItems, filter, query]);
 
   const counts = useMemo(() => ({
-    lost:  LOST_FOUND_ITEMS.filter(i => i.status === 'lost').length,
-    found: LOST_FOUND_ITEMS.filter(i => i.status === 'found').length,
-  }), []);
+    lost:  allItems.filter(i => i.status === 'lost').length,
+    found: allItems.filter(i => i.status === 'found').length,
+  }), [allItems]);
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -238,15 +249,24 @@ export default function LostFoundScreen({
         </div>
 
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '64px 24px' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-              Nothing here yet
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-              Try a different filter or report something
-            </p>
-          </div>
+          allItems.length === 0 ? (
+            <EmptyState
+              icon="🔍"
+              prompt="No lost or found items yet — that's a good sign!"
+              sub="If something goes missing, posting here can get it back faster than you'd think."
+              cta={{
+                label: 'Report something',
+                onClick: () => { if (!user) { onRequireAuth(); return; } onReport(); },
+              }}
+            />
+          ) : (
+            <EmptyState
+              icon="🔍"
+              prompt="Nothing matches that search."
+              sub="Try a different filter or clear the query."
+              compact
+            />
+          )
         )}
       </section>
 

@@ -16,6 +16,7 @@ import {
   type WecycleAlert,
 } from '../lib/alerts';
 import { getPostMetrics, getEventMetrics, summarizeCombined } from '../lib/metrics';
+import { isDemoMode } from '../lib/demoMode';
 
 type Tab = 'stats' | 'alerts' | 'inbox';
 
@@ -56,17 +57,21 @@ export default function ActivityScreen({
     return () => { cancelled = true; unsub(); };
   }, [user, mode]);
 
+  /* Activity is a per-user summary — in production this becomes a Supabase
+     query for `listings where owner = me` + `events where organizer = me`.
+     For now we mock my-own posts in demo and leave the screen empty in prod. */
+  const demo = isDemoMode();
   const myItems = useMemo(
-    () => MARKETPLACE_ITEMS.filter(i => MY_UPLOAD_IDS.includes(i.id)),
-    [],
+    () => (demo ? MARKETPLACE_ITEMS.filter(i => MY_UPLOAD_IDS.includes(i.id)) : []),
+    [demo],
   );
   const myEvents = useMemo(
-    () => EVENTS.filter(e => MY_EVENT_IDS.includes(e.id)),
-    [],
+    () => (demo ? EVENTS.filter(e => MY_EVENT_IDS.includes(e.id)) : []),
+    [demo],
   );
   const summary = useMemo(
-    () => summarizeCombined(MY_UPLOAD_IDS, MY_EVENT_IDS),
-    [],
+    () => summarizeCombined(demo ? MY_UPLOAD_IDS : [], demo ? MY_EVENT_IDS : []),
+    [demo],
   );
 
   return (

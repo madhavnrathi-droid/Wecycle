@@ -2039,7 +2039,11 @@ body {
 
 /* Pinterest-style waterfall: tight gaps, plenty of columns so the mosaic
    reads as one dense canvas instead of a sparse grid. Cards size to whatever
-   pixels are left after gaps, which scales naturally with the wider container. */
+   pixels are left after gaps, which scales naturally with the wider container.
+
+   We cap at 6 columns even on the widest desktops — letting cards keep
+   growing past 6 reads sparse; the user wants larger tiles on bigger screens,
+   not denser ones. */
 .masonry-2 {
   column-count: 2;            /* mobile  */
   column-gap: 8px;
@@ -2055,24 +2059,18 @@ body {
   .masonry-2 > * { margin-bottom: 8px; }
 }
 @media (min-width: 1024px) {
-  .masonry-2  { column-count: 5; column-gap: 8px; }
-  .masonry-2 > * { margin-bottom: 8px; }
+  .masonry-2  { column-count: 5; column-gap: 10px; }
+  .masonry-2 > * { margin-bottom: 10px; }
 }
 @media (min-width: 1280px) {
-  .masonry-2  { column-count: 6; column-gap: 8px; }
-  .masonry-2 > * { margin-bottom: 8px; }
-}
-@media (min-width: 1440px) {
-  .masonry-2  { column-count: 7; column-gap: 10px; }
+  .masonry-2  { column-count: 6; column-gap: 10px; }
   .masonry-2 > * { margin-bottom: 10px; }
 }
 @media (min-width: 1700px) {
-  .masonry-2  { column-count: 8; column-gap: 10px; }
-  .masonry-2 > * { margin-bottom: 10px; }
-}
-@media (min-width: 1900px) {
-  .masonry-2  { column-count: 9; column-gap: 12px; }
-  .masonry-2 > * { margin-bottom: 12px; }
+  /* Past 1700px, container keeps widening but column count holds at 6 so
+     each card grows roughly 1 px per 12 viewport px. */
+  .masonry-2  { column-count: 6; column-gap: 14px; }
+  .masonry-2 > * { margin-bottom: 14px; }
 }
 
 /* ═══════════════════════════════════════════════

@@ -445,6 +445,7 @@ export type Database = {
           status: Database["public"]["Enums"]["event_status"]
           title: string
           updated_at: string
+          video_urls: string[]
         }
         Insert: {
           attendee_count?: number
@@ -463,6 +464,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["event_status"]
           title: string
           updated_at?: string
+          video_urls?: string[]
         }
         Update: {
           attendee_count?: number
@@ -481,6 +483,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["event_status"]
           title?: string
           updated_at?: string
+          video_urls?: string[]
         }
         Relationships: [
           {
@@ -762,6 +765,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          video_urls: string[]
           view_count: number
         }
         Insert: {
@@ -785,6 +789,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          video_urls?: string[]
           view_count?: number
         }
         Update: {
@@ -808,6 +813,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          video_urls?: string[]
           view_count?: number
         }
         Relationships: [
@@ -863,6 +869,7 @@ export type Database = {
           updated_at: string
           user_id: string
           verified: boolean
+          video_urls: string[]
         }
         Insert: {
           category_id?: string | null
@@ -885,6 +892,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           verified?: boolean
+          video_urls?: string[]
         }
         Update: {
           category_id?: string | null
@@ -907,6 +915,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           verified?: boolean
+          video_urls?: string[]
         }
         Relationships: [
           {
@@ -1026,6 +1035,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          allow_dms: boolean
           avatar_color: string | null
           avatar_url: string | null
           badges: string[]
@@ -1033,10 +1043,14 @@ export type Database = {
           co2_saved_kg: number
           college_id: string | null
           community_id: string | null
+          contact_email_enabled: boolean
+          contact_whatsapp_enabled: boolean
           course: string | null
           department: string | null
           full_name: string | null
           graduating_year: number | null
+          hide_listings_from_search: boolean
+          hide_prices_on_feed: boolean
           id: string
           impact_score: number
           initials: string | null
@@ -1044,16 +1058,22 @@ export type Database = {
           items_received_count: number
           items_shared_count: number
           joined_at: string
+          larger_text: boolean
           last_active_at: string | null
           money_saved: number
+          notification_prefs: Json
           phone: string | null
           repairs_helped_count: number
           residence: Database["public"]["Enums"]["residence_kind"] | null
           role: string | null
+          show_online_status: boolean
+          show_phone_on_profile: boolean
+          theme: string
           updated_at: string
           username: string | null
         }
         Insert: {
+          allow_dms?: boolean
           avatar_color?: string | null
           avatar_url?: string | null
           badges?: string[]
@@ -1061,10 +1081,14 @@ export type Database = {
           co2_saved_kg?: number
           college_id?: string | null
           community_id?: string | null
+          contact_email_enabled?: boolean
+          contact_whatsapp_enabled?: boolean
           course?: string | null
           department?: string | null
           full_name?: string | null
           graduating_year?: number | null
+          hide_listings_from_search?: boolean
+          hide_prices_on_feed?: boolean
           id: string
           impact_score?: number
           initials?: string | null
@@ -1072,16 +1096,22 @@ export type Database = {
           items_received_count?: number
           items_shared_count?: number
           joined_at?: string
+          larger_text?: boolean
           last_active_at?: string | null
           money_saved?: number
+          notification_prefs?: Json
           phone?: string | null
           repairs_helped_count?: number
           residence?: Database["public"]["Enums"]["residence_kind"] | null
           role?: string | null
+          show_online_status?: boolean
+          show_phone_on_profile?: boolean
+          theme?: string
           updated_at?: string
           username?: string | null
         }
         Update: {
+          allow_dms?: boolean
           avatar_color?: string | null
           avatar_url?: string | null
           badges?: string[]
@@ -1089,10 +1119,14 @@ export type Database = {
           co2_saved_kg?: number
           college_id?: string | null
           community_id?: string | null
+          contact_email_enabled?: boolean
+          contact_whatsapp_enabled?: boolean
           course?: string | null
           department?: string | null
           full_name?: string | null
           graduating_year?: number | null
+          hide_listings_from_search?: boolean
+          hide_prices_on_feed?: boolean
           id?: string
           impact_score?: number
           initials?: string | null
@@ -1100,12 +1134,17 @@ export type Database = {
           items_received_count?: number
           items_shared_count?: number
           joined_at?: string
+          larger_text?: boolean
           last_active_at?: string | null
           money_saved?: number
+          notification_prefs?: Json
           phone?: string | null
           repairs_helped_count?: number
           residence?: Database["public"]["Enums"]["residence_kind"] | null
           role?: string | null
+          show_online_status?: boolean
+          show_phone_on_profile?: boolean
+          theme?: string
           updated_at?: string
           username?: string | null
         }
@@ -1691,4 +1730,3 @@ export const Constants = {
     },
   },
 } as const
-
