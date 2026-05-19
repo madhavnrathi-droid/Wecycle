@@ -48,6 +48,17 @@ export interface PrivacySettings {
   hideListingsFromSearch: boolean;
 }
 
+/* How OTHERS reach the user about their posts — separate from notification
+ * channels (which control inbound noise). When `whatsapp` is on but the user
+ * hasn't added a phone, the picker on the product page automatically falls
+ * back to email so the action button is never dead.
+ *
+ * Defaults: both on, because the whole product premise is being reachable. */
+export interface ContactSettings {
+  email: boolean;
+  whatsapp: boolean;
+}
+
 export interface NotificationSettings {
   channels: NotifChannels;
   categories: NotifCategories;
@@ -70,6 +81,7 @@ export interface UserSettings {
   notifications: NotificationSettings;
   data: DataSettings;
   marketplace: MarketplaceSettings;
+  contact: ContactSettings;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -102,6 +114,10 @@ export const DEFAULT_SETTINGS: UserSettings = {
   },
   marketplace: {
     hidePriceOnFeed: false,
+  },
+  contact: {
+    email: true,
+    whatsapp: true,
   },
 };
 

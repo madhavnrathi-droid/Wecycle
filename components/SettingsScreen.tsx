@@ -44,6 +44,8 @@ export default function SettingsScreen({
     saveSettings({ privacy: { ...settings.privacy, ...patch } });
   const setMarketplace = (patch: Partial<UserSettings['marketplace']>) =>
     saveSettings({ marketplace: { ...settings.marketplace, ...patch } });
+  const setContact = (patch: Partial<UserSettings['contact']>) =>
+    saveSettings({ contact: { ...settings.contact, ...patch } });
 
   const clearCache = () => {
     if (typeof window === 'undefined') return;
@@ -155,6 +157,38 @@ export default function SettingsScreen({
             />
           </Row>
         </Card>
+      </Section>
+
+      {/* ── CONTACT PREFERENCES ──
+         These drive which button(s) appear on YOUR posts. When both are on,
+         viewers see "Email you" + "WhatsApp you"; one is on → one CTA; none →
+         we fall back to email so the action is never dead. */}
+      <Section
+        title="How others contact you"
+        hint="Choose the channels viewers use to message you about your posts."
+      >
+        <Card>
+          <Row
+            label="Email"
+            hint="They open their mail app with your post pre-quoted."
+          >
+            <Toggle on={settings.contact.email} onChange={(v) => setContact({ email: v })} />
+          </Row>
+          <Divider />
+          <Row
+            label="WhatsApp"
+            hint="They open WhatsApp with a pre-filled message. Requires a phone on your account."
+          >
+            <Toggle on={settings.contact.whatsapp} onChange={(v) => setContact({ whatsapp: v })} />
+          </Row>
+        </Card>
+        {!settings.contact.email && !settings.contact.whatsapp && (
+          <p style={{
+            margin: '8px 4px 0', fontSize: 11, color: 'var(--accent-rose)', lineHeight: 1.4,
+          }}>
+            Both channels are off — Wecycle will still surface email as a fallback so people can reach you.
+          </p>
+        )}
       </Section>
 
       {/* ── MARKETPLACE ── */}
