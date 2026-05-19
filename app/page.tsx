@@ -12,6 +12,9 @@ import ItemDetailScreen from '../components/ItemDetailScreen';
 import EventDetailScreen from '../components/EventDetailScreen';
 import AccountScreen from '../components/AccountScreen';
 import ActivityScreen from '../components/ActivityScreen';
+import SettingsScreen from '../components/SettingsScreen';
+import NotificationsScreen from '../components/NotificationsScreen';
+import FeedbackScreen from '../components/FeedbackScreen';
 import Drawer from '../components/Drawer';
 import PostSheet from '../components/PostSheet';
 import ShareItemModal from '../components/forms/ShareItemModal';
@@ -25,6 +28,10 @@ import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import type { WecycleAlert } from '../lib/alerts';
+import {
+  getSettings, onSettingsChange, applyTheme, watchSystemTheme,
+  saveSettings, type ThemeMode,
+} from '../lib/settings';
 
 type ModalKind =
   | null
@@ -55,12 +62,57 @@ export default function WecycleApp() {
     return next;
   });
   const [lfDefaultStatus, setLfDefaultStatus] = useState<'lost' | 'found' | undefined>();
-  const [isDark, setIsDark] = useState(false);
 
-  /* Theme */
+  /* Sub-screens that take over the viewport. We keep a stack so "back" always
+     returns to the previous screen (e.g. Settings → Notifications → back → Settings),
+     and entering one directly from the drawer pops back to the main app. */
+  type SubScreen = 'settings' | 'notifications' | 'feedback';
+  const [subStack, setSubStack] = useState<SubScreen[]>([]);
+  const subScreen: SubScreen | null = subStack[subStack.length - 1] ?? null;
+  const pushSub = (s: SubScreen) => setSubStack(prev => [...prev, s]);
+  const popSub  = () => setSubStack(prev => prev.slice(0, -1));
+  const clearSubStack = () => setSubStack([]);
+
+  /* Theme state derived from settings — supports light/dark/system. */
+  const [themeMode, setThemeMode] = useState<ThemeMode>('system');
+  const [isDark, setIsDark] = useState(false);
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
+    const syncDarkFromDOM = () => {
+      if (typeof document !== 'undefined') {
+        setIsDark(document.documentElement.classList.contains('dark'));
+      }
+    };
+    /* Hydrate from localStorage and apply immediately */
+    const s = getSettings();
+    setThemeMode(s.appearance.theme);
+    applyTheme(s.appearance.theme);
+    syncDarkFromDOM();
+    /* Listen for in-app changes (Settings toggle) */
+    const off = onSettingsChange(next => {
+      setThemeMode(next.appearance.theme);
+      applyTheme(next.appearance.theme);
+      syncDarkFromDOM();
+    });
+    return off;
+  }, []);
+  useEffect(() => {
+    /* Re-resolve when OS preference flips while in 'system' mode */
+    return watchSystemTheme(themeMode, () => {
+      applyTheme(themeMode);
+      if (typeof document !== 'undefined') {
+        setIsDark(document.documentElement.classList.contains('dark'));
+      }
+    });
+  }, [themeMode]);
+
+  /* Drawer's sun/moon button cycles light → dark → system. */
+  const toggleTheme = () => {
+    const next: ThemeMode =
+      themeMode === 'light'  ? 'dark'   :
+      themeMode === 'dark'   ? 'system' :
+                                'light';
+    saveSettings({ appearance: { ...getSettings().appearance, theme: next } });
+  };
 
   /* Service worker */
   useEffect(() => {
@@ -99,12 +151,11 @@ export default function WecycleApp() {
     setModal('alert-form');
   };
 
-  const toggleTheme = () => setIsDark(d => !d);
-
   /* Avatar everywhere routes to the Account screen.
      If signed-out, prompt auth first. */
   const goToAccount = () => {
     if (!user) { setModal('auth'); return; }
+    clearSubStack();
     setActiveScreen('account');
   };
 
@@ -119,10 +170,45 @@ export default function WecycleApp() {
   };
 
   const handleDrawerNavigate = (id: string) => {
-    if (id === 'account') {
-      goToAccount();
-    }
-    /* settings / feedback / etc. wired later */
+    setDrawerOpen(false);
+    /* Defer screen switch by one frame so the drawer close animation reads cleanly */
+    setTimeout(() => {
+      if (id === 'account')   { goToAccount(); return; }
+      if (id === 'settings')  { setSubStack(['settings']);      return; }
+      if (id === 'notifs')    { setSubStack(['notifications']); return; }
+      if (id === 'feedback')  { setSubStack(['feedback']);      return; }
+      if (id === 'invite') {
+        if (typeof window === 'undefined') return;
+        const shareUrl = window.location.origin || 'https://wecycle.page';
+        const nav = window.navigator as Navigator & {
+          share?: (d: ShareData) => Promise<void>;
+        };
+        if (typeof nav.share === 'function') {
+          nav.share({
+            title: 'Wecycle',
+            text: 'Join me on Wecycle — circulate resources in our community.',
+            url: shareUrl,
+          }).catch(() => {});
+        } else if (nav.clipboard?.writeText) {
+          nav.clipboard.writeText(shareUrl).then(
+            () => window.alert('Link copied — share it with a friend!'),
+            () => {},
+          );
+        }
+        return;
+      }
+      if (id === 'updates' || id === 'mission' || id === 'team') {
+        /* Static destinations — open marketing site in a new tab */
+        const map: Record<string, string> = {
+          updates: 'https://wecycle.page/changelog',
+          mission: 'https://wecycle.page/mission',
+          team:    'https://wecycle.page/careers',
+        };
+        if (typeof window !== 'undefined') {
+          window.open(map[id], '_blank', 'noopener,noreferrer');
+        }
+      }
+    }, 80);
   };
 
   /* Item detail screen takes over the viewport */
@@ -137,6 +223,53 @@ export default function WecycleApp() {
               onBack={() => setOpenItem(null)}
               onContact={() => { /* messages in a future iteration */ }}
             />
+          </main>
+        </div>
+      </>
+    );
+  }
+
+  /* Settings sub-screens take over the viewport. `popSub` walks the stack back
+     one level so cross-links (Settings → Feedback) return to where you came from. */
+  if (subScreen === 'settings') {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <SettingsScreen
+              onBack={popSub}
+              onOpenNotifications={() => pushSub('notifications')}
+              onOpenFeedback={() => pushSub('feedback')}
+              onOpenAccount={() => { clearSubStack(); goToAccount(); }}
+            />
+          </main>
+        </div>
+      </>
+    );
+  }
+  if (subScreen === 'notifications') {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <NotificationsScreen
+              onBack={popSub}
+              onOpenAccount={() => { clearSubStack(); goToAccount(); }}
+            />
+          </main>
+        </div>
+      </>
+    );
+  }
+  if (subScreen === 'feedback') {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <FeedbackScreen onBack={popSub} />
           </main>
         </div>
       </>
