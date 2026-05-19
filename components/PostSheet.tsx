@@ -1,107 +1,100 @@
 'use client';
 
-import { X, Camera, Gift, HelpCircle, Repeat2, CalendarDays, Wrench, Search } from 'lucide-react';
+import { X } from 'lucide-react';
+
+export type PostKind = 'share' | 'request' | 'event' | 'report-lf';
 
 interface PostSheetProps {
   onClose: () => void;
+  onSelect: (kind: PostKind) => void;
 }
 
-const POST_OPTIONS = [
+const POST_OPTIONS: { id: PostKind; icon: string; label: string; desc: string; color: string }[] = [
   {
     id: 'share',
-    icon: '🎁', label: 'Share / Donate', desc: 'Give an item to your community',
-    color: '#22C55E', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.25)',
+    icon: '🎁', label: 'Share an item', desc: 'Give or sell something to your community',
+    color: '#22C55E',
   },
   {
     id: 'request',
-    icon: '🙋', label: 'Request Something', desc: 'Ask your community for help',
-    color: '#FF9A40', bg: 'rgba(255,154,64,0.12)', border: 'rgba(255,154,64,0.25)',
-  },
-  {
-    id: 'swap',
-    icon: '🔄', label: 'Swap / Exchange', desc: 'Trade something you have',
-    color: '#6C63FF', bg: 'rgba(108,99,255,0.12)', border: 'rgba(108,99,255,0.25)',
+    icon: '🙋', label: 'Post a request', desc: 'Ask your community for what you need',
+    color: '#FF9A40',
   },
   {
     id: 'event',
-    icon: '📅', label: 'Create Event', desc: 'Organize a community activity',
-    color: '#3DD6F5', bg: 'rgba(61,214,245,0.12)', border: 'rgba(61,214,245,0.25)',
+    icon: '📅', label: 'Submit an event', desc: 'Swap drive, repair café, workshop',
+    color: '#3DD6F5',
   },
   {
-    id: 'repair',
-    icon: '🔧', label: 'Repair Request', desc: 'Need something fixed?',
-    color: '#A855F7', bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.25)',
-  },
-  {
-    id: 'lost',
-    icon: '🔍', label: 'Lost & Found', desc: 'Report lost or found item',
-    color: '#FF6B80', bg: 'rgba(255,107,128,0.12)', border: 'rgba(255,107,128,0.25)',
+    id: 'report-lf',
+    icon: '🔍', label: 'Report lost / found', desc: 'Reunite items with their owners',
+    color: '#FF6B80',
   },
 ];
 
-export default function PostSheet({ onClose }: PostSheetProps) {
+export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
   return (
     <>
-      <div className="bottom-sheet-overlay" onClick={onClose} />
-      <div className="bottom-sheet">
-        <div className="sheet-handle" />
-        <div style={{ padding: '16px 20px 8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <div>
-              <h2 style={{
-                margin: '0 0 2px', fontSize: 'var(--text-lg)', fontWeight: 800,
-                letterSpacing: '-0.02em', color: 'var(--text-primary)',
-              }}>
-                Post to Community
-              </h2>
-              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                What would you like to share?
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: 'var(--bg-inset)', border: '1px solid var(--border-default)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: 'var(--text-muted)',
-              }}
-            >
-              <X size={16} strokeWidth={2} />
-            </button>
-          </div>
+      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="post-sheet-title"
+      >
+        {/* drag handle */}
+        <div className="mobile-only" style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}>
+          <div style={{
+            width: 36, height: 4,
+            background: 'var(--border-strong)',
+            borderRadius: 999,
+          }} aria-hidden="true" />
         </div>
 
-        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="modal-header">
+          <div style={{ flex: 1 }}>
+            <h2 id="post-sheet-title" className="modal-title">Create a post</h2>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              What would you like to do?
+            </p>
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close dialog">
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className="modal-body" style={{ gap: 8 }}>
           {POST_OPTIONS.map(opt => (
             <button
               key={opt.id}
-              onClick={onClose}
+              onClick={() => onSelect(opt.id)}
               className="press-scale"
               style={{
                 display: 'flex', alignItems: 'center', gap: 14,
-                background: opt.bg, border: `1.5px solid ${opt.border}`,
+                background: 'var(--bg-inset)',
+                border: '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-lg)', padding: '14px',
                 cursor: 'pointer', textAlign: 'left', width: '100%',
+                color: 'var(--text-primary)',
               }}
             >
               <div style={{
                 width: 44, height: 44, borderRadius: 'var(--radius-md)',
-                background: `${opt.color}20`,
+                background: `${opt.color}1A`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 22, flexShrink: 0,
-              }}>
+              }} aria-hidden="true">
                 {opt.icon}
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: '0 0 2px', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {opt.label}
                 </p>
-                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
                   {opt.desc}
                 </p>
               </div>
-              <div style={{ color: opt.color, fontSize: 18 }}>›</div>
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 18 }}>›</span>
             </button>
           ))}
         </div>

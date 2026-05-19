@@ -1,616 +1,625 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  CalendarDays, MapPin, Clock, Users, CheckCircle,
-  Plus, Search, AlertCircle, Tag, ChevronRight,
-  Flame, Wrench, Leaf, BookOpen, Truck, Zap,
-  Star, MessageCircle, ExternalLink,
-} from 'lucide-react';
-import { EVENTS, LOST_FOUND_ITEMS, type CommunityEvent, type LostItem } from '../lib/mockData';
+import { useEffect, useMemo, useState } from 'react';
+import { Menu, Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
+import { EVENTS, type CommunityEvent } from '../lib/mockData';
+import { getEventPhoto, getAvatar } from '../lib/photos';
+import { useAuth } from '../lib/AuthContext';
 
-type Tab = 'events' | 'lost_found' | 'requests';
+interface EventsScreenProps {
+  onOpenMenu: () => void;
+  onOpenAccount: () => void;
+  onCreate: () => void;
+  onOpenEvent: (event: CommunityEvent) => void;
+  rsvpdEvents: Set<string>;
+  onToggleRsvp: (id: string) => void;
+}
 
-const EVENT_TYPE_CONFIG = {
-  swap: { icon: '🔄', color: '#C8FF4D', label: 'Swap Drive' },
-  repair: { icon: '🔧', color: '#A855F7', label: 'Repair Café' },
-  cleanup: { icon: '🌿', color: '#3DD6F5', label: 'Cleanup' },
-  workshop: { icon: '📚', color: '#FF9A40', label: 'Workshop' },
-  drive: { icon: '🚛', color: '#3DD6F5', label: 'Drive' },
-  challenge: { icon: '⚡', color: '#FF6B80', label: 'Challenge' },
-};
+/* ── Filter definitions ───────────────────────────── */
 
-export default function EventsScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>('events');
-  const [rsvpdEvents, setRsvpdEvents] = useState<Set<string>>(new Set(['e1', 'e4', 'e5']));
+type TimeFilter = 'all' | 'today' | 'this_week' | 'weekend' | 'this_month';
 
-  const toggleRsvp = (id: string) => {
-    setRsvpdEvents(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
+const TIME_FILTERS: { id: TimeFilter; label: string }[] = [
+  { id: 'all',         label: 'Any time' },
+  { id: 'today',       label: 'Today' },
+  { id: 'this_week',   label: 'This week' },
+  { id: 'weekend',     label: 'Weekend' },
+  { id: 'this_month',  label: 'This month' },
+];
+
+const TYPE_FILTERS = [
+  { id: 'all',       label: 'All' },
+  { id: 'swap',      label: 'Swap' },
+  { id: 'repair',    label: 'Repair' },
+  { id: 'cleanup',   label: 'Cleanup' },
+  { id: 'workshop',  label: 'Workshop' },
+  { id: 'drive',     label: 'Drive' },
+  { id: 'challenge', label: 'Challenge' },
+];
+
+/* Parse the mock event date strings into JS Dates (best-effort) */
+function parseEventDate(s: string): Date | null {
+  /* mock data uses formats like "Sat, 17 May 2025" or "Mon, 12 – Sun, 18 May" */
+  const trimmed = s.split('–')[0].trim();
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function withinTimeFilter(dateStr: string, filter: TimeFilter): boolean {
+  if (filter === 'all') return true;
+  const d = parseEventDate(dateStr);
+  if (!d) return true; // permissive when unparseable
+  const now = new Date();
+  const dayMs = 86400000;
+
+  if (filter === 'today') {
+    return d.toDateString() === now.toDateString();
+  }
+  if (filter === 'this_week') {
+    const diff = (d.getTime() - now.getTime()) / dayMs;
+    return diff >= -1 && diff <= 7;
+  }
+  if (filter === 'weekend') {
+    const day = d.getDay(); // 0 = Sun, 6 = Sat
+    const diff = (d.getTime() - now.getTime()) / dayMs;
+    return (day === 0 || day === 6) && diff >= -1 && diff <= 14;
+  }
+  if (filter === 'this_month') {
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }
+  return true;
+}
+
+/* ── SCREEN ──────────────────────────────────────── */
+
+export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOpenEvent, rsvpdEvents, onToggleRsvp }: EventsScreenProps) {
+  const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const [query, setQuery] = useState('');
+  const [time, setTime] = useState<TimeFilter>('all');
+  const [type, setType] = useState<string>('all');
+  const rsvpd = rsvpdEvents;
+
+  const filtered = useMemo(() => {
+    return EVENTS.filter(e => {
+      if (query && !`${e.title} ${e.location}`.toLowerCase().includes(query.toLowerCase())) return false;
+      if (type !== 'all' && e.eventType !== type) return false;
+      if (!withinTimeFilter(e.date, time)) return false;
+      return true;
     });
-  };
+  }, [query, time, type]);
+
+  /* Events the user has RSVP'd to — sorted by upcoming date.
+     Powers the carousel that used to be the single featured card. */
+  const upcomingRsvps = useMemo(() => {
+    return EVENTS
+      .filter(e => rsvpd.has(e.id))
+      .map(e => ({ e, d: parseEventDate(e.date) }))
+      .sort((a, b) => {
+        const at = a.d?.getTime() ?? Infinity;
+        const bt = b.d?.getTime() ?? Infinity;
+        return at - bt;
+      })
+      .map(({ e }) => e);
+  }, [rsvpd]);
+
+  const rest = filtered;
+
+  const toggleRsvp = onToggleRsvp;
 
   return (
-    <div className="screen-transition" style={{ paddingBottom: 100 }}>
-      {/* ── HEADER ── */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 30,
-        background: 'var(--bg-overlay)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid var(--border-subtle)',
-        padding: '12px 16px 0',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <h1 style={{
-            margin: 0, fontSize: 'var(--text-xl)', fontWeight: 800,
-            letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1,
-          }}>
-            Community
-          </h1>
-          <button className="btn-icon" style={{ borderRadius: 'var(--radius-md)' }}>
-            <Search size={16} strokeWidth={2} />
-          </button>
-          <button className="btn btn-primary btn-sm" style={{ gap: 4 }}>
-            <Plus size={14} strokeWidth={2.5} />
-            Post
-          </button>
-        </div>
+    <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', marginBottom: -1 }}>
-          {(['events', 'lost_found', 'requests'] as Tab[]).map(tab => {
-            const labels: Record<Tab, string> = { events: 'Events', lost_found: 'Lost & Found', requests: 'Requests' };
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: '10px 14px',
-                  fontSize: 'var(--text-xs)', fontWeight: 700,
-                  color: activeTab === tab ? 'var(--accent-lime)' : 'var(--text-muted)',
-                  borderBottom: `2px solid ${activeTab === tab ? 'var(--accent-lime)' : 'transparent'}`,
-                  whiteSpace: 'nowrap', transition: 'all 0.15s',
-                }}
-              >
-                {labels[tab]}
-              </button>
-            );
-          })}
+      {/* ── TOP BAR ── */}
+      <header
+        style={{
+          position: 'sticky', top: 0, zIndex: 30,
+          background: 'var(--bg-overlay)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          padding: '14px 16px 10px',
+        }}
+        className="mobile-only-nav"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+            className="theme-toggle"
+            style={{ marginLeft: -8 }}
+          >
+            <Menu size={20} strokeWidth={1.8} />
+          </button>
+          <span style={{
+            flex: 1, textAlign: 'center',
+            fontWeight: 600, fontSize: 18,
+            letterSpacing: '-0.02em',
+            color: 'var(--text-primary)',
+          }}>
+            wecycle
+          </span>
+          <button
+            aria-label="Your profile"
+            onClick={onOpenAccount}
+            style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: 'var(--bg-inset)',
+              border: 'none', cursor: 'pointer',
+              padding: 0, overflow: 'hidden',
+            }}
+            suppressHydrationWarning
+          >
+            {mounted && (
+              <img
+                src={getAvatar(user?.id ?? 'guest')}
+                alt=""
+                width={34}
+                height={34}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            )}
+          </button>
         </div>
       </header>
 
-      {/* ── CONTENT ── */}
-      {activeTab === 'events' && <EventsTab rsvpdEvents={rsvpdEvents} onToggleRsvp={toggleRsvp} />}
-      {activeTab === 'lost_found' && <LostFoundTab />}
-      {activeTab === 'requests' && <RequestsTab />}
-    </div>
-  );
-}
-
-/* ══ EVENTS TAB ══════════════════════════════════ */
-
-function EventsTab({ rsvpdEvents, onToggleRsvp }: { rsvpdEvents: Set<string>; onToggleRsvp: (id: string) => void }) {
-  const [activeFilter, setActiveFilter] = useState('all');
-
-  const filters = [
-    { id: 'all', label: 'All Events' },
-    { id: 'swap', label: '🔄 Swap' },
-    { id: 'repair', label: '🔧 Repair' },
-    { id: 'cleanup', label: '🌿 Cleanup' },
-    { id: 'workshop', label: '📚 Workshop' },
-    { id: 'challenge', label: '⚡ Challenge' },
-  ];
-
-  const filtered = EVENTS.filter(e => activeFilter === 'all' || e.eventType === activeFilter);
-  const featured = filtered[0];
-  const rest = filtered.slice(1);
-
-  return (
-    <div>
-      {/* Filter chips */}
-      <div style={{ padding: '12px 16px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {filters.map(f => (
-          <button
-            key={f.id}
-            onClick={() => setActiveFilter(f.id)}
-            className={`filter-chip ${activeFilter === f.id ? 'active' : ''}`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Featured event (hero card) */}
-      {featured && (
-        <div style={{ padding: '0 16px 16px' }}>
-          <FeaturedEventCard event={featured} isRsvpd={rsvpdEvents.has(featured.id)} onRsvp={() => onToggleRsvp(featured.id)} />
-        </div>
-      )}
-
-      {/* Events list */}
-      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {rest.map(event => (
-          <EventListCard
-            key={event.id}
-            event={event}
-            isRsvpd={rsvpdEvents.has(event.id)}
-            onRsvp={() => onToggleRsvp(event.id)}
-          />
-        ))}
-      </div>
-
-      {/* Create event CTA */}
-      <div style={{ padding: '20px 16px' }}>
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1.5px dashed var(--border-default)',
-          borderRadius: 'var(--radius-xl)',
-          padding: '20px',
-          textAlign: 'center',
-          cursor: 'pointer',
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
-          <p style={{ margin: '0 0 4px', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>
-            Organize an Event
-          </p>
-          <p style={{ margin: '0 0 12px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            Swap drive, repair café, workshop — make it happen
-          </p>
-          <button className="btn btn-primary btn-sm">
-            <Plus size={14} /> Create Event
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; isRsvpd: boolean; onRsvp: () => void }) {
-  const tc = EVENT_TYPE_CONFIG[event.eventType];
-  const pct = event.maxAttendees ? (event.attendees / event.maxAttendees) * 100 : 60;
-
-  return (
-    <div className="card-hero" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}>
-      {/* Color banner */}
-      <div style={{
-        background: `linear-gradient(135deg, ${tc.color}30, ${tc.color}10)`,
-        padding: '20px 16px 16px',
-        borderBottom: `1px solid ${tc.color}25`,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 'var(--radius-lg)',
-            background: `${tc.color}25`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, flexShrink: 0,
+      {/* ── PAGE TITLE ── */}
+      <section style={{ padding: '14px 20px 12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <h1 style={{
+            margin: 0,
+            fontSize: 26, fontWeight: 600,
+            letterSpacing: '-0.03em',
+            color: 'var(--text-primary)',
+            lineHeight: 1.15,
           }}>
-            {tc.icon}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-              <span style={{
-                background: `${tc.color}20`, color: tc.color,
-                fontSize: 10, fontWeight: 700,
-                padding: '2px 8px', borderRadius: 'var(--radius-pill)',
-              }}>
-                {tc.label}
-              </span>
-              {isRsvpd && (
-                <span style={{
-                  background: 'rgba(34,197,94,0.12)', color: '#22C55E',
-                  fontSize: 10, fontWeight: 700,
-                  padding: '2px 8px', borderRadius: 'var(--radius-pill)',
-                  display: 'flex', alignItems: 'center', gap: 3,
-                }}>
-                  <CheckCircle size={10} /> Going
-                </span>
-              )}
-            </div>
-            <h2 style={{
-              margin: '0 0 8px', fontSize: 'var(--text-lg)', fontWeight: 800,
-              letterSpacing: '-0.02em', color: 'var(--text-primary)',
-              lineHeight: 1.2,
-            }}>
-              {event.title}
-            </h2>
-            <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              {event.description}
-            </p>
-          </div>
+            Events
+          </h1>
+          <p style={{
+            margin: '4px 0 0',
+            fontSize: 13, color: 'var(--text-muted)',
+          }}>
+            Swaps, repair cafés, workshops & more
+          </p>
         </div>
-      </div>
+        <button
+          onClick={onCreate}
+          aria-label="Create event"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            background: 'var(--text-primary)', color: 'var(--bg-base)',
+            border: 'none', borderRadius: 999,
+            padding: '8px 14px',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            letterSpacing: '-0.01em', flexShrink: 0,
+          }}
+        >
+          <Plus size={13} strokeWidth={2.5} />
+          New
+        </button>
+      </section>
 
-      <div style={{ padding: '14px 16px' }}>
-        {/* Event details */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-          {[
-            { icon: <CalendarDays size={12} />, text: event.date },
-            { icon: <Clock size={12} />, text: event.time },
-            { icon: <MapPin size={12} />, text: event.location },
-          ].map(({ icon, text }, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              fontSize: 'var(--text-xs)', color: 'var(--text-secondary)',
-            }}>
-              <span style={{ color: 'var(--text-muted)' }}>{icon}</span>
-              {text}
-            </div>
+      {/* ── SEARCH ── */}
+      <section style={{ padding: '0 16px 12px' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={15} strokeWidth={1.8} style={{
+            position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+            color: 'var(--text-muted)',
+          }} />
+          <input
+            type="search"
+            placeholder="Search events…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="search-pill"
+            aria-label="Search events"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+              style={{
+                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-muted)', padding: 4,
+              }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* ── TIME FILTER (segmented) ── */}
+      <section style={{ padding: '0 0 8px' }}>
+        <div className="chip-row" role="tablist" aria-label="Time filter">
+          {TIME_FILTERS.map(f => (
+            <button
+              key={f.id}
+              role="tab"
+              aria-selected={time === f.id}
+              onClick={() => setTime(f.id)}
+              className={`pill ${time === f.id ? 'pill-active' : ''}`}
+            >
+              {f.label}
+            </button>
           ))}
         </div>
+      </section>
 
-        {/* Attendance */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-secondary)' }}>
-              <strong style={{ color: tc.color }}>{event.attendees}</strong> going
-              {event.maxAttendees && ` · ${event.maxAttendees - event.attendees} spots left`}
-            </span>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-              {Math.round(pct)}% full
-            </span>
+      {/* ── TYPE FILTER ── */}
+      <section style={{ padding: '4px 0 14px' }}>
+        <div className="chip-row" role="tablist" aria-label="Event type">
+          {TYPE_FILTERS.map(t => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={type === t.id}
+              onClick={() => setType(t.id)}
+              className={`pill pill-soft ${type === t.id ? 'pill-soft-active' : ''}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ── YOUR UPCOMING (RSVP'd events carousel) ── */}
+      <section style={{ padding: '8px 20px 8px' }}>
+        <h3 style={{
+          margin: 0, fontSize: 13, fontWeight: 600,
+          letterSpacing: '0.04em', textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+        }}>
+          Your upcoming
+        </h3>
+      </section>
+      {upcomingRsvps.length > 0 ? (
+        <section
+          className="rsvp-carousel"
+          aria-label="Events you're attending"
+          role="region"
+        >
+          {upcomingRsvps.map(event => (
+            <UpcomingRsvpCard
+              key={event.id}
+              event={event}
+              onCancel={() => toggleRsvp(event.id)}
+              onOpen={() => onOpenEvent(event)}
+            />
+          ))}
+        </section>
+      ) : (
+        <section style={{ padding: '4px 20px 20px' }}>
+          <div style={{
+            padding: '20px 18px',
+            background: 'var(--bg-surface)',
+            border: '1px dashed var(--border-default)',
+            borderRadius: 16,
+            textAlign: 'center',
+          }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+              You haven't RSVP'd to anything yet
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              Tap RSVP on any event below to add it here.
+            </p>
           </div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${pct}%`, background: tc.color }} />
+        </section>
+      )}
+
+      {/* ── ALL EVENTS LIST ── */}
+      {rest.length > 0 && (
+        <>
+          <section style={{ padding: '18px 20px 12px' }}>
+            <h3 style={{
+              margin: 0, fontSize: 13, fontWeight: 600,
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+            }}>
+              Browse events
+            </h3>
+          </section>
+          <section className="events-list" style={{ padding: '0 16px' }}>
+            {rest.map(event => (
+              <EventListCard
+                key={event.id}
+                event={event}
+                isRsvpd={rsvpd.has(event.id)}
+                onRsvp={() => toggleRsvp(event.id)}
+                onOpen={() => onOpenEvent(event)}
+              />
+            ))}
+          </section>
+        </>
+      )}
+
+      {filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '60px 24px' }}>
+          <div style={{ fontSize: 36, marginBottom: 10 }}>📅</div>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
+            No events match your filters
+          </p>
+          <p style={{ margin: '4px 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
+            Try a different time or category
+          </p>
+          <button
+            onClick={() => { setTime('all'); setType('all'); setQuery(''); }}
+            className="btn btn-secondary btn-sm"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══ UPCOMING RSVP CARD (horizontal carousel) ════════ */
+
+function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; onCancel: () => void; onOpen?: () => void }) {
+  const photo = getEventPhoto(event.id, event.eventType);
+  return (
+    <article className="rsvp-card">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="rsvp-card-photo"
+        aria-label={`Open ${event.title}`}
+        style={{ border: 'none', padding: 0, cursor: onOpen ? 'pointer' : 'default', background: 'var(--bg-inset)' }}
+      >
+        <img src={photo} alt="" loading="lazy" />
+        <div className="rsvp-card-overlay" />
+        <span className="rsvp-card-going">
+          <Check size={11} strokeWidth={2.5} />
+          Going
+        </span>
+        <div className="rsvp-card-meta">
+          <p className="rsvp-card-label">{labelForType(event.eventType)}</p>
+          <p className="rsvp-card-title">{event.title}</p>
+          <p className="rsvp-card-when">
+            <CalendarDays size={11} strokeWidth={1.8} />
+            {event.date} · {event.time}
+          </p>
+        </div>
+      </button>
+      <div className="rsvp-card-footer">
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          fontSize: 11, color: 'var(--text-muted)',
+        }}>
+          <MapPin size={11} strokeWidth={1.8} />
+          {event.location}
+        </span>
+        <button
+          onClick={onCancel}
+          style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--text-muted)', fontSize: 11, fontWeight: 500,
+            padding: 0,
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/* ══ FEATURED EVENT CARD ═════════════════════════ */
+
+function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; isRsvpd: boolean; onRsvp: () => void }) {
+  const photo = getEventPhoto(event.id, event.eventType);
+  const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
+
+  return (
+    <article style={{
+      borderRadius: 22,
+      overflow: 'hidden',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-subtle)',
+    }}>
+      {/* Photo */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '5 / 4',
+        background: 'var(--bg-inset)',
+      }}>
+        <img
+          src={photo}
+          alt=""
+          loading="lazy"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+        <div style={{
+          position: 'absolute', top: 12, left: 12,
+          background: 'rgba(0,0,0,0.55)', color: '#fff',
+          backdropFilter: 'blur(8px)',
+          borderRadius: 999,
+          padding: '5px 10px',
+          fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
+        }}>
+          {labelForType(event.eventType)}
+        </div>
+        {isRsvpd && (
+          <div style={{
+            position: 'absolute', top: 12, right: 12,
+            background: '#22C55E', color: '#fff',
+            borderRadius: 999, padding: '5px 10px',
+            fontSize: 11, fontWeight: 600,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+          }}>
+            <Check size={11} strokeWidth={2.5} /> Going
           </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '16px 16px' }}>
+        <h2 style={{
+          margin: 0, fontSize: 18, fontWeight: 600,
+          letterSpacing: '-0.02em', color: 'var(--text-primary)',
+          lineHeight: 1.25,
+        }}>
+          {event.title}
+        </h2>
+        <div style={{
+          marginTop: 8, display: 'flex', alignItems: 'center', gap: 12,
+          fontSize: 12, color: 'var(--text-secondary)',
+        }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <CalendarDays size={12} strokeWidth={1.8} />
+            {event.date} · {event.time}
+          </span>
+        </div>
+        <div style={{
+          marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
+          fontSize: 12, color: 'var(--text-muted)',
+        }}>
+          <MapPin size={12} strokeWidth={1.8} />
+          {event.location}
         </div>
 
-        {/* Organizer */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <div style={{
-            width: 24, height: 24, borderRadius: '50%',
-            background: event.organizer.color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 9, fontWeight: 800, color: '#fff',
-          }}>
-            {event.organizer.initials}
+        {/* Attendance bar */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <strong style={{ color: 'var(--text-primary)' }}>{event.attendees}</strong>
+              {event.maxAttendees ? ` / ${event.maxAttendees} going` : ' going'}
+            </span>
+            {event.maxAttendees && (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{Math.round(pct)}% full</span>
+            )}
           </div>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-            Organized by <strong style={{ color: 'var(--text-primary)' }}>{event.organizer.name}</strong>
-          </span>
+          <div style={{ height: 3, background: 'var(--border-subtle)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{
+              width: `${pct}%`, height: '100%',
+              background: event.colorAccent ?? 'var(--text-primary)',
+              borderRadius: 99,
+              transition: 'width 0.4s',
+            }} />
+          </div>
         </div>
 
         <button
           onClick={onRsvp}
-          className="btn"
           style={{
-            width: '100%',
-            background: isRsvpd ? 'var(--bg-inset)' : tc.color,
-            color: isRsvpd ? 'var(--text-secondary)' : 'var(--text-on-accent)',
-            border: isRsvpd ? '1.5px solid var(--border-default)' : 'none',
-            borderRadius: 'var(--radius-pill)',
-            padding: '13px',
-            fontWeight: 700,
-            fontSize: 'var(--text-sm)',
+            marginTop: 14, width: '100%',
+            background: isRsvpd ? 'var(--bg-inset)' : 'var(--text-primary)',
+            color: isRsvpd ? 'var(--text-primary)' : 'var(--bg-base)',
+            border: isRsvpd ? '1px solid var(--border-default)' : 'none',
+            borderRadius: 999,
+            padding: '12px',
+            fontSize: 14, fontWeight: 600,
+            cursor: 'pointer', letterSpacing: '-0.01em',
           }}
         >
-          {isRsvpd ? '✓ Going — Cancel RSVP' : `RSVP for ${tc.label}`}
+          {isRsvpd ? '✓ You\'re going' : 'RSVP'}
         </button>
       </div>
-    </div>
+    </article>
   );
 }
 
-function EventListCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; isRsvpd: boolean; onRsvp: () => void }) {
-  const tc = EVENT_TYPE_CONFIG[event.eventType];
+/* ══ EVENT LIST CARD (compact) ═══════════════════ */
+
+function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEvent; isRsvpd: boolean; onRsvp: () => void; onOpen?: () => void }) {
+  const photo = getEventPhoto(event.id, event.eventType);
 
   return (
-    <div className="card" style={{ padding: '14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-      <div style={{
-        width: 46, height: 46, borderRadius: 'var(--radius-md)',
-        background: `${tc.color}18`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 22, flexShrink: 0,
-        border: `1px solid ${tc.color}25`,
-      }}>
-        {tc.icon}
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <div style={{ flex: 1 }}>
+    <article style={{
+      display: 'flex', gap: 12,
+      padding: 10,
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: 16,
+    }}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Open ${event.title}`}
+        style={{
+          flex: 1, minWidth: 0, display: 'flex', gap: 12, alignItems: 'center',
+          background: 'transparent', border: 'none', padding: 0, cursor: onOpen ? 'pointer' : 'default',
+          textAlign: 'left', font: 'inherit', color: 'inherit',
+        }}
+      >
+        <div style={{
+          width: 88, height: 88, borderRadius: 12,
+          overflow: 'hidden', flexShrink: 0,
+          background: 'var(--bg-inset)',
+        }}>
+          <img
+            src={photo}
+            alt=""
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
+              textTransform: 'uppercase', color: 'var(--text-muted)',
+              marginBottom: 3,
+            }}>
+              {labelForType(event.eventType)}
+            </div>
             <h3 style={{
-              margin: '0 0 3px', fontSize: 'var(--text-sm)', fontWeight: 700,
-              color: 'var(--text-primary)', letterSpacing: '-0.01em',
+              margin: 0, fontSize: 14, fontWeight: 600,
+              letterSpacing: '-0.015em', color: 'var(--text-primary)',
+              lineHeight: 1.25,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
             }}>
               {event.title}
             </h3>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                {event.date}
-              </span>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>·</span>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                {event.attendees} going
-              </span>
-            </div>
           </div>
-          <button
-            onClick={onRsvp}
-            style={{
-              padding: '5px 12px',
-              background: isRsvpd ? 'rgba(34,197,94,0.12)' : tc.color,
-              color: isRsvpd ? '#22C55E' : 'var(--text-on-accent)',
-              border: isRsvpd ? '1.5px solid rgba(34,197,94,0.25)' : 'none',
-              borderRadius: 'var(--radius-pill)',
-              fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            {isRsvpd ? '✓ Going' : 'RSVP'}
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
-          <MapPin size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {event.location}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ══ LOST & FOUND TAB ═══════════════════════════ */
-
-function LostFoundTab() {
-  const [activeFilter, setActiveFilter] = useState<'all' | 'lost' | 'found'>('all');
-  const [claimedItems, setClaimedItems] = useState<Set<string>>(new Set());
-
-  const filtered = LOST_FOUND_ITEMS.filter(item => {
-    if (activeFilter === 'all') return true;
-    return item.status === activeFilter;
-  });
-
-  return (
-    <div>
-      {/* Status tabs */}
-      <div style={{ padding: '12px 16px 0', display: 'flex', gap: 6 }}>
-        {(['all', 'lost', 'found'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
-            className={`filter-chip ${activeFilter === f ? 'active' : ''}`}
-          >
-            {f === 'all' ? 'All' : f === 'lost' ? '😟 Lost' : '🎉 Found'}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        <button className="btn btn-primary btn-sm" style={{ gap: 4 }}>
-          <Plus size={14} /> Report
-        </button>
-      </div>
-
-      {/* Stats bar */}
-      <div style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
-        <div style={{
-          flex: 1, background: 'var(--accent-rose-surface)',
-          border: '1px solid var(--accent-rose)20',
-          borderRadius: 'var(--radius-md)', padding: '10px 12px',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <AlertCircle size={18} style={{ color: 'var(--accent-rose)', flexShrink: 0 }} />
-          <div>
-            <p style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {LOST_FOUND_ITEMS.filter(i => i.status === 'lost').length}
-            </p>
-            <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>Lost Items</p>
-          </div>
-        </div>
-        <div style={{
-          flex: 1, background: 'var(--accent-lime-surface)',
-          border: '1px solid var(--accent-lime)20',
-          borderRadius: 'var(--radius-md)', padding: '10px 12px',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <CheckCircle size={18} style={{ color: 'var(--accent-lime-dim)', flexShrink: 0 }} />
-          <div>
-            <p style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {LOST_FOUND_ITEMS.filter(i => i.status === 'found').length}
-            </p>
-            <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>Found Items</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Items */}
-      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {filtered.map(item => (
-          <LostFoundItemCard key={item.id} item={item} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LostFoundItemCard({ item }: { item: LostItem }) {
-  const isLost = item.status === 'lost';
-
-  return (
-    <div className="card" style={{
-      padding: '14px',
-      borderLeft: `3px solid ${isLost ? 'var(--accent-rose)' : 'var(--accent-lime)'}`,
-    }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        {/* Photo */}
-        <div style={{
-          width: 64, height: 64, borderRadius: 'var(--radius-md)',
-          background: item.photoColor,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 28, flexShrink: 0,
-          border: '1px solid var(--border-subtle)',
-          position: 'relative',
-        }}>
-          {item.photoIcon}
-          {item.verified && (
-            <div style={{
-              position: 'absolute', bottom: -2, right: -2,
-              width: 16, height: 16, borderRadius: '50%',
-              background: '#22C55E',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '2px solid var(--bg-base)',
-            }}>
-              <CheckCircle size={8} strokeWidth={2.5} style={{ color: '#fff' }} />
-            </div>
-          )}
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
-            <h3 style={{
-              margin: 0, fontSize: 'var(--text-sm)', fontWeight: 700,
-              color: 'var(--text-primary)', flex: 1, lineHeight: 1.3,
-            }}>
-              {item.title}
-            </h3>
-            <span style={{
-              background: isLost ? 'var(--accent-rose-surface)' : 'var(--accent-lime-surface)',
-              color: isLost ? 'var(--accent-rose)' : 'var(--accent-lime-dim)',
-              fontSize: 10, fontWeight: 700,
-              padding: '2px 7px', borderRadius: 'var(--radius-pill)', flexShrink: 0,
-            }}>
-              {isLost ? 'Lost' : 'Found'}
-            </span>
-          </div>
-
-          <p style={{
-            margin: '0 0 6px', fontSize: 'var(--text-xs)',
-            color: 'var(--text-secondary)', lineHeight: 1.35,
-            display: '-webkit-box', WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginTop: 6,
+            fontSize: 11, color: 'var(--text-muted)',
           }}>
-            {item.description}
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-muted)' }}>
-              <MapPin size={10} /> {item.lastSeen}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <CalendarDays size={10} strokeWidth={1.8} />
+              {event.date}
             </span>
-          </div>
-
-          {/* Reporter + time */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <div style={{
-              width: 18, height: 18, borderRadius: '50%',
-              background: item.user.color,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 8, fontWeight: 800, color: '#fff',
-            }}>
-              {item.user.initials}
-            </div>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-              {item.user.name.split(' ')[0]} · {item.timeAgo}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <MapPin size={10} strokeWidth={1.8} />
+              {event.location}
             </span>
-            {item.reward && (
-              <>
-                <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>·</span>
-                <span style={{
-                  background: 'rgba(255,154,64,0.12)', color: 'var(--accent-amber)',
-                  fontSize: 10, fontWeight: 700,
-                  padding: '1px 6px', borderRadius: 'var(--radius-pill)',
-                }}>
-                  Reward: {item.reward}
-                </span>
-              </>
-            )}
           </div>
         </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button className="btn btn-primary btn-sm" style={{ flex: 1 }}>
-          {isLost ? '👋 I Found This!' : '✋ This Is Mine'}
-        </button>
-        <button className="btn btn-secondary btn-sm">
-          <MessageCircle size={13} />
-        </button>
-      </div>
-    </div>
+      </button>
+      <button
+        onClick={e => { e.stopPropagation(); onRsvp(); }}
+        aria-label={isRsvpd ? 'Cancel RSVP' : 'RSVP'}
+        style={{
+          alignSelf: 'center',
+          background: isRsvpd ? '#22C55E' : 'var(--bg-inset)',
+          color: isRsvpd ? '#fff' : 'var(--text-primary)',
+          border: isRsvpd ? 'none' : '1px solid var(--border-subtle)',
+          borderRadius: 999,
+          padding: '7px 12px',
+          fontSize: 11, fontWeight: 600, cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        {isRsvpd ? <><Check size={11} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-1px' }} /> Going</> : 'RSVP'}
+      </button>
+    </article>
   );
 }
 
-/* ══ REQUESTS TAB ════════════════════════════════ */
-
-const MOCK_REQUESTS = [
-  { id: 'r1', title: 'Need Casio fx-991 calculator', user: 'Sneha Patel', timeAgo: '45m', urgency: 'urgent', offers: 2, emoji: '🖩', desc: 'Finals week, desperate. Will swap my drawing set.' },
-  { id: 'r2', title: 'Looking for a portable hard drive (1TB+)', user: 'Karan Singh', timeAgo: '2h', urgency: 'normal', offers: 1, emoji: '💾', desc: 'Need to backup my project files before semester ends.' },
-  { id: 'r3', title: 'Anyone have a bike pump?', user: 'Dev Malhotra', timeAgo: '3h', urgency: 'normal', offers: 3, emoji: '🚲', desc: 'Flat tyre on my cycle. Just need it for 20 minutes.' },
-  { id: 'r4', title: 'Lab coat size M/L needed', user: 'Meera Iyer', timeAgo: '5h', urgency: 'normal', offers: 0, emoji: '🥼', desc: 'Mine got damaged in the chem lab. Need one for practical tomorrow.' },
-  { id: 'r5', title: 'Need extension cord 10m for studio', user: 'Ananya Sharma', timeAgo: '1d', urgency: 'normal', offers: 2, emoji: '🔌', desc: 'Photo shoot project. Need for the weekend.' },
-];
-
-function RequestsTab() {
-  return (
-    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-muted)' }}>
-          {MOCK_REQUESTS.length} open requests
-        </p>
-        <button className="btn btn-primary btn-sm" style={{ gap: 4 }}>
-          <Plus size={14} /> New Request
-        </button>
-      </div>
-      {MOCK_REQUESTS.map(req => (
-        <div
-          key={req.id}
-          className="card"
-          style={{
-            padding: '14px',
-            borderLeft: `3px solid ${req.urgency === 'urgent' ? 'var(--accent-rose)' : 'var(--accent-amber)'}`,
-          }}
-        >
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 'var(--radius-md)',
-              background: req.urgency === 'urgent' ? 'var(--accent-rose-surface)' : 'var(--accent-amber-surface)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 22, flexShrink: 0,
-            }}>
-              {req.emoji}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                <h3 style={{
-                  margin: '0 0 2px', fontSize: 'var(--text-sm)', fontWeight: 700,
-                  color: 'var(--text-primary)', flex: 1, lineHeight: 1.3,
-                }}>
-                  {req.title}
-                </h3>
-                {req.urgency === 'urgent' && (
-                  <span style={{
-                    background: 'var(--accent-rose-surface)', color: 'var(--accent-rose)',
-                    fontSize: 9, fontWeight: 700, padding: '2px 6px',
-                    borderRadius: 'var(--radius-pill)', flexShrink: 0,
-                  }}>
-                    Urgent
-                  </span>
-                )}
-              </div>
-              <p style={{ margin: '0 0 6px', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                {req.desc}
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{req.user} · {req.timeAgo}</span>
-                {req.offers > 0 && (
-                  <span style={{
-                    background: 'rgba(34,197,94,0.12)', color: 'var(--color-donate)',
-                    fontSize: 10, fontWeight: 700, padding: '1px 6px',
-                    borderRadius: 'var(--radius-pill)',
-                  }}>
-                    {req.offers} can help
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 10 }}>
-            I Can Help
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+function labelForType(t: CommunityEvent['eventType']): string {
+  return {
+    swap: 'Swap drive',
+    repair: 'Repair café',
+    cleanup: 'Cleanup',
+    workshop: 'Workshop',
+    drive: 'Collection drive',
+    challenge: 'Challenge',
+  }[t];
 }

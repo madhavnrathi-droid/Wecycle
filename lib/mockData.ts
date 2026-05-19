@@ -539,7 +539,7 @@ export const EVENTS: CommunityEvent[] = [
     attendees: 41,
     maxAttendees: 80,
     colorAccent: '#3DD6F5',
-    organizer: USERS[2],
+    organizer: USERS[0],
     tags: ['cleanup', 'environment', 'team'],
     rsvpd: false,
   },
@@ -582,11 +582,15 @@ export const EVENTS: CommunityEvent[] = [
     location: 'Main Gate Foyer',
     attendees: 56,
     colorAccent: '#3DD6F5',
-    organizer: USERS[1],
+    organizer: USERS[0],
     tags: ['e-waste', 'electronics', 'recycling'],
     rsvpd: false,
   },
 ];
+
+/* IDs of events organized by the current viewer — drives the
+   "Uploads" and "Activity" surfaces. */
+export const MY_EVENT_IDS = ['e3', 'e6'];
 
 /* ─── LOST & FOUND ─────────────────────────────── */
 
