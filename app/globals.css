@@ -559,11 +559,22 @@ body {
 @media (min-width: 768px) {
   .app-container { max-width: 720px; }
 }
+/* Desktop: stop pinching the layout. We give the page near-full width with
+   modest side gutters, so the masonry, events list, inventory tiles, and
+   activity feed all fill a 16" MacBook viewport instead of huddling in the
+   middle. Existing column counts stay the same, which makes every individual
+   card larger as the container grows. */
 @media (min-width: 1024px) {
-  .app-container { max-width: 1200px; }
+  .app-container { max-width: min(100vw - 48px, 1480px); }
+}
+@media (min-width: 1280px) {
+  .app-container { max-width: min(100vw - 64px, 1720px); }
 }
 @media (min-width: 1536px) {
-  .app-container { max-width: 1480px; }
+  .app-container { max-width: min(100vw - 80px, 1920px); }
+}
+@media (min-width: 1800px) {
+  .app-container { max-width: min(100vw - 96px, 2160px); }
 }
 
 .safe-bottom { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
@@ -879,6 +890,10 @@ body {
 @media (min-width: 768px) {
   .content-wide { padding-left: 32px; padding-right: 32px; }
 }
+@media (min-width: 1024px) { .content-wide { max-width: 1400px; } }
+@media (min-width: 1280px) { .content-wide { max-width: 1680px; } }
+@media (min-width: 1536px) { .content-wide { max-width: 1880px; } }
+@media (min-width: 1800px) { .content-wide { max-width: 2120px; } }
 
 /* Two-column desktop split: main feed + side rail */
 .split-feed {
@@ -889,11 +904,17 @@ body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
     gap: 32px;
-    max-width: 1120px;
+    max-width: 1400px;          /* was 1120 — give the grid room to breathe */
     margin: 0 auto;
     padding: 24px 24px 80px;
     align-items: start;
   }
+}
+@media (min-width: 1280px) { .split-feed { max-width: 1680px !important; gap: 36px; } }
+@media (min-width: 1536px) { .split-feed { max-width: 1880px !important; gap: 40px; } }
+@media (min-width: 1800px) { .split-feed { max-width: 2120px !important; } }
+@media (min-width: 1024px) {
+  /* (re-open the original media block scope for the existing inner rules) */
   .split-feed > main {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-xl);
@@ -2161,7 +2182,9 @@ body {
   align-items: center;
   justify-content: space-around;
   padding: 10px 12px;
-  margin: 0 10px 16px;
+  /* Lifted ~3mm off the viewport edge (was 16px). Reads better above the
+     home-bar on iOS and gives the floating pill more breathing room on desktop. */
+  margin: 0 10px 27px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 32px;
