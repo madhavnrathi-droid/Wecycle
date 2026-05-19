@@ -809,10 +809,15 @@ body {
 @media (min-width: 1024px) {
   .feed-greeting-row {
     flex-direction: row;
-    align-items: flex-end;
-    gap: 24px;
+    align-items: center;     /* was flex-end — center reads tighter at smaller h1 */
+    gap: 20px;
+    padding-top: 8px !important;
+    padding-bottom: 10px !important;
   }
   .feed-greeting-row > :first-child { flex: 0 0 auto; }
+  /* Compact the greeting H1 on desktop so the grid is the visual hero. */
+  .feed-greeting-row > :first-child h1 { font-size: 18px !important; }
+  .feed-greeting-row > :first-child p  { font-size: 12px; }
   /* Stretch the search all the way to the right edge of the grid */
   .feed-greeting-search {
     display: block !important;
@@ -2032,6 +2037,9 @@ body {
    MASONRY (Pinterest) — responsive columns
    ═══════════════════════════════════════════════ */
 
+/* Pinterest-style waterfall: tight gaps, plenty of columns so the mosaic
+   reads as one dense canvas instead of a sparse grid. Cards size to whatever
+   pixels are left after gaps, which scales naturally with the wider container. */
 .masonry-2 {
   column-count: 2;            /* mobile  */
   column-gap: 8px;
@@ -2043,20 +2051,28 @@ body {
   width: 100%;
 }
 @media (min-width: 768px) {
-  .masonry-2  { column-count: 4; column-gap: 10px; }
-  .masonry-2 > * { margin-bottom: 10px; }
+  .masonry-2  { column-count: 4; column-gap: 8px; }
+  .masonry-2 > * { margin-bottom: 8px; }
 }
 @media (min-width: 1024px) {
-  .masonry-2  { column-count: 5; column-gap: 12px; }
-  .masonry-2 > * { margin-bottom: 12px; }
+  .masonry-2  { column-count: 5; column-gap: 8px; }
+  .masonry-2 > * { margin-bottom: 8px; }
 }
 @media (min-width: 1280px) {
-  .masonry-2  { column-count: 6; column-gap: 12px; }
-  .masonry-2 > * { margin-bottom: 12px; }
+  .masonry-2  { column-count: 6; column-gap: 8px; }
+  .masonry-2 > * { margin-bottom: 8px; }
 }
-@media (min-width: 1536px) {
-  .masonry-2  { column-count: 7; column-gap: 14px; }
-  .masonry-2 > * { margin-bottom: 14px; }
+@media (min-width: 1440px) {
+  .masonry-2  { column-count: 7; column-gap: 10px; }
+  .masonry-2 > * { margin-bottom: 10px; }
+}
+@media (min-width: 1700px) {
+  .masonry-2  { column-count: 8; column-gap: 10px; }
+  .masonry-2 > * { margin-bottom: 10px; }
+}
+@media (min-width: 1900px) {
+  .masonry-2  { column-count: 9; column-gap: 12px; }
+  .masonry-2 > * { margin-bottom: 12px; }
 }
 
 /* ═══════════════════════════════════════════════

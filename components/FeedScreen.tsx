@@ -204,14 +204,18 @@ export default function FeedScreen({ onOpenMenu, onOpenAccount, onOpenItem }: Fe
         </div>
       </section>
 
-      {/* ── MASONRY 2-COL GRID ── */}
-      <section style={{ padding: '0 12px' }}>
+      {/* ── MASONRY (Pinterest-style waterfall) ──
+         Tight side padding so the grid reads as edge-to-edge on desktop —
+         the .app-container already gives us the outer gutter. */}
+      <section className="masonry-shell" style={{ padding: '0 8px' }}>
         <div className="masonry-2">
           {filtered.map((item, idx) => (
             <FeedCard
               key={item.id}
               item={item}
-              tall={idx % 5 === 0 || idx % 5 === 3}
+              /* Pinterest-style: cycle through 5 aspect ratios so the waterfall
+                 has the irregular puzzle-piece flow instead of a 2-state stripe. */
+              variant={(['xtall','tall','portrait','square','landscape'] as const)[idx % 5]}
               isSaved={savedIds.has(item.id)}
               onToggleSave={() => {
                 setSavedIds(prev => {
@@ -243,18 +247,28 @@ export default function FeedScreen({ onOpenMenu, onOpenAccount, onOpenItem }: Fe
 
 /* ── CARD ──────────────────────────────────────── */
 
+type FeedCardVariant = 'xtall' | 'tall' | 'portrait' | 'square' | 'landscape';
+
+const VARIANT_RATIOS: Record<FeedCardVariant, string> = {
+  xtall:     '0.58',   /* ~3:5  — dramatic vertical */
+  tall:      '0.72',   /* ~4:5.5 */
+  portrait:  '0.82',
+  square:    '1.00',
+  landscape: '1.20',   /* short, wide-ish */
+};
+
 function FeedCard({
-  item, tall, isSaved, onToggleSave, onClick,
+  item, variant, isSaved, onToggleSave, onClick,
 }: {
   item: MarketplaceItem;
-  tall: boolean;
+  variant: FeedCardVariant;
   isSaved: boolean;
   onToggleSave: () => void;
   onClick: () => void;
 }) {
   const photos = getItemPhotos(item.id, item.category);
   const isPriced = item.listingType === 'sell';
-  const ar = tall ? '0.72' : '0.92';
+  const ar = VARIANT_RATIOS[variant];
 
   return (
     <div className="feed-card" style={{ aspectRatio: ar, padding: 0 }} aria-label={`Open ${item.title}`}>
