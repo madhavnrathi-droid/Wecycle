@@ -49,7 +49,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo]   = useState<string | null>(null);
 
   const resetAll = () => {
     setTab('signin');
@@ -60,7 +59,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     setPassword('');
     setSubmitting(false);
     setError(null);
-    setInfo(null);
   };
 
   const handleClose = () => { resetAll(); onClose(); };
@@ -83,7 +81,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     e.preventDefault();
     if (!canSubmit || submitting) return;
     setError(null);
-    setInfo(null);
     setSubmitting(true);
     try {
       if (!hasSupabaseEnv) {
@@ -108,6 +105,10 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         if (err) throw err;
         handleClose();
       } else {
+        /* Sign up → immediate sign-in. Our DB trigger `wecycle_autoconfirm`
+           pre-fills email_confirmed_at on every new auth.users row, so no
+           confirmation link is ever sent and the credentials are usable on
+           the very next request. */
         const { data, error: err } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -119,21 +120,22 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
               initials:  initialsOf(name),
               college_id: collegeId.trim(),
             },
-            /* Email confirmation flow: if the Supabase project requires
-               confirmation, this redirect lands them back on the app. */
-            emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
           },
         });
         if (err) throw err;
-        /* When email confirmation is required, `data.session` is null on
-           signup — we tell the user to verify and switch back to sign-in. */
+
+        /* When the project's "Confirm email" toggle happens to still be on,
+           signUp returns `data.session === null`. Our trigger has already
+           confirmed the user at the DB level, so an immediate password-based
+           sign-in resolves to a real session without the user noticing. */
         if (!data.session) {
-          setInfo(`We sent a confirmation link to ${email.trim()}. Click it, then sign in.`);
-          setTab('signin');
-          setPassword('');
-        } else {
-          handleClose();
+          const { error: signInErr } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
+          if (signInErr) throw signInErr;
         }
+        handleClose();
       }
     } catch (err) {
       const msg = (err as Error).message || 'Something went wrong';
@@ -186,7 +188,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           <button
             type="button"
             role="tab"
-            onClick={() => { setTab('signin'); setError(null); setInfo(null); }}
+            onClick={() => { setTab('signin'); setError(null); }}
             aria-selected={tab === 'signin'}
             data-active={tab === 'signin' || undefined}
           >
@@ -195,7 +197,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           <button
             type="button"
             role="tab"
-            onClick={() => { setTab('signup'); setError(null); setInfo(null); }}
+            onClick={() => { setTab('signup'); setError(null); }}
             aria-selected={tab === 'signup'}
             data-active={tab === 'signup' || undefined}
           >
@@ -327,20 +329,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
             {error}
           </div>
         )}
-        {info && (
-          <div role="status" style={{
-            padding: '10px 12px',
-            background: 'rgba(34,197,94,0.10)',
-            border: '1px solid rgba(34,197,94,0.25)',
-            borderRadius: 'var(--radius-md)',
-            color: '#16A34A',
-            fontSize: 12, fontWeight: 500,
-            lineHeight: 1.45,
-          }}>
-            {info}
-          </div>
-        )}
-
         <p style={{
           margin: '4px 0 0',
           fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5,
