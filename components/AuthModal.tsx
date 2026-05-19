@@ -136,10 +136,14 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     else void verifyCode();
   };
 
+  /* Accept either a MAHE learner address (`@learner.manipal.edu`) or a
+     faculty / staff address (`@manipal.edu`). The trailing slash is anchored
+     so a stray "@learner.manipal.edu.fake.com" is rejected. */
+  const MAHE_EMAIL = /^[^\s@]+@(learner\.)?manipal\.edu$/i;
   const canContinue =
     name.trim().length >= 2 &&
     collegeId.trim().length >= 3 &&
-    (mode === 'email' ? /.+@.+\..+/.test(email) : phone.replace(/\D/g, '').length >= 8);
+    (mode === 'email' ? MAHE_EMAIL.test(email.trim()) : phone.replace(/\D/g, '').length >= 8);
 
   const target = mode === 'email' ? email : phone;
 
@@ -268,7 +272,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                   required
                 />
                 <span className="field-hint">
-                  Tip: any email works. MAHE / learner.manipal.edu addresses get community matching first.
+                  Use your MAHE email — <strong>@learner.manipal.edu</strong> or <strong>@manipal.edu</strong>.
                 </span>
               </div>
             ) : (

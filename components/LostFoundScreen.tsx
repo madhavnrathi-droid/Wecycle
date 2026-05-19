@@ -1,280 +1,521 @@
 'use client';
 
-import { useState } from 'react';
+/* Lost & Found — restyled to mirror the Marketplace surface.
+ *
+ *   - Same sticky top bar pattern (logo / menu / avatar slot)
+ *   - Same chip-row filters underneath (All / Lost / Found)
+ *   - Same masonry grid of image-first cards
+ *   - Custom buttons per-card: "I found this" (lost), "It's mine" (found),
+ *     and a contact action that routes through the email/WhatsApp helper.
+ *
+ * Cards are clickable and open a lightweight detail sheet. Contact actions
+ * gate behind auth via the shared onRequireAuth + onOpenStorefront props. */
+
+import { useMemo, useState } from 'react';
 import {
-  AlertCircle, CheckCircle, MapPin, MessageCircle, Plus,
-  Search,
+  Menu, Search, Plus, MapPin, AlertCircle, CheckCircle,
+  Mail, X,
 } from 'lucide-react';
-import { LOST_FOUND_ITEMS, type LostItem } from '../lib/mockData';
+import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
+import { useAuth } from '../lib/AuthContext';
+import { buildContactLinks, type ContactLink } from '../lib/contactUser';
+import { getAvatar } from '../lib/photos';
+import OnlineBadge from './OnlineBadge';
 
 interface LostFoundScreenProps {
   onReport: (defaultStatus?: 'lost' | 'found') => void;
+  onOpenMenu: () => void;
+  onOpenAccount: () => void;
+  onRequireAuth: () => void;
+  onOpenStorefront?: (user: User) => void;
 }
 
-export default function LostFoundScreen({ onReport }: LostFoundScreenProps) {
-  const [activeFilter, setActiveFilter] = useState<'all' | 'lost' | 'found'>('all');
+type StatusFilter = 'all' | 'lost' | 'found';
+
+function WhatsAppGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
+}
+
+export default function LostFoundScreen({
+  onReport, onOpenMenu, onOpenAccount, onRequireAuth, onOpenStorefront,
+}: LostFoundScreenProps) {
+  const { user, profile } = useAuth();
+  const [filter, setFilter] = useState<StatusFilter>('all');
   const [query, setQuery] = useState('');
+  const [openItem, setOpenItem] = useState<LostItem | null>(null);
 
-  const filtered = LOST_FOUND_ITEMS.filter(item => {
-    if (activeFilter !== 'all' && item.status !== activeFilter) return false;
-    if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = useMemo(() => {
+    return LOST_FOUND_ITEMS.filter(it => {
+      if (filter !== 'all' && it.status !== filter) return false;
+      if (query) {
+        const q = query.toLowerCase();
+        if (!`${it.title} ${it.description} ${it.lastSeen}`.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [filter, query]);
 
-  const lostCount = LOST_FOUND_ITEMS.filter(i => i.status === 'lost').length;
-  const foundCount = LOST_FOUND_ITEMS.filter(i => i.status === 'found').length;
+  const counts = useMemo(() => ({
+    lost:  LOST_FOUND_ITEMS.filter(i => i.status === 'lost').length,
+    found: LOST_FOUND_ITEMS.filter(i => i.status === 'found').length,
+  }), []);
 
   return (
-    <div className="screen-transition" style={{ paddingBottom: 100, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
-      {/* ── HEADER (mobile) ── */}
-      <header className="mobile-only-nav" style={{
-        position: 'sticky', top: 0, zIndex: 30,
-        background: 'var(--bg-overlay)',
-        backdropFilter: 'blur(28px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-        borderBottom: '1px solid var(--border-subtle)',
-        padding: '14px 16px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{
-              margin: 0, fontSize: 20, fontWeight: 700,
-              letterSpacing: '-0.025em', color: 'var(--text-primary)',
-            }}>
-              Lost &amp; Found
-            </h1>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-              Help reunite items with their owners
-            </p>
-          </div>
+      {/* ── TOP BAR ── */}
+      <header
+        className="mobile-only-nav"
+        style={{
+          position: 'sticky', top: 0, zIndex: 30,
+          background: 'var(--bg-overlay)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          padding: '14px 16px 10px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
-            onClick={() => onReport()}
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+            className="theme-toggle"
+            style={{ width: 38, height: 38 }}
+          >
+            <Menu size={18} strokeWidth={1.8} />
+          </button>
+          <h1 style={{
+            margin: 0, flex: 1, textAlign: 'center',
+            fontSize: 15, fontWeight: 600,
+            letterSpacing: '-0.01em', color: 'var(--text-primary)',
+          }}>
+            Lost &amp; Found
+          </h1>
+          <button
+            onClick={onOpenAccount}
+            aria-label="Account"
+            className="theme-toggle"
             style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              background: 'var(--accent-lime)', color: '#0C0C0B',
-              border: 'none', padding: '9px 14px',
-              borderRadius: 'var(--radius-pill)',
-              fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              letterSpacing: '-0.01em',
+              width: 38, height: 38, borderRadius: '50%', overflow: 'hidden',
+              background: profile?.avatar_color ?? 'var(--bg-inset)',
+              padding: 0,
             }}
           >
-            <Plus size={14} strokeWidth={2.5} />
-            Report
+            {user ? (
+              <img
+                src={getAvatar(user.id)}
+                alt=""
+                width={38} height={38}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <span style={{ fontSize: 14 }}>·</span>
+            )}
           </button>
         </div>
+      </header>
 
-        {/* Search */}
-        <div style={{ position: 'relative' }}>
-          <Search size={14} strokeWidth={2} style={{
-            position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+      {/* ── GREETING + ACTION ── */}
+      <section className="feed-greeting-row" style={{ padding: '14px 20px 14px' }}>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{
+            margin: 0, fontSize: 22, fontWeight: 600,
+            letterSpacing: '-0.025em', color: 'var(--text-primary)',
+          }}>
+            Reunite lost things
+          </h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+            {counts.lost} lost · {counts.found} found in your community
+          </p>
+        </div>
+        {/* Search lives inline with the greeting on desktop */}
+        <div className="feed-greeting-search desktop-only" style={{ position: 'relative' }}>
+          <Search size={14} strokeWidth={1.8} style={{
+            position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
             color: 'var(--text-muted)',
           }} />
           <input
             type="search"
-            placeholder="Search lost or found items…"
-            className="form-input"
+            placeholder="Search lost or found…"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            style={{ paddingLeft: 34 }}
-            aria-label="Search lost and found items"
+            className="search-pill"
+            aria-label="Search lost and found"
+            style={{ width: '100%' }}
           />
         </div>
-      </header>
+      </section>
 
-      {/* ── STATS PAIR ── */}
-      <section style={{
-        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
-        padding: '18px 18px',
-        borderBottom: '1px solid var(--border-subtle)',
-      }}>
+      {/* Mobile search */}
+      <section className="mobile-only" style={{ padding: '0 16px 12px' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={15} strokeWidth={1.8} style={{
+            position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+            color: 'var(--text-muted)',
+          }} />
+          <input
+            type="search"
+            placeholder="Search lost or found…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="search-pill"
+            aria-label="Search lost and found"
+          />
+        </div>
+      </section>
+
+      {/* ── REPORT BUTTONS (two custom, prominent) ── */}
+      <section style={{ padding: '0 16px 14px', display: 'flex', gap: 10 }}>
         <button
-          onClick={() => setActiveFilter('lost')}
-          aria-pressed={activeFilter === 'lost'}
+          onClick={() => { if (!user) { onRequireAuth(); return; } onReport('lost'); }}
           style={{
-            paddingRight: 14, borderRight: '1px solid var(--border-subtle)',
-            display: 'flex', alignItems: 'center', gap: 12,
-            background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
-            color: 'inherit',
+            flex: 1, height: 44, borderRadius: 999,
+            background: 'rgba(237,46,80,0.10)',
+            color: 'var(--accent-rose)',
+            border: '1px solid rgba(237,46,80,0.22)',
+            cursor: 'pointer',
+            fontSize: 13, fontWeight: 600,
+            letterSpacing: '-0.01em',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
         >
-          <AlertCircle size={22} strokeWidth={2} style={{ color: 'var(--accent-rose)', flexShrink: 0 }} />
-          <div>
-            <p style={{
-              margin: 0, fontSize: 22, fontWeight: 700,
-              letterSpacing: '-0.025em', color: 'var(--text-primary)',
-              lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
-            }}>
-              {lostCount}
-            </p>
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-              Lost items
-            </p>
-          </div>
+          <AlertCircle size={14} strokeWidth={2} />
+          Report lost
         </button>
         <button
-          onClick={() => setActiveFilter('found')}
-          aria-pressed={activeFilter === 'found'}
+          onClick={() => { if (!user) { onRequireAuth(); return; } onReport('found'); }}
           style={{
-            paddingLeft: 14,
-            display: 'flex', alignItems: 'center', gap: 12,
-            background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
-            color: 'inherit',
+            flex: 1, height: 44, borderRadius: 999,
+            background: 'rgba(34,197,94,0.10)',
+            color: '#16A34A',
+            border: '1px solid rgba(34,197,94,0.22)',
+            cursor: 'pointer',
+            fontSize: 13, fontWeight: 600,
+            letterSpacing: '-0.01em',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
         >
-          <CheckCircle size={22} strokeWidth={2} style={{ color: 'var(--accent-lime-dim)', flexShrink: 0 }} />
-          <div>
-            <p style={{
-              margin: 0, fontSize: 22, fontWeight: 700,
-              letterSpacing: '-0.025em', color: 'var(--text-primary)',
-              lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
-            }}>
-              {foundCount}
-            </p>
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-              Found items
-            </p>
-          </div>
+          <CheckCircle size={14} strokeWidth={2} />
+          Report found
         </button>
       </section>
 
       {/* ── FILTER CHIPS ── */}
-      <div style={{ padding: '12px 16px', display: 'flex', gap: 6 }}>
-        {(['all', 'lost', 'found'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
-            className={`filter-chip ${activeFilter === f ? 'active' : ''}`}
-            aria-pressed={activeFilter === f}
-          >
-            {f === 'all' ? 'All' : f === 'lost' ? '😟 Lost' : '🎉 Found'}
-          </button>
-        ))}
-      </div>
+      <section style={{ padding: '0 0 12px' }}>
+        <div className="chip-row">
+          {([
+            { id: 'all',   label: 'All'   },
+            { id: 'lost',  label: 'Lost'  },
+            { id: 'found', label: 'Found' },
+          ] as Array<{ id: StatusFilter; label: string }>).map(c => (
+            <button
+              key={c.id}
+              onClick={() => setFilter(c.id)}
+              className={`pill ${filter === c.id ? 'pill-active' : ''}`}
+              aria-pressed={filter === c.id}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
-      {/* ── ITEMS ── */}
-      <div>
-        {filtered.length === 0 ? (
-          <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+      {/* ── MASONRY GRID ── */}
+      <section className="masonry-shell" style={{ padding: '0 8px' }}>
+        <div className="masonry-2">
+          {filtered.map((item, idx) => (
+            <LostFoundCard
+              key={item.id}
+              item={item}
+              variant={(['portrait','square','landscape','tall','portrait'] as const)[idx % 5]}
+              onClick={() => setOpenItem(item)}
+            />
+          ))}
+        </div>
+
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '64px 24px' }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-            <p style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
-              No items match
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+              Nothing here yet
             </p>
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-              Try a different filter or report a new item
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              Try a different filter or report something
             </p>
           </div>
-        ) : (
-          filtered.map(item => (
-            <LostFoundRow key={item.id} item={item} />
-          ))
         )}
-      </div>
+      </section>
+
+      {openItem && (
+        <LostFoundDetailSheet
+          item={openItem}
+          onClose={() => setOpenItem(null)}
+          onRequireAuth={onRequireAuth}
+          onOpenStorefront={onOpenStorefront}
+          viewerName={profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined}
+        />
+      )}
     </div>
   );
 }
 
-function LostFoundRow({ item }: { item: LostItem }) {
+/* ── Card ──────────────────────────────────────── */
+
+type Variant = 'tall' | 'portrait' | 'square' | 'landscape';
+const RATIOS: Record<Variant, string> = {
+  tall: '0.72', portrait: '0.82', square: '1.00', landscape: '1.20',
+};
+
+function LostFoundCard({
+  item, variant, onClick,
+}: { item: LostItem; variant: Variant; onClick: () => void }) {
   const isLost = item.status === 'lost';
-  const accent = isLost ? 'var(--accent-rose)' : 'var(--accent-lime-dim)';
+  const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
+  const bg = isLost ? 'rgba(237,46,80,0.10)' : 'rgba(34,197,94,0.10)';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="feed-card"
+      style={{ aspectRatio: RATIOS[variant], padding: 0 }}
+      aria-label={`Open ${item.title}`}
+    >
+      {/* Emoji-on-color hero, mirrors how LF items have been seeded */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: item.photoColor,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 'clamp(48px, 30%, 96px)',
+      }}>
+        {item.photoIcon}
+      </div>
+      <span style={{
+        position: 'absolute', top: 8, left: 8,
+        background: bg,
+        color: accent,
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        padding: '4px 10px',
+        borderRadius: 999,
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}>
+        {item.status}
+      </span>
+      {item.verified && (
+        <span style={{
+          position: 'absolute', top: 8, right: 8,
+          background: 'rgba(255,255,255,0.92)',
+          color: '#16A34A',
+          padding: 4, borderRadius: '50%',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }} aria-label="Verified">
+          <CheckCircle size={12} strokeWidth={2.5} />
+        </span>
+      )}
+      <div className="feed-card-overlay">
+        <p className="feed-card-title">{item.title}</p>
+        <div className="feed-card-meta">
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <MapPin size={10} strokeWidth={2} /> {item.lastSeen}
+          </span>
+          {item.reward && (
+            <span className="feed-card-price">
+              {item.reward}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* ── Detail sheet ──────────────────────────────── */
+
+function LostFoundDetailSheet({
+  item, onClose, onRequireAuth, onOpenStorefront, viewerName,
+}: {
+  item: LostItem;
+  onClose: () => void;
+  onRequireAuth: () => void;
+  onOpenStorefront?: (user: User) => void;
+  viewerName?: string;
+}) {
+  const { user } = useAuth();
+  const isLost = item.status === 'lost';
+  const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
+
+  /* Build email/WhatsApp links targeted at the reporter. */
+  const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
+    owner: {
+      name: item.user.name,
+      email: item.user.email,
+      phone: item.user.phone,
+      contact: item.user.contact,
+    },
+    action: isLost ? 'general' : 'general',
+    /* We re-use the item-shaped quote for the body since LostItem has a title */
+    item: { title: item.title, category: 'Lost & Found', listingType: 'free' },
+    viewerName,
+  }), [item, viewerName, isLost]);
+
+  const claimLabel = isLost ? 'I found this' : "It's mine";
+
+  const handleContact = (link: ContactLink) => {
+    if (!user) { onRequireAuth(); return; }
+    if (link.channel === 'whatsapp') {
+      window.open(link.href, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = link.href;
+    }
+  };
 
   return (
-    <article style={{
-      padding: '16px 16px',
-      borderBottom: '1px solid var(--border-subtle)',
-    }}>
-      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          zIndex: 100,
+        }}
+      />
+      <div role="dialog" aria-label={item.title} style={{
+        position: 'fixed', left: '50%', bottom: 0,
+        transform: 'translateX(-50%)',
+        width: '100%', maxWidth: 520,
+        background: 'var(--bg-card)',
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        padding: '14px 20px calc(20px + env(safe-area-inset-bottom, 0px))',
+        zIndex: 101,
+        maxHeight: '88svh',
+        overflowY: 'auto',
+      }}>
         <div style={{
-          width: 64, height: 64, borderRadius: 14,
+          width: 38, height: 4, background: 'var(--border-default)',
+          borderRadius: 999, margin: '0 auto 14px',
+        }} aria-hidden="true" />
+
+        <header style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span style={{
+            background: isLost ? 'rgba(237,46,80,0.12)' : 'rgba(34,197,94,0.12)',
+            color: accent,
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            padding: '4px 10px', borderRadius: 999,
+          }}>{item.status}</span>
+          <h2 style={{
+            margin: 0, fontSize: 18, fontWeight: 600,
+            letterSpacing: '-0.025em', color: 'var(--text-primary)',
+            flex: 1, minWidth: 0,
+          }}>{item.title}</h2>
+          <button onClick={onClose} aria-label="Close" className="theme-toggle">
+            <X size={18} strokeWidth={1.8} />
+          </button>
+        </header>
+
+        <div style={{
+          aspectRatio: '4 / 3', borderRadius: 16, overflow: 'hidden',
           background: item.photoColor,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 30, flexShrink: 0, position: 'relative',
+          fontSize: 96, marginBottom: 14,
+        }}>{item.photoIcon}</div>
+
+        <p style={{
+          margin: '0 0 14px', fontSize: 14, lineHeight: 1.55, color: 'var(--text-secondary)',
+          whiteSpace: 'pre-wrap',
+        }}>{item.description}</p>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14,
+          padding: '12px 14px', background: 'var(--bg-inset)', borderRadius: 14,
         }}>
-          {item.photoIcon}
-          {item.verified && (
+          <div style={{
+            width: 38, height: 38, borderRadius: '50%', overflow: 'hidden',
+            background: item.user.color, flexShrink: 0,
+          }}>
+            <img
+              src={getAvatar(item.user.id)}
+              alt=""
+              width={38} height={38}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenStorefront?.(item.user)}
+            style={{
+              all: 'unset', cursor: onOpenStorefront ? 'pointer' : 'default',
+              flex: 1, minWidth: 0,
+            }}
+          >
             <div style={{
-              position: 'absolute', bottom: -3, right: -3,
-              width: 18, height: 18, borderRadius: '50%',
-              background: '#22C55E',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '2.5px solid var(--bg-base)',
-            }} aria-label="Verified">
-              <CheckCircle size={9} strokeWidth={3} style={{ color: '#fff' }} />
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+            }}>
+              <span>{item.user.name}</span>
+              <OnlineBadge isOnline={item.user.isOnline} />
             </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              <MapPin size={11} strokeWidth={1.8} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />
+              {item.lastSeen} · {item.timeAgo}
+            </div>
+          </button>
+          {item.reward && (
+            <span style={{
+              background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
+              padding: '4px 10px', borderRadius: 999, fontWeight: 600, fontSize: 12,
+            }}>
+              {item.reward}
+            </span>
           )}
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
-            <h3 style={{
-              margin: 0, fontSize: 14, fontWeight: 700,
-              color: 'var(--text-primary)', flex: 1, lineHeight: 1.25, letterSpacing: '-0.01em',
-            }}>
-              {item.title}
-            </h3>
-            <span style={{
-              background: isLost ? 'rgba(237,46,80,0.12)' : 'rgba(168,221,0,0.18)',
-              color: accent,
-              fontSize: 10, fontWeight: 600,
-              padding: '3px 9px', borderRadius: 999, flexShrink: 0,
+        {/* Custom action row */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => contactLinks[0] && handleContact(contactLinks[0])}
+            disabled={contactLinks.length === 0}
+            style={{
+              flex: '1 1 200px', minWidth: 0, height: 48, borderRadius: 14,
+              background: 'var(--text-primary)',
+              color: 'var(--bg-base)',
+              border: 'none', cursor: contactLinks.length ? 'pointer' : 'not-allowed',
+              fontSize: 14, fontWeight: 600,
+              opacity: contactLinks.length ? 1 : 0.6,
               letterSpacing: '-0.01em',
-            }}>
-              {isLost ? 'Lost' : 'Found'}
-            </span>
-          </div>
-          <p style={{
-            margin: '0 0 8px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45,
-            display: '-webkit-box', WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical', overflow: 'hidden',
-          }}>
-            {item.description}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <MapPin size={11} strokeWidth={1.8} /> {item.lastSeen}
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>{item.user.name.split(' ')[0]} · {item.timeAgo}</span>
-            {item.reward && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span style={{
-                  background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
-                  padding: '2px 8px', borderRadius: 999, fontWeight: 600,
-                }}>
-                  Reward · {item.reward}
-                </span>
-              </>
-            )}
-          </div>
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {claimLabel}
+          </button>
+          {contactLinks.length >= 2 ? contactLinks.map(link => (
+            <button
+              key={link.channel}
+              onClick={() => handleContact(link)}
+              aria-label={link.ariaLabel}
+              style={{
+                flex: '0 0 auto', height: 48, padding: '0 14px', borderRadius: 14,
+                background: link.channel === 'whatsapp' ? '#25D366' : 'transparent',
+                color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-primary)',
+                border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-default)',
+                cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              {link.channel === 'whatsapp' ? <WhatsAppGlyph /> : <Mail size={14} strokeWidth={2} />}
+              {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+            </button>
+          )) : null}
         </div>
       </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button
-          style={{
-            flex: 1, background: 'var(--text-primary)', color: 'var(--bg-base)',
-            border: 'none', borderRadius: 999,
-            padding: '10px',
-            fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          {isLost ? 'I found this' : "It's mine"}
-        </button>
-        <button
-          aria-label="Message reporter"
-          style={{
-            background: 'transparent',
-            border: '1px solid var(--border-default)', borderRadius: 999,
-            padding: '10px 14px',
-            color: 'var(--text-secondary)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <MessageCircle size={15} strokeWidth={1.8} />
-        </button>
-      </div>
-    </article>
+    </>
   );
 }

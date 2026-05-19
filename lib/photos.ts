@@ -95,6 +95,48 @@ export function getItemPhotos(id: string, category?: string): string[] {
   return [getCategoryPhoto(category)];
 }
 
+/* ── Mixed-media (photo + video) sets ─────────────────
+   When an item has a video in its gallery, the feed's PhotoCarousel renders
+   a real <video> element instead of <img> and autoplays it (muted) when the
+   slide is active and the card is in the viewport. Source clips are tiny
+   royalty-free MP4s hosted on Pixabay's CDN so the demo is bandwidth-safe. */
+
+interface VideoEntry { kind: 'video'; src: string; poster?: string; }
+export type MediaEntry = string | VideoEntry;
+
+export const ITEM_MEDIA_SETS: Record<string, MediaEntry[]> = {
+  /* Sony headphones — photo, *video walkthrough*, side photo. Putting the
+     video at index 1 demonstrates the "swipe to second slide → autoplays"
+     behavior the brief calls out. */
+  m1: [
+    u('1505740420928-5e560c06d30e'),
+    {
+      kind: 'video',
+      src: 'https://cdn.pixabay.com/video/2021/10/12/91744-633165956_tiny.mp4',
+      poster: u('1583394838336-acd977736f90'),
+    },
+    u('1606220945770-b5b6c2c55bf1'),
+  ],
+  /* Yoga mat: open with a short clip showing it unrolling */
+  m6: [
+    u('1545205597-3d9d02c29597'),
+    {
+      kind: 'video',
+      src: 'https://cdn.pixabay.com/video/2024/04/30/210064_tiny.mp4',
+      poster: u('1517649763962-0c623066013b'),
+    },
+  ],
+};
+
+/* Returns the full media gallery for a card (mixed photo + video).
+   Falls back through video-sets → photo-sets → single photo → category. */
+export function getItemMedia(id: string, category?: string): MediaEntry[] {
+  if (ITEM_MEDIA_SETS[id]) return ITEM_MEDIA_SETS[id];
+  if (ITEM_PHOTO_SETS[id]) return ITEM_PHOTO_SETS[id];
+  if (ITEM_PHOTOS[id])     return [ITEM_PHOTOS[id]];
+  return [getCategoryPhoto(category)];
+}
+
 /* Generic, themed Unsplash fallback by category. */
 export function getCategoryPhoto(category?: string): string {
   switch ((category || '').toLowerCase()) {

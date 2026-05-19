@@ -1,10 +1,13 @@
 'use client';
 
-import { Home, Plus, Package, CalendarDays, Activity } from 'lucide-react';
+import { Home, Plus, Package, CalendarDays, Search } from 'lucide-react';
 
+/* Activity dropped from the bottom nav — its post-level metrics now live
+   inline on each Inventory card (and on the item-detail page for the owner).
+   Lost & Found takes the freed-up slot since it's a high-traffic flow. */
 export type Screen =
-  | 'feed' | 'events' | 'activity' | 'inventory'
-  | 'market' | 'lost_found' | 'impact' | 'account';
+  | 'feed' | 'events' | 'lost_found' | 'inventory'
+  | 'market' | 'impact' | 'account' | 'activity';
 
 interface BottomNavProps {
   active: Screen;
@@ -41,11 +44,11 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
         </button>
 
         <NavButton
-          label="Activity"
-          isActive={active === 'activity'}
-          onClick={() => onChange('activity')}
+          label="Lost & Found"
+          isActive={active === 'lost_found'}
+          onClick={() => onChange('lost_found')}
         >
-          <Activity size={20} strokeWidth={active === 'activity' ? 2 : 1.7} />
+          <Search size={20} strokeWidth={active === 'lost_found' ? 2 : 1.7} />
         </NavButton>
 
         <NavButton

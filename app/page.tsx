@@ -15,6 +15,7 @@ import ActivityScreen from '../components/ActivityScreen';
 import SettingsScreen from '../components/SettingsScreen';
 import NotificationsScreen from '../components/NotificationsScreen';
 import FeedbackScreen from '../components/FeedbackScreen';
+import StorefrontScreen from '../components/StorefrontScreen';
 import Drawer from '../components/Drawer';
 import PostSheet from '../components/PostSheet';
 import ShareItemModal from '../components/forms/ShareItemModal';
@@ -25,7 +26,7 @@ import EditItemModal from '../components/forms/EditItemModal';
 import AlertFormModal from '../components/forms/AlertFormModal';
 import AuthModal from '../components/AuthModal';
 import { useAuth } from '../lib/AuthContext';
-import type { MarketplaceItem, CommunityEvent } from '../lib/mockData';
+import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import type { WecycleAlert } from '../lib/alerts';
 import {
@@ -52,6 +53,9 @@ export default function WecycleApp() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openItem, setOpenItem] = useState<MarketplaceItem | null>(null);
   const [openEvent, setOpenEvent] = useState<CommunityEvent | null>(null);
+  /* Storefront takes over the viewport when set — clicking any author avatar
+     or owner card lands here. Cleared on back. */
+  const [openStorefront, setOpenStorefront] = useState<User | null>(null);
   const [editItem, setEditItem] = useState<MarketplaceItem | null>(null);
   const [editingAlert, setEditingAlert] = useState<WecycleAlert | null>(null);
   /* Track RSVPs at app-level so EventsScreen + EventDetailScreen stay in sync */
@@ -213,7 +217,9 @@ export default function WecycleApp() {
     }, 80);
   };
 
-  /* Item detail screen takes over the viewport */
+  /* Item detail screen takes over the viewport. Logged-out viewers can read
+     everything; the contact buttons gate via `onRequireAuth`. Tapping the
+     owner card opens their storefront. */
   if (openItem) {
     return (
       <>
@@ -223,7 +229,28 @@ export default function WecycleApp() {
             <ItemDetailScreen
               item={openItem}
               onBack={() => setOpenItem(null)}
-              onContact={() => { /* messages in a future iteration */ }}
+              onRequireAuth={() => setModal('auth')}
+              onOpenStorefront={(u) => setOpenStorefront(u)}
+            />
+          </main>
+        </div>
+        <AuthModal open={modal === 'auth'} onClose={closeModal} />
+      </>
+    );
+  }
+
+  /* Storefront screen — accessed from any owner card / commenter avatar */
+  if (openStorefront) {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <StorefrontScreen
+              user={openStorefront}
+              onBack={() => setOpenStorefront(null)}
+              onOpenItem={(item) => { setOpenStorefront(null); setOpenItem(item); }}
+              onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
             />
           </main>
         </div>
@@ -292,10 +319,13 @@ export default function WecycleApp() {
               isOwner={isOwner}
               onBack={() => setOpenEvent(null)}
               onRsvp={() => toggleRsvp(openEvent.id)}
+              onRequireAuth={() => setModal('auth')}
+              onOpenStorefront={(u) => setOpenStorefront(u)}
               onEdit={isOwner ? () => { /* TODO: open edit-event modal */ } : undefined}
             />
           </main>
         </div>
+        <AuthModal open={modal === 'auth'} onClose={closeModal} />
       </>
     );
   }
@@ -324,6 +354,18 @@ export default function WecycleApp() {
               onToggleRsvp={toggleRsvp}
             />
           )}
+          {activeScreen === 'lost_found' && (
+            <LostFoundScreen
+              onReport={openReportLF}
+              onOpenMenu={() => setDrawerOpen(true)}
+              onOpenAccount={goToAccount}
+              onRequireAuth={() => setModal('auth')}
+              onOpenStorefront={(u) => setOpenStorefront(u)}
+            />
+          )}
+          {/* Activity is still reachable via Settings → Notifications hint
+             flows or the alerts CTA on the home feed, but it's no longer in
+             the bottom nav. */}
           {activeScreen === 'activity' && (
             <ActivityScreen
               onOpenMenu={() => setDrawerOpen(true)}
@@ -354,7 +396,6 @@ export default function WecycleApp() {
           )}
           {/* Desktop-only auxiliary screens */}
           {activeScreen === 'market'     && <MarketplaceScreen />}
-          {activeScreen === 'lost_found' && <LostFoundScreen onReport={openReportLF} />}
           {activeScreen === 'impact'     && <ImpactScreen />}
         </main>
 

@@ -1,20 +1,37 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronLeft, MapPin, Heart, Share2, MessageCircle, IndianRupee } from 'lucide-react';
-import type { MarketplaceItem } from '../lib/mockData';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee } from 'lucide-react';
+import type { MarketplaceItem, User } from '../lib/mockData';
 import { getItemPhotos, getAvatar } from '../lib/photos';
 import PhotoCarousel from './PhotoCarousel';
 import OnlineBadge from './OnlineBadge';
+import CommentsSection from './CommentsSection';
 import { useBreakpoint } from '../lib/useBreakpoint';
+import { useAuth } from '../lib/AuthContext';
+import { buildContactLinks, itemAction, actionLabel, type ContactLink } from '../lib/contactUser';
 
 interface ItemDetailScreenProps {
   item: MarketplaceItem;
   onBack: () => void;
-  onContact: () => void;
+  /** Invoked when an unauthenticated viewer tries to contact the owner. */
+  onRequireAuth: () => void;
+  /** Optional: tap an avatar/owner name to open their storefront. */
+  onOpenStorefront?: (user: User) => void;
 }
 
-export default function ItemDetailScreen({ item, onBack, onContact }: ItemDetailScreenProps) {
+/* WhatsApp logo glyph — lucide doesn't ship a brand icon, so we inline a minimal one.
+   Stroke matches the other action buttons. */
+function WhatsAppGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
+}
+
+export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
   const photos = getItemPhotos(item.id, item.category);
@@ -23,6 +40,44 @@ export default function ItemDetailScreen({ item, onBack, onContact }: ItemDetail
   const desc = item.description ?? '';
   const shouldClamp = desc.length > 140;
   const { isDesktop } = useBreakpoint();
+  const { user, profile } = useAuth();
+
+  /* Resolve contact channels the owner has accepted. We compute these
+     unconditionally so logged-out viewers see the right *number* of buttons
+     (just blurred behind an auth prompt); only the actual link is gated. */
+  const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
+    owner: {
+      name:    item.user.name,
+      email:   item.user.email,
+      phone:   item.user.phone,
+      contact: item.user.contact,
+    },
+    action: itemAction(item),
+    item,
+    viewerName: profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined,
+  }), [item, profile, user]);
+
+  const primaryActionLabel = actionLabel(itemAction(item));
+
+  const handleContactClick = (link: ContactLink) => {
+    if (!user) {
+      onRequireAuth();
+      return;
+    }
+    /* In-place navigation — opens the OS mail/WhatsApp handler reliably on
+       iOS and Android, and a new tab on desktop browsers. */
+    if (link.channel === 'whatsapp') {
+      /* Always open WhatsApp in a new tab so we don't lose context. */
+      window.open(link.href, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = link.href;
+    }
+  };
+
+  /* Convenience: when only one channel is on, the primary CTA carries the
+     action label ("Request to borrow"). When both, we surface two named
+     buttons ("Email Aditya" + "WhatsApp Aditya") side by side. */
+  const hasBoth = contactLinks.length >= 2;
 
   /* Desktop (≥1024px) gets an Amazon-style 2-column layout:
      photos on the left, title + meta + actions on the right.
@@ -41,7 +96,12 @@ export default function ItemDetailScreen({ item, onBack, onContact }: ItemDetail
         isPriced={isPriced}
         priceLabel={priceLabel}
         onBack={onBack}
-        onContact={onContact}
+        onRequireAuth={onRequireAuth}
+        onOpenStorefront={onOpenStorefront}
+        contactLinks={contactLinks}
+        primaryActionLabel={primaryActionLabel}
+        handleContactClick={handleContactClick}
+        hasBoth={hasBoth}
       />
     );
   }
@@ -205,15 +265,24 @@ export default function ItemDetailScreen({ item, onBack, onContact }: ItemDetail
               {item.user.role}
             </p>
           </div>
-          <button
-            onClick={onContact}
-            aria-label="Message owner"
-            className="theme-toggle"
-            style={{ marginRight: -4 }}
-          >
-            <MessageCircle size={16} strokeWidth={1.8} />
-          </button>
+          {/* Tappable owner row → storefront. Wrapped as a button for keyboard a11y. */}
+          {onOpenStorefront && (
+            <button
+              type="button"
+              onClick={() => onOpenStorefront(item.user)}
+              aria-label={`View ${item.user.name}'s profile`}
+              className="theme-toggle"
+              style={{ marginRight: -4 }}
+            >
+              <MessageCircle size={16} strokeWidth={1.8} />
+            </button>
+          )}
         </div>
+      </section>
+
+      {/* ── COMMENTS (mobile) ── */}
+      <section style={{ padding: '20px 20px 0' }}>
+        <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} />
       </section>
 
       {/* ── ACTION BAR ── */}
@@ -256,22 +325,49 @@ export default function ItemDetailScreen({ item, onBack, onContact }: ItemDetail
           >
             <Share2 size={18} strokeWidth={1.8} />
           </button>
-          <button
-            onClick={onContact}
-            style={{
-              flex: 1, height: 52, borderRadius: 999,
-              background: 'var(--text-primary)',
-              color: 'var(--bg-base)',
-              border: 'none', cursor: 'pointer',
-              fontSize: 14, fontWeight: 600,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {item.listingType === 'free' ? "I'll take it" :
-             item.listingType === 'borrow' ? 'Request to borrow' :
-             item.listingType === 'swap' ? 'Offer a swap' :
-             'Contact seller'}
-          </button>
+          {/* When the owner accepts both email + WhatsApp we surface two
+              clearly-labelled buttons. When only one channel is on, the single
+              CTA carries the action verb ("Request to borrow"). */}
+          {hasBoth ? (
+            contactLinks.map(link => (
+              <button
+                key={link.channel}
+                onClick={() => handleContactClick(link)}
+                aria-label={link.ariaLabel}
+                style={{
+                  flex: 1, height: 52, borderRadius: 999,
+                  background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                  color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                {link.channel === 'whatsapp' ? <WhatsAppGlyph size={15} /> : <Mail size={15} strokeWidth={2} />}
+                {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+              </button>
+            ))
+          ) : (
+            <button
+              onClick={() => contactLinks[0] && handleContactClick(contactLinks[0])}
+              disabled={contactLinks.length === 0}
+              aria-label={contactLinks[0]?.ariaLabel ?? primaryActionLabel}
+              style={{
+                flex: 1, height: 52, borderRadius: 999,
+                background: contactLinks[0]?.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                color: contactLinks[0]?.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                border: 'none', cursor: contactLinks.length ? 'pointer' : 'not-allowed',
+                fontSize: 14, fontWeight: 600,
+                letterSpacing: '-0.01em',
+                opacity: contactLinks.length ? 1 : 0.6,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {contactLinks[0]?.channel === 'whatsapp' && <WhatsAppGlyph size={15} />}
+              {primaryActionLabel}
+            </button>
+          )}
         </div>
       </section>
     </div>
@@ -294,18 +390,19 @@ interface DesktopLayoutProps {
   isPriced: boolean;
   priceLabel: string;
   onBack: () => void;
-  onContact: () => void;
+  onRequireAuth: () => void;
+  onOpenStorefront?: (user: User) => void;
+  contactLinks: ContactLink[];
+  primaryActionLabel: string;
+  handleContactClick: (link: ContactLink) => void;
+  hasBoth: boolean;
 }
 
 function DesktopLayout({
   item, photos, saved, setSaved, expanded, setExpanded,
-  shouldClamp, desc, isPriced, priceLabel, onBack, onContact,
+  shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
+  contactLinks, primaryActionLabel, handleContactClick, hasBoth,
 }: DesktopLayoutProps) {
-  const actionLabel =
-    item.listingType === 'free'   ? "I'll take it" :
-    item.listingType === 'borrow' ? 'Request to borrow' :
-    item.listingType === 'swap'   ? 'Offer a swap' :
-                                    'Contact seller';
   return (
     <div className="screen-transition" style={{ background: 'var(--bg-base)', minHeight: '100%' }}>
       {/* Slim top bar with back button */}
@@ -463,14 +560,20 @@ function DesktopLayout({
             </div>
           )}
 
-          {/* Owner card */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 14,
-            padding: '14px 16px',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 14,
-          }}>
+          {/* Owner card — tappable to open the storefront */}
+          <button
+            type="button"
+            onClick={() => onOpenStorefront?.(item.user)}
+            aria-label={`View ${item.user.name}'s profile`}
+            style={{
+              all: 'unset', cursor: onOpenStorefront ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', gap: 14,
+              padding: '14px 16px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 14,
+            }}
+          >
             <div style={{
               width: 44, height: 44, borderRadius: '50%',
               overflow: 'hidden',
@@ -498,27 +601,56 @@ function DesktopLayout({
                 {item.user.role}
               </p>
             </div>
-          </div>
+          </button>
 
-          {/* Action buttons — inline on desktop, no fixed bar */}
+          {/* Action buttons — inline on desktop, no fixed bar.
+              When both channels are accepted we show two named buttons.
+              When only one, the single CTA carries the action verb. */}
           <div style={{
-            display: 'flex', gap: 10, marginTop: 4,
+            display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap',
           }}>
-            <button
-              onClick={onContact}
-              style={{
-                flex: 1, height: 52, borderRadius: 14,
-                background: 'var(--text-primary)',
-                color: 'var(--bg-base)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 15, fontWeight: 600,
-                letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              <MessageCircle size={16} strokeWidth={2} />
-              {actionLabel}
-            </button>
+            {hasBoth ? (
+              contactLinks.map(link => (
+                <button
+                  key={link.channel}
+                  onClick={() => handleContactClick(link)}
+                  aria-label={link.ariaLabel}
+                  style={{
+                    flex: '1 1 220px', minWidth: 0, height: 52, borderRadius: 14,
+                    background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                    color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: 15, fontWeight: 600,
+                    letterSpacing: '-0.01em',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  {link.channel === 'whatsapp' ? <WhatsAppGlyph size={16} /> : <Mail size={16} strokeWidth={2} />}
+                  {link.channel === 'whatsapp' ? `WhatsApp ${item.user.name.split(' ')[0]}` : `Email ${item.user.name.split(' ')[0]}`}
+                </button>
+              ))
+            ) : (
+              <button
+                onClick={() => contactLinks[0] && handleContactClick(contactLinks[0])}
+                disabled={contactLinks.length === 0}
+                aria-label={contactLinks[0]?.ariaLabel ?? primaryActionLabel}
+                style={{
+                  flex: 1, height: 52, borderRadius: 14,
+                  background: contactLinks[0]?.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                  color: contactLinks[0]?.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                  border: 'none', cursor: contactLinks.length ? 'pointer' : 'not-allowed',
+                  fontSize: 15, fontWeight: 600,
+                  letterSpacing: '-0.01em',
+                  opacity: contactLinks.length ? 1 : 0.6,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {contactLinks[0]?.channel === 'whatsapp'
+                  ? <WhatsAppGlyph size={16} />
+                  : <MessageCircle size={16} strokeWidth={2} />}
+                {primaryActionLabel}
+              </button>
+            )}
             <button
               onClick={() => setSaved(s => !s)}
               aria-label={saved ? 'Saved' : 'Save'}
@@ -574,6 +706,11 @@ function DesktopLayout({
               </li>
             ))}
           </ul>
+
+          {/* Comments thread — full width below the right column on desktop */}
+          <div style={{ marginTop: 8 }}>
+            <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} />
+          </div>
         </div>
       </div>
     </div>

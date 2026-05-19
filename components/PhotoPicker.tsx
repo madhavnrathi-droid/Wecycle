@@ -20,51 +20,80 @@
 import {
   useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef,
 } from 'react';
-import { Plus, X, Camera, ImagePlus, Upload } from 'lucide-react';
-import { compressImages, type CompressedPhoto } from '../lib/imageCompression';
+import { Plus, X, Camera, ImagePlus, Video, Play } from 'lucide-react';
+import {
+  compressMediaBatch, MAX_VIDEO_BYTES, MediaTooLargeError,
+  type CompressedMedia,
+} from '../lib/mediaCompression';
 
 interface PhotoPickerProps {
-  photos: string[];                             /* object URLs currently in state */
-  onChange: (next: string[]) => void;            /* setter (reorder / add / remove) */
+  /** Object URLs currently held (photos and videos share this list). */
+  photos: string[];
+  onChange: (next: string[]) => void;
   max?: number;                                  /* hard cap, default 3 */
-  label?: string;                                /* hint shown in the empty state */
+  label?: string;
   /** When provided, the picker will skip the source-choice sheet and use this. */
   defaultSource?: 'camera' | 'library';
+  /** When false, the video option is hidden — photo-only consumers (alerts,
+   *  L&F report) opt out. Default true. */
+  allowVideo?: boolean;
 }
 
 export interface PhotoPickerHandle {
   /** Pull compressed blobs in current display order. */
   getBlobs: () => Blob[];
+  /** Pull rich media records (kind + poster + dimensions) in display order.
+   *  Mainly useful for the feed card which needs to know which entries are
+   *  videos so it can render `<video>` instead of `<img>`. */
+  getMedia: () => CompressedMedia[];
   /** Drop the internal blob cache (call after upload). */
   clear: () => void;
 }
 
 const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function PhotoPicker(
-  { photos, onChange, max = 3, label = 'first is cover', defaultSource },
+  { photos, onChange, max = 3, label = 'first is cover', defaultSource, allowVideo = true },
   ref,
 ) {
-  /* Map of objectURL → Blob, so the parent can hand us back any order and
-     we still ship the matching compressed bytes. */
-  const blobsRef = useRef<Map<string, Blob>>(new Map());
+  /* Map of objectURL → CompressedMedia, so the parent can hand us back any
+     order and we still ship the matching compressed bytes + know which
+     entries are videos. */
+  const mediaRef = useRef<Map<string, CompressedMedia>>(new Map());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(0); /* number of files currently compressing */
 
-  const libraryInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef  = useRef<HTMLInputElement>(null);
+  const libraryPhotoRef = useRef<HTMLInputElement>(null);
+  const libraryVideoRef = useRef<HTMLInputElement>(null);
+  const cameraPhotoRef  = useRef<HTMLInputElement>(null);
+  const cameraVideoRef  = useRef<HTMLInputElement>(null);
+
+  const [error, setError] = useState<string | null>(null);
+  /* Clear the error after a few seconds — it's a soft toast, not a permanent state. */
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 4500);
+    return () => clearTimeout(t);
+  }, [error]);
 
   /* Revoke any object URLs that left the photos array (removed / reordered out) */
   useEffect(() => {
     return () => {
-      blobsRef.current.forEach((_b, url) => URL.revokeObjectURL(url));
-      blobsRef.current.clear();
+      mediaRef.current.forEach((m, url) => {
+        URL.revokeObjectURL(url);
+        if (m.posterUrl) URL.revokeObjectURL(m.posterUrl);
+      });
+      mediaRef.current.clear();
     };
   }, []);
 
   useImperativeHandle(ref, () => ({
-    getBlobs: () => photos.map(url => blobsRef.current.get(url)).filter((b): b is Blob => !!b),
+    getBlobs: () => photos.map(url => mediaRef.current.get(url)?.blob).filter((b): b is Blob => !!b),
+    getMedia: () => photos.map(url => mediaRef.current.get(url)).filter((m): m is CompressedMedia => !!m),
     clear: () => {
-      blobsRef.current.forEach((_b, url) => URL.revokeObjectURL(url));
-      blobsRef.current.clear();
+      mediaRef.current.forEach((m, url) => {
+        URL.revokeObjectURL(url);
+        if (m.posterUrl) URL.revokeObjectURL(m.posterUrl);
+      });
+      mediaRef.current.clear();
     },
   }), [photos]);
 
@@ -79,9 +108,24 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
 
     setBusy(prev => prev + toProcess.length);
     try {
-      const results: CompressedPhoto[] = await compressImages(toProcess);
-      results.forEach(r => blobsRef.current.set(r.url, r.blob));
-      onChange([...photos, ...results.map(r => r.url)]);
+      const settled = await compressMediaBatch(toProcess);
+      const accepted: CompressedMedia[] = [];
+      const errs: string[] = [];
+      settled.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          accepted.push(res.value);
+          mediaRef.current.set(res.value.url, res.value);
+        } else {
+          const reason = res.reason;
+          if (reason instanceof MediaTooLargeError) {
+            errs.push(`${toProcess[idx].name} is over ${(MAX_VIDEO_BYTES / (1024 * 1024)).toFixed(0)} MB`);
+          } else {
+            errs.push(`Couldn't read ${toProcess[idx].name}`);
+          }
+        }
+      });
+      if (accepted.length) onChange([...photos, ...accepted.map(m => m.url)]);
+      if (errs.length) setError(errs.join(' · '));
     } finally {
       setBusy(prev => Math.max(0, prev - toProcess.length));
     }
@@ -92,8 +136,11 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   const removeAt = (idx: number) => {
     const url = photos[idx];
     if (url) {
-      const b = blobsRef.current.get(url);
-      if (b) blobsRef.current.delete(url);
+      const m = mediaRef.current.get(url);
+      if (m) {
+        if (m.posterUrl) URL.revokeObjectURL(m.posterUrl);
+        mediaRef.current.delete(url);
+      }
       URL.revokeObjectURL(url);
     }
     onChange(photos.filter((_, i) => i !== idx));
@@ -134,27 +181,38 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
 
   /* ── source choice ────────────────────────── */
 
-  const openCamera  = () => { setSheetOpen(false); cameraInputRef.current?.click(); };
-  const openLibrary = () => { setSheetOpen(false); libraryInputRef.current?.click(); };
+  const openCameraPhoto  = () => { setSheetOpen(false); cameraPhotoRef.current?.click(); };
+  const openCameraVideo  = () => { setSheetOpen(false); cameraVideoRef.current?.click(); };
+  const openLibraryPhoto = () => { setSheetOpen(false); libraryPhotoRef.current?.click(); };
+  const openLibraryVideo = () => { setSheetOpen(false); libraryVideoRef.current?.click(); };
 
   const onAddClick = () => {
-    if (defaultSource === 'camera')  { openCamera();  return; }
-    if (defaultSource === 'library') { openLibrary(); return; }
+    if (defaultSource === 'camera')  { openCameraPhoto();  return; }
+    if (defaultSource === 'library') { openLibraryPhoto(); return; }
     /* On phones with a camera, show the choice. On desktop, just open file picker. */
     const hasCamera = typeof navigator !== 'undefined' &&
       'mediaDevices' in navigator &&
       !!navigator.mediaDevices?.getUserMedia;
-    if (hasCamera) setSheetOpen(true);
-    else openLibrary();
+    if (hasCamera || allowVideo) setSheetOpen(true);
+    else openLibraryPhoto();
   };
 
   /* ── render ───────────────────────────────── */
 
   const status = useMemo(() => {
-    if (busy > 0) return `Compressing ${busy} photo${busy === 1 ? '' : 's'}…`;
+    if (busy > 0) return `Compressing ${busy} item${busy === 1 ? '' : 's'}…`;
     if (photos.length === 0) return null;
-    return `${photos.length} / ${max} · ${label}`;
-  }, [busy, photos.length, max, label]);
+    const types = photos.map(u => mediaRef.current.get(u)?.kind ?? 'photo');
+    const videoCount = types.filter(k => k === 'video').length;
+    const photoCount = types.length - videoCount;
+    const summary =
+      videoCount > 0 && photoCount > 0
+        ? `${photoCount} photo${photoCount === 1 ? '' : 's'} + ${videoCount} video${videoCount === 1 ? '' : 's'}`
+        : videoCount > 0
+          ? `${videoCount} video${videoCount === 1 ? '' : 's'}`
+          : `${photoCount} photo${photoCount === 1 ? '' : 's'}`;
+    return `${summary} of ${max} · ${label}`;
+  }, [busy, photos, max, label]);
 
   return (
     <>
@@ -166,34 +224,59 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
       )}
 
       <div className="photo-picker">
-        {photos.map((src, i) => (
-          <div
-            key={src + i}
-            className={
-              'photo-picker-tile photo-picker-tile--filled' +
-              (dragIdx === i ? ' is-dragging' : '') +
-              (dropTarget === i ? ' is-drop-target' : '')
-            }
-            draggable
-            onDragStart={onDragStart(i)}
-            onDragOver={onDragOver(i)}
-            onDrop={onDrop(i)}
-            onDragEnd={onDragEnd}
-            aria-grabbed={dragIdx === i || undefined}
-            aria-label={`Photo ${i + 1}${i === 0 ? ' (cover)' : ''} — drag to reorder`}
-          >
-            <img src={src} alt="" draggable={false} />
-            {i === 0 && <span className="photo-picker-cover">Cover</span>}
-            <button
-              type="button"
-              className="photo-picker-remove"
-              aria-label={`Remove photo ${i + 1}`}
-              onClick={() => removeAt(i)}
+        {photos.map((src, i) => {
+          const m = mediaRef.current.get(src);
+          const isVideo = m?.kind === 'video';
+          return (
+            <div
+              key={src + i}
+              className={
+                'photo-picker-tile photo-picker-tile--filled' +
+                (dragIdx === i ? ' is-dragging' : '') +
+                (dropTarget === i ? ' is-drop-target' : '')
+              }
+              draggable
+              onDragStart={onDragStart(i)}
+              onDragOver={onDragOver(i)}
+              onDrop={onDrop(i)}
+              onDragEnd={onDragEnd}
+              aria-grabbed={dragIdx === i || undefined}
+              aria-label={`${isVideo ? 'Video' : 'Photo'} ${i + 1}${i === 0 ? ' (cover)' : ''} — drag to reorder`}
             >
-              <X size={12} strokeWidth={2.5} />
-            </button>
-          </div>
-        ))}
+              {isVideo
+                ? <img src={m?.posterUrl ?? src} alt="" draggable={false} />
+                : <img src={src} alt="" draggable={false} />}
+              {isVideo && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute', inset: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <span style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.55)', color: '#fff',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    backdropFilter: 'blur(6px)',
+                  }}>
+                    <Play size={14} strokeWidth={2} fill="currentColor" />
+                  </span>
+                </span>
+              )}
+              {i === 0 && <span className="photo-picker-cover">Cover</span>}
+              <button
+                type="button"
+                className="photo-picker-remove"
+                aria-label={`Remove ${isVideo ? 'video' : 'photo'} ${i + 1}`}
+                onClick={() => removeAt(i)}
+              >
+                <X size={12} strokeWidth={2.5} />
+              </button>
+            </div>
+          );
+        })}
 
         {photos.length < max && (
           <button
@@ -211,9 +294,11 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         )}
       </div>
 
-      {/* Hidden inputs — separate so the camera input gets `capture`. */}
+      {/* Hidden inputs — four flavors: library/camera × photo/video.
+          The camera ones carry `capture="environment"` so the OS opens the
+          rear-camera UI in the matching mode (photo vs video). */}
       <input
-        ref={libraryInputRef}
+        ref={libraryPhotoRef}
         type="file"
         accept="image/*"
         multiple
@@ -221,13 +306,45 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
       />
       <input
-        ref={cameraInputRef}
+        ref={cameraPhotoRef}
         type="file"
         accept="image/*"
         capture="environment"
         style={{ display: 'none' }}
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
       />
+      {allowVideo && (
+        <>
+          <input
+            ref={libraryVideoRef}
+            type="file"
+            accept="video/*"
+            style={{ display: 'none' }}
+            onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
+          />
+          <input
+            ref={cameraVideoRef}
+            type="file"
+            accept="video/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
+          />
+        </>
+      )}
+
+      {/* Soft error toast — invalid file (e.g. video over 5 MB) */}
+      {error && (
+        <div role="alert" style={{
+          marginTop: 8, padding: '8px 12px',
+          borderRadius: 10,
+          background: 'rgba(237,46,80,0.10)',
+          color: 'var(--accent-rose)',
+          fontSize: 12, fontWeight: 500,
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* Source choice bottom sheet */}
       {sheetOpen && (
@@ -237,22 +354,42 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
             onClick={() => setSheetOpen(false)}
             aria-hidden="true"
           />
-          <div className="photo-source-sheet" role="dialog" aria-label="Add photo">
+          <div className="photo-source-sheet" role="dialog" aria-label="Add media">
             <div className="grabber" aria-hidden="true" />
-            <button type="button" className="photo-source-option" onClick={openCamera}>
+            <button type="button" className="photo-source-option" onClick={openCameraPhoto}>
               <Camera size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div>Take a photo</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Use your camera right now</div>
               </div>
             </button>
-            <button type="button" className="photo-source-option" onClick={openLibrary}>
+            {allowVideo && (
+              <button type="button" className="photo-source-option" onClick={openCameraVideo}>
+                <Video size={20} strokeWidth={1.8} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div>Record a video</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Up to 5 MB · auto-compresses on upload
+                  </div>
+                </div>
+              </button>
+            )}
+            <button type="button" className="photo-source-option" onClick={openLibraryPhoto}>
               <ImagePlus size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div>Choose from library</div>
+                <div>Choose photos</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pick up to {remaining} from your phone</div>
               </div>
             </button>
+            {allowVideo && (
+              <button type="button" className="photo-source-option" onClick={openLibraryVideo}>
+                <Video size={20} strokeWidth={1.8} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div>Choose a video</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pick from your library · 5 MB max</div>
+                </div>
+              </button>
+            )}
             <button type="button" className="photo-source-cancel" onClick={() => setSheetOpen(false)}>
               Cancel
             </button>

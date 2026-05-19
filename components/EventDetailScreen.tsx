@@ -1,15 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ChevronLeft, CalendarDays, Clock, MapPin, Users,
-  Heart, Share2, MessageCircle, Check, Edit3, Tag,
+  Heart, Share2, MessageCircle, Mail, Check, Edit3, Tag,
 } from 'lucide-react';
-import type { CommunityEvent } from '../lib/mockData';
+import type { CommunityEvent, User } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
 import { getEventMetrics } from '../lib/metrics';
 import OnlineBadge from './OnlineBadge';
 import PhotoCarousel from './PhotoCarousel';
+import CommentsSection from './CommentsSection';
+import { useAuth } from '../lib/AuthContext';
+import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 
 interface EventDetailScreenProps {
   event: CommunityEvent;
@@ -17,7 +20,18 @@ interface EventDetailScreenProps {
   isOwner: boolean;
   onBack: () => void;
   onRsvp: () => void;
+  onRequireAuth: () => void;
+  onOpenStorefront?: (user: User) => void;
   onEdit?: () => void;
+}
+
+function WhatsAppGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
 }
 
 const TYPE_LABEL: Record<CommunityEvent['eventType'], string> = {
@@ -30,15 +44,47 @@ const TYPE_LABEL: Record<CommunityEvent['eventType'], string> = {
 };
 
 export default function EventDetailScreen({
-  event, isRsvpd, isOwner, onBack, onRsvp, onEdit,
+  event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onEdit,
 }: EventDetailScreenProps) {
   const photos = getEventPhotos(event.id, event.eventType);
   const [expanded, setExpanded] = useState(false);
   const desc = event.description ?? '';
   const shouldClamp = desc.length > 220;
+  const { user, profile } = useAuth();
 
   const metrics = getEventMetrics(event.id);
   const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
+
+  /* Contact links for messaging the organizer — same flow as item details. */
+  const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
+    owner: {
+      name:    event.organizer.name,
+      email:   event.organizer.email,
+      phone:   event.organizer.phone,
+      contact: event.organizer.contact,
+    },
+    action: 'event',
+    event,
+    viewerName: profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined,
+  }), [event, profile, user]);
+
+  const handleContact = (link: ContactLink) => {
+    if (!user) { onRequireAuth(); return; }
+    if (link.channel === 'whatsapp') {
+      window.open(link.href, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = link.href;
+    }
+  };
+
+  const handleRsvpClick = () => {
+    if (!user) { onRequireAuth(); return; }
+    onRsvp();
+  };
+
+  /* When both channels are accepted we render two named buttons inline with
+     the RSVP CTA. When only one, the message button sits beside RSVP. */
+  const hasBoth = contactLinks.length >= 2;
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 140, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -296,9 +342,11 @@ export default function EventDetailScreen({
               {event.organizer.role}
             </p>
           </div>
-          {!isOwner && (
+          {!isOwner && onOpenStorefront && (
             <button
-              aria-label="Message organizer"
+              type="button"
+              onClick={() => onOpenStorefront(event.organizer)}
+              aria-label={`View ${event.organizer.name}'s profile`}
               className="theme-toggle"
               style={{ marginRight: -4 }}
             >
@@ -306,6 +354,14 @@ export default function EventDetailScreen({
             </button>
           )}
         </div>
+      </section>
+
+      {/* ── COMMENTS ── */}
+      <section style={{ padding: '24px 20px 0' }}>
+        <CommentsSection
+          postId={event.id}
+          onRequireAuth={onRequireAuth}
+        />
       </section>
 
       {/* ── OWNER METRICS ── */}
@@ -344,7 +400,7 @@ export default function EventDetailScreen({
         pointerEvents: 'none',
         zIndex: 30,
       }}>
-        <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto' }}>
+        <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto', flexWrap: 'wrap' }}>
           <button
             aria-label="Save"
             style={{
@@ -359,9 +415,9 @@ export default function EventDetailScreen({
             <Heart size={18} strokeWidth={1.8} />
           </button>
           <button
-            onClick={onRsvp}
+            onClick={handleRsvpClick}
             style={{
-              flex: 1, height: 52, borderRadius: 999,
+              flex: 1, minWidth: 120, height: 52, borderRadius: 999,
               background: isRsvpd ? 'var(--bg-surface)' : 'var(--text-primary)',
               color: isRsvpd ? 'var(--text-primary)' : 'var(--bg-base)',
               border: isRsvpd ? '1px solid var(--border-default)' : 'none',
@@ -370,8 +426,51 @@ export default function EventDetailScreen({
               letterSpacing: '-0.01em',
             }}
           >
-            {isRsvpd ? <><Check size={14} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 5 }} />You're going</> : 'RSVP'}
+            {isRsvpd
+              ? <><Check size={14} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 5 }} />You're going</>
+              : 'RSVP'}
           </button>
+
+          {/* Message organizer — only show when viewer isn't the owner.
+              Mirrors ItemDetailScreen: one button per accepted channel. */}
+          {!isOwner && (
+            hasBoth ? (
+              contactLinks.map(link => (
+                <button
+                  key={link.channel}
+                  onClick={() => handleContact(link)}
+                  aria-label={link.ariaLabel}
+                  style={{
+                    width: 52, height: 52, borderRadius: 999,
+                    background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
+                    color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
+                    border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  {link.channel === 'whatsapp' ? <WhatsAppGlyph /> : <Mail size={16} strokeWidth={1.8} />}
+                </button>
+              ))
+            ) : contactLinks.length === 1 ? (
+              <button
+                onClick={() => handleContact(contactLinks[0])}
+                aria-label={contactLinks[0].ariaLabel}
+                style={{
+                  width: 52, height: 52, borderRadius: 999,
+                  background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
+                  color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
+                  border: contactLinks[0].channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                {contactLinks[0].channel === 'whatsapp'
+                  ? <WhatsAppGlyph />
+                  : <Mail size={16} strokeWidth={1.8} />}
+              </button>
+            ) : null
+          )}
         </div>
       </section>
     </div>

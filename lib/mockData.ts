@@ -29,6 +29,16 @@ export interface User {
   impactScore: number;
   badges: string[];
   isOnline: boolean;
+  /* Contact channels — drives the "Request to borrow / I'll take it / Contact"
+     buttons on a user's posts. We always have an email on file (it's how they
+     signed up); phone is optional and enables WhatsApp. The booleans below
+     mirror what the user picked in Settings → Notifications → channels. */
+  email?: string;
+  phone?: string;           /* E.164 ideally, but we accept any string */
+  contact?: {
+    email: boolean;          /* opt-in to receive item-related email */
+    whatsapp: boolean;       /* opt-in to receive WhatsApp messages (requires phone) */
+  };
 }
 
 export interface FeedItem {
@@ -207,48 +217,66 @@ export const USERS: User[] = [
     role: 'Design Student', community: 'BITS Goa', joinedDaysAgo: 142,
     itemsShared: 23, itemsReceived: 18, impactScore: 847,
     badges: ['Pioneer', 'Top Sharer', 'Green Star'], isOnline: true,
+    email: 'ananya.sharma@learner.manipal.edu', phone: '+919812340001',
+    contact: { email: true, whatsapp: true },
   },
   {
     id: 'u2', name: 'Rahul Mehta', initials: 'RM', color: '#FF6B80',
     role: 'CS Senior', community: 'BITS Goa', joinedDaysAgo: 89,
     itemsShared: 14, itemsReceived: 11, impactScore: 521,
     badges: ['Repair Hero', 'Connector'], isOnline: true,
+    email: 'rahul.mehta@learner.manipal.edu', phone: '+919812340002',
+    contact: { email: true, whatsapp: true },
   },
   {
     id: 'u3', name: 'Priya Nair', initials: 'PN', color: '#3DD6F5',
     role: 'EEE Junior', community: 'BITS Goa', joinedDaysAgo: 203,
     itemsShared: 31, itemsReceived: 27, impactScore: 1124,
     badges: ['Pioneer', 'Impact Leader', 'Community Hero', 'Top Sharer'], isOnline: false,
+    email: 'priya.nair@learner.manipal.edu',
+    /* Priya only accepts email — privacy preference */
+    contact: { email: true, whatsapp: false },
   },
   {
     id: 'u4', name: 'Karan Singh', initials: 'KS', color: '#C8FF4D',
     role: 'Mech Engineer', community: 'BITS Goa', joinedDaysAgo: 67,
     itemsShared: 8, itemsReceived: 12, impactScore: 342,
     badges: ['Fixer'], isOnline: true,
+    email: 'karan.singh@learner.manipal.edu', phone: '+919812340004',
+    contact: { email: true, whatsapp: true },
   },
   {
     id: 'u5', name: 'Meera Iyer', initials: 'MI', color: '#FF9A40',
     role: 'BioTech Research', community: 'BITS Goa', joinedDaysAgo: 178,
     itemsShared: 19, itemsReceived: 15, impactScore: 712,
     badges: ['Lab Connector', 'Green Star'], isOnline: false,
+    email: 'meera.iyer@learner.manipal.edu', phone: '+919812340005',
+    /* Meera prefers WhatsApp only */
+    contact: { email: false, whatsapp: true },
   },
   {
     id: 'u6', name: 'Aditya Kumar', initials: 'AK', color: '#A855F7',
     role: 'Physics PhD', community: 'BITS Goa', joinedDaysAgo: 310,
     itemsShared: 42, itemsReceived: 38, impactScore: 1876,
     badges: ['Pioneer', 'Top Sharer', 'Community Hero', 'Impact Leader', 'Fixer'], isOnline: true,
+    email: 'aditya.kumar@learner.manipal.edu', phone: '+919812340006',
+    contact: { email: true, whatsapp: true },
   },
   {
     id: 'u7', name: 'Sneha Patel', initials: 'SP', color: '#22C55E',
     role: 'Management Student', community: 'BITS Goa', joinedDaysAgo: 55,
     itemsShared: 6, itemsReceived: 9, impactScore: 218,
     badges: ['Newcomer'], isOnline: false,
+    email: 'sneha.patel@learner.manipal.edu', phone: '+919812340007',
+    contact: { email: true, whatsapp: true },
   },
   {
     id: 'u8', name: 'Dev Malhotra', initials: 'DM', color: '#F472B6',
     role: 'Architecture', community: 'BITS Goa', joinedDaysAgo: 125,
     itemsShared: 17, itemsReceived: 14, impactScore: 589,
     badges: ['Space Maker', 'Green Star'], isOnline: true,
+    email: 'dev.malhotra@learner.manipal.edu', phone: '+919812340008',
+    contact: { email: true, whatsapp: true },
   },
 ];
 

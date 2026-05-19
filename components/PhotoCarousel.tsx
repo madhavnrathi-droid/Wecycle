@@ -1,10 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+
+/* Each slide is either a photo URL (string) or a video descriptor. We keep the
+ * legacy "string[]" entry point so existing callers (detail screens, picker
+ * preview) keep working — they just pass photo URLs. The feed wraps its photo
+ * arrays in `mediaSlides()` to opt into video slides + autoplay. */
+export type Slide = string | VideoSlide;
+
+export interface VideoSlide {
+  kind: 'video';
+  src: string;
+  /** Poster shown while paused / before metadata arrives. */
+  poster?: string;
+}
 
 interface PhotoCarouselProps {
-  photos: string[];
+  photos: Slide[];
   /** Aspect ratio (CSS aspect-ratio value), e.g. '1', '4/5', '0.72' */
   aspectRatio?: string;
   /** Show prev/next arrows on hover (desktop). */
@@ -19,6 +32,34 @@ interface PhotoCarouselProps {
   objectFit?: 'cover' | 'contain';
   /** Position of the dot indicators */
   dotsPosition?: 'top' | 'bottom';
+  /** Autoplay video slides when they become the active slide AND the carousel
+   *  is at least partially in the viewport. Default true. */
+  autoplayVideos?: boolean;
+}
+
+/* Mute state is shared across every carousel on the page so toggling sound
+   on one card affects the whole feed (matches Instagram / Reels behavior). */
+const muteStore = (() => {
+  const listeners = new Set<(muted: boolean) => void>();
+  let muted = true;
+  return {
+    get: () => muted,
+    set: (next: boolean) => {
+      if (muted === next) return;
+      muted = next;
+      listeners.forEach(l => l(muted));
+    },
+    subscribe: (fn: (muted: boolean) => void) => {
+      listeners.add(fn);
+      return () => { listeners.delete(fn); };
+    },
+  };
+})();
+
+export function useCarouselMuted(): [boolean, (next: boolean) => void] {
+  const [muted, setMuted] = useState(() => muteStore.get());
+  useEffect(() => muteStore.subscribe(setMuted), []);
+  return [muted, (v: boolean) => muteStore.set(v)];
 }
 
 /**
@@ -30,12 +71,29 @@ export default function PhotoCarousel({
   photos, aspectRatio, showArrows = true, overlay,
   radius, onClick, objectFit = 'cover',
   dotsPosition = 'bottom',
+  autoplayVideos = true,
 }: PhotoCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
   const [active, setActive] = useState(0);
+  /* Whether the whole carousel is in viewport — drives play/pause when scrolling */
+  const [inView, setInView] = useState(true);
   const single = photos.length <= 1;
+  const [muted, setMuted] = useCarouselMuted();
   /* Track whether the pointer moved enough to count as a drag */
   const dragRef = useRef<{ startX: number; moved: boolean }>({ startX: 0, moved: false });
+
+  /* Pre-resolve which slides are videos so we can expose an unmute button only
+     when at least one exists. */
+  const hasVideo = useMemo(
+    () => photos.some(p => typeof p !== 'string' && p.kind === 'video'),
+    [photos],
+  );
+  const activeIsVideo = useMemo(() => {
+    const p = photos[active];
+    return typeof p !== 'string' && p?.kind === 'video';
+  }, [photos, active]);
 
   useEffect(() => {
     const el = trackRef.current;
@@ -55,6 +113,44 @@ export default function PhotoCarousel({
       if (raf) cancelAnimationFrame(raf);
     };
   }, [photos.length]);
+
+  /* Track whether the frame is on-screen so we don't autoplay a video that
+     scrolled out of view (would burn the user's battery on long feeds). */
+  useEffect(() => {
+    if (!autoplayVideos || !hasVideo) return;
+    const el = frameRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const obs = new IntersectionObserver(
+      entries => {
+        for (const e of entries) {
+          if (e.target === el) setInView(e.intersectionRatio > 0.4);
+        }
+      },
+      { threshold: [0, 0.4, 0.8] },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [autoplayVideos, hasVideo]);
+
+  /* Drive play/pause on every render that might change the active slide,
+     visibility, or mute state. The "second post + swiped to it" case in the
+     spec lands here: when the user swipes to a video slide and the carousel
+     is in view, that slide starts playing — even if other cards on the page
+     are still images. */
+  useEffect(() => {
+    if (!autoplayVideos) return;
+    videoRefs.current.forEach((video, idx) => {
+      const shouldPlay = inView && idx === active;
+      video.muted = muted;
+      if (shouldPlay) {
+        /* play() can reject (autoplay policy etc.); we swallow because muted
+           autoplay is the universally-allowed fallback we already use. */
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    });
+  }, [active, inView, muted, autoplayVideos, photos]);
 
   const scrollToIndex = (i: number) => {
     const el = trackRef.current;
@@ -76,6 +172,7 @@ export default function PhotoCarousel({
 
   return (
     <div
+      ref={frameRef}
       className="carousel-frame"
       style={{
         aspectRatio,
@@ -93,33 +190,85 @@ export default function PhotoCarousel({
         className="carousel-track"
         role="region"
         aria-roledescription="carousel"
-        aria-label={`${photos.length} photo${photos.length > 1 ? 's' : ''}`}
+        aria-label={`${photos.length} item${photos.length > 1 ? 's' : ''}`}
       >
-        {photos.map((src, i) => (
-          <div
-            key={i}
-            className="carousel-slide"
-            role="group"
-            aria-roledescription="slide"
-            aria-label={`Photo ${i + 1} of ${photos.length}`}
-          >
-            <img
-              src={src}
-              alt=""
-              draggable={false}
-              loading={i === 0 ? 'eager' : 'lazy'}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit,
-                display: 'block',
-                userSelect: 'none',
-                pointerEvents: 'none',
-              }}
-            />
-          </div>
-        ))}
+        {photos.map((slide, i) => {
+          const isVideo = typeof slide !== 'string' && slide.kind === 'video';
+          return (
+            <div
+              key={i}
+              className="carousel-slide"
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${isVideo ? 'Video' : 'Photo'} ${i + 1} of ${photos.length}`}
+            >
+              {isVideo ? (
+                <video
+                  ref={el => {
+                    if (el) videoRefs.current.set(i, el);
+                    else videoRefs.current.delete(i);
+                  }}
+                  src={(slide as VideoSlide).src}
+                  poster={(slide as VideoSlide).poster}
+                  playsInline
+                  loop
+                  muted={muted}
+                  preload="metadata"
+                  /* Disable native controls — we drive playback via the
+                     IntersectionObserver + active-slide effect above. */
+                  controls={false}
+                  /* Prevent pointer events so the card's click handler still
+                     bubbles when the user taps a video. */
+                  style={{
+                    width: '100%', height: '100%',
+                    objectFit, display: 'block',
+                    pointerEvents: 'none',
+                    background: '#000',
+                  }}
+                />
+              ) : (
+                <img
+                  src={slide as string}
+                  alt=""
+                  draggable={false}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit,
+                    display: 'block',
+                    userSelect: 'none',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Unmute / mute pill — only when the active slide is a video.
+          Lives in the top-right by default; sits above any other overlay. */}
+      {activeIsVideo && (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); setMuted(!muted); }}
+          aria-label={muted ? 'Unmute video' : 'Mute video'}
+          aria-pressed={!muted}
+          style={{
+            position: 'absolute', top: 10, right: 10,
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.55)', color: '#fff',
+            border: 'none',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            cursor: 'pointer', zIndex: 4,
+          }}
+        >
+          {muted ? <VolumeX size={15} strokeWidth={2} /> : <Volume2 size={15} strokeWidth={2} />}
+        </button>
+      )}
 
       {overlay}
 

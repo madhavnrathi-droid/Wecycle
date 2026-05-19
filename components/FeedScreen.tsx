@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X } from 'lucide-react';
 import { MARKETPLACE_ITEMS, CATEGORIES, type MarketplaceItem } from '../lib/mockData';
-import { getItemPhotos, getAvatar } from '../lib/photos';
+import { getItemMedia, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import PhotoCarousel from './PhotoCarousel';
 
@@ -266,7 +266,9 @@ function FeedCard({
   onToggleSave: () => void;
   onClick: () => void;
 }) {
-  const photos = getItemPhotos(item.id, item.category);
+  /* Use the media (photo+video) gallery so cards autoplay videos inline
+     when the user swipes to a video slide. */
+  const photos = getItemMedia(item.id, item.category);
   const isPriced = item.listingType === 'sell';
   const ar = VARIANT_RATIOS[variant];
 
