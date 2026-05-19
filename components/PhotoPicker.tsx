@@ -20,7 +20,7 @@
 import {
   useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef,
 } from 'react';
-import { Plus, X, Camera, ImagePlus, Video, Play } from 'lucide-react';
+import { Plus, X, Camera, ImagePlus, Play } from 'lucide-react';
 import {
   compressMediaBatch, MAX_VIDEO_BYTES, MediaTooLargeError,
   type CompressedMedia,
@@ -61,10 +61,11 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(0); /* number of files currently compressing */
 
-  const libraryPhotoRef = useRef<HTMLInputElement>(null);
-  const libraryVideoRef = useRef<HTMLInputElement>(null);
-  const cameraPhotoRef  = useRef<HTMLInputElement>(null);
-  const cameraVideoRef  = useRef<HTMLInputElement>(null);
+  /* Two inputs — one per source. Both accept image + video; the OS picker
+     then surfaces the right capture/library UI. Less cognitive load than
+     forcing the user to pre-decide photo vs video before opening the picker. */
+  const libraryRef = useRef<HTMLInputElement>(null);
+  const cameraRef  = useRef<HTMLInputElement>(null);
 
   const [error, setError] = useState<string | null>(null);
   /* Clear the error after a few seconds — it's a soft toast, not a permanent state. */
@@ -181,20 +182,20 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
 
   /* ── source choice ────────────────────────── */
 
-  const openCameraPhoto  = () => { setSheetOpen(false); cameraPhotoRef.current?.click(); };
-  const openCameraVideo  = () => { setSheetOpen(false); cameraVideoRef.current?.click(); };
-  const openLibraryPhoto = () => { setSheetOpen(false); libraryPhotoRef.current?.click(); };
-  const openLibraryVideo = () => { setSheetOpen(false); libraryVideoRef.current?.click(); };
+  const openCamera  = () => { setSheetOpen(false); cameraRef.current?.click(); };
+  const openLibrary = () => { setSheetOpen(false); libraryRef.current?.click(); };
 
   const onAddClick = () => {
-    if (defaultSource === 'camera')  { openCameraPhoto();  return; }
-    if (defaultSource === 'library') { openLibraryPhoto(); return; }
+    if (defaultSource === 'camera')  { openCamera();  return; }
+    if (defaultSource === 'library') { openLibrary(); return; }
     /* On phones with a camera, show the choice. On desktop, just open file picker. */
     const hasCamera = typeof navigator !== 'undefined' &&
       'mediaDevices' in navigator &&
       !!navigator.mediaDevices?.getUserMedia;
-    if (hasCamera || allowVideo) setSheetOpen(true);
-    else openLibraryPhoto();
+    /* On a touch device with a camera, show both choices. Desktop browsers
+       almost always lack a real camera — just open the file picker. */
+    if (hasCamera) setSheetOpen(true);
+    else openLibrary();
   };
 
   /* ── render ───────────────────────────────── */
@@ -294,44 +295,26 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         )}
       </div>
 
-      {/* Hidden inputs — four flavors: library/camera × photo/video.
-          The camera ones carry `capture="environment"` so the OS opens the
-          rear-camera UI in the matching mode (photo vs video). */}
+      {/* Two hidden inputs — library and camera. Both accept image + video
+          (when allowVideo), so the user only has to pick *where* the media
+          comes from. The OS picker handles photo vs video selection within
+          each. */}
       <input
-        ref={libraryPhotoRef}
+        ref={libraryRef}
         type="file"
-        accept="image/*"
+        accept={allowVideo ? 'image/*,video/*' : 'image/*'}
         multiple
         style={{ display: 'none' }}
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
       />
       <input
-        ref={cameraPhotoRef}
+        ref={cameraRef}
         type="file"
-        accept="image/*"
+        accept={allowVideo ? 'image/*,video/*' : 'image/*'}
         capture="environment"
         style={{ display: 'none' }}
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
       />
-      {allowVideo && (
-        <>
-          <input
-            ref={libraryVideoRef}
-            type="file"
-            accept="video/*"
-            style={{ display: 'none' }}
-            onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
-          />
-          <input
-            ref={cameraVideoRef}
-            type="file"
-            accept="video/*"
-            capture="environment"
-            style={{ display: 'none' }}
-            onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
-          />
-        </>
-      )}
 
       {/* Soft error toast — invalid file (e.g. video over 5 MB) */}
       {error && (
@@ -356,40 +339,38 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
           />
           <div className="photo-source-sheet" role="dialog" aria-label="Add media">
             <div className="grabber" aria-hidden="true" />
-            <button type="button" className="photo-source-option" onClick={openCameraPhoto}>
+            <button type="button" className="photo-source-option" onClick={openCamera}>
               <Camera size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div>Take a photo</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Use your camera right now</div>
+                <div>Camera</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Take a photo or record a video right now
+                </div>
               </div>
             </button>
-            {allowVideo && (
-              <button type="button" className="photo-source-option" onClick={openCameraVideo}>
-                <Video size={20} strokeWidth={1.8} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div>Record a video</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    Up to 5 MB · auto-compresses on upload
-                  </div>
-                </div>
-              </button>
-            )}
-            <button type="button" className="photo-source-option" onClick={openLibraryPhoto}>
+            <button type="button" className="photo-source-option" onClick={openLibrary}>
               <ImagePlus size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div>Choose photos</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pick up to {remaining} from your phone</div>
+                <div>Upload from library</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Pick {allowVideo ? 'photos or a video' : 'photos'} you've already saved
+                </div>
               </div>
             </button>
-            {allowVideo && (
-              <button type="button" className="photo-source-option" onClick={openLibraryVideo}>
-                <Video size={20} strokeWidth={1.8} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div>Choose a video</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pick from your library · 5 MB max</div>
-                </div>
-              </button>
-            )}
+
+            {/* Size hint — universal, sits below both options. */}
+            <p style={{
+              margin: '6px 12px 0',
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              textAlign: 'center',
+              lineHeight: 1.5,
+            }}>
+              {allowVideo
+                ? 'Photo or video must be under 5 MB. We compress on upload to save your data.'
+                : 'Photos must be under 5 MB each. We compress on upload to save your data.'}
+            </p>
+
             <button type="button" className="photo-source-cancel" onClick={() => setSheetOpen(false)}>
               Cancel
             </button>
