@@ -17,7 +17,8 @@ interface DrawerProps {
   onNavigate?: (id: string) => void;
 }
 
-const SECTIONS: { items: { id: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; desc?: string }[] }[] = [
+type IconCmp = React.ComponentType<React.SVGProps<SVGSVGElement> & { size?: number | string; strokeWidth?: number | string }>;
+const SECTIONS: { items: { id: string; label: string; icon: IconCmp; desc?: string }[] }[] = [
   {
     items: [
       { id: 'account',  label: 'Account',         icon: User,         desc: 'Profile & community' },
