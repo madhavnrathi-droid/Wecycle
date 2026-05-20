@@ -124,6 +124,10 @@ export interface MarketplaceItem {
      hardcoded Unsplash sets keyed by id in lib/photos.ts). */
   photoUrls?: string[];
   videoUrls?: string[];
+  /* Real metric counts from the DB (absent on mock items → deterministic
+     pseudo-random fallback via lib/metrics.ts). */
+  viewCount?: number;
+  saveCount?: number;
 }
 
 export interface CommunityEvent {

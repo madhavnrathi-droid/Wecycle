@@ -1505,6 +1505,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      rpc_increment_listing_view: {
+        Args: { _listing_id: string }
+        Returns: undefined
+      }
       rpc_mark_notifications_read: {
         Args: { _ids?: string[] }
         Returns: number

@@ -29,6 +29,7 @@ import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
+import { updateListingFields, repostListing, deleteListingById } from '../lib/liveData';
 import type { WecycleAlert } from '../lib/alerts';
 import {
   getSettings, onSettingsChange, applyTheme, watchSystemTheme,
@@ -432,11 +433,39 @@ export default function WecycleApp() {
         {editItem && (
           <EditItemModal
             open={modal === 'edit-item'}
-            onClose={() => { closeModal(); setEditItem(null); }}
             item={editItem}
-            onSave={() => { /* TODO: persist via lib/api/listings updateListing */ }}
-            onRepost={() => { /* TODO: updateListing + reset posted_at to now() */ }}
-            onDelete={() => { /* TODO: deleteListing */ }}
+            initiallyHidden={false}
+            onClose={() => { closeModal(); setEditItem(null); }}
+            onSave={async (data) => {
+              if (isDemoMode() || !editItem) return;
+              await updateListingFields(editItem.id, {
+                title: data.title,
+                category: data.category,
+                condition: data.condition as 'like_new' | 'good' | 'fair',
+                description: data.description,
+                location: data.location,
+                listingType: data.pricing,
+                price: data.price,
+                isHidden: data.isHidden,
+              });
+            }}
+            onRepost={async (data) => {
+              if (isDemoMode() || !editItem) return;
+              await repostListing(editItem.id, {
+                title: data.title,
+                category: data.category,
+                condition: data.condition as 'like_new' | 'good' | 'fair',
+                description: data.description,
+                location: data.location,
+                listingType: data.pricing,
+                price: data.price,
+                isHidden: data.isHidden,
+              });
+            }}
+            onDelete={async () => {
+              if (isDemoMode() || !editItem) return;
+              await deleteListingById(editItem.id);
+            }}
           />
         )}
         {user && (

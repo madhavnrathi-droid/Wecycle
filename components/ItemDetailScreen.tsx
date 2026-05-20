@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee } from 'lucide-react';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
@@ -11,6 +11,8 @@ import CommentsSection from './CommentsSection';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, itemAction, actionLabel, type ContactLink } from '../lib/contactUser';
+import { incrementListingView, toggleListingSave } from '../lib/liveData';
+import { isDemoMode } from '../lib/demoMode';
 
 interface ItemDetailScreenProps {
   item: MarketplaceItem;
@@ -34,8 +36,24 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
 
 export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(item.saved);
   const photos = resolveItemMedia(item);
+
+  /* Count a view once per open for real listings. Fire-and-forget; the next
+     fetch picks up the bumped count. We detect "real" by the presence of a
+     server count field on the mapped item. */
+  useEffect(() => {
+    const isLive = !isDemoMode() && (item.viewCount !== undefined || item.saveCount !== undefined);
+    if (isLive) incrementListingView(item.id);
+  }, [item.id]);
+
+  const handleToggleSave = () => {
+    if (!user) { onRequireAuth(); return; }
+    setSaved(s => !s); // optimistic
+    if (!isDemoMode()) {
+      toggleListingSave(item.id).catch(() => setSaved(s => !s)); // revert on failure
+    }
+  };
   const isPriced = item.listingType === 'sell';
   const priceLabel = isPriced ? `₹${item.price}` : item.listingType === 'free' ? 'Free' : item.listingType[0].toUpperCase() + item.listingType.slice(1);
   const desc = item.description ?? '';
@@ -90,6 +108,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         photos={photos}
         saved={saved}
         setSaved={setSaved}
+        onToggleSave={handleToggleSave}
         expanded={expanded}
         setExpanded={setExpanded}
         shouldClamp={shouldClamp}
@@ -136,7 +155,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           {item.category}
         </span>
         <button
-          onClick={() => setSaved(s => !s)}
+          onClick={handleToggleSave}
           aria-label={saved ? 'Unsave' : 'Save'}
           aria-pressed={saved}
           className="theme-toggle"
@@ -306,7 +325,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           display: 'flex', gap: 8,
         }}>
           <button
-            onClick={() => setSaved(s => !s)}
+            onClick={handleToggleSave}
             aria-label={saved ? 'Saved' : 'Save'}
             aria-pressed={saved}
             style={{
@@ -394,6 +413,7 @@ interface DesktopLayoutProps {
   photos: import('../lib/photos').MediaEntry[];
   saved: boolean;
   setSaved: (v: boolean | ((prev: boolean) => boolean)) => void;
+  onToggleSave: () => void;
   expanded: boolean;
   setExpanded: (v: boolean | ((prev: boolean) => boolean)) => void;
   shouldClamp: boolean;
@@ -410,10 +430,11 @@ interface DesktopLayoutProps {
 }
 
 function DesktopLayout({
-  item, photos, saved, setSaved, expanded, setExpanded,
+  item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   contactLinks, primaryActionLabel, handleContactClick, hasBoth,
 }: DesktopLayoutProps) {
+  void setSaved; /* save state is driven through onToggleSave now */
   return (
     <div className="screen-transition" style={{ background: 'var(--bg-base)', minHeight: '100%' }}>
       {/* Slim top bar with back button */}
@@ -678,7 +699,7 @@ function DesktopLayout({
               </button>
             )}
             <button
-              onClick={() => setSaved(s => !s)}
+              onClick={onToggleSave}
               aria-label={saved ? 'Saved' : 'Save'}
               aria-pressed={saved}
               style={{
@@ -754,7 +775,15 @@ function DesktopLayout({
    ("this has 312 views, 18 saves"), and owners get a quick health check
    without bouncing to the Activity tab. */
 function ItemMetrics({ item }: { item: MarketplaceItem }) {
-  const m = getPostMetrics(item.id);
+  /* Real listings carry actual DB counts (viewCount/saveCount/responses).
+     Mock items have none → deterministic pseudo-random fallback. */
+  const isLive = item.viewCount !== undefined || item.saveCount !== undefined;
+  const mock = getPostMetrics(item.id);
+  const views     = isLive ? (item.viewCount ?? 0) : mock.views;
+  const saves     = isLive ? (item.saveCount ?? 0) : mock.saves;
+  const inquiries = isLive ? item.responses        : mock.inquiries;
+  /* The schema has no share counter yet; show 0 for live posts. */
+  const shares    = isLive ? 0 : mock.shares;
   return (
     <section style={{ padding: '24px 20px 0' }}>
       <h3 style={{
@@ -773,10 +802,10 @@ function ItemMetrics({ item }: { item: MarketplaceItem }) {
         padding: '14px 12px',
         gap: 8,
       }}>
-        <MiniStat label="Views"     value={m.views}     />
-        <MiniStat label="Saves"     value={m.saves}     />
-        <MiniStat label="Shares"    value={m.shares}    />
-        <MiniStat label="Inquiries" value={m.inquiries} />
+        <MiniStat label="Views"     value={views}     />
+        <MiniStat label="Saves"     value={saves}     />
+        <MiniStat label="Shares"    value={shares}    />
+        <MiniStat label="Inquiries" value={inquiries} />
       </div>
     </section>
   );

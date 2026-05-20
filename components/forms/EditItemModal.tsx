@@ -37,9 +37,9 @@ interface EditItemModalProps {
   onClose: () => void;
   item: MarketplaceItem;
   initiallyHidden?: boolean;
-  onSave?: (data: EditItemForm) => void;          // in-place update (does NOT bump feed)
-  onRepost?: (data: EditItemForm) => void;        // saves AND bumps to top of feed
-  onDelete?: () => void;
+  onSave?: (data: EditItemForm) => void | Promise<void>;    // in-place update (does NOT bump feed)
+  onRepost?: (data: EditItemForm) => void | Promise<void>;  // saves AND bumps to top of feed
+  onDelete?: () => void | Promise<void>;
 }
 
 export default function EditItemModal({
@@ -89,22 +89,34 @@ export default function EditItemModal({
     return Object.keys(e).length === 0;
   };
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleSave = async () => {
     if (!validate()) return;
     setSubmitting('save');
-    await new Promise(r => setTimeout(r, 350));
-    onSave?.(form);
-    setSubmitting(null);
-    onClose();
+    setActionError(null);
+    try {
+      await onSave?.(form);
+      onClose();
+    } catch (e) {
+      setActionError((e as Error).message || 'Could not save changes.');
+    } finally {
+      setSubmitting(null);
+    }
   };
 
   const handleRepost = async () => {
     if (!validate()) return;
     setSubmitting('repost');
-    await new Promise(r => setTimeout(r, 350));
-    onRepost?.(form);
-    setSubmitting(null);
-    onClose();
+    setActionError(null);
+    try {
+      await onRepost?.(form);
+      onClose();
+    } catch (e) {
+      setActionError((e as Error).message || 'Could not repost.');
+    } finally {
+      setSubmitting(null);
+    }
   };
 
   const handleDelete = async () => {
@@ -113,10 +125,14 @@ export default function EditItemModal({
       return;
     }
     setSubmitting('delete');
-    await new Promise(r => setTimeout(r, 300));
-    onDelete?.();
-    setSubmitting(null);
-    onClose();
+    setActionError(null);
+    try {
+      await onDelete?.();
+      onClose();
+    } catch (e) {
+      setActionError((e as Error).message || 'Could not delete.');
+      setSubmitting(null);
+    }
   };
 
   return (
@@ -408,6 +424,19 @@ export default function EditItemModal({
             </button>
           )}
         </div>
+
+        {actionError && (
+          <div role="alert" style={{
+            marginTop: 14, padding: '10px 12px',
+            background: 'rgba(237,46,80,0.10)',
+            border: '1px solid rgba(237,46,80,0.25)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--accent-rose)',
+            fontSize: 12, fontWeight: 500,
+          }}>
+            {actionError}
+          </div>
+        )}
       </form>
     </Modal>
   );

@@ -18,6 +18,7 @@
 import { supabase, hasSupabaseEnv } from './supabase';
 import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData';
 import type { CompressedMedia } from './mediaCompression';
+import type { Database } from './database.types';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -52,6 +53,8 @@ interface ListingRow {
   photo_icon: string | null;
   tags: string[] | null;
   response_count: number | null;
+  save_count: number | null;
+  view_count: number | null;
   posted_at: string;
   user?: JoinedProfile | null;
   category?: { id: string; label: string; icon: string } | null;
@@ -105,6 +108,8 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     tags: row.tags ?? [],
     photoUrls: row.photo_urls ?? [],
     videoUrls: row.video_urls ?? [],
+    viewCount: row.view_count ?? 0,
+    saveCount: row.save_count ?? 0,
   };
 }
 
@@ -619,6 +624,79 @@ export async function fetchLostFound(): Promise<(LostItem & { photoUrls?: string
     .order('posted_at', { ascending: false });
   if (error || !data) return [];
   return (data as unknown as LostFoundRowLite[]).map(mapLostFoundRow);
+}
+
+/* ════════════════════════════════════════════════════
+   UPDATE / DELETE / REPOST a listing
+   ════════════════════════════════════════════════════ */
+
+export interface EditListingPatch {
+  title?: string;
+  category?: string;        /* category id, lowercased */
+  condition?: 'like_new' | 'good' | 'fair';
+  description?: string;
+  location?: string;
+  listingType?: 'free' | 'sell' | 'borrow' | 'swap';
+  price?: number;
+  isHidden?: boolean;
+}
+
+type ListingUpdate = Database['public']['Tables']['listings']['Update'];
+
+export async function updateListingFields(id: string, patch: EditListingPatch) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const update: ListingUpdate = { updated_at: new Date().toISOString() };
+  if (patch.title !== undefined)       update.title = patch.title.trim();
+  if (patch.category !== undefined)    update.category_id = patch.category.trim().toLowerCase();
+  if (patch.condition !== undefined)   update.condition = patch.condition;
+  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.location !== undefined)    update.location = patch.location.trim() || null;
+  if (patch.listingType !== undefined) {
+    update.listing_type = patch.listingType;
+    update.price = patch.listingType === 'sell' ? (patch.price ?? null) : null;
+  } else if (patch.price !== undefined) {
+    update.price = patch.price;
+  }
+  if (patch.isHidden !== undefined)    update.status = patch.isHidden ? 'hidden' : 'active';
+
+  const { error } = await supabase.from('listings').update(update).eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+/** Bump posted_at to now so the listing jumps to the top of the feed. */
+export async function repostListing(id: string, patch?: EditListingPatch) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  if (patch) await updateListingFields(id, patch);
+  const { error } = await supabase
+    .from('listings')
+    .update({ posted_at: new Date().toISOString(), status: 'active' })
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+export async function deleteListingById(id: string) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { error } = await supabase.from('listings').delete().eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+/** Bump a listing's view counter (fire-and-forget — never blocks the UI). */
+export function incrementListingView(id: string) {
+  if (!hasSupabaseEnv) return;
+  /* SECURITY DEFINER RPC — viewers can't UPDATE the row directly. */
+  supabase.rpc('rpc_increment_listing_view', { _listing_id: id }).then(() => {}, () => {});
+}
+
+/** Toggle a save on a listing for the signed-in user. Returns the new state. */
+export async function toggleListingSave(id: string): Promise<boolean> {
+  if (!hasSupabaseEnv) return false;
+  const { data, error } = await supabase.rpc('rpc_toggle_save', { _listing_id: id });
+  if (error) throw error;
+  notifyPostsChanged();
+  return !!data;
 }
 
 /* ── Pub/sub: refetch feeds after a post ───────────── */
