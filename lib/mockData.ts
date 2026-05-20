@@ -120,6 +120,10 @@ export interface MarketplaceItem {
   responses: number;
   postedDaysAgo: number;
   tags: string[];
+  /* Real media from Supabase (absent on mock items, which fall back to the
+     hardcoded Unsplash sets keyed by id in lib/photos.ts). */
+  photoUrls?: string[];
+  videoUrls?: string[];
 }
 
 export interface CommunityEvent {

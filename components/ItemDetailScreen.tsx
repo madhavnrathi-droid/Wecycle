@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee } from 'lucide-react';
 import type { MarketplaceItem, User } from '../lib/mockData';
-import { getItemPhotos, getAvatar } from '../lib/photos';
+import { resolveItemMedia, getAvatar } from '../lib/photos';
 import { getPostMetrics } from '../lib/metrics';
 import PhotoCarousel from './PhotoCarousel';
 import OnlineBadge from './OnlineBadge';
@@ -35,7 +35,7 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
 export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
-  const photos = getItemPhotos(item.id, item.category);
+  const photos = resolveItemMedia(item);
   const isPriced = item.listingType === 'sell';
   const priceLabel = isPriced ? `₹${item.price}` : item.listingType === 'free' ? 'Free' : item.listingType[0].toUpperCase() + item.listingType.slice(1);
   const desc = item.description ?? '';
@@ -390,7 +390,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
 
 interface DesktopLayoutProps {
   item: MarketplaceItem;
-  photos: string[];
+  /* Mixed media slides — photo URL strings or video records. */
+  photos: import('../lib/photos').MediaEntry[];
   saved: boolean;
   setSaved: (v: boolean | ((prev: boolean) => boolean)) => void;
   expanded: boolean;
@@ -475,17 +476,31 @@ function DesktopLayout({
               maxWidth: 560, margin: '12px auto 0',
               flexWrap: 'wrap',
             }}>
-              {photos.map((p, i) => (
-                <div key={i} style={{
-                  width: 64, height: 80,
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                  background: 'var(--bg-inset)',
-                  border: '1px solid var(--border-subtle)',
-                }}>
-                  <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              ))}
+              {photos.map((p, i) => {
+                /* Each slide is either a photo URL string or a video record
+                   { kind:'video', src, poster } — use the poster for the thumb. */
+                const thumb = typeof p === 'string' ? p : (p.poster ?? p.src);
+                const isVideo = typeof p !== 'string';
+                return (
+                  <div key={i} style={{
+                    position: 'relative',
+                    width: 64, height: 80,
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: 'var(--bg-inset)',
+                    border: '1px solid var(--border-subtle)',
+                  }}>
+                    <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {isVideo && (
+                      <span style={{
+                        position: 'absolute', inset: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(0,0,0,0.25)', color: '#fff', fontSize: 16,
+                      }} aria-hidden="true">▶</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Gift, Tag, MapPin } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoCarousel from '../PhotoCarousel';
-import PhotoPicker from '../PhotoPicker';
+import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import { createListingWithMedia } from '../../lib/liveData';
+import { isDemoMode } from '../../lib/demoMode';
+import { hasSupabaseEnv } from '../../lib/supabase';
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
@@ -43,6 +46,8 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ShareItemForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const pickerRef = useRef<PhotoPickerHandle>(null);
 
   const update = <K extends keyof ShareItemForm>(key: K, value: ShareItemForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -60,17 +65,41 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const reset = () => setForm({
+    title: '', category: '', condition: '', description: '', location: '', pricing: 'free', photos: [],
+  });
+
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    /* mock latency */
-    setTimeout(() => {
+    setSubmitError(null);
+    try {
+      if (hasSupabaseEnv && !isDemoMode()) {
+        /* Real path: upload the picker's compressed blobs + insert the row. */
+        await createListingWithMedia({
+          title: form.title,
+          category: form.category,
+          condition: form.condition as 'like_new' | 'good' | 'fair',
+          description: form.description,
+          location: form.location,
+          listingType: form.pricing === 'sell' ? 'sell' : 'free',
+          price: form.price,
+          media: pickerRef.current?.getMedia() ?? [],
+        });
+      } else {
+        /* Demo path — no backend; just simulate latency. */
+        await new Promise(r => setTimeout(r, 400));
+      }
       onSubmit?.(form);
-      setSubmitting(false);
-      setForm({ title: '', category: '', condition: '', description: '', location: '', pricing: 'free', photos: [] });
+      pickerRef.current?.clear();
+      reset();
       onClose();
-    }, 400);
+    } catch (err) {
+      setSubmitError((err as Error).message || 'Could not post — please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -122,6 +151,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           )}
 
           <PhotoPicker
+            ref={pickerRef}
             photos={form.photos}
             onChange={next => update('photos', next)}
             max={MAX_PHOTOS}
@@ -254,6 +284,19 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
             </div>
           )}
         </fieldset>
+
+        {submitError && (
+          <div role="alert" style={{
+            marginTop: 4, padding: '10px 12px',
+            background: 'rgba(237,46,80,0.10)',
+            border: '1px solid rgba(237,46,80,0.25)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--accent-rose)',
+            fontSize: 12, fontWeight: 500,
+          }}>
+            {submitError}
+          </div>
+        )}
 
       </form>
     </Modal>

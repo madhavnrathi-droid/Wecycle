@@ -162,6 +162,28 @@ export function getItemMedia(id: string, category?: string): MediaEntry[] {
   return [getCategoryPhoto(category)];
 }
 
+/* Resolve the media gallery for a real or mock item. Real listings carry
+   their own photoUrls/videoUrls from Supabase; we build photo-first +
+   video-after Slides from those. Mock items (no URLs) fall back to the
+   hardcoded sets above so the demo still looks rich. */
+export function resolveItemMedia(item: {
+  id: string;
+  category?: string;
+  photoUrls?: string[] | null;
+  videoUrls?: string[] | null;
+}): MediaEntry[] {
+  const photos = item.photoUrls ?? [];
+  const videos = item.videoUrls ?? [];
+  if (photos.length || videos.length) {
+    const out: MediaEntry[] = [...photos];
+    /* Use the first photo as each video's poster when available. */
+    const poster = photos[0];
+    for (const v of videos) out.push({ kind: 'video', src: v, poster });
+    return out.length ? out : [getCategoryPhoto(item.category)];
+  }
+  return getItemMedia(item.id, item.category);
+}
+
 /* Generic, themed Unsplash fallback by category. */
 export function getCategoryPhoto(category?: string): string {
   switch ((category || '').toLowerCase()) {

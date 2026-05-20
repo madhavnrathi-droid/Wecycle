@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X } from 'lucide-react';
 import { MARKETPLACE_ITEMS, CATEGORIES, type MarketplaceItem } from '../lib/mockData';
-import { getItemMedia, getAvatar } from '../lib/photos';
+import { resolveItemMedia, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
+import { hasSupabaseEnv } from '../lib/supabase';
+import { fetchMarketplaceItems, onPostsChanged } from '../lib/liveData';
 import { getSettings, onSettingsChange } from '../lib/settings';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
@@ -35,14 +37,39 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
     return onSettingsChange(s => setHidePrice(s.marketplace.hidePriceOnFeed));
   }, []);
 
-  /* Source of truth for the marketplace cards: real Supabase reads in prod
-     (which return [] until people start posting), the mock catalogue in
-     demo mode. Both paths run through the same filter pipeline so the UI
-     doesn't branch. */
-  const items: MarketplaceItem[] = useMemo(
-    () => (mounted && isDemoMode() ? MARKETPLACE_ITEMS : []),
-    [mounted],
-  );
+  /* Source of truth for the marketplace cards:
+       - demo mode → the seeded mock catalogue
+       - live (Supabase env) → real listings, refetched whenever a post lands
+       - neither → empty (first-mover prompt) */
+  const [items, setItems] = useState<MarketplaceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+
+    if (isDemoMode()) {
+      setItems(MARKETPLACE_ITEMS);
+      setLoading(false);
+      return;
+    }
+    if (!hasSupabaseEnv) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
+    const load = () => {
+      setLoading(true);
+      fetchMarketplaceItems({ limit: 60 })
+        .then(rows => { if (!cancelled) setItems(rows); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    };
+    load();
+    /* Refetch the instant someone posts (same tab) */
+    const off = onPostsChanged(load);
+    return () => { cancelled = true; off(); };
+  }, [mounted]);
 
   const filtered = items.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
@@ -250,7 +277,13 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
           ))}
         </div>
 
-        {filtered.length === 0 && (
+        {loading && filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
+            Loading the feed…
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
           items.length === 0 ? (
             /* Truly empty community — first-mover prompt. */
             <EmptyState
@@ -299,8 +332,9 @@ function FeedCard({
   hidePrice: boolean;
 }) {
   /* Use the media (photo+video) gallery so cards autoplay videos inline
-     when the user swipes to a video slide. */
-  const photos = getItemMedia(item.id, item.category);
+     when the user swipes to a video slide. Real listings carry their own
+     uploaded URLs; mock items fall back to the hardcoded sets. */
+  const photos = resolveItemMedia(item);
   const isPriced = item.listingType === 'sell';
   const ar = VARIANT_RATIOS[variant];
 

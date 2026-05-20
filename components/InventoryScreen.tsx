@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, X, Heart, CalendarDays, Eye, Bookmark, Users } from 'lucide-react';
 import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent } from '../lib/mockData';
-import { getItemPhotos, getEventPhoto, getAvatar } from '../lib/photos';
+import { resolveItemMedia, getEventPhoto, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { getPostMetrics, getEventMetrics } from '../lib/metrics';
 import { isDemoMode } from '../lib/demoMode';
+import { hasSupabaseEnv } from '../lib/supabase';
+import { fetchMyUploads, onPostsChanged } from '../lib/liveData';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 
@@ -40,34 +42,55 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
   const [activeTab, setActiveTab] = useState<Tab>('uploads');
   const [query, setQuery] = useState('');
 
-  /* Items + events as a unified list for the active tab. In demo mode we
-     mock my-own posts via the MY_*_IDS lists; in production, the seeded
-     catalogue is gone so all three tabs start at zero and grow as the user
-     posts. */
-  const entries = useMemo<UploadEntry[]>(() => {
-    if (!mounted || !isDemoMode()) return [];
+  /* My real uploads from Supabase (live mode), refetched whenever a post
+     lands. Empty in production until the user posts. */
+  const [myLiveUploads, setMyLiveUploads] = useState<MarketplaceItem[]>([]);
+  useEffect(() => {
+    if (!mounted || isDemoMode() || !hasSupabaseEnv || !user) return;
+    let cancelled = false;
+    const load = () => {
+      fetchMyUploads(user.id).then(rows => { if (!cancelled) setMyLiveUploads(rows); });
+    };
+    load();
+    const off = onPostsChanged(load);
+    return () => { cancelled = true; off(); };
+  }, [mounted, user]);
 
-    const itemIds =
-      activeTab === 'uploads'  ? MY_UPLOAD_IDS  :
-      activeTab === 'requests' ? MY_REQUEST_IDS :
-                                 MY_SAVED_IDS;
-    const itemEntries: UploadEntry[] = MARKETPLACE_ITEMS
-      .filter(i => itemIds.includes(i.id))
+  /* Items + events as a unified list for the active tab.
+       - demo mode → seeded MY_*_IDS lists
+       - live mode → my real uploads from Supabase (requests/events wire up
+         as those create paths land; for now uploads is the live tab) */
+  const entries = useMemo<UploadEntry[]>(() => {
+    if (!mounted) return [];
+
+    if (isDemoMode()) {
+      const itemIds =
+        activeTab === 'uploads'  ? MY_UPLOAD_IDS  :
+        activeTab === 'requests' ? MY_REQUEST_IDS :
+                                   MY_SAVED_IDS;
+      const itemEntries: UploadEntry[] = MARKETPLACE_ITEMS
+        .filter(i => itemIds.includes(i.id))
+        .filter(i => !query || i.title.toLowerCase().includes(query.toLowerCase()))
+        .map(item => ({ kind: 'item', item }));
+
+      if (activeTab !== 'uploads') return itemEntries;
+
+      const eventEntries: UploadEntry[] = EVENTS
+        .filter(e => MY_EVENT_IDS.includes(e.id))
+        .filter(e => !query || e.title.toLowerCase().includes(query.toLowerCase()))
+        .map(event => ({ kind: 'event', event }));
+
+      return [...itemEntries, ...eventEntries];
+    }
+
+    /* Live mode — only the uploads tab has a create path wired so far. */
+    if (activeTab !== 'uploads') return [];
+    return myLiveUploads
       .filter(i => !query || i.title.toLowerCase().includes(query.toLowerCase()))
       .map(item => ({ kind: 'item', item }));
+  }, [activeTab, query, mounted, myLiveUploads]);
 
-    /* Events only show under Uploads */
-    if (activeTab !== 'uploads') return itemEntries;
-
-    const eventEntries: UploadEntry[] = EVENTS
-      .filter(e => MY_EVENT_IDS.includes(e.id))
-      .filter(e => !query || e.title.toLowerCase().includes(query.toLowerCase()))
-      .map(event => ({ kind: 'event', event }));
-
-    return [...itemEntries, ...eventEntries];
-  }, [activeTab, query, mounted]);
-
-  const uploadItemCount  = mounted && isDemoMode() ? MY_UPLOAD_IDS.length : 0;
+  const uploadItemCount  = mounted && isDemoMode() ? MY_UPLOAD_IDS.length : myLiveUploads.length;
   const uploadEventCount = mounted && isDemoMode() ? MY_EVENT_IDS.length  : 0;
 
   return (
@@ -268,7 +291,7 @@ function InventoryCard({
   item: MarketplaceItem; tall: boolean; onClick: () => void;
   showHeart: boolean; showEditTag?: boolean;
 }) {
-  const photos = getItemPhotos(item.id, item.category);
+  const photos = resolveItemMedia(item);
   const isPriced = item.listingType === 'sell';
   const ar = tall ? '0.72' : '0.92';
 
