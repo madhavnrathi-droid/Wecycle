@@ -275,10 +275,10 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     item={entry.item}
                     tall={tall}
                     onClick={() => {
-                      /* My listings open the edit modal; requests + saved open
-                         the detail view (the edit modal only knows listings). */
-                      if (activeTab === 'saved' || entry.item.isRequest) onOpenItem(entry.item);
-                      else onEditItem(entry.item);
+                      /* Open the detail view for everything — the owner sees
+                         Edit + Delete there. (The dedicated edit modal still
+                         opens from the detail's Edit button.) */
+                      onOpenItem(entry.item);
                     }}
                     showHeart={activeTab === 'saved'}
                     showEditTag={activeTab !== 'saved' && !entry.item.isRequest}

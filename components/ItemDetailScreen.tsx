@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee, Edit3, Trash2 } from 'lucide-react';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
 import { getPostMetrics } from '../lib/metrics';
@@ -21,6 +21,10 @@ interface ItemDetailScreenProps {
   onRequireAuth: () => void;
   /** Optional: tap an avatar/owner name to open their storefront. */
   onOpenStorefront?: (user: User) => void;
+  /** When the viewer owns this post, these enable the Edit + Delete actions
+   *  (shown in place of the contact buttons — you don't contact yourself). */
+  onEdit?: () => void;
+  onDelete?: () => void | Promise<void>;
 }
 
 /* WhatsApp logo glyph — lucide doesn't ship a brand icon, so we inline a minimal one.
@@ -34,10 +38,20 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onEdit, onDelete }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const canManage = !!(onEdit || onDelete);
   const photos = resolveItemMedia(item);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setDeleting(true);
+    try { await onDelete?.(); onBack(); }
+    finally { setDeleting(false); }
+  };
 
   /* Count a view once per open for real listings. Fire-and-forget; the next
      fetch picks up the bumped count. We detect "real" by the presence of a
@@ -133,6 +147,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         primaryActionLabel={primaryActionLabel}
         handleContactClick={handleContactClick}
         hasBoth={hasBoth}
+        canManage={canManage}
+        onEdit={onEdit}
+        onDelete={onDelete}
       />
     );
   }
@@ -335,6 +352,46 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         <div style={{
           display: 'flex', gap: 8,
         }}>
+          {/* OWNER VIEW — Edit + Delete instead of contact (you can't message
+              yourself). Delete asks for one confirm tap. */}
+          {canManage ? (
+            <>
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  style={{
+                    flex: 1, height: 52, borderRadius: 999,
+                    background: 'var(--text-primary)', color: 'var(--bg-base)',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <Edit3 size={16} strokeWidth={2} />
+                  Edit post
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  style={{
+                    flex: confirmDelete ? 1 : '0 0 auto',
+                    minWidth: 52, height: 52, padding: '0 16px', borderRadius: 999,
+                    background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
+                    color: confirmDelete ? '#fff' : 'var(--accent-rose)',
+                    border: confirmDelete ? 'none' : '1px solid var(--border-subtle)',
+                    cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <Trash2 size={16} strokeWidth={2} />
+                  {deleting ? 'Deleting…' : confirmDelete ? 'Tap to confirm' : ''}
+                </button>
+              )}
+            </>
+          ) : (
+          <>
           <button
             onClick={handleToggleSave}
             aria-label={saved ? 'Saved' : 'Save'}
@@ -408,6 +465,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               {primaryActionLabel}
             </button>
           )}
+          </>
+          )}
         </div>
       </section>
     </div>
@@ -438,12 +497,16 @@ interface DesktopLayoutProps {
   primaryActionLabel: string;
   handleContactClick: (link: ContactLink) => void;
   hasBoth: boolean;
+  canManage: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void | Promise<void>;
 }
 
 function DesktopLayout({
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   contactLinks, primaryActionLabel, handleContactClick, hasBoth,
+  canManage, onEdit, onDelete,
 }: DesktopLayoutProps) {
   void setSaved; /* save state is driven through onToggleSave now */
   return (
@@ -662,12 +725,44 @@ function DesktopLayout({
           </button>
 
           {/* Action buttons — inline on desktop, no fixed bar.
-              When both channels are accepted we show two named buttons.
-              When only one, the single CTA carries the action verb. */}
+              Owners get Edit + Delete; everyone else gets contact. */}
           <div style={{
             display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap',
           }}>
-            {hasBoth ? (
+            {canManage ? (
+              <>
+                {onEdit && (
+                  <button
+                    onClick={onEdit}
+                    style={{
+                      flex: 1, minWidth: 160, height: 52, borderRadius: 14,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <Edit3 size={16} strokeWidth={2} /> Edit post
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={async () => {
+                      if (typeof window !== 'undefined' && !window.confirm('Delete this post permanently?')) return;
+                      await onDelete();
+                    }}
+                    style={{
+                      flex: '0 0 auto', height: 52, padding: '0 18px', borderRadius: 14,
+                      background: 'transparent', color: 'var(--accent-rose)',
+                      border: '1px solid var(--accent-rose)', cursor: 'pointer',
+                      fontSize: 15, fontWeight: 600,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <Trash2 size={16} strokeWidth={2} /> Delete
+                  </button>
+                )}
+              </>
+            ) : hasBoth ? (
               contactLinks.map(link => (
                 <button
                   key={link.channel}

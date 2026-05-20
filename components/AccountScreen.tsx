@@ -4,6 +4,16 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { updateDemoSession, DEPARTMENTS, type Residence } from '../lib/demoAuth';
+import { supabase, hasSupabaseEnv } from '../lib/supabase';
+
+/* Strip everything down to the local 10-digit number, dropping a leading
+   +91 / 91 / 0 if the user pasted one. */
+function tenDigits(raw: string): string {
+  let d = raw.replace(/\D+/g, '');
+  if (d.length > 10 && d.startsWith('91')) d = d.slice(2);
+  if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+  return d.slice(0, 10);
+}
 
 interface AccountScreenProps {
   onBack: () => void;
@@ -11,7 +21,7 @@ interface AccountScreenProps {
 }
 
 export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProps) {
-  const { profile, signOut, isDemo } = useAuth();
+  const { profile, user, signOut, isDemo, refreshProfile } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -34,7 +44,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     if (!profile) return;
     setName(profile.full_name ?? '');
     setEmail((profile as { email?: string }).email ?? '');
-    setPhone(profile.phone ?? '');
+    setPhone(tenDigits(profile.phone ?? ''));
     setCollegeId((profile as { college_id?: string | null }).college_id ?? '');
     const gy = (profile as { graduating_year?: number | null }).graduating_year;
     setGraduatingYear(gy ? String(gy) : '');
@@ -47,9 +57,13 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
      fall back to a friendly placeholder. */
   const currentEmail = email || '';
 
+  /* Phone is optional, but if present it must be exactly 10 digits. */
+  const phoneValid = phone.length === 0 || phone.length === 10;
+
   const canSave =
     name.trim().length >= 2 &&
-    collegeId.trim().length >= 3;
+    collegeId.trim().length >= 3 &&
+    phoneValid;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,19 +71,39 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     setSubmitting(true);
     setError(null);
     try {
+      /* Store phone with the +91 country code so WhatsApp deep-links work,
+         but the UI only ever shows/accepts the 10-digit local number. */
+      const storedPhone = phone.length === 10 ? `+91${phone}` : null;
+
       if (isDemo) {
         updateDemoSession({
           name: name.trim(),
           collegeId: collegeId.trim(),
           email: currentEmail.trim() || undefined,
-          phone: phone.trim() || undefined,
+          phone: storedPhone ?? undefined,
           graduatingYear: graduatingYear ? Number(graduatingYear) : undefined,
           course: course.trim() || undefined,
           department: department || undefined,
           residence: residence || undefined,
         });
+      } else if (hasSupabaseEnv && user) {
+        /* Live: persist to the profiles row immediately. */
+        const { error: err } = await supabase
+          .from('profiles')
+          .update({
+            full_name: name.trim() || null,
+            phone: storedPhone,
+            college_id: collegeId.trim() || null,
+            graduating_year: graduatingYear ? Number(graduatingYear) : null,
+            course: course.trim() || null,
+            department: department || null,
+            residence: residence || null,
+          })
+          .eq('id', user.id);
+        if (err) throw err;
+        await refreshProfile();
       }
-      /* Real path would be a supabase.from('profiles').update({...}) here. */
+
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1800);
     } catch (e) {
@@ -224,16 +258,34 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               <Phone size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
               Phone <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
             </label>
-            <input
-              id="acc-phone"
-              type="tel"
-              inputMode="tel"
-              className="form-input"
-              placeholder="+91 98765 43210"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              autoComplete="tel"
-            />
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '0 12px', borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-inset)', border: '1px solid var(--border-default)',
+                fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap',
+              }}>
+                +91
+              </span>
+              <input
+                id="acc-phone"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={10}
+                className="form-input"
+                placeholder="98765 43210"
+                value={phone}
+                onChange={e => setPhone(tenDigits(e.target.value))}
+                autoComplete="tel-national"
+                aria-invalid={!phoneValid}
+                style={{ flex: 1 }}
+              />
+            </div>
+            {!phoneValid && (
+              <span className="field-error">Enter a 10-digit number (without +91).</span>
+            )}
           </div>
         </Section>
 

@@ -30,7 +30,7 @@ import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { updateListingFields, repostListing, deleteListingById } from '../lib/liveData';
-import { updateDemoPost, repostDemoPost, deleteDemoPost } from '../lib/demoInventory';
+import { updateDemoPost, repostDemoPost, deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
   getSettings, onSettingsChange, applyTheme, watchSystemTheme,
@@ -66,6 +66,12 @@ export default function WecycleApp() {
     setOpenItem(null);
     setOpenEvent(null);
     setOpenStorefront(u);
+  };
+  /* Does the signed-in user own this post? Demo: it's one of the demo-store
+     posts. Live: the listing's author id matches the auth user. */
+  const ownsItem = (it: MarketplaceItem) => {
+    if (isDemoMode()) return demoOwnedIds().includes(it.id);
+    return !!user && it.user.id === user.id;
   };
   const [editItem, setEditItem] = useState<MarketplaceItem | null>(null);
   const [editingAlert, setEditingAlert] = useState<WecycleAlert | null>(null);
@@ -242,6 +248,12 @@ export default function WecycleApp() {
               onBack={() => setOpenItem(null)}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
+              /* Owner sees Edit + Delete instead of contact buttons. */
+              onEdit={ownsItem(openItem) ? () => { setEditItem(openItem); setModal('edit-item'); } : undefined}
+              onDelete={ownsItem(openItem) ? async () => {
+                if (isDemoMode()) { deleteDemoPost(openItem.id); return; }
+                await deleteListingById(openItem.id);
+              } : undefined}
             />
           </main>
         </div>

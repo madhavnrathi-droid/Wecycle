@@ -46,6 +46,10 @@ let requests: MarketplaceItem[] = [
   },
 ];
 
+export function demoOwnedIds(): string[] {
+  return [...uploads.map(i => i.id), ...requests.map(i => i.id)];
+}
+
 export function getDemoUploads(): MarketplaceItem[] {
   return uploads.slice();
 }
