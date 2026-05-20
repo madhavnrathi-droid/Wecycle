@@ -376,17 +376,17 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                   onClick={handleDelete}
                   disabled={deleting}
                   style={{
-                    flex: confirmDelete ? 1 : '0 0 auto',
+                    flex: 1,
                     minWidth: 52, height: 52, padding: '0 16px', borderRadius: 999,
                     background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
                     color: confirmDelete ? '#fff' : 'var(--accent-rose)',
-                    border: confirmDelete ? 'none' : '1px solid var(--border-subtle)',
+                    border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
                     cursor: 'pointer', fontSize: 14, fontWeight: 600,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
                   <Trash2 size={16} strokeWidth={2} />
-                  {deleting ? 'Deleting…' : confirmDelete ? 'Tap to confirm' : ''}
+                  {deleting ? 'Deleting…' : confirmDelete ? 'Tap again to confirm' : 'Delete'}
                 </button>
               )}
             </>

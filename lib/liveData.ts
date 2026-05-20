@@ -122,6 +122,15 @@ const SELECT_WITH_JOINS = `
   category:categories(id, label, icon)
 `;
 
+/* ── Optimistic overlay ────────────────────────────────
+   Ids the user just deleted. We filter these out of every read immediately
+   so a deleted post never flashes back while the server round-trips or a
+   stale refetch lands. Cleared lazily — the set staying small is fine. */
+const removedIds = new Set<string>();
+function notRemoved<T extends { id: string }>(rows: T[]): T[] {
+  return removedIds.size ? rows.filter(r => !removedIds.has(r.id)) : rows;
+}
+
 /* ── Reads ─────────────────────────────────────────── */
 
 export interface FeedFilter {
@@ -144,7 +153,7 @@ export async function fetchMarketplaceItems(filter: FeedFilter = {}): Promise<Ma
 
   const { data, error } = await q;
   if (error || !data) return [];
-  return (data as unknown as ListingRow[]).map(mapListingRow);
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
 }
 
 export async function fetchMyUploads(userId: string): Promise<MarketplaceItem[]> {
@@ -156,7 +165,7 @@ export async function fetchMyUploads(userId: string): Promise<MarketplaceItem[]>
     .neq('status', 'removed')
     .order('posted_at', { ascending: false });
   if (error || !data) return [];
-  return (data as unknown as ListingRow[]).map(mapListingRow);
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
 }
 
 export async function fetchListingsByUser(userId: string): Promise<MarketplaceItem[]> {
@@ -168,7 +177,7 @@ export async function fetchListingsByUser(userId: string): Promise<MarketplaceIt
     .eq('status', 'active')
     .order('posted_at', { ascending: false });
   if (error || !data) return [];
-  return (data as unknown as ListingRow[]).map(mapListingRow);
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
 }
 
 /* ── Media upload ──────────────────────────────────── */
@@ -481,7 +490,7 @@ export async function fetchRequests(filter: FeedFilter = {}): Promise<Marketplac
   if (filter.search?.trim()) q = q.ilike('title', `%${filter.search.trim()}%`);
   const { data, error } = await q;
   if (error || !data) return [];
-  return (data as unknown as RequestRowLite[]).map(mapRequestRow);
+  return notRemoved((data as unknown as RequestRowLite[]).map(mapRequestRow));
 }
 
 export async function fetchMyRequests(userId: string): Promise<MarketplaceItem[]> {
@@ -492,7 +501,7 @@ export async function fetchMyRequests(userId: string): Promise<MarketplaceItem[]
     .eq('user_id', userId)
     .order('posted_at', { ascending: false });
   if (error || !data) return [];
-  return (data as unknown as RequestRowLite[]).map(mapRequestRow);
+  return notRemoved((data as unknown as RequestRowLite[]).map(mapRequestRow));
 }
 
 /* ════════════════════════════════════════════════════
@@ -688,9 +697,35 @@ export async function repostListing(id: string, patch?: EditListingPatch) {
 
 export async function deleteListingById(id: string) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
-  const { error } = await supabase.from('listings').delete().eq('id', id);
-  if (error) throw error;
+  /* Optimistic: hide it from every read immediately, then refresh so the
+     inventory updates the instant we pop back — no waiting on the round-trip. */
+  removedIds.add(id);
   notifyPostsChanged();
+  /* `.select('id')` makes the delete return the rows it removed. If RLS
+     silently blocked it (0 rows), we'd otherwise get a false success — so we
+     surface that as an error and un-hide the item. */
+  const { data, error } = await supabase
+    .from('listings').delete().eq('id', id).select('id');
+  if (error || !data || data.length === 0) {
+    removedIds.delete(id);
+    notifyPostsChanged();
+    throw error ?? new Error('Could not delete — you may not own this post.');
+  }
+}
+
+/** Try delete; also try requests/lost-found in case the id belongs there.
+ *  Used by the generic detail-screen delete which doesn't know the post type. */
+export async function deletePostById(id: string, kind: 'listing' | 'request' | 'lostfound' = 'listing') {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const table = kind === 'request' ? 'requests' : kind === 'lostfound' ? 'lost_found_reports' : 'listings';
+  removedIds.add(id);
+  notifyPostsChanged();
+  const { data, error } = await supabase.from(table).delete().eq('id', id).select('id');
+  if (error || !data || data.length === 0) {
+    removedIds.delete(id);
+    notifyPostsChanged();
+    throw error ?? new Error('Could not delete — you may not own this post.');
+  }
 }
 
 /** Bump a listing's view counter (fire-and-forget — never blocks the UI). */

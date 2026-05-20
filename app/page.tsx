@@ -29,7 +29,7 @@ import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
-import { updateListingFields, repostListing, deleteListingById } from '../lib/liveData';
+import { updateListingFields, repostListing, deleteListingById, deletePostById } from '../lib/liveData';
 import { updateDemoPost, repostDemoPost, deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
@@ -249,10 +249,10 @@ export default function WecycleApp() {
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
               /* Owner sees Edit + Delete instead of contact buttons. */
-              onEdit={ownsItem(openItem) ? () => { setEditItem(openItem); setModal('edit-item'); } : undefined}
+              onEdit={ownsItem(openItem) && !openItem.isRequest ? () => { setEditItem(openItem); setModal('edit-item'); } : undefined}
               onDelete={ownsItem(openItem) ? async () => {
                 if (isDemoMode()) { deleteDemoPost(openItem.id); return; }
-                await deleteListingById(openItem.id);
+                await deletePostById(openItem.id, openItem.isRequest ? 'request' : 'listing');
               } : undefined}
             />
           </main>
