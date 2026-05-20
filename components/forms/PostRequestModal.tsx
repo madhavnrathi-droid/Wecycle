@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Modal from '../Modal';
 import PhotoCarousel from '../PhotoCarousel';
-import PhotoPicker from '../PhotoPicker';
+import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import { createRequest } from '../../lib/liveData';
+import { isDemoMode } from '../../lib/demoMode';
+import { hasSupabaseEnv } from '../../lib/supabase';
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
@@ -33,6 +36,8 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
   });
   const [errors, setErrors] = useState<Partial<Record<keyof RequestForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const pickerRef = useRef<PhotoPickerHandle>(null);
 
   const update = <K extends keyof RequestForm>(key: K, value: RequestForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -48,16 +53,33 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    setTimeout(() => {
+    setSubmitError(null);
+    try {
+      if (hasSupabaseEnv && !isDemoMode()) {
+        await createRequest({
+          title: form.title,
+          category: form.category,
+          description: form.description,
+          urgency: form.urgency,
+          needByDate: form.needByDate,
+          media: pickerRef.current?.getMedia() ?? [],
+        });
+      } else {
+        await new Promise(r => setTimeout(r, 400));
+      }
       onSubmit?.(form);
-      setSubmitting(false);
+      pickerRef.current?.clear();
       setForm({ title: '', category: '', urgency: 'normal', description: '', needByDate: '', photos: [] });
       onClose();
-    }, 400);
+    } catch (err) {
+      setSubmitError((err as Error).message || 'Could not post — please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -198,11 +220,25 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
           )}
 
           <PhotoPicker
+            ref={pickerRef}
             photos={form.photos}
             onChange={next => update('photos', next)}
             max={MAX_PHOTOS}
           />
         </section>
+
+        {submitError && (
+          <div role="alert" style={{
+            marginTop: 14, padding: '10px 12px',
+            background: 'rgba(237,46,80,0.10)',
+            border: '1px solid rgba(237,46,80,0.25)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--accent-rose)',
+            fontSize: 12, fontWeight: 500,
+          }}>
+            {submitError}
+          </div>
+        )}
       </form>
     </Modal>
   );

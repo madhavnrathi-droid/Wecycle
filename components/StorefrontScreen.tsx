@@ -16,7 +16,7 @@
  * either uploads or requests is empty we still show the tab (with a friendly
  * empty state) since users will want to see "no requests right now". */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, MapPin, Calendar, Users, IndianRupee } from 'lucide-react';
 import type {
   User, MarketplaceItem, CommunityEvent, FeedItem,
@@ -24,10 +24,12 @@ import type {
 import {
   MARKETPLACE_ITEMS, EVENTS, FEED_ITEMS, CATEGORIES, MY_EVENT_IDS,
 } from '../lib/mockData';
-import { getAvatar, getItemPhotos, getEventPhoto } from '../lib/photos';
+import { getAvatar, resolveItemMedia, getEventPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
+import { hasSupabaseEnv } from '../lib/supabase';
+import { fetchListingsByUser, fetchEventsByUser, onPostsChanged } from '../lib/liveData';
 
 interface StorefrontScreenProps {
   user: User;
@@ -44,30 +46,34 @@ export default function StorefrontScreen({
   const { user: viewer } = useAuth();
   const isMe = !!viewer && viewer.id === user.id;
 
-  /* Slice the global data by author. In production this becomes a Supabase
-     query (`select … from listings where owner_id = …`) but the shape stays
-     identical so the views below don't need to change. Demo mode keeps the
-     seeded catalogue so demo storefronts feel populated. */
+  /* Demo mode slices the seeded catalogue by author; live mode fetches the
+     user's real listings + events from Supabase. */
   const demo = isDemoMode();
-  const uploads = useMemo(
-    () => (demo ? MARKETPLACE_ITEMS.filter(i => i.user.id === user.id) : []),
-    [user.id, demo],
-  );
   const requests = useMemo(
     () => (demo ? FEED_ITEMS.filter(f => f.type === 'request' && f.user.id === user.id) : []),
     [user.id, demo],
   );
-  const events = useMemo(
-    /* `MY_EVENT_IDS` carries demo-user ownership for the current user
-       (id u1). For other users we fall back to `organizer.id` matching. */
-    () => demo
-      ? EVENTS.filter(e =>
-          e.organizer.id === user.id ||
-          (user.id === 'u1' && MY_EVENT_IDS.includes(e.id))
-        )
-      : [],
-    [user.id, demo],
+
+  const [uploads, setUploads] = useState<MarketplaceItem[]>(
+    demo ? MARKETPLACE_ITEMS.filter(i => i.user.id === user.id) : [],
   );
+  const [events, setEvents] = useState<CommunityEvent[]>(
+    demo
+      ? EVENTS.filter(e => e.organizer.id === user.id || (user.id === 'u1' && MY_EVENT_IDS.includes(e.id)))
+      : [],
+  );
+
+  useEffect(() => {
+    if (demo || !hasSupabaseEnv) return;
+    let cancelled = false;
+    const load = () => {
+      fetchListingsByUser(user.id).then(rows => { if (!cancelled) setUploads(rows); });
+      fetchEventsByUser(user.id).then(rows => { if (!cancelled) setEvents(rows); });
+    };
+    load();
+    const off = onPostsChanged(load);
+    return () => { cancelled = true; off(); };
+  }, [user.id, demo]);
 
   /* Decide which tabs to surface. Events is conditional. */
   const tabs: { id: Tab; label: string; count: number }[] = [
@@ -317,7 +323,9 @@ function ItemTile({
   variant: keyof typeof RATIOS;
   onClick: () => void;
 }) {
-  const photo = getItemPhotos(item.id, item.category)[0];
+  /* First slide as a thumbnail — use the video poster if the first media is a clip. */
+  const first = resolveItemMedia(item)[0];
+  const photo = typeof first === 'string' ? first : (first?.poster ?? first?.src);
   const isPriced = item.listingType === 'sell';
   return (
     <button

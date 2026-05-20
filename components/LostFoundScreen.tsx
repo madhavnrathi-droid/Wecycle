@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
+import { hasSupabaseEnv } from '../lib/supabase';
+import { fetchLostFound, onPostsChanged } from '../lib/liveData';
 import EmptyState from './EmptyState';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
@@ -55,9 +57,20 @@ export default function LostFoundScreen({
      things. Demo mode keeps the seeded items so screenshots stay full. */
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  const [liveItems, setLiveItems] = useState<LostItem[]>([]);
+  useEffect(() => {
+    if (!mounted || isDemoMode() || !hasSupabaseEnv) return;
+    let cancelled = false;
+    const load = () => { fetchLostFound().then(rows => { if (!cancelled) setLiveItems(rows); }); };
+    load();
+    const off = onPostsChanged(load);
+    return () => { cancelled = true; off(); };
+  }, [mounted]);
+
   const allItems: LostItem[] = useMemo(
-    () => (mounted && isDemoMode() ? LOST_FOUND_ITEMS : []),
-    [mounted],
+    () => (mounted && isDemoMode() ? LOST_FOUND_ITEMS : liveItems),
+    [mounted, liveItems],
   );
 
   const filtered = useMemo(() => {
@@ -307,7 +320,7 @@ function LostFoundCard({
       {/* Real photo hero — same Marketplace card look. The lower gradient is
           baked into .feed-card-overlay so titles stay legible. */}
       <img
-        src={getLostFoundPhoto(item.id, item.photoIcon)}
+        src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
         alt=""
         loading="lazy"
         style={{
@@ -455,7 +468,7 @@ function LostFoundDetailSheet({
           marginBottom: 14,
         }}>
           <img
-            src={getLostFoundPhoto(item.id, item.photoIcon)}
+            src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
             alt=""
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />

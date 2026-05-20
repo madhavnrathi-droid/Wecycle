@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoCarousel from '../PhotoCarousel';
-import PhotoPicker from '../PhotoPicker';
+import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import { createEvent } from '../../lib/liveData';
+import { isDemoMode } from '../../lib/demoMode';
+import { hasSupabaseEnv } from '../../lib/supabase';
 
 const EVENT_TYPES = [
   { value: 'swap',      label: '🔄 Swap Drive' },
@@ -40,6 +43,8 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
   });
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const pickerRef = useRef<PhotoPickerHandle>(null);
 
   const update = <K extends keyof EventForm>(key: K, value: EventForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -58,16 +63,35 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    setTimeout(() => {
+    setSubmitError(null);
+    try {
+      if (hasSupabaseEnv && !isDemoMode()) {
+        await createEvent({
+          title: form.title,
+          eventType: form.eventType as 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge',
+          date: form.date,
+          time: form.time,
+          location: form.location,
+          description: form.description,
+          maxAttendees: form.maxAttendees,
+          media: pickerRef.current?.getMedia() ?? [],
+        });
+      } else {
+        await new Promise(r => setTimeout(r, 400));
+      }
       onSubmit?.(form);
-      setSubmitting(false);
+      pickerRef.current?.clear();
       setForm({ title: '', eventType: '', date: '', time: '', location: '', description: '', photos: [] });
       onClose();
-    }, 400);
+    } catch (err) {
+      setSubmitError((err as Error).message || 'Could not submit — please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -234,11 +258,25 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           )}
 
           <PhotoPicker
+            ref={pickerRef}
             photos={form.photos}
             onChange={next => update('photos', next)}
             max={MAX_PHOTOS}
           />
         </section>
+
+        {submitError && (
+          <div role="alert" style={{
+            marginTop: 14, padding: '10px 12px',
+            background: 'rgba(237,46,80,0.10)',
+            border: '1px solid rgba(237,46,80,0.25)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--accent-rose)',
+            fontSize: 12, fontWeight: 500,
+          }}>
+            {submitError}
+          </div>
+        )}
       </form>
     </Modal>
   );

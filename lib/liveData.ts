@@ -16,7 +16,7 @@
  */
 
 import { supabase, hasSupabaseEnv } from './supabase';
-import type { MarketplaceItem, User } from './mockData';
+import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData';
 import type { CompressedMedia } from './mediaCompression';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
@@ -267,6 +267,281 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
   if (error) throw error;
   notifyPostsChanged();
   return mapListingRow(data as unknown as ListingRow);
+}
+
+/* ════════════════════════════════════════════════════
+   REQUESTS
+   ════════════════════════════════════════════════════ */
+
+export interface NewRequestInput {
+  title: string;
+  category: string;
+  description?: string;
+  urgency: 'normal' | 'urgent';
+  needByDate?: string;     /* ISO date or '' */
+  media: CompressedMedia[];
+}
+
+async function resolveCommunityId(userId: string): Promise<string> {
+  const { data } = await supabase
+    .from('profiles').select('community_id').eq('id', userId).single();
+  const cid = (data as { community_id?: string } | null)?.community_id;
+  if (!cid) throw new Error('Your profile has no community yet — sign out and back in.');
+  return cid;
+}
+
+export async function createRequest(input: NewRequestInput) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Please sign in to post');
+  const communityId = await resolveCommunityId(user.id);
+
+  const { photoUrls, videoUrls } = input.media.length
+    ? await uploadMedia('listings', input.media)
+    : { photoUrls: [], videoUrls: [] };
+
+  const { error } = await supabase.from('requests').insert({
+    user_id: user.id,
+    community_id: communityId,
+    title: input.title.trim(),
+    description: input.description?.trim() || null,
+    category_id: input.category.trim().toLowerCase() || null,
+    urgency: input.urgency,
+    need_by_date: input.needByDate || null,
+    status: 'open',
+    photo_urls: photoUrls,
+    video_urls: videoUrls,
+  });
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+/* ════════════════════════════════════════════════════
+   EVENTS
+   ════════════════════════════════════════════════════ */
+
+export interface NewEventInput {
+  title: string;
+  eventType: 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge';
+  date: string;            /* yyyy-mm-dd */
+  time: string;            /* HH:MM */
+  location: string;
+  description?: string;
+  maxAttendees?: number;
+  media: CompressedMedia[];
+}
+
+export async function createEvent(input: NewEventInput) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Please sign in to post');
+  const communityId = await resolveCommunityId(user.id);
+
+  const { photoUrls, videoUrls } = input.media.length
+    ? await uploadMedia('events', input.media)
+    : { photoUrls: [], videoUrls: [] };
+
+  /* Combine date + time into a timestamptz. Falls back to midnight when the
+     time is blank. */
+  const startsAt = new Date(`${input.date}T${input.time || '00:00'}:00`).toISOString();
+
+  const { error } = await supabase.from('events').insert({
+    organizer_id: user.id,
+    community_id: communityId,
+    title: input.title.trim(),
+    description: input.description?.trim() || null,
+    event_type: input.eventType,
+    starts_at: startsAt,
+    location: input.location.trim(),
+    max_attendees: input.maxAttendees ?? null,
+    status: 'published',
+    cover_url: photoUrls[0] ?? null,
+    photo_urls: photoUrls,
+    video_urls: videoUrls,
+  });
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+/* ════════════════════════════════════════════════════
+   LOST & FOUND
+   ════════════════════════════════════════════════════ */
+
+export interface NewLostFoundInput {
+  title: string;
+  status: 'lost' | 'found';
+  description?: string;
+  category?: string;
+  lastSeen?: string;
+  reward?: string;
+  media: CompressedMedia[];
+}
+
+export async function createLostFound(input: NewLostFoundInput) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Please sign in to post');
+  const communityId = await resolveCommunityId(user.id);
+
+  const { photoUrls, videoUrls } = input.media.length
+    ? await uploadMedia('lost-found', input.media)
+    : { photoUrls: [], videoUrls: [] };
+
+  const { error } = await supabase.from('lost_found_reports').insert({
+    user_id: user.id,
+    community_id: communityId,
+    title: input.title.trim(),
+    description: input.description?.trim() || null,
+    category_id: input.category?.trim().toLowerCase() || null,
+    status: input.status,
+    last_seen: input.lastSeen?.trim() || null,
+    reward: input.reward?.trim() || null,
+    photo_urls: photoUrls,
+    video_urls: videoUrls,
+  });
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+/* ════════════════════════════════════════════════════
+   READ: events + lost-found (with mappers)
+   ════════════════════════════════════════════════════ */
+
+const EVENT_SELECT = `
+  *,
+  organizer:profiles!events_organizer_id_fkey(
+    id, username, full_name, initials, avatar_url, avatar_color, role,
+    is_online, contact_email_enabled, contact_whatsapp_enabled
+  )
+`;
+
+interface EventRowLite {
+  id: string;
+  organizer_id: string;
+  title: string;
+  description: string | null;
+  event_type: CommunityEvent['eventType'];
+  color_accent: string | null;
+  starts_at: string;
+  location: string;
+  max_attendees: number | null;
+  attendee_count: number | null;
+  photo_urls: string[] | null;
+  video_urls: string[] | null;
+  cover_url: string | null;
+  organizer?: JoinedProfile | null;
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '');
+}
+
+export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: string[]; videoUrls?: string[] } {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    eventType: row.event_type,
+    date: fmtDate(row.starts_at),
+    time: fmtTime(row.starts_at),
+    location: row.location,
+    attendees: row.attendee_count ?? 0,
+    maxAttendees: row.max_attendees ?? undefined,
+    colorAccent: row.color_accent ?? '#A8DD00',
+    organizer: profileToUser(row.organizer, row.organizer_id),
+    tags: [],
+    rsvpd: false,
+    photoUrls: row.photo_urls ?? [],
+    videoUrls: row.video_urls ?? [],
+  };
+}
+
+export async function fetchEvents(): Promise<CommunityEvent[]> {
+  if (!hasSupabaseEnv) return [];
+  const { data, error } = await supabase
+    .from('events')
+    .select(EVENT_SELECT)
+    .eq('status', 'published')
+    .order('starts_at', { ascending: true });
+  if (error || !data) return [];
+  return (data as unknown as EventRowLite[]).map(mapEventRow);
+}
+
+export async function fetchEventsByUser(userId: string): Promise<CommunityEvent[]> {
+  if (!hasSupabaseEnv || !userId) return [];
+  const { data, error } = await supabase
+    .from('events')
+    .select(EVENT_SELECT)
+    .eq('organizer_id', userId)
+    .order('starts_at', { ascending: true });
+  if (error || !data) return [];
+  return (data as unknown as EventRowLite[]).map(mapEventRow);
+}
+
+const LF_SELECT = `
+  *,
+  user:profiles!lost_found_reports_user_id_fkey(
+    id, username, full_name, initials, avatar_url, avatar_color, role,
+    is_online, contact_email_enabled, contact_whatsapp_enabled
+  )
+`;
+
+interface LostFoundRowLite {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  status: 'lost' | 'found' | 'claimed' | 'returned';
+  last_seen: string | null;
+  photo_color: string | null;
+  photo_icon: string | null;
+  photo_urls: string[] | null;
+  reward: string | null;
+  verified: boolean;
+  posted_at: string;
+  user?: JoinedProfile | null;
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(diff / 3_600_000);
+  if (h < 1) return 'just now';
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+export function mapLostFoundRow(row: LostFoundRowLite): LostItem & { photoUrls?: string[] } {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    status: (row.status === 'returned' ? 'claimed' : row.status) as LostItem['status'],
+    lastSeen: row.last_seen ?? '',
+    photoColor: row.photo_color ?? '#1C1C1A',
+    photoIcon: row.photo_icon ?? '🔍',
+    user: profileToUser(row.user, row.user_id),
+    timeAgo: timeAgo(row.posted_at),
+    reward: row.reward ?? undefined,
+    verified: row.verified,
+    photoUrls: row.photo_urls ?? [],
+  };
+}
+
+export async function fetchLostFound(): Promise<(LostItem & { photoUrls?: string[] })[]> {
+  if (!hasSupabaseEnv) return [];
+  const { data, error } = await supabase
+    .from('lost_found_reports')
+    .select(LF_SELECT)
+    .in('status', ['lost', 'found'])
+    .order('posted_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as unknown as LostFoundRowLite[]).map(mapLostFoundRow);
 }
 
 /* ── Pub/sub: refetch feeds after a post ───────────── */

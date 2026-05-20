@@ -441,6 +441,7 @@ export type Database = {
           location: string
           max_attendees: number | null
           organizer_id: string
+          photo_urls: string[]
           starts_at: string
           status: Database["public"]["Enums"]["event_status"]
           title: string
@@ -460,6 +461,7 @@ export type Database = {
           location: string
           max_attendees?: number | null
           organizer_id: string
+          photo_urls?: string[]
           starts_at: string
           status?: Database["public"]["Enums"]["event_status"]
           title: string
@@ -479,6 +481,7 @@ export type Database = {
           location?: string
           max_attendees?: number | null
           organizer_id?: string
+          photo_urls?: string[]
           starts_at?: string
           status?: Database["public"]["Enums"]["event_status"]
           title?: string
@@ -1305,12 +1308,14 @@ export type Database = {
           id: string
           need_by_date: string | null
           offer_count: number
+          photo_urls: string[]
           posted_at: string
           status: Database["public"]["Enums"]["request_status"]
           title: string
           updated_at: string
           urgency: Database["public"]["Enums"]["request_urgency"]
           user_id: string
+          video_urls: string[]
         }
         Insert: {
           category_id?: string | null
@@ -1319,12 +1324,14 @@ export type Database = {
           id?: string
           need_by_date?: string | null
           offer_count?: number
+          photo_urls?: string[]
           posted_at?: string
           status?: Database["public"]["Enums"]["request_status"]
           title: string
           updated_at?: string
           urgency?: Database["public"]["Enums"]["request_urgency"]
           user_id: string
+          video_urls?: string[]
         }
         Update: {
           category_id?: string | null
@@ -1333,12 +1340,14 @@ export type Database = {
           id?: string
           need_by_date?: string | null
           offer_count?: number
+          photo_urls?: string[]
           posted_at?: string
           status?: Database["public"]["Enums"]["request_status"]
           title?: string
           updated_at?: string
           urgency?: Database["public"]["Enums"]["request_urgency"]
           user_id?: string
+          video_urls?: string[]
         }
         Relationships: [
           {
@@ -1473,6 +1482,7 @@ export type Database = {
       is_community_admin: { Args: { _community_id: string }; Returns: boolean }
       is_community_member: { Args: { _community_id: string }; Returns: boolean }
       mark_expired_alerts: { Args: never; Returns: number }
+      password_policy: { Args: never; Returns: Json }
       purge_old_expired_alerts: { Args: never; Returns: number }
       rpc_community_feed: {
         Args: { _before?: string; _community_id: string; _limit?: number }

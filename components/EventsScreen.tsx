@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
 import { EVENTS, type CommunityEvent } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
+import { hasSupabaseEnv } from '../lib/supabase';
+import { fetchEvents, onPostsChanged } from '../lib/liveData';
 import EmptyState from './EmptyState';
 import { getEventPhoto, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
@@ -83,11 +85,20 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
   const [type, setType] = useState<string>('all');
   const rsvpd = rsvpdEvents;
 
-  /* Single source of truth — flips between mock catalogue (demo) and an
-     empty array (real-data deploys, until the first event lands). */
+  /* Single source of truth — demo catalogue, live Supabase events, or empty. */
+  const [liveEvents, setLiveEvents] = useState<CommunityEvent[]>([]);
+  useEffect(() => {
+    if (!mounted || isDemoMode() || !hasSupabaseEnv) return;
+    let cancelled = false;
+    const load = () => { fetchEvents().then(rows => { if (!cancelled) setLiveEvents(rows); }); };
+    load();
+    const off = onPostsChanged(load);
+    return () => { cancelled = true; off(); };
+  }, [mounted]);
+
   const allEvents: CommunityEvent[] = useMemo(
-    () => (mounted && isDemoMode() ? EVENTS : []),
-    [mounted],
+    () => (mounted && isDemoMode() ? EVENTS : liveEvents),
+    [mounted, liveEvents],
   );
 
   const filtered = useMemo(() => {

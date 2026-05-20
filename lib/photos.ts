@@ -104,7 +104,10 @@ const LF_EMOJI_FALLBACKS: Record<string, string> = {
   '💼': u('1606312619070-d48b4c652a52'),  // laptop case
 };
 
-export function getLostFoundPhoto(id: string, photoIcon?: string): string {
+export function getLostFoundPhoto(id: string, photoIcon?: string, photoUrls?: string[] | null): string {
+  /* Real uploaded photo wins; then the keyed mock map; then an emoji-based
+     guess; finally a generic lost-stuff fallback. */
+  if (photoUrls && photoUrls.length) return photoUrls[0];
   return (
     ITEM_PHOTOS[id]              ??
     (photoIcon ? LF_EMOJI_FALLBACKS[photoIcon] : undefined) ??

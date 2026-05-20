@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { Upload, Camera, MapPin } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { MapPin } from 'lucide-react';
 import Modal from '../Modal';
+import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import { createLostFound } from '../../lib/liveData';
+import { isDemoMode } from '../../lib/demoMode';
+import { hasSupabaseEnv } from '../../lib/supabase';
 
 const CATEGORIES = [
   'Electronics', 'Bag/Wallet', 'Keys', 'ID/Card', 'Clothing',
@@ -24,17 +28,22 @@ export interface ReportLFForm {
   dateLastSeen: string;
   description: string;
   contact: string;
+  photos: string[];
 }
+
+const MAX_PHOTOS = 3;
 
 export default function ReportLostFoundModal({
   open, onClose, onSubmit, defaultStatus,
 }: ReportLostFoundModalProps) {
   const [form, setForm] = useState<ReportLFForm>({
     name: '', status: defaultStatus ?? '', category: '',
-    location: '', dateLastSeen: '', description: '', contact: '',
+    location: '', dateLastSeen: '', description: '', contact: '', photos: [],
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ReportLFForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const pickerRef = useRef<PhotoPickerHandle>(null);
 
   const update = <K extends keyof ReportLFForm>(key: K, value: ReportLFForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -53,16 +62,33 @@ export default function ReportLostFoundModal({
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    setTimeout(() => {
+    setSubmitError(null);
+    try {
+      if (hasSupabaseEnv && !isDemoMode()) {
+        await createLostFound({
+          title: form.name,
+          status: form.status as 'lost' | 'found',
+          description: form.description,
+          category: form.category,
+          lastSeen: form.location,
+          media: pickerRef.current?.getMedia() ?? [],
+        });
+      } else {
+        await new Promise(r => setTimeout(r, 400));
+      }
       onSubmit?.(form);
-      setSubmitting(false);
-      setForm({ name: '', status: defaultStatus ?? '', category: '', location: '', dateLastSeen: '', description: '', contact: '' });
+      pickerRef.current?.clear();
+      setForm({ name: '', status: defaultStatus ?? '', category: '', location: '', dateLastSeen: '', description: '', contact: '', photos: [] });
       onClose();
-    }, 400);
+    } catch (err) {
+      setSubmitError((err as Error).message || 'Could not submit — please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -216,19 +242,26 @@ export default function ReportLostFoundModal({
           <legend className="field-label" style={{ marginBottom: 8 }}>
             Photo <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
           </legend>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <label className="dropzone">
-              <Upload size={20} strokeWidth={1.8} />
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Upload</span>
-              <input type="file" accept="image/*" style={{ display: 'none' }} />
-            </label>
-            <label className="dropzone">
-              <Camera size={20} strokeWidth={1.8} />
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Camera</span>
-              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} />
-            </label>
-          </div>
+          <PhotoPicker
+            ref={pickerRef}
+            photos={form.photos}
+            onChange={next => update('photos', next)}
+            max={MAX_PHOTOS}
+          />
         </fieldset>
+
+        {submitError && (
+          <div role="alert" style={{
+            marginTop: 14, padding: '10px 12px',
+            background: 'rgba(237,46,80,0.10)',
+            border: '1px solid rgba(237,46,80,0.25)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--accent-rose)',
+            fontSize: 12, fontWeight: 500,
+          }}>
+            {submitError}
+          </div>
+        )}
       </form>
     </Modal>
   );

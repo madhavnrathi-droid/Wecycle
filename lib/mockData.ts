@@ -154,6 +154,8 @@ export interface LostItem {
   timeAgo: string;
   reward?: string;
   verified: boolean;
+  /* Real uploaded photos (absent on mock items). */
+  photoUrls?: string[];
 }
 
 export interface InventoryItem {
