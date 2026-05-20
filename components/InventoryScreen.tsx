@@ -9,6 +9,7 @@ import { getPostMetrics, getEventMetrics } from '../lib/metrics';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchMyUploads, fetchMyRequests, onPostsChanged } from '../lib/liveData';
+import { getDemoUploads, getDemoRequests } from '../lib/demoInventory';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 
@@ -58,6 +59,14 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
     return () => { cancelled = true; off(); };
   }, [mounted, user]);
 
+  /* Demo mode reads from the mutable demo store; bump a tick on every change
+     so edits/deletes reflect instantly (the store is plain module state). */
+  const [demoTick, setDemoTick] = useState(0);
+  useEffect(() => {
+    if (!isDemoMode()) return;
+    return onPostsChanged(() => setDemoTick(t => t + 1));
+  }, []);
+
   /* Items + events as a unified list for the active tab.
        - demo mode → seeded MY_*_IDS lists
        - live mode → my real uploads from Supabase (requests/events wire up
@@ -68,14 +77,13 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
     if (!mounted) return [];
 
     if (isDemoMode()) {
-      /* 'all' = uploads + requests + events; otherwise the single tab's pool. */
-      const itemIds =
-        activeTab === 'uploads'  ? MY_UPLOAD_IDS  :
-        activeTab === 'requests' ? MY_REQUEST_IDS :
-        activeTab === 'saved'    ? MY_SAVED_IDS   :
-        [...MY_UPLOAD_IDS, ...MY_REQUEST_IDS];   /* all */
-      const itemEntries: UploadEntry[] = MARKETPLACE_ITEMS
-        .filter(i => itemIds.includes(i.id))
+      /* Read from the mutable demo store so edits + deletes reflect live. */
+      const pool: MarketplaceItem[] =
+        activeTab === 'uploads'  ? getDemoUploads() :
+        activeTab === 'requests' ? getDemoRequests() :
+        activeTab === 'saved'    ? MARKETPLACE_ITEMS.filter(i => MY_SAVED_IDS.includes(i.id)) :
+        [...getDemoUploads(), ...getDemoRequests()];   /* all */
+      const itemEntries: UploadEntry[] = pool
         .filter(i => matchesQuery(i.title))
         .map(item => ({ kind: 'item', item }));
 
@@ -103,9 +111,9 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
     return pool
       .filter(i => matchesQuery(i.title))
       .map(item => ({ kind: 'item' as const, item }));
-  }, [activeTab, query, mounted, myLiveUploads, myLiveRequests]);
+  }, [activeTab, query, mounted, myLiveUploads, myLiveRequests, demoTick]);
 
-  const uploadItemCount  = mounted && isDemoMode() ? MY_UPLOAD_IDS.length : myLiveUploads.length;
+  const uploadItemCount  = mounted && isDemoMode() ? getDemoUploads().length : myLiveUploads.length;
   const uploadEventCount = mounted && isDemoMode() ? MY_EVENT_IDS.length  : 0;
 
   return (

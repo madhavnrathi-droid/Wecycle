@@ -30,6 +30,7 @@ import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { updateListingFields, repostListing, deleteListingById } from '../lib/liveData';
+import { updateDemoPost, repostDemoPost, deleteDemoPost } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
   getSettings, onSettingsChange, applyTheme, watchSystemTheme,
@@ -445,7 +446,17 @@ export default function WecycleApp() {
             initiallyHidden={false}
             onClose={() => { closeModal(); setEditItem(null); }}
             onSave={async (data) => {
-              if (isDemoMode() || !editItem) return;
+              if (!editItem) return;
+              if (isDemoMode()) {
+                /* Demo: mutate the in-memory store so the change reflects. */
+                updateDemoPost(editItem.id, {
+                  title: data.title, category: data.category,
+                  condition: data.condition as 'like_new' | 'good' | 'fair',
+                  description: data.description, location: data.location,
+                  listingType: data.pricing, price: data.price,
+                });
+                return;
+              }
               await updateListingFields(editItem.id, {
                 title: data.title,
                 category: data.category,
@@ -458,7 +469,16 @@ export default function WecycleApp() {
               });
             }}
             onRepost={async (data) => {
-              if (isDemoMode() || !editItem) return;
+              if (!editItem) return;
+              if (isDemoMode()) {
+                repostDemoPost(editItem.id, {
+                  title: data.title, category: data.category,
+                  condition: data.condition as 'like_new' | 'good' | 'fair',
+                  description: data.description, location: data.location,
+                  listingType: data.pricing, price: data.price,
+                });
+                return;
+              }
               await repostListing(editItem.id, {
                 title: data.title,
                 category: data.category,
@@ -471,7 +491,8 @@ export default function WecycleApp() {
               });
             }}
             onDelete={async () => {
-              if (isDemoMode() || !editItem) return;
+              if (!editItem) return;
+              if (isDemoMode()) { deleteDemoPost(editItem.id); return; }
               await deleteListingById(editItem.id);
             }}
           />
