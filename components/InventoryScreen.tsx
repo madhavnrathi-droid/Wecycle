@@ -8,7 +8,7 @@ import { useAuth } from '../lib/AuthContext';
 import { getPostMetrics, getEventMetrics } from '../lib/metrics';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
-import { fetchMyUploads, onPostsChanged } from '../lib/liveData';
+import { fetchMyUploads, fetchMyRequests, onPostsChanged } from '../lib/liveData';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 
@@ -42,14 +42,16 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
   const [activeTab, setActiveTab] = useState<Tab>('uploads');
   const [query, setQuery] = useState('');
 
-  /* My real uploads from Supabase (live mode), refetched whenever a post
-     lands. Empty in production until the user posts. */
+  /* My real uploads + requests from Supabase (live mode), refetched whenever
+     a post lands. Empty in production until the user posts. */
   const [myLiveUploads, setMyLiveUploads] = useState<MarketplaceItem[]>([]);
+  const [myLiveRequests, setMyLiveRequests] = useState<MarketplaceItem[]>([]);
   useEffect(() => {
     if (!mounted || isDemoMode() || !hasSupabaseEnv || !user) return;
     let cancelled = false;
     const load = () => {
       fetchMyUploads(user.id).then(rows => { if (!cancelled) setMyLiveUploads(rows); });
+      fetchMyRequests(user.id).then(rows => { if (!cancelled) setMyLiveRequests(rows); });
     };
     load();
     const off = onPostsChanged(load);
@@ -83,12 +85,16 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       return [...itemEntries, ...eventEntries];
     }
 
-    /* Live mode — only the uploads tab has a create path wired so far. */
-    if (activeTab !== 'uploads') return [];
-    return myLiveUploads
+    /* Live mode — uploads + requests have create paths; saved is local-only
+       for now (no server-side saves UI yet). */
+    const pool =
+      activeTab === 'uploads'  ? myLiveUploads :
+      activeTab === 'requests' ? myLiveRequests :
+                                 [];
+    return pool
       .filter(i => !query || i.title.toLowerCase().includes(query.toLowerCase()))
-      .map(item => ({ kind: 'item', item }));
-  }, [activeTab, query, mounted, myLiveUploads]);
+      .map(item => ({ kind: 'item' as const, item }));
+  }, [activeTab, query, mounted, myLiveUploads, myLiveRequests]);
 
   const uploadItemCount  = mounted && isDemoMode() ? MY_UPLOAD_IDS.length : myLiveUploads.length;
   const uploadEventCount = mounted && isDemoMode() ? MY_EVENT_IDS.length  : 0;

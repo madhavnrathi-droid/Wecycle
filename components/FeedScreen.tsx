@@ -7,7 +7,7 @@ import { resolveItemMedia, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
-import { fetchMarketplaceItems, onPostsChanged } from '../lib/liveData';
+import { fetchMarketplaceItems, fetchRequests, onPostsChanged } from '../lib/liveData';
 import { getSettings, onSettingsChange } from '../lib/settings';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
@@ -42,6 +42,7 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
        - live (Supabase env) → real listings, refetched whenever a post lands
        - neither → empty (first-mover prompt) */
   const [items, setItems] = useState<MarketplaceItem[]>([]);
+  const [requests, setRequests] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,19 +51,28 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
 
     if (isDemoMode()) {
       setItems(MARKETPLACE_ITEMS);
+      setRequests([]);
       setLoading(false);
       return;
     }
     if (!hasSupabaseEnv) {
       setItems([]);
+      setRequests([]);
       setLoading(false);
       return;
     }
 
     const load = () => {
       setLoading(true);
-      fetchMarketplaceItems({ limit: 60 })
-        .then(rows => { if (!cancelled) setItems(rows); })
+      Promise.all([
+        fetchMarketplaceItems({ limit: 60 }),
+        fetchRequests({ limit: 60 }),
+      ])
+        .then(([listingRows, requestRows]) => {
+          if (cancelled) return;
+          setItems(listingRows);
+          setRequests(requestRows);
+        })
         .finally(() => { if (!cancelled) setLoading(false); });
     };
     load();
@@ -71,7 +81,10 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
     return () => { cancelled = true; off(); };
   }, [mounted]);
 
-  const filtered = items.filter(item => {
+  /* The active tab decides which pool we render. Uploads → listings,
+     Requests → open requests. */
+  const source = activeType === 'requests' ? requests : items;
+  const filtered = source.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
     if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
@@ -284,14 +297,23 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
         )}
 
         {!loading && filtered.length === 0 && (
-          items.length === 0 ? (
-            /* Truly empty community — first-mover prompt. */
-            <EmptyState
-              icon="🌱"
-              prompt="Looks like the feed's just sprouting. Be the first to share something!"
-              sub="Post a free find, a borrow request, or an event — your community's waiting."
-              cta={{ label: 'Post the first thing', onClick: onPost }}
-            />
+          source.length === 0 ? (
+            /* Truly empty pool — first-mover prompt, tab-aware copy. */
+            activeType === 'requests' ? (
+              <EmptyState
+                icon="🙋"
+                prompt="No open requests yet. Need something? Ask away!"
+                sub="Posting a request is usually faster (and cheaper) than buying new."
+                cta={{ label: 'Post a request', onClick: onPost }}
+              />
+            ) : (
+              <EmptyState
+                icon="🌱"
+                prompt="Looks like the feed's just sprouting. Be the first to share something!"
+                sub="Post a free find, a borrow request, or an event — your community's waiting."
+                cta={{ label: 'Post the first thing', onClick: onPost }}
+              />
+            )
           ) : (
             /* Filter / search returned no rows — softer "no match" copy. */
             <EmptyState

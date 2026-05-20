@@ -404,6 +404,83 @@ export async function createLostFound(input: NewLostFoundInput) {
 }
 
 /* ════════════════════════════════════════════════════
+   READ: requests (with mapper → MarketplaceItem-shaped)
+   ════════════════════════════════════════════════════ */
+
+interface RequestRowLite {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  category_id: string | null;
+  urgency: 'normal' | 'urgent';
+  need_by_date: string | null;
+  photo_urls: string[] | null;
+  video_urls: string[] | null;
+  offer_count: number | null;
+  posted_at: string;
+  user?: JoinedProfile | null;
+}
+
+/** Requests render through the same MarketplaceItem cards. We map urgency →
+ *  listingType-ish label via the `tags` field and keep listingType 'borrow'
+ *  as a neutral default so the price chip shows the urgency instead. */
+export function mapRequestRow(row: RequestRowLite): MarketplaceItem {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    category: row.category_id ?? 'Other',
+    listingType: 'borrow',
+    condition: 'good',
+    photoColor: '#1C1C1A',
+    photoIcon: '🙋',
+    location: '',
+    user: profileToUser(row.user, row.user_id),
+    saved: false,
+    responses: row.offer_count ?? 0,
+    postedDaysAgo: daysAgo(row.posted_at),
+    tags: row.urgency === 'urgent' ? ['urgent'] : [],
+    photoUrls: row.photo_urls ?? [],
+    videoUrls: row.video_urls ?? [],
+  };
+}
+
+const REQUEST_SELECT = `
+  *,
+  user:profiles!requests_user_id_fkey(
+    id, username, full_name, initials, avatar_url, avatar_color, role,
+    is_online, contact_email_enabled, contact_whatsapp_enabled
+  )
+`;
+
+export async function fetchRequests(filter: FeedFilter = {}): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv) return [];
+  let q = supabase
+    .from('requests')
+    .select(REQUEST_SELECT)
+    .eq('status', 'open')
+    .order('posted_at', { ascending: false })
+    .limit(filter.limit ?? 60);
+  if (filter.category && filter.category !== 'all') q = q.eq('category_id', filter.category);
+  if (filter.search?.trim()) q = q.ilike('title', `%${filter.search.trim()}%`);
+  const { data, error } = await q;
+  if (error || !data) return [];
+  return (data as unknown as RequestRowLite[]).map(mapRequestRow);
+}
+
+export async function fetchMyRequests(userId: string): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv || !userId) return [];
+  const { data, error } = await supabase
+    .from('requests')
+    .select(REQUEST_SELECT)
+    .eq('user_id', userId)
+    .order('posted_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as unknown as RequestRowLite[]).map(mapRequestRow);
+}
+
+/* ════════════════════════════════════════════════════
    READ: events + lost-found (with mappers)
    ════════════════════════════════════════════════════ */
 
