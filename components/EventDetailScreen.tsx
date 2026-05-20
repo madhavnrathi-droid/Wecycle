@@ -362,6 +362,7 @@ export default function EventDetailScreen({
         <CommentsSection
           postId={event.id}
           onRequireAuth={onRequireAuth}
+          onOpenStorefront={onOpenStorefront}
         />
       </section>
 

@@ -54,12 +54,23 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       toggleListingSave(item.id).catch(() => setSaved(s => !s)); // revert on failure
     }
   };
-  const isPriced = item.listingType === 'sell';
-  const priceLabel = isPriced ? `₹${item.price}` : item.listingType === 'free' ? 'Free' : item.listingType[0].toUpperCase() + item.listingType.slice(1);
+  /* Requests are "wanted" posts — never priced, and the action is to offer help
+     rather than to take/buy. */
+  const isRequest = !!item.isRequest;
+  const isPriced = !isRequest && item.listingType === 'sell';
+  const priceLabel = isRequest
+    ? (item.urgent ? 'Urgent request' : 'Wanted')
+    : isPriced ? `₹${item.price}`
+    : item.listingType === 'free' ? 'Free'
+    : item.listingType[0].toUpperCase() + item.listingType.slice(1);
   const desc = item.description ?? '';
   const shouldClamp = desc.length > 140;
   const { isDesktop } = useBreakpoint();
   const { user, profile } = useAuth();
+
+  /* The action the contact buttons fire: requests → 'request' ("I can help"),
+     otherwise derived from the listing type. */
+  const action = isRequest ? 'request' as const : itemAction(item);
 
   /* Resolve contact channels the owner has accepted. We compute these
      unconditionally so logged-out viewers see the right *number* of buttons
@@ -71,12 +82,12 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       phone:   item.user.phone,
       contact: item.user.contact,
     },
-    action: itemAction(item),
+    action,
     item,
     viewerName: profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined,
-  }), [item, profile, user]);
+  }), [item, profile, user, action]);
 
-  const primaryActionLabel = actionLabel(itemAction(item));
+  const primaryActionLabel = actionLabel(action);
 
   const handleContactClick = (link: ContactLink) => {
     if (!user) {
@@ -311,7 +322,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
 
       {/* ── COMMENTS (mobile) ── */}
       <section style={{ padding: '20px 20px 0' }}>
-        <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} />
+        <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
       </section>
 
       {/* ── ACTION BAR ── */}
@@ -761,7 +772,7 @@ function DesktopLayout({
 
           {/* Comments thread — full width below the right column on desktop */}
           <div style={{ marginTop: 8 }}>
-            <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} />
+            <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
           </div>
         </div>
       </div>

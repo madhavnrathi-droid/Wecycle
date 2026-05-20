@@ -20,14 +20,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Send, CornerDownRight } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { addComment, getComments, timeAgo, type Comment } from '../lib/comments';
-import { USERS } from '../lib/mockData';
+import { USERS, type User } from '../lib/mockData';
 import { getAvatar } from '../lib/photos';
 
 interface CommentsSectionProps {
   postId: string;
   onRequireAuth: () => void;
-  /** When provided, tapping a commenter's avatar opens their storefront. */
-  onOpenStorefront?: (userId: string) => void;
+  /** When provided, tapping a commenter's name/avatar opens their storefront. */
+  onOpenStorefront?: (user: User) => void;
 }
 
 export default function CommentsSection({ postId, onRequireAuth, onOpenStorefront }: CommentsSectionProps) {
@@ -293,10 +293,10 @@ function CommentRow({
   comment: Comment;
   compact?: boolean;
   onReply: (c: Comment) => void;
-  onAvatarClick?: (userId: string) => void;
+  onAvatarClick?: (user: User) => void;
 }) {
   const av = onAvatarClick
-    ? () => onAvatarClick(comment.author.id)
+    ? () => onAvatarClick(comment.author)
     : undefined;
 
   return (

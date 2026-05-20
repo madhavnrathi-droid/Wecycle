@@ -12,7 +12,7 @@ import { fetchMyUploads, fetchMyRequests, onPostsChanged } from '../lib/liveData
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 
-type Tab = 'requests' | 'uploads' | 'saved';
+type Tab = 'all' | 'requests' | 'uploads' | 'saved';
 
 interface InventoryScreenProps {
   onOpenMenu: () => void;
@@ -39,7 +39,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-  const [activeTab, setActiveTab] = useState<Tab>('uploads');
+  const [activeTab, setActiveTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
 
   /* My real uploads + requests from Supabase (live mode), refetched whenever
@@ -62,37 +62,46 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
        - demo mode → seeded MY_*_IDS lists
        - live mode → my real uploads from Supabase (requests/events wire up
          as those create paths land; for now uploads is the live tab) */
+  const matchesQuery = (t: string) => !query || t.toLowerCase().includes(query.toLowerCase());
+
   const entries = useMemo<UploadEntry[]>(() => {
     if (!mounted) return [];
 
     if (isDemoMode()) {
+      /* 'all' = uploads + requests + events; otherwise the single tab's pool. */
       const itemIds =
         activeTab === 'uploads'  ? MY_UPLOAD_IDS  :
         activeTab === 'requests' ? MY_REQUEST_IDS :
-                                   MY_SAVED_IDS;
+        activeTab === 'saved'    ? MY_SAVED_IDS   :
+        [...MY_UPLOAD_IDS, ...MY_REQUEST_IDS];   /* all */
       const itemEntries: UploadEntry[] = MARKETPLACE_ITEMS
         .filter(i => itemIds.includes(i.id))
-        .filter(i => !query || i.title.toLowerCase().includes(query.toLowerCase()))
+        .filter(i => matchesQuery(i.title))
         .map(item => ({ kind: 'item', item }));
 
-      if (activeTab !== 'uploads') return itemEntries;
+      /* Events show under 'all' and 'uploads'. */
+      if (activeTab !== 'uploads' && activeTab !== 'all') return itemEntries;
 
       const eventEntries: UploadEntry[] = EVENTS
         .filter(e => MY_EVENT_IDS.includes(e.id))
-        .filter(e => !query || e.title.toLowerCase().includes(query.toLowerCase()))
+        .filter(e => matchesQuery(e.title))
         .map(event => ({ kind: 'event', event }));
 
       return [...itemEntries, ...eventEntries];
     }
 
-    /* Live mode — uploads + requests have create paths; saved is local-only
-       for now (no server-side saves UI yet). */
+    /* Live mode:
+         all      → my uploads + my requests (everything I've shared)
+         uploads  → my listings
+         requests → my requests
+         saved    → local-only for now (no server saves UI yet) */
     const pool =
       activeTab === 'uploads'  ? myLiveUploads :
       activeTab === 'requests' ? myLiveRequests :
-                                 [];
+      activeTab === 'saved'    ? [] :
+      [...myLiveUploads, ...myLiveRequests];   /* all */
     return pool
-      .filter(i => !query || i.title.toLowerCase().includes(query.toLowerCase()))
+      .filter(i => matchesQuery(i.title))
       .map(item => ({ kind: 'item' as const, item }));
   }, [activeTab, query, mounted, myLiveUploads, myLiveRequests]);
 
@@ -203,7 +212,14 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
 
       {/* ── TABS ── */}
       <section style={{ padding: '0 16px 16px' }}>
-        <div className="segmented" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="segmented" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <button
+            onClick={() => setActiveTab('all')}
+            aria-pressed={activeTab === 'all'}
+            data-active={activeTab === 'all' || undefined}
+          >
+            All
+          </button>
           <button
             onClick={() => setActiveTab('uploads')}
             aria-pressed={activeTab === 'uploads'}
@@ -251,12 +267,13 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     item={entry.item}
                     tall={tall}
                     onClick={() => {
-                      /* uploads + requests are MINE → edit; saved is browse → detail */
-                      if (activeTab === 'saved') onOpenItem(entry.item);
+                      /* My listings open the edit modal; requests + saved open
+                         the detail view (the edit modal only knows listings). */
+                      if (activeTab === 'saved' || entry.item.isRequest) onOpenItem(entry.item);
                       else onEditItem(entry.item);
                     }}
                     showHeart={activeTab === 'saved'}
-                    showEditTag={activeTab !== 'saved'}
+                    showEditTag={activeTab !== 'saved' && !entry.item.isRequest}
                   />
                 );
               }
@@ -340,11 +357,19 @@ function InventoryCard({
               <p className="feed-card-title">{item.title}</p>
               <div className="feed-card-meta">
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                  <MapPin size={10} strokeWidth={2} />
-                  {item.location}
+                  {item.isRequest
+                    ? <>🙋 {item.category}</>
+                    : <><MapPin size={10} strokeWidth={2} />{item.location}</>}
                 </span>
-                <span className="feed-card-price">
-                  {isPriced ? `₹${item.price}` : item.listingType === 'free' ? 'Free' : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+                <span
+                  className="feed-card-price"
+                  style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
+                >
+                  {item.isRequest
+                    ? (item.urgent ? 'Urgent' : 'Wanted')
+                    : isPriced ? `₹${item.price}`
+                    : item.listingType === 'free' ? 'Free'
+                    : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
                 </span>
               </div>
             </div>
@@ -423,6 +448,12 @@ function InventoryEventCard({
 function InventoryEmpty({ tab, onPostNew }: { tab: Tab; onPostNew: () => void }) {
   /* Per-tab copy lives here because each tab has a different verb and CTA. */
   const copy =
+    tab === 'all' ? {
+      icon: '🗂️',
+      prompt: "You haven't posted anything yet.",
+      sub: 'Everything you share or request shows up here. Start with your first post.',
+      ctaLabel: 'Create a post',
+    } :
     tab === 'uploads'  ? {
       icon: '📦',
       prompt: 'Your shelves are empty for now.',

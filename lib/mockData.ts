@@ -128,6 +128,13 @@ export interface MarketplaceItem {
      pseudo-random fallback via lib/metrics.ts). */
   viewCount?: number;
   saveCount?: number;
+  /* True when this card is a community *request* (someone wanting something)
+     rather than a listing (someone offering). Drives the "Wanted" chip +
+     "Respond / I can help" action instead of a price + listing-type verb. */
+  isRequest?: boolean;
+  urgent?: boolean;
+  /* Optional "need by" date string for requests. */
+  needBy?: string;
 }
 
 export interface CommunityEvent {

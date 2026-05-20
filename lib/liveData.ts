@@ -427,16 +427,23 @@ interface RequestRowLite {
   user?: JoinedProfile | null;
 }
 
-/** Requests render through the same MarketplaceItem cards. We map urgency →
- *  listingType-ish label via the `tags` field and keep listingType 'borrow'
- *  as a neutral default so the price chip shows the urgency instead. */
+/** Title-case a lowercase category id ("electronics" → "Electronics"). */
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** Requests render through the MarketplaceItem cards but flagged `isRequest`
+ *  so the UI shows a "Wanted" chip + "Respond / I can help" action instead of
+ *  a price and a listing-type verb. `listingType` is irrelevant for requests
+ *  (kept as 'free' purely to satisfy the type — the UI never reads it when
+ *  isRequest is true). */
 export function mapRequestRow(row: RequestRowLite): MarketplaceItem {
   return {
     id: row.id,
     title: row.title,
     description: row.description ?? '',
-    category: row.category_id ?? 'Other',
-    listingType: 'borrow',
+    category: row.category_id ? titleCase(row.category_id) : 'Other',
+    listingType: 'free',
     condition: 'good',
     photoColor: '#1C1C1A',
     photoIcon: '🙋',
@@ -448,6 +455,9 @@ export function mapRequestRow(row: RequestRowLite): MarketplaceItem {
     tags: row.urgency === 'urgent' ? ['urgent'] : [],
     photoUrls: row.photo_urls ?? [],
     videoUrls: row.video_urls ?? [],
+    isRequest: true,
+    urgent: row.urgency === 'urgent',
+    needBy: row.need_by_date ?? undefined,
   };
 }
 

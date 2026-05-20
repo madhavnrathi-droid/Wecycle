@@ -391,16 +391,21 @@ function FeedCard({
                   <MapPin size={10} strokeWidth={2} />
                   {item.location}
                 </span>
-                <span className="feed-card-price">
-                  {isPriced && hidePrice
-                    /* User opted to hide prices — surface just "Sell" so they
-                       still know the listing isn't free, without the rupee figure. */
-                    ? 'Sell'
-                    : isPriced
-                      ? `₹${item.price}`
-                      : item.listingType === 'free'
-                        ? 'Free'
-                        : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+                <span
+                  className="feed-card-price"
+                  style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
+                >
+                  {item.isRequest
+                    /* Requests show "Wanted" (or "Urgent" when flagged) — never
+                       a price or a listing-type verb. */
+                    ? (item.urgent ? 'Urgent' : 'Wanted')
+                    : isPriced && hidePrice
+                      ? 'Sell'
+                      : isPriced
+                        ? `₹${item.price}`
+                        : item.listingType === 'free'
+                          ? 'Free'
+                          : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
                 </span>
               </div>
             </div>

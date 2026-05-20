@@ -58,6 +58,14 @@ export default function WecycleApp() {
   /* Storefront takes over the viewport when set — clicking any author avatar
      or owner card lands here. Cleared on back. */
   const [openStorefront, setOpenStorefront] = useState<User | null>(null);
+  /* Opening a storefront must clear any open item/event first — otherwise the
+     `if (openItem)` early-return below wins and the storefront never renders.
+     This is THE fix for "clicking a user's name does nothing". */
+  const openStorefrontFor = (u: User) => {
+    setOpenItem(null);
+    setOpenEvent(null);
+    setOpenStorefront(u);
+  };
   const [editItem, setEditItem] = useState<MarketplaceItem | null>(null);
   const [editingAlert, setEditingAlert] = useState<WecycleAlert | null>(null);
   /* Track RSVPs at app-level so EventsScreen + EventDetailScreen stay in sync */
@@ -232,7 +240,7 @@ export default function WecycleApp() {
               item={openItem}
               onBack={() => setOpenItem(null)}
               onRequireAuth={() => setModal('auth')}
-              onOpenStorefront={(u) => setOpenStorefront(u)}
+              onOpenStorefront={openStorefrontFor}
             />
           </main>
         </div>
@@ -325,7 +333,7 @@ export default function WecycleApp() {
               onBack={() => setOpenEvent(null)}
               onRsvp={() => toggleRsvp(openEvent.id)}
               onRequireAuth={() => setModal('auth')}
-              onOpenStorefront={(u) => setOpenStorefront(u)}
+              onOpenStorefront={openStorefrontFor}
               onEdit={isOwner ? () => { /* TODO: open edit-event modal */ } : undefined}
             />
           </main>
@@ -365,7 +373,7 @@ export default function WecycleApp() {
               onOpenMenu={() => setDrawerOpen(true)}
               onOpenAccount={goToAccount}
               onRequireAuth={() => setModal('auth')}
-              onOpenStorefront={(u) => setOpenStorefront(u)}
+              onOpenStorefront={openStorefrontFor}
             />
           )}
           {/* Activity is still reachable via Settings → Notifications hint
