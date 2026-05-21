@@ -1,6 +1,14 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
+/* We use @supabase/supabase-js `createClient` with localStorage-backed session
+ * persistence rather than @supabase/ssr `createBrowserClient`. This app is a
+ * pure client-rendered SPA (every screen is 'use client', no server auth /
+ * middleware), and the SSR client's cookie-chunked session proved flaky here:
+ * getUser() could report a signed-in user while the access token failed to
+ * attach to PostgREST/Storage requests — so writes silently hit RLS as anon
+ * and vanished (posts not saving, delete/like doing nothing). localStorage
+ * persistence attaches the bearer token reliably on every request. */
+import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
 /**
@@ -12,7 +20,7 @@ import type { Database } from './database.types';
  *   const { data } = await supabase.from('listings').select('*');
  */
 
-let _client: ReturnType<typeof createBrowserClient<Database>> | null = null;
+let _client: ReturnType<typeof createClient<Database>> | null = null;
 
 /* Accept either the new "publishable" key (sb_publishable_…) or the legacy
    anon JWT — both work for browser-side access; deployments built before the
@@ -33,7 +41,7 @@ export const hasSupabaseEnv = !!(
  * method resolves to `{ data: null, error: <missing-env> }`; sync helpers
  * return inert objects so chain-builders (`from().select().eq()`) keep working.
  */
-function makeStubClient(): ReturnType<typeof createBrowserClient<Database>> {
+function makeStubClient(): ReturnType<typeof createClient<Database>> {
   const missingEnvError = {
     message: 'Supabase env vars not configured — running in demo mode.',
     name: 'MissingSupabaseEnvError',
@@ -99,7 +107,14 @@ export function getSupabase() {
     return _client;
   }
 
-  _client = createBrowserClient<Database>(url, key);
+  _client = createClient<Database>(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'wecycle-auth',
+    },
+  });
   return _client;
 }
 
