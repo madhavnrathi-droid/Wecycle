@@ -837,28 +837,47 @@ body {
 
 /* ═══════════════════════════════════════════════
    MARKETING BANNER (use-case carousel on the home feed)
+   ───────────────────────────────────────────────
+   Two variants:
+     - .marketing-banner-compact → sits in the greeting row on mobile
+     - .marketing-banner-wide    → sits below the search bar on desktop
+   The mount divs in FeedScreen.tsx (`.marketing-banner-mount-mobile` and
+   `.marketing-banner-mount-desktop`) handle responsive visibility so each
+   variant only renders at the right breakpoint.
    ═══════════════════════════════════════════════ */
 
+/* Responsive mounts — only one banner is visible at a time. */
+.marketing-banner-mount-mobile  { display: block; }
+.marketing-banner-mount-desktop { display: none; }
+@media (min-width: 1280px) {
+  .marketing-banner-mount-mobile  { display: none; }
+  .marketing-banner-mount-desktop { display: block; }
+}
+
 .marketing-banner {
-  flex: 1 1 160px;
-  max-width: 200px;
-  min-width: 130px;
-  height: 86px;
   position: relative;
   border-radius: 16px;
   overflow: hidden;
   isolation: isolate;
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.08),
-    0 6px 18px -8px rgba(0, 0, 0, 0.18);
+    0 8px 24px -10px rgba(0, 0, 0, 0.22);
 }
-/* Desktop gets a bigger banner that still feels at home next to the search */
-@media (min-width: 1280px) {
-  .marketing-banner {
-    max-width: 320px;
-    min-width: 220px;
-    height: 96px;
-  }
+
+/* COMPACT — phone-shape pill next to the greeting */
+.marketing-banner-compact {
+  flex: 1 1 160px;
+  max-width: 210px;
+  min-width: 130px;
+  height: 86px;
+  border-radius: 14px;
+}
+
+/* WIDE — desktop strip below the search row */
+.marketing-banner-wide {
+  width: 100%;
+  height: 168px;
+  border-radius: 20px;
 }
 
 .marketing-banner-track {
@@ -880,42 +899,34 @@ body {
   position: relative;
   border: none;
   cursor: pointer;
-  padding: 10px 12px 18px;
-  display: flex;
-  align-items: flex-end;
   text-align: left;
   color: #fff;
   font: inherit;
   background: transparent;
   overflow: hidden;
   transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  display: flex;
 }
 .marketing-banner-slide:focus-visible {
   outline: 2px solid #fff;
   outline-offset: -3px;
 }
-.marketing-banner-slide:active { transform: scale(0.985); }
+.marketing-banner-slide:active { transform: scale(0.99); }
 
-/* Image layer — slow Ken-Burns zoom on the active slide. */
-.marketing-banner-image {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  transform: scale(1);
-  transform-origin: center;
-  z-index: 0;
-  transition: opacity 600ms ease;
-}
-.marketing-banner-slide[data-active] .marketing-banner-image {
-  animation: mb-ken-burns 12s ease-in-out infinite alternate;
-}
-@keyframes mb-ken-burns {
-  0%   { transform: scale(1)    translate3d(0, 0, 0); }
-  100% { transform: scale(1.14) translate3d(-2%, 1%, 0); }
+/* Compact slide layout: vertical, text bottom-anchored. */
+.marketing-banner-compact .marketing-banner-slide {
+  padding: 10px 12px 18px;
+  align-items: flex-end;
 }
 
-/* Foreground gradient overlay for legibility. */
+/* Wide slide layout: horizontal — illustration on the left, copy on the right. */
+.marketing-banner-wide .marketing-banner-slide {
+  padding: 22px 28px 24px;
+  align-items: center;
+  gap: 24px;
+}
+
+/* Color-coded gradient overlay (the "color coding" we want to keep). */
 .marketing-banner-gradient {
   position: absolute;
   inset: 0;
@@ -923,75 +934,168 @@ body {
   pointer-events: none;
 }
 
-/* Big emoji top-right. Idle float so the card always feels alive. */
-.marketing-banner-emoji {
+/* ── Abstract hand-drawn doodles (background) ─────────────
+   These are inline SVGs that sit behind the illustration. Each blob/squiggle
+   drifts on its own timer so the composition never settles. */
+.marketing-banner-doodles {
   position: absolute;
-  top: 6px;
-  right: 10px;
-  font-size: 22px;
-  z-index: 2;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
-  animation: mb-float 3.4s ease-in-out infinite;
-  transform-origin: 60% 60%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;  /* keeps the lines visible against any gradient */
 }
-@keyframes mb-float {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50%      { transform: translateY(-3px) rotate(5deg); }
+.mb-doodle           { transform-box: fill-box; transform-origin: center; }
+.mb-doodle-1         { animation: mb-drift1 9s ease-in-out infinite; }
+.mb-doodle-2         { animation: mb-drift2 11s ease-in-out infinite; }
+.mb-doodle-3         { animation: mb-drift3 7.5s ease-in-out infinite; }
+.mb-doodle-4         { animation: mb-twinkle 3s ease-in-out infinite; }
+.mb-doodle-5         { animation: mb-twinkle 4s ease-in-out infinite reverse; }
+@keyframes mb-drift1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50%      { transform: translate(-4px, 3px) rotate(2deg); }
+}
+@keyframes mb-drift2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(3px, -2px) scale(1.06); }
+}
+@keyframes mb-drift3 {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(2px, 1px); }
+}
+@keyframes mb-twinkle {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; transform: scale(1.2); }
 }
 
+/* ── Hand-drawn illustration ───────────────────────── */
+.marketing-banner-illu-wrap {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.marketing-banner-compact .marketing-banner-illu-wrap {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 56px;
+  height: 56px;
+}
+.marketing-banner-wide .marketing-banner-illu-wrap {
+  flex: 0 0 auto;
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.marketing-banner-illu {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.18));
+  animation: mb-illu-float 3.6s ease-in-out infinite;
+  transform-origin: 60% 60%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+@keyframes mb-illu-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-4px) rotate(4deg); }
+}
+
+/* ── Text ────────────────────────────────────────── */
 .marketing-banner-text {
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  width: 100%;
-  padding-right: 18px;  /* leave room for the arrow */
 }
+.marketing-banner-compact .marketing-banner-text {
+  width: 100%;
+  padding-right: 18px;
+  gap: 1px;
+}
+.marketing-banner-wide .marketing-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 56px;  /* room for the arrow chip */
+  gap: 6px;
+}
+
 .marketing-banner-title {
-  font-size: 12px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   line-height: 1.18;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-  /* clamp to 2 lines */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.marketing-banner-compact .marketing-banner-title { font-size: 12px; }
+.marketing-banner-wide    .marketing-banner-title { font-size: 22px; letter-spacing: -0.022em; }
+
 .marketing-banner-subtitle {
-  font-size: 10px;
   font-weight: 500;
-  opacity: 0.92;
-  line-height: 1.2;
+  opacity: 0.94;
+  line-height: 1.25;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.marketing-banner-compact .marketing-banner-subtitle {
+  font-size: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-@media (min-width: 1280px) {
-  .marketing-banner-title    { font-size: 13px; }
-  .marketing-banner-subtitle { font-size: 11px; }
-  .marketing-banner-emoji    { font-size: 26px; top: 8px; right: 12px; }
+.marketing-banner-wide .marketing-banner-subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.98;
 }
 
+.marketing-banner-detail {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.84;
+  line-height: 1.45;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 56ch;
+}
+
+/* ── Arrow ───────────────────────────────────────── */
 .marketing-banner-arrow {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
   z-index: 2;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0E0E08;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0E0E08;
+  border-radius: 50%;
   opacity: 0;
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+.marketing-banner-compact .marketing-banner-arrow {
+  width: 22px; height: 22px;
+  right: 8px; bottom: 8px;
   transform: translate(4px, 4px);
-  transition: opacity 220ms ease, transform 220ms ease;
+}
+.marketing-banner-wide .marketing-banner-arrow {
+  width: 38px; height: 38px;
+  right: 24px; bottom: 24px;
+  transform: translate(6px, 6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 }
 .marketing-banner-slide[data-active] .marketing-banner-arrow,
 .marketing-banner-slide:hover .marketing-banner-arrow,
@@ -1000,37 +1104,41 @@ body {
   transform: translate(0, 0);
 }
 
-/* Dots — sit centered below the slide content. */
+/* ── Dots ────────────────────────────────────────── */
 .marketing-banner-dots {
   position: absolute;
-  bottom: 5px;
   left: 0;
   right: 0;
   display: flex;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   z-index: 3;
 }
+.marketing-banner-compact .marketing-banner-dots { bottom: 5px; }
+.marketing-banner-wide    .marketing-banner-dots { bottom: 10px; }
+
 .marketing-banner-dot {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.5);
   border: none;
   padding: 0;
   cursor: pointer;
   transition: width 220ms ease, background 220ms ease;
 }
+.marketing-banner-wide .marketing-banner-dot { width: 6px; height: 6px; }
 .marketing-banner-dot[data-active] {
-  width: 14px;
+  width: 16px;
   background: #fff;
 }
-.marketing-banner-dot:hover { background: rgba(255, 255, 255, 0.85); }
+.marketing-banner-wide .marketing-banner-dot[data-active] { width: 20px; }
+.marketing-banner-dot:hover { background: rgba(255, 255, 255, 0.9); }
 
-/* Reduced motion — disable Ken-Burns + emoji float. */
+/* Reduced motion — every animation off. */
 @media (prefers-reduced-motion: reduce) {
-  .marketing-banner-slide[data-active] .marketing-banner-image { animation: none; }
-  .marketing-banner-emoji { animation: none; }
+  .marketing-banner-illu,
+  .mb-doodle { animation: none !important; }
   .marketing-banner-track { scroll-behavior: auto; }
 }
 

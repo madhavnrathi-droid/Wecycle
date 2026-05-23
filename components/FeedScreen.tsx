@@ -97,49 +97,50 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
   const greetingName = (profile?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0];
 
   /* Marketing banner slides — promote each Wecycle use case to first-time
-     visitors. Order matters: leading with "Share" matches the platform's
-     give-first ethos; Lost & Found rotates last because it's situational.
-     Images are Unsplash IDs picked for warm, community-feeling visuals. */
-  const u = (id: string) => `https://images.unsplash.com/photo-${id}?w=900&h=700&auto=format&fit=crop&q=80`;
+     visitors. Hand-drawn / abstract aesthetic: each card uses a Wecycle
+     accent gradient + a Twemoji illustration (loaded via Iconify CDN) that
+     reads as loose, flat, hand-crafted artwork rather than a literal photo.
+     The same `slides` array feeds both the compact (mobile) banner next to
+     the greeting and the wide (desktop) banner below the search bar. */
   const bannerSlides: BannerSlide[] = [
     {
       id: 'share',
-      emoji: '🎁',
+      illustration: 'twemoji:wrapped-gift',
       title: 'Share what you don’t use',
       subtitle: 'Give it a second life nearby',
-      image: u('1607344645866-009c320b63e0'),  /* hands passing items */
+      detail: 'Drop a photo, name your price (or free) — the right neighbour finds it in minutes.',
       gradient:
-        'linear-gradient(135deg, rgba(34,197,94,0.78) 0%, rgba(13,148,136,0.65) 60%, rgba(0,0,0,0.55) 100%)',
+        'linear-gradient(135deg, rgba(34,197,94,0.92) 0%, rgba(13,148,136,0.85) 100%)',
       onClick: () => onBannerAction?.('share'),
     },
     {
       id: 'request',
-      emoji: '🙋',
+      illustration: 'twemoji:raising-hand',
       title: 'Ask for what you need',
       subtitle: 'Borrow before you buy',
-      image: u('1556761175-5973dc0f32e7'),     /* workshop / community */
+      detail: 'Post a request and let the community come to you — books, tools, a kettle, anything.',
       gradient:
-        'linear-gradient(135deg, rgba(245,132,0,0.82) 0%, rgba(244,63,94,0.65) 65%, rgba(0,0,0,0.5) 100%)',
+        'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
       onClick: () => onBannerAction?.('request'),
     },
     {
       id: 'events',
-      emoji: '\u{1F4C5}',
+      illustration: 'twemoji:tear-off-calendar',
       title: 'Join local events',
       subtitle: 'Repair cafés, swaps, cleanups',
-      image: u('1511795409834-ef04bbd61622'),  /* community gathering */
+      detail: 'See what your community is hosting this week. RSVP in one tap.',
       gradient:
-        'linear-gradient(135deg, rgba(99,102,241,0.82) 0%, rgba(168,85,247,0.6) 60%, rgba(0,0,0,0.55) 100%)',
+        'linear-gradient(135deg, rgba(99,102,241,0.92) 0%, rgba(168,85,247,0.88) 100%)',
       onClick: () => onBannerAction?.('events'),
     },
     {
       id: 'lost-found',
-      emoji: '\u{1F50D}',
+      illustration: 'twemoji:magnifying-glass-tilted-left',
       title: 'Lost something?',
       subtitle: 'Or help return what you found',
-      image: u('1572021335469-31706a17aaef'),  /* keys / small items */
+      detail: 'A second board, side-by-side with the marketplace. Verified by the community.',
       gradient:
-        'linear-gradient(135deg, rgba(234,179,8,0.82) 0%, rgba(217,119,6,0.62) 60%, rgba(0,0,0,0.55) 100%)',
+        'linear-gradient(135deg, rgba(234,179,8,0.92) 0%, rgba(217,119,6,0.88) 100%)',
       onClick: () => onBannerAction?.('lost-found'),
     },
   ];
@@ -219,9 +220,12 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
           </p>
         </div>
 
-        {/* Auto-cycling marketing carousel — sits where there's blank space
-           next to the greeting and pitches each Wecycle use case. */}
-        <MarketingBanner slides={bannerSlides} />
+        {/* Compact carousel — sits next to the greeting on mobile widths
+           (hidden on desktop ≥1280px, where the wide variant below takes
+           over instead). */}
+        <div className="marketing-banner-mount-mobile">
+          <MarketingBanner slides={bannerSlides} variant="compact" />
+        </div>
 
         {/* Search lives inline with the greeting on desktop */}
         <div className="feed-greeting-search desktop-only" style={{ position: 'relative' }}>
@@ -252,6 +256,15 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
             </button>
           )}
         </div>
+      </section>
+
+      {/* ── DESKTOP MARKETING BANNER ──
+         Wider, richer variant of the carousel. Sits below the search row so
+         the marketing strip gets its own real estate on big screens. Hidden
+         on mobile widths — the compact variant inside the greeting row
+         covers those instead. */}
+      <section className="marketing-banner-mount-desktop" style={{ padding: '0 16px 20px' }}>
+        <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
 
       {/* ── MOBILE SEARCH (under greeting) ── */}
