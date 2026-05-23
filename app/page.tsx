@@ -381,6 +381,15 @@ export default function WecycleApp() {
               onOpenMenu={() => setDrawerOpen(true)}
               onOpenAccount={goToAccount}
               onOpenItem={setOpenItem}
+              onBannerAction={(kind) => {
+                /* Marketing-banner CTAs jump straight to the targeted feature
+                   instead of through the post-picker — that's the point of
+                   the banner: shave a step off the path-to-action. */
+                if (kind === 'share')       openShareItem();
+                else if (kind === 'request') openPostRequest();
+                else if (kind === 'events')  setActiveScreen('events');
+                else if (kind === 'lost-found') setActiveScreen('lost_found');
+              }}
             />
           )}
           {activeScreen === 'events' && (

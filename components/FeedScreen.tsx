@@ -11,15 +11,19 @@ import { fetchMarketplaceItems, fetchRequests, onPostsChanged } from '../lib/liv
 import { getSettings, onSettingsChange } from '../lib/settings';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
+import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 
 interface FeedScreenProps {
   onPost: () => void;
   onOpenMenu: () => void;
   onOpenAccount: () => void;
   onOpenItem: (item: MarketplaceItem) => void;
+  /** Banner CTA — fired when a marketing-banner slide is tapped.
+   *  kind = which feature the user wants to jump to. */
+  onBannerAction?: (kind: 'share' | 'request' | 'events' | 'lost-found') => void;
 }
 
-export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenItem }: FeedScreenProps) {
+export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenItem, onBannerAction }: FeedScreenProps) {
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -92,6 +96,54 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
 
   const greetingName = (profile?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0];
 
+  /* Marketing banner slides — promote each Wecycle use case to first-time
+     visitors. Order matters: leading with "Share" matches the platform's
+     give-first ethos; Lost & Found rotates last because it's situational.
+     Images are Unsplash IDs picked for warm, community-feeling visuals. */
+  const u = (id: string) => `https://images.unsplash.com/photo-${id}?w=900&h=700&auto=format&fit=crop&q=80`;
+  const bannerSlides: BannerSlide[] = [
+    {
+      id: 'share',
+      emoji: '🎁',
+      title: 'Share what you don’t use',
+      subtitle: 'Give it a second life nearby',
+      image: u('1607344645866-009c320b63e0'),  /* hands passing items */
+      gradient:
+        'linear-gradient(135deg, rgba(34,197,94,0.78) 0%, rgba(13,148,136,0.65) 60%, rgba(0,0,0,0.55) 100%)',
+      onClick: () => onBannerAction?.('share'),
+    },
+    {
+      id: 'request',
+      emoji: '🙋',
+      title: 'Ask for what you need',
+      subtitle: 'Borrow before you buy',
+      image: u('1556761175-5973dc0f32e7'),     /* workshop / community */
+      gradient:
+        'linear-gradient(135deg, rgba(245,132,0,0.82) 0%, rgba(244,63,94,0.65) 65%, rgba(0,0,0,0.5) 100%)',
+      onClick: () => onBannerAction?.('request'),
+    },
+    {
+      id: 'events',
+      emoji: '\u{1F4C5}',
+      title: 'Join local events',
+      subtitle: 'Repair cafés, swaps, cleanups',
+      image: u('1511795409834-ef04bbd61622'),  /* community gathering */
+      gradient:
+        'linear-gradient(135deg, rgba(99,102,241,0.82) 0%, rgba(168,85,247,0.6) 60%, rgba(0,0,0,0.55) 100%)',
+      onClick: () => onBannerAction?.('events'),
+    },
+    {
+      id: 'lost-found',
+      emoji: '\u{1F50D}',
+      title: 'Lost something?',
+      subtitle: 'Or help return what you found',
+      image: u('1572021335469-31706a17aaef'),  /* keys / small items */
+      gradient:
+        'linear-gradient(135deg, rgba(234,179,8,0.82) 0%, rgba(217,119,6,0.62) 60%, rgba(0,0,0,0.55) 100%)',
+      onClick: () => onBannerAction?.('lost-found'),
+    },
+  ];
+
   return (
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
@@ -145,9 +197,9 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
         </div>
       </header>
 
-      {/* ── GREETING + DESKTOP-INLINE SEARCH ── */}
+      {/* ── GREETING + MARKETING BANNER + DESKTOP-INLINE SEARCH ── */}
       <section className="feed-greeting-row" style={{ padding: '14px 20px 16px' }}>
-        <div style={{ minWidth: 0 }}>
+        <div className="feed-greeting-text" style={{ minWidth: 0 }}>
           <h1 style={{
             margin: 0,
             fontSize: 26, fontWeight: 600,
@@ -166,6 +218,10 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
             })}
           </p>
         </div>
+
+        {/* Auto-cycling marketing carousel — sits where there's blank space
+           next to the greeting and pitches each Wecycle use case. */}
+        <MarketingBanner slides={bannerSlides} />
 
         {/* Search lives inline with the greeting on desktop */}
         <div className="feed-greeting-search desktop-only" style={{ position: 'relative' }}>
