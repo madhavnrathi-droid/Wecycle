@@ -562,6 +562,17 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
   };
 }
 
+/* Events past their starts_at are auto-hidden client-side. We don't trust the
+   server clock alone — a viewer hitting the page right after start would still
+   see the event for a few seconds. Filtering here makes it instant. */
+function notExpired(rows: EventRowLite[]): EventRowLite[] {
+  const now = Date.now();
+  return rows.filter(r => {
+    const ts = new Date(r.starts_at).getTime();
+    return Number.isFinite(ts) && ts > now;
+  });
+}
+
 export async function fetchEvents(): Promise<CommunityEvent[]> {
   if (!hasSupabaseEnv) return [];
   const { data, error } = await supabase
@@ -570,7 +581,8 @@ export async function fetchEvents(): Promise<CommunityEvent[]> {
     .eq('status', 'published')
     .order('starts_at', { ascending: true });
   if (error || !data) return [];
-  return (data as unknown as EventRowLite[]).map(mapEventRow);
+  const live = notExpired(data as unknown as EventRowLite[]);
+  return notRemoved(live.map(mapEventRow));
 }
 
 export async function fetchEventsByUser(userId: string): Promise<CommunityEvent[]> {
@@ -581,7 +593,60 @@ export async function fetchEventsByUser(userId: string): Promise<CommunityEvent[
     .eq('organizer_id', userId)
     .order('starts_at', { ascending: true });
   if (error || !data) return [];
-  return (data as unknown as EventRowLite[]).map(mapEventRow);
+  /* Owner's inventory also drops expired events — they're cleaned up. */
+  const live = notExpired(data as unknown as EventRowLite[]);
+  return notRemoved(live.map(mapEventRow));
+}
+
+/** Best-effort cleanup of past-dated events. Fire-and-forget — RLS lets the
+ *  organizer delete their own, the admin lets everyone's go. Called by a tiny
+ *  client-side janitor on app load. */
+export async function purgeExpiredEvents() {
+  if (!hasSupabaseEnv) return;
+  const cutoff = new Date().toISOString();
+  await supabase.from('events').delete().lt('starts_at', cutoff);
+  notifyPostsChanged();
+}
+
+/* ── Event edit + delete ───────────────────────────── */
+
+export interface EditEventPatch {
+  title?: string;
+  eventType?: 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge';
+  date?: string;     /* yyyy-mm-dd */
+  time?: string;     /* HH:MM */
+  location?: string;
+  description?: string;
+  maxAttendees?: number;
+}
+
+export async function updateEvent(id: string, patch: EditEventPatch) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.title !== undefined)       update.title = patch.title.trim();
+  if (patch.eventType !== undefined)   update.event_type = patch.eventType;
+  if (patch.location !== undefined)    update.location = patch.location.trim();
+  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.maxAttendees !== undefined) update.max_attendees = patch.maxAttendees ?? null;
+  if (patch.date !== undefined || patch.time !== undefined) {
+    /* Recompose starts_at from whichever parts we have. */
+    update.starts_at = new Date(`${patch.date ?? '1970-01-01'}T${patch.time || '00:00'}:00`).toISOString();
+  }
+  const { error } = await supabase.from('events').update(update as never).eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+export async function deleteEvent(id: string) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  removedIds.add(id);
+  notifyPostsChanged();
+  const { data, error } = await supabase.from('events').delete().eq('id', id).select('id');
+  if (error || !data || data.length === 0) {
+    removedIds.delete(id);
+    notifyPostsChanged();
+    throw error ?? new Error('Could not delete — you may not own this event.');
+  }
 }
 
 const LF_SELECT = `
@@ -715,9 +780,13 @@ export async function deleteListingById(id: string) {
 
 /** Try delete; also try requests/lost-found in case the id belongs there.
  *  Used by the generic detail-screen delete which doesn't know the post type. */
-export async function deletePostById(id: string, kind: 'listing' | 'request' | 'lostfound' = 'listing') {
+export async function deletePostById(id: string, kind: 'listing' | 'request' | 'lostfound' | 'event' = 'listing') {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
-  const table = kind === 'request' ? 'requests' : kind === 'lostfound' ? 'lost_found_reports' : 'listings';
+  const table =
+    kind === 'request'  ? 'requests' :
+    kind === 'lostfound' ? 'lost_found_reports' :
+    kind === 'event'    ? 'events' :
+    'listings';
   removedIds.add(id);
   notifyPostsChanged();
   const { data, error } = await supabase.from(table).delete().eq('id', id).select('id');
@@ -726,6 +795,21 @@ export async function deletePostById(id: string, kind: 'listing' | 'request' | '
     notifyPostsChanged();
     throw error ?? new Error('Could not delete — you may not own this post.');
   }
+}
+
+/* ── Mark complete ──────────────────────────────────
+   "Sold" / "Completed" / "Found" all do the same thing: drop the post from
+   the system. We use delete (not a status flip) because the user's clear
+   intent is "remove this from my inventory". The optimistic overlay in
+   deletePostById ensures the masonry empties instantly. */
+export async function markListingSold(id: string) {
+  return deletePostById(id, 'listing');
+}
+export async function markRequestCompleted(id: string) {
+  return deletePostById(id, 'request');
+}
+export async function markLostFoundResolved(id: string) {
+  return deletePostById(id, 'lostfound');
 }
 
 /** Bump a listing's view counter (fire-and-forget — never blocks the UI). */
@@ -742,6 +826,77 @@ export async function toggleListingSave(id: string): Promise<boolean> {
   if (error) throw error;
   notifyPostsChanged();
   return !!data;
+}
+
+/* ── Storefront stats ──────────────────────────────
+   Pulls the three numbers shown on a storefront's hero (Shared / Received /
+   Impact). We prefer values from the profile row (computed by DB triggers
+   when present), but fall back to live counts from listings/requests/events
+   so a brand-new account that hasn't yet had its triggers fire still shows
+   a meaningful "Shared = 1" the moment a post lands. */
+export interface ProfileStats {
+  shared: number;
+  received: number;
+  impact: number;
+}
+
+export async function fetchProfileStats(userId: string): Promise<ProfileStats> {
+  if (!hasSupabaseEnv || !userId) return { shared: 0, received: 0, impact: 0 };
+
+  /* Profile counters (trigger-maintained) */
+  const profileQ = supabase
+    .from('profiles')
+    .select('items_shared_count, items_received_count, impact_score')
+    .eq('id', userId)
+    .single();
+
+  /* Live counts as a fallback / for currently-active posts */
+  const listingsQ = supabase
+    .from('listings')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  const eventsQ = supabase
+    .from('events')
+    .select('id', { count: 'exact', head: true })
+    .eq('organizer_id', userId);
+
+  const requestsQ = supabase
+    .from('requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  const [profileRes, listingsRes, eventsRes, requestsRes] = await Promise.all([
+    profileQ, listingsQ, eventsQ, requestsQ,
+  ]);
+
+  const prof = (profileRes.data ?? null) as {
+    items_shared_count?: number | null;
+    items_received_count?: number | null;
+    impact_score?: number | null;
+  } | null;
+
+  const listingCount  = listingsRes.count ?? 0;
+  const eventCount    = eventsRes.count   ?? 0;
+  const requestCount  = requestsRes.count ?? 0;
+
+  /* Shared = listings the user actively has up + events organized.
+     Profile counter wins when it's the larger number (covers historical posts
+     that have since been removed). */
+  const sharedLive = listingCount + eventCount;
+  const shared = Math.max(prof?.items_shared_count ?? 0, sharedLive);
+
+  /* Received = profile-tracked items received (no live source). */
+  const received = prof?.items_received_count ?? 0;
+
+  /* Impact = profile-tracked score; if missing, derive a friendly default
+     so new users see *something* nonzero once they post:
+       10 per active listing + 25 per event + 5 per open request. */
+  const impactLive = listingCount * 10 + eventCount * 25 + requestCount * 5;
+  const impact = Math.max(prof?.impact_score ?? 0, impactLive);
+
+  return { shared, received, impact };
 }
 
 /* ── Pub/sub: refetch feeds after a post ───────────── */

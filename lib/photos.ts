@@ -182,7 +182,15 @@ export function resolveItemMedia(item: {
     /* Use the first photo as each video's poster when available. */
     const poster = photos[0];
     for (const v of videos) out.push({ kind: 'video', src: v, poster });
-    return out.length ? out : [getCategoryPhoto(item.category)];
+    return out;
+  }
+  /* Real listings (Supabase rows always carry photoUrls/videoUrls arrays —
+     even when empty) explicitly opt out of stock-photo fallbacks: if you
+     didn't upload an image, the card just renders text. We detect this by
+     checking whether photoUrls is an array at all (mock items leave it
+     undefined). */
+  if (Array.isArray(item.photoUrls) || Array.isArray(item.videoUrls)) {
+    return [];
   }
   return getItemMedia(item.id, item.category);
 }

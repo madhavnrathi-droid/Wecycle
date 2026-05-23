@@ -79,6 +79,16 @@ export function getComments(postId: string): Comment[] {
   return (store.get(postId) ?? []).slice();
 }
 
+/** Remove a comment + any of its replies in one pass. Used by admin moderation. */
+export function deleteComment(postId: string, commentId: string): boolean {
+  const arr = store.get(postId);
+  if (!arr) return false;
+  const next = arr.filter(c => c.id !== commentId && c.parentId !== commentId);
+  if (next.length === arr.length) return false;
+  store.set(postId, next);
+  return true;
+}
+
 export function addComment(c: Omit<Comment, 'id' | 'createdAt'>): Comment {
   const full: Comment = {
     ...c,

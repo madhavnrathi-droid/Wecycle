@@ -547,7 +547,12 @@ body {
    LAYOUT
    ═══════════════════════════════════════════════ */
 
-/* Mobile-first: 430 px column, growing at tablet / desktop / wide */
+/* Mobile-first: 430 px column, growing at tablet / desktop / wide.
+   Important: we keep the **phone-shaped mockup** centered until the viewport
+   is genuinely desktop-wide (≥1280px). At intermediate widths (tablet, a
+   narrow Claude preview pane, a half-width browser window), the app stays
+   as a phone — that's the canonical Wecycle look and prevents the squished
+   "neither phone nor desktop" middle state. */
 .app-container {
   width: 100%;
   max-width: 430px;
@@ -556,24 +561,21 @@ body {
   position: relative;
   background: var(--bg-base);
 }
-@media (min-width: 768px) {
-  .app-container { max-width: 720px; }
-}
 /* Desktop: stop pinching the layout. We give the page near-full width with
    modest side gutters, so the masonry, events list, inventory tiles, and
    activity feed all fill a 16" MacBook viewport instead of huddling in the
    middle. Existing column counts stay the same, which makes every individual
    card larger as the container grows. */
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .app-container { max-width: min(100vw - 48px, 1480px); }
 }
-@media (min-width: 1280px) {
+@media (min-width: 1440px) {
   .app-container { max-width: min(100vw - 64px, 1720px); }
 }
-@media (min-width: 1536px) {
+@media (min-width: 1700px) {
   .app-container { max-width: min(100vw - 80px, 1920px); }
 }
-@media (min-width: 1800px) {
+@media (min-width: 1900px) {
   .app-container { max-width: min(100vw - 96px, 2160px); }
 }
 
@@ -589,10 +591,12 @@ body {
 .mobile-only-nav   { display: block; }
 .desktop-only-nav  { display: none !important; }
 
-/* In-component tiny show/hide helpers */
+/* In-component tiny show/hide helpers.
+   Bumped to 1280px so a Claude preview pane (or a half-width browser window)
+   keeps showing the mobile UI instead of awkwardly switching to desktop. */
 .mobile-only       { display: initial; }
 .desktop-only      { display: none; }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .mobile-only     { display: none !important; }
   .desktop-only    { display: initial !important; }
 }
@@ -799,26 +803,26 @@ body {
   }
 }
 
-/* Greeting + search row — column on mobile, inline on desktop */
+/* Greeting + search row — column on mobile, inline on desktop.
+   Bumped breakpoint to 1280px to match `.app-container` so we don't get the
+   awkward "inline greeting/search overlapping in 600px pane" middle state. */
 .feed-greeting-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 .feed-greeting-search { display: none; }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .feed-greeting-row {
     flex-direction: row;
-    align-items: center;     /* was flex-end — center reads tighter at smaller h1 */
+    align-items: center;
     gap: 20px;
     padding-top: 8px !important;
     padding-bottom: 10px !important;
   }
   .feed-greeting-row > :first-child { flex: 0 0 auto; }
-  /* Compact the greeting H1 on desktop so the grid is the visual hero. */
   .feed-greeting-row > :first-child h1 { font-size: 18px !important; }
   .feed-greeting-row > :first-child p  { font-size: 12px; }
-  /* Stretch the search all the way to the right edge of the grid */
   .feed-greeting-search {
     display: block !important;
     flex: 1 1 auto;

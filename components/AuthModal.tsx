@@ -36,6 +36,11 @@ export const PASSWORD_MIN_LENGTH = 6;
 /* Accept either a MAHE learner address (`@learner.manipal.edu`) or a
    faculty / staff address (`@manipal.edu`). */
 const MAHE_EMAIL = /^[^\s@]+@(learner\.)?manipal\.edu$/i;
+/* Admin escape hatch — the single hard-coded moderation account. We allow it
+   alongside MAHE addresses so the admin can sign in from this same modal. */
+const ADMIN_EMAIL = 'wecycle.page@gmail.com';
+const isAllowedEmail = (e: string) =>
+  MAHE_EMAIL.test(e.trim()) || e.trim().toLowerCase() === ADMIN_EMAIL;
 
 export default function AuthModal({ open, onClose }: AuthModalProps) {
   const [tab, setTab] = useState<Tab>('signin');
@@ -65,7 +70,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
 
   /* ── Validation ─────────────────────────────── */
 
-  const emailOk    = MAHE_EMAIL.test(email.trim());
+  const emailOk    = isAllowedEmail(email);
   const passwordOk = password.length >= PASSWORD_MIN_LENGTH;
   const nameOk     = name.trim().length >= 2;
   const collegeOk  = collegeId.trim().length >= 3;

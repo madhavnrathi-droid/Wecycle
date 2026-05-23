@@ -25,6 +25,13 @@ interface ItemDetailScreenProps {
    *  (shown in place of the contact buttons — you don't contact yourself). */
   onEdit?: () => void;
   onDelete?: () => void | Promise<void>;
+  /** True when the viewer is the post's author. Drives the "owner" UI branch
+   *  (Edit + Delete instead of contact). Distinct from isAdmin which is
+   *  cross-account moderation. */
+  isOwner?: boolean;
+  /** When the viewer is the wecycle admin — adds an "Admin" delete affordance
+   *  on every post, even posts they don't own. Shown alongside contact bar. */
+  isAdmin?: boolean;
 }
 
 /* WhatsApp logo glyph — lucide doesn't ship a brand icon, so we inline a minimal one.
@@ -38,12 +45,14 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onEdit, onDelete }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onEdit, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const canManage = !!(onEdit || onDelete);
+  /* "Manage" UI = the owner's Edit + Delete bar. Admin moderation is rendered
+     INSIDE the regular contact bar so the admin still sees the contact CTAs. */
+  const canManage = !!isOwner && !!(onEdit || onDelete);
   const photos = resolveItemMedia(item);
 
   const handleDelete = async () => {
@@ -71,10 +80,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   /* Requests are "wanted" posts — never priced, and the action is to offer help
      rather than to take/buy. */
   const isRequest = !!item.isRequest;
-  const isPriced = !isRequest && item.listingType === 'sell';
+  const isPriced = !isRequest && item.listingType === 'sell' && typeof item.price === 'number';
+  /* "Selling" stands in for an unpriced sell post — paired with a small
+     "contact for more info" note next to the action buttons. */
+  const isUnpricedSell = !isRequest && item.listingType === 'sell' && !isPriced;
   const priceLabel = isRequest
     ? (item.urgent ? 'Urgent request' : 'Wanted')
     : isPriced ? `₹${item.price}`
+    : isUnpricedSell ? 'Selling'
     : item.listingType === 'free' ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
   const desc = item.description ?? '';
@@ -272,6 +285,18 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             {expanded ? 'Show less' : 'Read more'}
           </button>
         )}
+        {isUnpricedSell && (
+          <p style={{
+            marginTop: 12,
+            padding: '8px 12px',
+            background: 'var(--bg-inset)',
+            borderRadius: 10,
+            fontSize: 12, color: 'var(--text-muted)',
+            fontStyle: 'italic',
+          }}>
+            No price set — contact the seller for more info.
+          </p>
+        )}
       </section>
 
       {/* ── OWNER ──
@@ -408,6 +433,24 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           >
             <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
           </button>
+          {isAdmin && (
+            <button
+              onClick={async () => {
+                if (typeof window !== 'undefined' && !window.confirm('Admin: delete this post permanently?')) return;
+                try { await onDelete?.(); } finally { onBack(); }
+              }}
+              aria-label="Admin delete"
+              style={{
+                width: 52, height: 52, borderRadius: 999,
+                background: '#ED2E50', color: '#fff',
+                border: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <Trash2 size={18} strokeWidth={2} />
+            </button>
+          )}
           <button
             aria-label="Share"
             style={{

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
-  Heart, Share2, Mail, Check, Edit3, Tag,
+  Heart, Share2, Mail, Check, Edit3, Tag, Trash2,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
@@ -13,6 +13,7 @@ import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
+import { useBreakpoint } from '../lib/useBreakpoint';
 
 interface EventDetailScreenProps {
   event: CommunityEvent;
@@ -23,6 +24,7 @@ interface EventDetailScreenProps {
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
   onEdit?: () => void;
+  onDelete?: () => void | Promise<void>;
 }
 
 function WhatsAppGlyph({ size = 14 }: { size?: number }) {
@@ -44,13 +46,21 @@ const TYPE_LABEL: Record<CommunityEvent['eventType'], string> = {
 };
 
 export default function EventDetailScreen({
-  event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onEdit,
+  event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onEdit, onDelete,
 }: EventDetailScreenProps) {
-  const photos = getEventPhotos(event.id, event.eventType);
+  /* Prefer the organizer's uploaded photos; mock events fall back to the
+     curated Unsplash covers. Real events with no upload → empty array → we
+     render the hero block without an image. */
+  const uploadedPhotos = (event as { photoUrls?: string[] }).photoUrls;
+  const photos: string[] = uploadedPhotos && uploadedPhotos.length > 0
+    ? uploadedPhotos
+    : (Array.isArray(uploadedPhotos) ? [] : getEventPhotos(event.id, event.eventType));
+  const hasPhotos = photos.length > 0;
   const [expanded, setExpanded] = useState(false);
   const desc = event.description ?? '';
   const shouldClamp = desc.length > 220;
   const { user, profile } = useAuth();
+  const { isDesktop } = useBreakpoint();
 
   const metrics = getEventMetrics(event.id);
   const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
@@ -134,51 +144,71 @@ export default function EventDetailScreen({
         )}
       </header>
 
-      {/* ── HERO PHOTO CAROUSEL ── */}
-      <section style={{ padding: '12px 16px 0' }}>
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          aspectRatio: '4 / 5',
-          borderRadius: 24,
-          overflow: 'hidden',
-          background: 'var(--bg-inset)',
-        }}>
-          <PhotoCarousel
-            photos={photos}
-            aspectRatio="4 / 5"
-            dotsPosition="bottom"
-            radius={24}
-            overlay={
-              <>
-                <div style={{
-                  position: 'absolute', top: 14, left: 14,
-                  background: 'rgba(0,0,0,0.55)', color: '#fff',
-                  backdropFilter: 'blur(8px)',
-                  borderRadius: 999,
-                  padding: '5px 11px',
-                  fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
-                  zIndex: 4,
-                }}>
-                  {TYPE_LABEL[event.eventType]}
-                </div>
-                {isRsvpd && (
-                  <div style={{
-                    position: 'absolute', top: 14, right: 14,
-                    background: '#22C55E', color: '#fff',
-                    borderRadius: 999, padding: '5px 11px',
-                    fontSize: 11, fontWeight: 600,
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    zIndex: 4,
-                  }}>
-                    <Check size={11} strokeWidth={2.5} /> Going
-                  </div>
-                )}
-              </>
-            }
-          />
-        </div>
-      </section>
+      {/* ── DESKTOP 2-COLUMN WRAPPER ──
+           On ≥1024px the hero photo sits on the left (max ~560px) and the
+           title/facts/description fill the right column. On mobile the
+           wrapper is transparent — all sections stack normally. */}
+      <div
+        style={isDesktop ? {
+          maxWidth: 1280, margin: '0 auto',
+          padding: '20px 32px 0',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+          gap: 48,
+          alignItems: 'start',
+        } : undefined}
+      >
+        {/* ── HERO PHOTO CAROUSEL ── */}
+        {hasPhotos && (
+          <section style={{ padding: isDesktop ? 0 : '12px 16px 0' }}>
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: isDesktop ? 560 : undefined,
+              aspectRatio: '4 / 5',
+              borderRadius: 24,
+              overflow: 'hidden',
+              background: 'var(--bg-inset)',
+            }}>
+              <PhotoCarousel
+                photos={photos}
+                aspectRatio="4 / 5"
+                dotsPosition="bottom"
+                radius={24}
+                overlay={
+                  <>
+                    <div style={{
+                      position: 'absolute', top: 14, left: 14,
+                      background: 'rgba(0,0,0,0.55)', color: '#fff',
+                      backdropFilter: 'blur(8px)',
+                      borderRadius: 999,
+                      padding: '5px 11px',
+                      fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
+                      zIndex: 4,
+                    }}>
+                      {TYPE_LABEL[event.eventType]}
+                    </div>
+                    {isRsvpd && (
+                      <div style={{
+                        position: 'absolute', top: 14, right: 14,
+                        background: '#22C55E', color: '#fff',
+                        borderRadius: 999, padding: '5px 11px',
+                        fontSize: 11, fontWeight: 600,
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        zIndex: 4,
+                      }}>
+                        <Check size={11} strokeWidth={2.5} /> Going
+                      </div>
+                    )}
+                  </>
+                }
+              />
+            </div>
+          </section>
+        )}
+        {/* RIGHT COLUMN starts here — wrapped on desktop for the side-by-side
+            layout. Closing tag is right before the bottom CTA. */}
+        <div style={isDesktop ? { minWidth: 0 } : { display: 'contents' }}>
 
       {/* ── TITLE + KEY FACTS ── */}
       <section style={{ padding: '20px 20px 0' }}>
@@ -393,6 +423,8 @@ export default function EventDetailScreen({
           <MiniStat label="Questions" value={metrics.questions} />
         </div>
       </section>
+        </div>{/* /right column */}
+      </div>{/* /desktop grid wrapper */}
 
       {/* ── BOTTOM CTA ── */}
       <section style={{
@@ -404,6 +436,43 @@ export default function EventDetailScreen({
         zIndex: 30,
       }}>
         <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto', flexWrap: 'wrap' }}>
+          {/* OWNER: Edit + Delete instead of RSVP/contact. */}
+          {isOwner ? (
+            <>
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  style={{
+                    flex: 1, minWidth: 140, height: 52, borderRadius: 999,
+                    background: 'var(--text-primary)', color: 'var(--bg-base)',
+                    border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <Edit3 size={16} strokeWidth={2} /> Edit event
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={async () => {
+                    if (typeof window !== 'undefined' && !window.confirm('Delete this event permanently?')) return;
+                    await onDelete();
+                    onBack();
+                  }}
+                  style={{
+                    flex: '0 0 auto', minWidth: 52, height: 52, padding: '0 18px', borderRadius: 999,
+                    background: 'transparent', color: 'var(--accent-rose)',
+                    border: '1px solid var(--accent-rose)', cursor: 'pointer',
+                    fontSize: 14, fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <Trash2 size={16} strokeWidth={2} /> Delete
+                </button>
+              )}
+            </>
+          ) : (
+          <>
           <button
             aria-label="Save"
             style={{
@@ -434,9 +503,8 @@ export default function EventDetailScreen({
               : 'RSVP'}
           </button>
 
-          {/* Message organizer — only show when viewer isn't the owner.
-              Mirrors ItemDetailScreen: one button per accepted channel. */}
-          {!isOwner && (
+          {/* Message organizer — one button per accepted channel. */}
+          {(
             hasBoth ? (
               contactLinks.map(link => (
                 <button
@@ -473,6 +541,8 @@ export default function EventDetailScreen({
                   : <Mail size={16} strokeWidth={1.8} />}
               </button>
             ) : null
+          )}
+          </>
           )}
         </div>
       </section>

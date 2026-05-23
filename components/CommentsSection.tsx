@@ -17,9 +17,9 @@
  * later — the Comment shape already matches what the table will look like. */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, Send, CornerDownRight } from 'lucide-react';
+import { MessageCircle, Send, CornerDownRight, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { addComment, getComments, timeAgo, type Comment } from '../lib/comments';
+import { addComment, deleteComment, getComments, timeAgo, type Comment } from '../lib/comments';
 import { USERS, type User } from '../lib/mockData';
 import { getAvatar } from '../lib/photos';
 
@@ -31,7 +31,12 @@ interface CommentsSectionProps {
 }
 
 export default function CommentsSection({ postId, onRequireAuth, onOpenStorefront }: CommentsSectionProps) {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
+  const handleDelete = (c: Comment) => {
+    if (typeof window !== 'undefined' && !window.confirm('Admin: delete this comment?')) return;
+    deleteComment(postId, c.id);
+    setComments(getComments(postId));
+  };
   const [comments, setComments] = useState<Comment[]>(() => getComments(postId));
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
@@ -158,6 +163,7 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
                 comment={top}
                 onReply={beginReply}
                 onAvatarClick={onOpenStorefront}
+                onDelete={isAdmin ? () => handleDelete(top) : undefined}
               />
               {(repliesByParent.get(top.id) ?? []).length > 0 && (
                 <ol style={{
@@ -173,6 +179,7 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
                         compact
                         onReply={beginReply}
                         onAvatarClick={onOpenStorefront}
+                        onDelete={isAdmin ? () => handleDelete(r) : undefined}
                       />
                     </li>
                   ))}
@@ -288,12 +295,14 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
 /* ── Comment row ──────────────────────────────── */
 
 function CommentRow({
-  comment, compact, onReply, onAvatarClick,
+  comment, compact, onReply, onAvatarClick, onDelete,
 }: {
   comment: Comment;
   compact?: boolean;
   onReply: (c: Comment) => void;
   onAvatarClick?: (user: User) => void;
+  /** Admin moderation: when present, shows a red trash button on the row. */
+  onDelete?: () => void;
 }) {
   const av = onAvatarClick
     ? () => onAvatarClick(comment.author)
@@ -355,19 +364,35 @@ function CommentRow({
         }}>
           <Body text={comment.body} />
         </p>
-        <button
-          type="button"
-          onClick={() => onReply(comment)}
-          style={{
-            all: 'unset', cursor: 'pointer',
-            marginTop: 4,
-            fontSize: 11, fontWeight: 600,
-            color: 'var(--text-muted)',
-            letterSpacing: '0.01em',
-          }}
-        >
-          Reply
-        </button>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={() => onReply(comment)}
+            style={{
+              all: 'unset', cursor: 'pointer',
+              fontSize: 11, fontWeight: 600,
+              color: 'var(--text-muted)',
+              letterSpacing: '0.01em',
+            }}
+          >
+            Reply
+          </button>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label="Admin: delete comment"
+              style={{
+                all: 'unset', cursor: 'pointer',
+                fontSize: 11, fontWeight: 600,
+                color: '#ED2E50',
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+              }}
+            >
+              <Trash2 size={11} strokeWidth={2} /> Delete
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

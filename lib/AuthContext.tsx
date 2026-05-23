@@ -6,6 +6,14 @@ import { supabase } from './supabase';
 import type { Profile } from './api/types';
 import { getDemoSession, clearDemoSession, onDemoSessionChange, type DemoSession, initialsOf } from './demoAuth';
 
+/* Single admin account — hard-coded by request. Anyone signed in with this
+   email gets isAdmin=true and can delete any post/comment regardless of
+   ownership. Combined with RLS: see SQL migration in BACKEND.md. */
+export const ADMIN_EMAIL = 'wecycle.page@gmail.com';
+export function isAdminEmail(email?: string | null): boolean {
+  return (email ?? '').trim().toLowerCase() === ADMIN_EMAIL;
+}
+
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
@@ -15,6 +23,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** True when the active session is a local-only demo session (not a real Supabase user). */
   isDemo: boolean;
+  /** True when the signed-in user is the wecycle admin account. */
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -25,6 +35,7 @@ const AuthContext = createContext<AuthContextValue>({
   refreshProfile: async () => {},
   signOut: async () => {},
   isDemo: false,
+  isAdmin: false,
 });
 
 /* Synthesize a `User`-shaped object from a demo session. */
@@ -164,8 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const isAdmin = !isDemo && isAdminEmail(user?.email);
+
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, refreshProfile, signOut, isDemo }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, refreshProfile, signOut, isDemo, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

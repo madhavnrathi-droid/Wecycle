@@ -29,7 +29,7 @@ import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
-import { fetchListingsByUser, fetchEventsByUser, onPostsChanged } from '../lib/liveData';
+import { fetchListingsByUser, fetchEventsByUser, fetchProfileStats, onPostsChanged, type ProfileStats } from '../lib/liveData';
 
 interface StorefrontScreenProps {
   user: User;
@@ -63,17 +63,37 @@ export default function StorefrontScreen({
       : [],
   );
 
+  /* Live storefront stats — refetched whenever a post lands so the Shared
+     counter updates the instant the user creates / deletes a post. */
+  const [stats, setStats] = useState<ProfileStats | null>(null);
+
   useEffect(() => {
     if (demo || !hasSupabaseEnv) return;
     let cancelled = false;
     const load = () => {
       fetchListingsByUser(user.id).then(rows => { if (!cancelled) setUploads(rows); });
       fetchEventsByUser(user.id).then(rows => { if (!cancelled) setEvents(rows); });
+      fetchProfileStats(user.id).then(s => { if (!cancelled) setStats(s); });
     };
     load();
     const off = onPostsChanged(load);
     return () => { cancelled = true; off(); };
   }, [user.id, demo]);
+
+  /* Pick the stats to render:
+       - Demo mode: derive from in-memory data (shared = uploads+events,
+         received from user.itemsReceived, impact derived).
+       - Live mode: use the fetched stats; until they arrive, fall back to
+         what we already know so the tiles never sit on 0 unnecessarily. */
+  const sharedDisplay = demo
+    ? uploads.length + events.length
+    : (stats?.shared ?? (uploads.length + events.length));
+  const receivedDisplay = demo
+    ? (user.itemsReceived || 0)
+    : (stats?.received ?? 0);
+  const impactDisplay = demo
+    ? (user.impactScore || (uploads.length * 10 + events.length * 25))
+    : (stats?.impact ?? (uploads.length * 10 + events.length * 25));
 
   /* Decide which tabs to surface. Events is conditional. */
   const tabs: { id: Tab; label: string; count: number }[] = [
@@ -179,14 +199,14 @@ export default function StorefrontScreen({
           </div>
         </div>
 
-        {/* Stat tiles */}
+        {/* Stat tiles — live counts (refetched on every post change). */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
           marginTop: 16,
         }}>
-          <StatTile value={user.itemsShared}  label="Shared"  />
-          <StatTile value={user.itemsReceived} label="Received"/>
-          <StatTile value={user.impactScore}   label="Impact"  />
+          <StatTile value={sharedDisplay}   label="Shared"  />
+          <StatTile value={receivedDisplay} label="Received" />
+          <StatTile value={impactDisplay}   label="Impact"  />
         </div>
       </section>
 

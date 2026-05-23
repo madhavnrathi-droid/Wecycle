@@ -14,11 +14,17 @@ const CATEGORIES = [
   'Tools', 'Kitchen', 'Lab', 'Art', 'Clothing', 'Services', 'Other',
 ];
 
-const CONDITIONS = [
-  { value: 'like_new', label: 'Like new' },
-  { value: 'good',     label: 'Good' },
-  { value: 'fair',     label: 'Fair' },
-];
+/* Condition slider — 5 stops with an animated emoji face per stop. Stored as
+   one of the three Supabase enum values, but the user picks via a colorful
+   left-to-right slider. The "worst" is just "fair" (not terrible) — by design
+   we don't ask users to grade their own stuff harshly. */
+const CONDITION_STOPS = [
+  { value: 'fair',     emoji: '😅', label: 'Used',       color: '#F87171' },  // red
+  { value: 'fair',     emoji: '🙂', label: 'OK',         color: '#FB923C' },  // orange
+  { value: 'good',     emoji: '😊', label: 'Good',       color: '#FACC15' },  // yellow
+  { value: 'good',     emoji: '😃', label: 'Great',      color: '#86EFAC' },  // mint
+  { value: 'like_new', emoji: '🤩', label: 'Like new',   color: '#22C55E' },  // green
+] as const;
 
 interface ShareItemModalProps {
   open: boolean;
@@ -58,9 +64,9 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     const e: typeof errors = {};
     if (!form.title.trim()) e.title = 'Required';
     if (!form.category) e.category = 'Pick a category';
-    if (!form.condition) e.condition = 'Pick a condition';
+    /* Condition is now OPTIONAL — defaults to 'good' on submit if not chosen. */
     if (!form.location.trim()) e.location = 'Where can people pick this up?';
-    if (form.pricing === 'sell' && !form.price) e.price = 'Set a price';
+    /* Price is now OPTIONAL even when listing as Sell — empty → "Selling" label. */
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -76,11 +82,12 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     setSubmitError(null);
     try {
       if (hasSupabaseEnv && !isDemoMode()) {
-        /* Real path: upload the picker's compressed blobs + insert the row. */
+        /* Real path: upload the picker's compressed blobs + insert the row.
+           Default condition to 'good' when the user didn't slide. */
         await createListingWithMedia({
           title: form.title,
           category: form.category,
-          condition: form.condition as 'like_new' | 'good' | 'fair',
+          condition: (form.condition || 'good') as 'like_new' | 'good' | 'fair',
           description: form.description,
           location: form.location,
           listingType: form.pricing === 'sell' ? 'sell' : 'free',
@@ -175,41 +182,34 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           {errors.title && <span id="si-title-err" className="field-error">{errors.title}</span>}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          <div className="field">
-            <label htmlFor="si-cat" className="field-label">
-              Category <span className="required" aria-hidden="true">*</span>
-            </label>
-            <select
-              id="si-cat"
-              className="form-select"
-              value={form.category}
-              onChange={e => update('category', e.target.value)}
-              aria-required="true"
-              aria-invalid={!!errors.category}
-            >
-              <option value="">Select…</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            {errors.category && <span className="field-error">{errors.category}</span>}
-          </div>
-          <div className="field">
-            <label htmlFor="si-cond" className="field-label">
-              Condition <span className="required" aria-hidden="true">*</span>
-            </label>
-            <select
-              id="si-cond"
-              className="form-select"
-              value={form.condition}
-              onChange={e => update('condition', e.target.value)}
-              aria-required="true"
-              aria-invalid={!!errors.condition}
-            >
-              <option value="">Select…</option>
-              {CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            {errors.condition && <span className="field-error">{errors.condition}</span>}
-          </div>
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label htmlFor="si-cat" className="field-label">
+            Category <span className="required" aria-hidden="true">*</span>
+          </label>
+          <select
+            id="si-cat"
+            className="form-select"
+            value={form.category}
+            onChange={e => update('category', e.target.value)}
+            aria-required="true"
+            aria-invalid={!!errors.category}
+          >
+            <option value="">Select…</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          {errors.category && <span className="field-error">{errors.category}</span>}
+        </div>
+
+        {/* Colored condition slider — optional. */}
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <span>Condition</span>
+            <span className="field-hint" style={{ fontWeight: 400 }}>Optional</span>
+          </label>
+          <ConditionSlider
+            value={form.condition}
+            onChange={v => update('condition', v)}
+          />
         </div>
 
         <div className="field" style={{ marginBottom: 14 }}>
@@ -268,19 +268,18 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           </div>
           {form.pricing === 'sell' && (
             <div className="field" style={{ marginTop: 10 }}>
-              <label htmlFor="si-price" className="field-label">
-                Price (₹) <span className="required" aria-hidden="true">*</span>
+              <label htmlFor="si-price" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span>Price (₹)</span>
+                <span className="field-hint" style={{ fontWeight: 400 }}>Optional — leave blank for "Selling"</span>
               </label>
               <input
                 id="si-price"
                 type="number" inputMode="numeric" min="1"
                 className="form-input"
-                placeholder="500"
+                placeholder="e.g. 500 (or leave blank)"
                 value={form.price ?? ''}
                 onChange={e => update('price', Number(e.target.value) || undefined)}
-                aria-invalid={!!errors.price}
               />
-              {errors.price && <span className="field-error">{errors.price}</span>}
             </div>
           )}
         </fieldset>
@@ -300,5 +299,93 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
 
       </form>
     </Modal>
+  );
+}
+
+/* ── Animated condition slider ──────────────────────
+   Five stops along a red→green gradient. Picking a stop animates the emoji
+   above the thumb (bounces up + scales briefly). value is one of the three
+   Supabase enum values; we round to the nearest enum when storing. */
+function ConditionSlider({
+  value, onChange,
+}: { value: string; onChange: (v: string) => void }) {
+  const initial = Math.max(0, CONDITION_STOPS.findIndex(s => s.value === value));
+  const [idx, setIdx] = useState(initial >= 0 ? initial : 2);
+  const [bump, setBump] = useState(0);
+  const stop = CONDITION_STOPS[idx];
+  const pct = (idx / (CONDITION_STOPS.length - 1)) * 100;
+
+  return (
+    <div style={{ padding: '4px 0 8px' }}>
+      <div style={{ position: 'relative', height: 56 }}>
+        {/* Floating emoji label above the thumb */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: `calc(${pct}% - 18px)`,
+            top: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            transition: 'left 200ms cubic-bezier(.2,.8,.2,1), transform 240ms',
+            transform: `translateY(${bump ? -2 : 0}px) scale(${bump ? 1.18 : 1})`,
+            fontSize: 22, lineHeight: 1, userSelect: 'none',
+            pointerEvents: 'none',
+          }}
+        >
+          <span>{stop.emoji}</span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, marginTop: 2,
+            color: stop.color, letterSpacing: '-0.01em',
+          }}>{stop.label}</span>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={CONDITION_STOPS.length - 1}
+        step={1}
+        value={idx}
+        onChange={e => {
+          const v = Number(e.target.value);
+          setIdx(v);
+          setBump(b => b + 1);
+          setTimeout(() => setBump(0), 220);
+          onChange(CONDITION_STOPS[v].value);
+        }}
+        aria-label="Condition"
+        style={{
+          width: '100%',
+          appearance: 'none',
+          WebkitAppearance: 'none',
+          height: 10,
+          borderRadius: 999,
+          background: 'linear-gradient(to right, #F87171 0%, #FB923C 25%, #FACC15 50%, #86EFAC 75%, #22C55E 100%)',
+          outline: 'none',
+          cursor: 'pointer',
+        }}
+      />
+      <style jsx>{`
+        input[type='range']::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 22px; height: 22px;
+          border-radius: 50%;
+          background: #fff;
+          border: 2px solid ${stop.color};
+          box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+          cursor: pointer;
+          transition: transform 0.15s;
+        }
+        input[type='range']::-webkit-slider-thumb:hover { transform: scale(1.08); }
+        input[type='range']::-moz-range-thumb {
+          width: 22px; height: 22px;
+          border-radius: 50%;
+          background: #fff;
+          border: 2px solid ${stop.color};
+          box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+          cursor: pointer;
+        }
+      `}</style>
+    </div>
   );
 }

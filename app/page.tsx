@@ -29,7 +29,7 @@ import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
-import { updateListingFields, repostListing, deleteListingById, deletePostById } from '../lib/liveData';
+import { updateListingFields, repostListing, deleteListingById, deletePostById, deleteEvent, purgeExpiredEvents } from '../lib/liveData';
 import { updateDemoPost, repostDemoPost, deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
@@ -49,7 +49,7 @@ type ModalKind =
   | 'alert-form';
 
 export default function WecycleApp() {
-  const { user, isDemo } = useAuth();
+  const { user, isDemo, isAdmin } = useAuth();
   const storageMode = isDemo ? 'demo' as const : 'supabase' as const;
   const [activeScreen, setActiveScreen] = useState<Screen>('feed');
   const [modal, setModal] = useState<ModalKind>(null);
@@ -143,6 +143,13 @@ export default function WecycleApp() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+  }, []);
+
+  /* On app open, fire a one-time janitor that drops past-dated events from
+     the DB. Best-effort: RLS lets organizers/admin nuke their own; expired
+     ones that we can't delete are still filtered client-side in fetchEvents. */
+  useEffect(() => {
+    if (!isDemoMode()) purgeExpiredEvents();
   }, []);
 
   const closeModal = () => setModal(null);
@@ -248,9 +255,12 @@ export default function WecycleApp() {
               onBack={() => setOpenItem(null)}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
-              /* Owner sees Edit + Delete instead of contact buttons. */
+              /* Owner sees Edit + Delete instead of contact buttons.
+                 Admin gets Delete on every post (cross-account moderation). */
+              isOwner={ownsItem(openItem)}
+              isAdmin={isAdmin}
               onEdit={ownsItem(openItem) && !openItem.isRequest ? () => { setEditItem(openItem); setModal('edit-item'); } : undefined}
-              onDelete={ownsItem(openItem) ? async () => {
+              onDelete={(ownsItem(openItem) || isAdmin) ? async () => {
                 if (isDemoMode()) { deleteDemoPost(openItem.id); return; }
                 await deletePostById(openItem.id, openItem.isRequest ? 'request' : 'listing');
               } : undefined}
@@ -342,12 +352,15 @@ export default function WecycleApp() {
             <EventDetailScreen
               event={openEvent}
               isRsvpd={rsvpdEvents.has(openEvent.id)}
-              isOwner={isOwner}
+              isOwner={isOwner || isAdmin}
               onBack={() => setOpenEvent(null)}
               onRsvp={() => toggleRsvp(openEvent.id)}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
-              onEdit={isOwner ? () => { /* TODO: open edit-event modal */ } : undefined}
+              onDelete={(isOwner || isAdmin) ? async () => {
+                if (isDemoMode()) { deleteDemoPost(openEvent.id); return; }
+                await deleteEvent(openEvent.id);
+              } : undefined}
             />
           </main>
         </div>
@@ -407,11 +420,6 @@ export default function WecycleApp() {
               onPostNew={() => requireAuth('post-picker')}
               onOpenItem={setOpenItem}
               onOpenEvent={setOpenEvent}
-              onEditItem={(item) => {
-                if (!user) { setModal('auth'); return; }
-                setEditItem(item);
-                setModal('edit-item');
-              }}
             />
           )}
           {activeScreen === 'account' && (
