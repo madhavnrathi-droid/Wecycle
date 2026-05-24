@@ -547,12 +547,18 @@ body {
    LAYOUT
    ═══════════════════════════════════════════════ */
 
-/* Mobile-first: 430 px column, growing at tablet / desktop / wide.
-   Important: we keep the **phone-shaped mockup** centered until the viewport
-   is genuinely desktop-wide (≥1280px). At intermediate widths (tablet, a
-   narrow Claude preview pane, a half-width browser window), the app stays
-   as a phone — that's the canonical Wecycle look and prevents the squished
-   "neither phone nor desktop" middle state. */
+/* Fluid app-container: the page width follows the viewport smoothly instead
+   of jumping at distant breakpoints.
+     • Below 720px → phone-shaped (430px max), centered. Keeps the canonical
+       Wecycle phone mockup visible in any narrow surface (a Claude preview
+       pane, a half-width browser, a real phone).
+     • 720px and up → max-width tracks the viewport (92vw with side gutters)
+       and caps at 1480px on truly large displays. Cards grow with the
+       container, so an 1132px desktop window shows a ~1040px container
+       full of 5 well-sized masonry columns — not a 430px phone in a sea
+       of empty space.
+   The cap step-ups past 1480 just keep increasing the side gutters as
+   bigger screens come into play. */
 .app-container {
   width: 100%;
   max-width: 430px;
@@ -561,13 +567,8 @@ body {
   position: relative;
   background: var(--bg-base);
 }
-/* Desktop: stop pinching the layout. We give the page near-full width with
-   modest side gutters, so the masonry, events list, inventory tiles, and
-   activity feed all fill a 16" MacBook viewport instead of huddling in the
-   middle. Existing column counts stay the same, which makes every individual
-   card larger as the container grows. */
-@media (min-width: 1280px) {
-  .app-container { max-width: min(100vw - 48px, 1480px); }
+@media (min-width: 720px) {
+  .app-container { max-width: min(92vw, 1480px); }
 }
 @media (min-width: 1440px) {
   .app-container { max-width: min(100vw - 64px, 1720px); }
@@ -592,11 +593,13 @@ body {
 .desktop-only-nav  { display: none !important; }
 
 /* In-component tiny show/hide helpers.
-   Bumped to 1280px so a Claude preview pane (or a half-width browser window)
-   keeps showing the mobile UI instead of awkwardly switching to desktop. */
+   Switch at 1024px — that's where the container has grown enough to host
+   the desktop two-column header (greeting + inline search + the wider
+   marketing banner below). Narrow preview panes (<1024px) still get the
+   mobile flow with the centered phone mockup. */
 .mobile-only       { display: initial; }
 .desktop-only      { display: none; }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .mobile-only     { display: none !important; }
   .desktop-only    { display: initial !important; }
 }
@@ -804,9 +807,8 @@ body {
 }
 
 /* Greeting + marketing banner + (desktop-only) search row.
-   The row is ALWAYS inline now — the greeting takes the left, the marketing
-   banner fills the dead space on the right. On real desktop (≥1280px) the
-   search slides in alongside both. */
+   Mobile: greeting stacks above the marketing banner section. Desktop
+   (≥1024px): the search slides inline next to a compacted greeting. */
 .feed-greeting-row {
   display: flex;
   flex-direction: row;
@@ -818,7 +820,7 @@ body {
   min-width: 0;
 }
 .feed-greeting-search { display: none; }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .feed-greeting-row {
     gap: 20px;
     padding-top: 8px !important;
@@ -846,10 +848,11 @@ body {
    variant only renders at the right breakpoint.
    ═══════════════════════════════════════════════ */
 
-/* Responsive mounts — only one banner is visible at a time. */
+/* Responsive mounts — only one banner is visible at a time.
+   Switch at 1024px to match the rest of the desktop layout boundaries. */
 .marketing-banner-mount-mobile  { display: block; }
 .marketing-banner-mount-desktop { display: none; }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-mount-mobile  { display: none; }
   .marketing-banner-mount-desktop { display: block; }
 }
@@ -882,7 +885,7 @@ body {
   height: 132px;
   border-radius: 18px;
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-wide {
     height: 168px;
     border-radius: 20px;
@@ -935,7 +938,7 @@ body {
   align-items: center;
   gap: 16px;
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-slide {
     padding: 22px 28px 24px;
     gap: 24px;
@@ -1010,7 +1013,7 @@ body {
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-illu-wrap {
     width: 120px;
     height: 120px;
@@ -1051,7 +1054,7 @@ body {
   padding-right: 38px;  /* room for the arrow chip (mobile) */
   gap: 4px;
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-text {
     padding-right: 56px;
     gap: 6px;
@@ -1073,7 +1076,7 @@ body {
   font-size: 16px;
   letter-spacing: -0.018em;
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-title {
     font-size: 22px;
     letter-spacing: -0.022em;
@@ -1097,7 +1100,7 @@ body {
   font-weight: 600;
   opacity: 0.98;
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-subtitle {
     font-size: 13px;
   }
@@ -1115,7 +1118,7 @@ body {
   overflow: hidden;
   max-width: 56ch;
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-detail {
     font-size: 12px;
     line-height: 1.45;
@@ -1146,7 +1149,7 @@ body {
   transform: translate(6px, 6px);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
 }
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-arrow {
     width: 38px; height: 38px;
     right: 24px; bottom: 24px;
