@@ -490,10 +490,14 @@ function FeedCard({
      This is what the user spec'd: "name biggest, then person, description
      last; plain card if no image". */
   if (!hasMedia) {
+    /* No aspect-ratio for text-only — the card sizes to its content
+       (with a small min-height so very short text still feels card-like).
+       This is what fixes the "huge empty space below the text" issue:
+       columns in the masonry pack tightly around shorter cards. */
     return (
       <article
         className="feed-card feed-card--text"
-        style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}
+        style={{ padding: 0, position: 'relative', overflow: 'hidden' }}
       >
         <button
           type="button"

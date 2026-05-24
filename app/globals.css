@@ -2981,18 +2981,18 @@ body {
 .feed-card-save:active { transform: scale(0.88); }
 
 /* ── Text-only feed card variant ──
-   Used when a post carries no photo/video. Same outer dimensions as an
-   image card so the masonry stays balanced, but the content is laid out
-   as a plain typographic card: big title, small author chip, description
-   body, footer meta. */
+   Used when a post carries no photo/video. The card AUTO-SIZES to its
+   content (no forced aspect ratio) so a short post doesn't stretch into
+   a wall of empty space — the masonry packs tightly around it. We keep a
+   tiny min-height so the card still reads as a card, not a single line. */
 .feed-card--text {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
+  min-height: 140px;
 }
 .feed-card-text-button {
   all: unset;
-  position: absolute;
-  inset: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3000,9 +3000,9 @@ body {
   box-sizing: border-box;
   cursor: pointer;
   color: var(--text-primary);
+  width: 100%;
 }
 .feed-card-text-body {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;

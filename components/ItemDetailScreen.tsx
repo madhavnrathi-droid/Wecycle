@@ -348,24 +348,30 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         </button>
       </header>
 
-      {/* ── PHOTO CAROUSEL ── */}
-      <section style={{ padding: '12px 16px 0' }}>
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          aspectRatio: '4 / 5',
-          borderRadius: 24,
-          overflow: 'hidden',
-          background: 'var(--bg-inset)',
-        }}>
-          <PhotoCarousel
-            photos={photos}
-            aspectRatio="4 / 5"
-            dotsPosition="bottom"
-            radius={24}
-          />
-        </div>
-      </section>
+      {/* ── PHOTO CAROUSEL ──
+         Skip the entire hero frame when the post has no photos or videos.
+         Otherwise we'd render a giant empty 4/5 box that's just visual
+         dead space. The title + meta section below picks up the leftover
+         padding naturally. */}
+      {photos.length > 0 && (
+        <section style={{ padding: '12px 16px 0' }}>
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            aspectRatio: '4 / 5',
+            borderRadius: 24,
+            overflow: 'hidden',
+            background: 'var(--bg-inset)',
+          }}>
+            <PhotoCarousel
+              photos={photos}
+              aspectRatio="4 / 5"
+              dotsPosition="bottom"
+              radius={24}
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── TITLE + META ──
          Owner-edit mode breaks the meta into one-field-per-row so each
@@ -876,16 +882,24 @@ function DesktopLayout({
         </span>
       </header>
 
+      {/* When there are no photos we collapse the 2-column grid into a
+         single centered column so the right-hand info block isn't squeezed
+         into half-width with an empty void next to it. */}
       <div style={{
-        maxWidth: 1280,
+        maxWidth: photos.length > 0 ? 1280 : 760,
         margin: '0 auto',
         padding: '28px 32px 48px',
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
+        gridTemplateColumns: photos.length > 0
+          ? 'minmax(0, 1.05fr) minmax(0, 1fr)'
+          : 'minmax(0, 1fr)',
         gap: 48,
         alignItems: 'start',
       }}>
-        {/* ── LEFT: Photo carousel (sticky so it stays visible while reading) ── */}
+        {/* ── LEFT: Photo carousel (sticky so it stays visible while reading).
+             Rendered only when there's media; otherwise the right column
+             takes over the full width. */}
+        {photos.length > 0 && (
         <div style={{
           position: 'sticky',
           top: 76,
@@ -944,6 +958,7 @@ function DesktopLayout({
             </div>
           )}
         </div>
+        )}
 
         {/* ── RIGHT: Title, price, description, owner, actions ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
