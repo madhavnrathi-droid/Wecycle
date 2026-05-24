@@ -271,6 +271,10 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
             className="form-input"
             placeholder="ananya@learner.manipal.edu"
             value={email}
+            /* Max 80 chars during sign-up keeps the email column from being
+             * abused; matches typical max-length of the email column on
+             * Supabase (255) while staying well within MAHE-mail bounds. */
+            maxLength={80}
             onChange={e => setEmail(e.target.value)}
             autoComplete="email"
             required

@@ -707,7 +707,54 @@ export async function fetchLostFound(): Promise<(LostItem & { photoUrls?: string
     .in('status', ['lost', 'found'])
     .order('posted_at', { ascending: false });
   if (error || !data) return [];
-  return (data as unknown as LostFoundRowLite[]).map(mapLostFoundRow);
+  return notRemoved((data as unknown as LostFoundRowLite[]).map(mapLostFoundRow));
+}
+
+/** Just the lost/found posts the signed-in user opened. Powers the L&F
+ *  group in the Inventory "All" tab. */
+export async function fetchLostFoundByUser(userId: string): Promise<(LostItem & { photoUrls?: string[] })[]> {
+  if (!hasSupabaseEnv || !userId) return [];
+  const { data, error } = await supabase
+    .from('lost_found_reports')
+    .select(LF_SELECT)
+    .eq('user_id', userId)
+    .order('posted_at', { ascending: false });
+  if (error || !data) return [];
+  return notRemoved((data as unknown as LostFoundRowLite[]).map(mapLostFoundRow));
+}
+
+/* ── Lost & Found: edit + repost ───────────────────── */
+
+export interface EditLostFoundPatch {
+  title?: string;
+  description?: string;
+  status?: 'lost' | 'found';
+  lastSeen?: string;
+  reward?: string;
+}
+
+export async function updateLostFoundFields(id: string, patch: EditLostFoundPatch) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.title !== undefined)       update.title = patch.title.trim();
+  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.status !== undefined)      update.status = patch.status;
+  if (patch.lastSeen !== undefined)    update.last_seen = patch.lastSeen.trim() || null;
+  if (patch.reward !== undefined)      update.reward = patch.reward.trim() || null;
+  const { error } = await supabase.from('lost_found_reports').update(update as never).eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+export async function repostLostFound(id: string, patch?: EditLostFoundPatch) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  if (patch) await updateLostFoundFields(id, patch);
+  const { error } = await supabase
+    .from('lost_found_reports')
+    .update({ posted_at: new Date().toISOString() } as never)
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
 }
 
 /* ════════════════════════════════════════════════════

@@ -1205,6 +1205,45 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
+   INVENTORY CARD STROKES — color-code post types
+   ───────────────────────────────────────────────
+   Inventory-only signal: a 2px outer ring tells you at a glance whether each
+   tile is a marketplace listing (green), an event (purple), a lost-found
+   post (orange), or a request (green-leaning teal so it pairs with sells).
+   Applied via [data-stroke] on .inventory-card so it doesn't leak to the
+   home feed or storefront grids. */
+.inventory-card {
+  position: relative;
+  isolation: isolate;
+}
+.inventory-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid transparent;
+  pointer-events: none;
+  z-index: 5;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.inventory-card[data-stroke="marketplace"]::after {
+  border-color: #22C55E;             /* mint green */
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.18) inset;
+}
+.inventory-card[data-stroke="request"]::after {
+  border-color: #16A34A;             /* deeper green so requests still register as "give" */
+  box-shadow: 0 0 0 1px rgba(22,163,74,0.18) inset;
+}
+.inventory-card[data-stroke="event"]::after {
+  border-color: #A855F7;             /* purple */
+  box-shadow: 0 0 0 1px rgba(168,85,247,0.20) inset;
+}
+.inventory-card[data-stroke="lostfound"]::after {
+  border-color: #F58400;             /* wecycle amber */
+  box-shadow: 0 0 0 1px rgba(245,132,0,0.22) inset;
+}
+
+/* ═══════════════════════════════════════════════
    INLINE EDIT — owner-editable fields on detail screens
    ───────────────────────────────────────────────
    Design intent: every editable field looks like a clear, bordered card so

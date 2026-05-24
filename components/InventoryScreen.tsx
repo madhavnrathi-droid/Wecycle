@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
-import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent } from '../lib/mockData';
-import { resolveItemMedia, getEventPhoto, getAvatar } from '../lib/photos';
+import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem } from '../lib/mockData';
+import { resolveItemMedia, getEventPhoto, getAvatar, getLostFoundPhoto } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { getEventMetrics } from '../lib/metrics';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import {
-  fetchMyUploads, fetchMyRequests, fetchEventsByUser, onPostsChanged,
-  markListingSold, markRequestCompleted, deleteEvent,
+  fetchMyUploads, fetchMyRequests, fetchEventsByUser, fetchLostFoundByUser, onPostsChanged,
+  markListingSold, markRequestCompleted, markLostFoundResolved, deleteEvent,
 } from '../lib/liveData';
 import { getDemoUploads, getDemoRequests, deleteDemoPost } from '../lib/demoInventory';
 import PhotoCarousel from './PhotoCarousel';
@@ -25,6 +25,8 @@ interface InventoryScreenProps {
   onOpenItem: (item: MarketplaceItem) => void;
   /** Opens an event detail screen — used when an event card in Uploads is tapped */
   onOpenEvent: (event: CommunityEvent) => void;
+  /** Opens the Lost & Found detail sheet (lifted to app/page.tsx). */
+  onOpenLF?: (item: LostItem) => void;
 }
 
 const MY_UPLOAD_IDS = ['m1', 'm5', 'm10'];
@@ -32,12 +34,15 @@ const MY_SAVED_IDS = ['m2', 'm6'];
 /* No requests yet — empty state will show */
 const MY_REQUEST_IDS: string[] = [];
 
-/* Discriminated union for the uploads tab — listings AND events together */
+/* Discriminated union for the uploads tab — listings, events, AND lost-found
+ * items render in the same masonry. Each kind drives a different color stroke
+ * (green / purple / orange) and a different open-detail callback. */
 type UploadEntry =
   | { kind: 'item'; item: MarketplaceItem }
-  | { kind: 'event'; event: CommunityEvent };
+  | { kind: 'event'; event: CommunityEvent }
+  | { kind: 'lostfound'; lf: LostItem };
 
-export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, onOpenItem, onOpenEvent }: InventoryScreenProps) {
+export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, onOpenItem, onOpenEvent, onOpenLF }: InventoryScreenProps) {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -49,6 +54,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
   const [myLiveUploads, setMyLiveUploads] = useState<MarketplaceItem[]>([]);
   const [myLiveRequests, setMyLiveRequests] = useState<MarketplaceItem[]>([]);
   const [myLiveEvents, setMyLiveEvents] = useState<CommunityEvent[]>([]);
+  const [myLiveLF, setMyLiveLF] = useState<LostItem[]>([]);
   useEffect(() => {
     if (!mounted || isDemoMode() || !hasSupabaseEnv || !user) return;
     let cancelled = false;
@@ -56,6 +62,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       fetchMyUploads(user.id).then(rows => { if (!cancelled) setMyLiveUploads(rows); });
       fetchMyRequests(user.id).then(rows => { if (!cancelled) setMyLiveRequests(rows); });
       fetchEventsByUser(user.id).then(rows => { if (!cancelled) setMyLiveEvents(rows); });
+      fetchLostFoundByUser(user.id).then(rows => { if (!cancelled) setMyLiveLF(rows); });
     };
     load();
     const off = onPostsChanged(load);
@@ -92,6 +99,8 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
 
   const eventEntriesFor = (evts: CommunityEvent[]): UploadEntry[] =>
     evts.filter(e => matchesQuery(e.title)).map(event => ({ kind: 'event', event }));
+  const lfEntriesFor = (lfs: LostItem[]): UploadEntry[] =>
+    lfs.filter(l => matchesQuery(l.title)).map(lf => ({ kind: 'lostfound', lf }));
 
   const entries = useMemo<UploadEntry[]>(() => {
     if (!mounted) return [];
@@ -125,12 +134,16 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       .filter(i => matchesQuery(i.title))
       .map(item => ({ kind: 'item' as const, item }));
 
-    /* Events join 'all' and 'uploads'. */
-    if (activeTab === 'uploads' || activeTab === 'all') {
+    /* "All" rolls everything in: items + requests + events + lost-found. */
+    if (activeTab === 'all') {
+      return [...itemEntries, ...eventEntriesFor(myEvents), ...lfEntriesFor(myLiveLF)];
+    }
+    /* "Uploaded" also joins events (you organized them). */
+    if (activeTab === 'uploads') {
       return [...itemEntries, ...eventEntriesFor(myEvents)];
     }
     return itemEntries;
-  }, [activeTab, query, mounted, myLiveUploads, myLiveRequests, myEvents, demoTick]);
+  }, [activeTab, query, mounted, myLiveUploads, myLiveRequests, myEvents, myLiveLF, demoTick]);
 
   const uploadItemCount  = mounted && isDemoMode() ? getDemoUploads().length : myLiveUploads.length;
   const uploadEventCount = myEvents.length;
@@ -323,16 +336,38 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                   />
                 );
               }
+              if (entry.kind === 'event') {
+                return (
+                  <InventoryEventCard
+                    key={`event-${entry.event.id}`}
+                    event={entry.event}
+                    tall={tall}
+                    onClick={() => onOpenEvent(entry.event)}
+                    onDelete={async () => {
+                      if (typeof window !== 'undefined' && !window.confirm(`Delete event "${entry.event.title}"?`)) return;
+                      if (isDemoMode()) deleteDemoPost(entry.event.id);
+                      else try { await deleteEvent(entry.event.id); } catch {/*noop*/}
+                    }}
+                  />
+                );
+              }
+              /* Lost & Found card — orange stroke marker, "Found"/"Resolved"
+                 quick-close button, taps open the lifted L&F sheet. */
+              const lfLabel = entry.lf.status === 'lost' ? 'Found it' : 'Resolved';
               return (
-                <InventoryEventCard
-                  key={`event-${entry.event.id}`}
-                  event={entry.event}
+                <InventoryLostFoundCard
+                  key={`lf-${entry.lf.id}`}
+                  lf={entry.lf}
                   tall={tall}
-                  onClick={() => onOpenEvent(entry.event)}
-                  onDelete={async () => {
-                    if (typeof window !== 'undefined' && !window.confirm(`Delete event "${entry.event.title}"?`)) return;
-                    if (isDemoMode()) deleteDemoPost(entry.event.id);
-                    else try { await deleteEvent(entry.event.id); } catch {/*noop*/}
+                  onClick={() => onOpenLF?.(entry.lf)}
+                  completeLabel={lfLabel}
+                  onComplete={async () => {
+                    if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.lf.title}" as resolved? This removes the post.`)) return;
+                    if (isDemoMode()) {
+                      /* Demo store doesn't track L&F separately yet; no-op. */
+                    } else {
+                      try { await markLostFoundResolved(entry.lf.id); } catch {/*noop*/}
+                    }
                   }}
                 />
               );
@@ -373,12 +408,17 @@ function InventoryCard({
   const isPriced = item.listingType === 'sell' && typeof item.price === 'number';
   const ar = tall ? '0.72' : '0.92';
 
+  /* Stroke kind drives the inventory-only colored border (green for items +
+     requests; orange for L&F; purple for events — applied via CSS data attr). */
+  const strokeKind: 'marketplace' | 'request' = item.isRequest ? 'request' : 'marketplace';
+
   /* When the listing has no real photos we render a text-only card — no
      stock image, no fabricated thumbnail. Title + description shown directly. */
   if (!hasMedia) {
     return (
       <article
-        className="feed-card"
+        className="feed-card inventory-card"
+        data-stroke={strokeKind}
         style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}
         aria-label={`Open ${item.title}`}
       >
@@ -449,7 +489,8 @@ function InventoryCard({
 
   return (
     <div
-      className="feed-card"
+      className="feed-card inventory-card"
+      data-stroke={strokeKind}
       style={{ aspectRatio: ar, padding: 0, position: 'relative' }}
       aria-label={`Open ${item.title}`}
     >
@@ -554,7 +595,7 @@ function InventoryEventCard({
   if (!photo && !hasUploaded && !isMockEvent) {
     /* Text-only event card. */
     return (
-      <article className="feed-card" style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}>
+      <article className="feed-card inventory-card" data-stroke="event" style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}>
         <button onClick={onClick} style={{
           all: 'unset', cursor: 'pointer', position: 'absolute', inset: 0,
           padding: '14px 14px 56px', display: 'flex', flexDirection: 'column', gap: 8,
@@ -597,7 +638,7 @@ function InventoryEventCard({
   }
 
   return (
-    <div className="feed-card" style={{ aspectRatio: ar, padding: 0, position: 'relative' }}>
+    <div className="feed-card inventory-card" data-stroke="event" style={{ aspectRatio: ar, padding: 0, position: 'relative' }}>
       <button
         onClick={onClick}
         className="feed-card"
@@ -630,6 +671,63 @@ function InventoryEventCard({
         </div>
       </button>
       {onDelete && <CompleteButton label="Delete" onClick={onDelete} variant="photo-card" />}
+    </div>
+  );
+}
+
+/* ── Lost & Found tile (orange-stroked, inventory-only) ── */
+function InventoryLostFoundCard({
+  lf, tall, onClick, completeLabel, onComplete,
+}: {
+  lf: LostItem;
+  tall: boolean;
+  onClick: () => void;
+  completeLabel?: string;
+  onComplete?: () => void | Promise<void>;
+}) {
+  const photo = getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls);
+  const isLost = lf.status === 'lost';
+  const ar = tall ? '0.72' : '0.92';
+  return (
+    <div
+      className="feed-card inventory-card"
+      data-stroke="lostfound"
+      style={{ aspectRatio: ar, padding: 0, position: 'relative' }}
+    >
+      <button
+        onClick={onClick}
+        className="feed-card"
+        style={{ aspectRatio: ar, padding: 0, border: 'none', background: 'transparent', width: '100%', height: '100%' }}
+        aria-label={`Open ${lf.title}`}
+      >
+        <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+
+        <span style={{
+          position: 'absolute', top: 10, left: 10,
+          background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
+          color: '#fff',
+          backdropFilter: 'blur(8px)', borderRadius: 999,
+          padding: '4px 10px',
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+          zIndex: 3,
+        }}>
+          {lf.status}
+        </span>
+
+        <div className="feed-card-overlay">
+          <p className="feed-card-title">{lf.title}</p>
+          <div className="feed-card-meta" style={{ gap: 10 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <MapPin size={10} strokeWidth={2} />
+              {lf.lastSeen}
+            </span>
+            <span className="feed-card-price">{lf.timeAgo}</span>
+          </div>
+        </div>
+      </button>
+      {completeLabel && onComplete && (
+        <CompleteButton label={completeLabel} onClick={onComplete} variant="photo-card" />
+      )}
     </div>
   );
 }

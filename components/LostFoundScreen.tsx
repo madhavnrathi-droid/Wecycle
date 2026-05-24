@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Menu, Search, Plus, MapPin, AlertCircle, CheckCircle,
-  Mail, X,
+  Mail, X, Trash2, Save, RotateCcw, Loader2,
 } from 'lucide-react';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
@@ -32,6 +32,10 @@ interface LostFoundScreenProps {
   onOpenAccount: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
+  /** When provided, tapping a card delegates open-detail to the parent
+   *  (so the same sheet can be triggered from the Inventory screen too).
+   *  When undefined, the screen falls back to its internal openItem state. */
+  onOpenLF?: (item: LostItem) => void;
 }
 
 type StatusFilter = 'all' | 'lost' | 'found';
@@ -46,7 +50,7 @@ function WhatsAppGlyph({ size = 14 }: { size?: number }) {
 }
 
 export default function LostFoundScreen({
-  onReport, onOpenMenu, onOpenAccount, onRequireAuth, onOpenStorefront,
+  onReport, onOpenMenu, onOpenAccount, onRequireAuth, onOpenStorefront, onOpenLF,
 }: LostFoundScreenProps) {
   const { user, profile } = useAuth();
   const [filter, setFilter] = useState<StatusFilter>('all');
@@ -256,7 +260,7 @@ export default function LostFoundScreen({
               key={item.id}
               item={item}
               variant={(['portrait','square','landscape','tall','portrait'] as const)[idx % 5]}
-              onClick={() => setOpenItem(item)}
+              onClick={() => (onOpenLF ? onOpenLF(item) : setOpenItem(item))}
             />
           ))}
         </div>
@@ -373,18 +377,85 @@ function LostFoundCard({
 
 /* ── Detail sheet ──────────────────────────────── */
 
-function LostFoundDetailSheet({
-  item, onClose, onRequireAuth, onOpenStorefront, viewerName,
-}: {
+export interface LostFoundDetailSheetProps {
   item: LostItem;
   onClose: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
   viewerName?: string;
-}) {
+  /** Owner controls — when supplied the sheet renders inline-editable fields
+   *  with Save changes / Save & repost / Delete CTAs at the bottom. */
+  isOwner?: boolean;
+  onSaveChanges?: (patch: LFSavePatch) => Promise<void> | void;
+  onSaveAndRepost?: (patch: LFSavePatch) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
+}
+
+export interface LFSavePatch {
+  title: string;
+  description: string;
+  status: 'lost' | 'found';
+  lastSeen: string;
+  reward: string;
+}
+
+export function LostFoundDetailSheet({
+  item, onClose, onRequireAuth, onOpenStorefront, viewerName,
+  isOwner, onSaveChanges, onSaveAndRepost, onDelete,
+}: LostFoundDetailSheetProps) {
   const { user } = useAuth();
   const isLost = item.status === 'lost';
   const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
+
+  /* Inline-edit state — only meaningful when isOwner. */
+  const [eTitle, setETitle] = useState(item.title);
+  const [eDescription, setEDescription] = useState(item.description ?? '');
+  const [eStatus, setEStatus] = useState<'lost' | 'found'>(
+    item.status === 'lost' || item.status === 'found' ? item.status : 'lost',
+  );
+  const [eLastSeen, setELastSeen] = useState(item.lastSeen ?? '');
+  const [eReward, setEReward] = useState(item.reward ?? '');
+  useEffect(() => {
+    setETitle(item.title);
+    setEDescription(item.description ?? '');
+    setEStatus(item.status === 'lost' || item.status === 'found' ? item.status : 'lost');
+    setELastSeen(item.lastSeen ?? '');
+    setEReward(item.reward ?? '');
+  }, [item.id, item.title, item.description, item.status, item.lastSeen, item.reward]);
+
+  const isDirty =
+    eTitle !== item.title ||
+    eDescription !== (item.description ?? '') ||
+    eStatus !== item.status ||
+    eLastSeen !== (item.lastSeen ?? '') ||
+    eReward !== (item.reward ?? '');
+
+  const [saving, setSaving] = useState<null | 'save' | 'repost'>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const buildPatch = (): LFSavePatch => ({
+    title: eTitle, description: eDescription,
+    status: eStatus, lastSeen: eLastSeen, reward: eReward,
+  });
+  const runSave = async (kind: 'save' | 'repost') => {
+    if (!isDirty || saving) return;
+    setSaving(kind);
+    setSaveError(null);
+    try {
+      if (kind === 'save') await onSaveChanges?.(buildPatch());
+      else                  await onSaveAndRepost?.(buildPatch());
+    } catch (e) {
+      setSaveError((e as Error).message ?? 'Could not save');
+    } finally {
+      setSaving(null);
+    }
+  };
+  const discard = () => {
+    setETitle(item.title);
+    setEDescription(item.description ?? '');
+    setEStatus(item.status === 'lost' || item.status === 'found' ? item.status : 'lost');
+    setELastSeen(item.lastSeen ?? '');
+    setEReward(item.reward ?? '');
+  };
 
   /* Build email/WhatsApp links targeted at the reporter. */
   const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
@@ -451,12 +522,15 @@ function LostFoundDetailSheet({
             fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
             textTransform: 'uppercase',
             padding: '4px 10px', borderRadius: 999,
-          }}>{item.status}</span>
-          <h2 style={{
-            margin: 0, fontSize: 18, fontWeight: 600,
-            letterSpacing: '-0.025em', color: 'var(--text-primary)',
-            flex: 1, minWidth: 0,
-          }}>{item.title}</h2>
+          }}>{isOwner ? eStatus : item.status}</span>
+          {!isOwner && (
+            <h2 style={{
+              margin: 0, fontSize: 18, fontWeight: 600,
+              letterSpacing: '-0.025em', color: 'var(--text-primary)',
+              flex: 1, minWidth: 0,
+            }}>{item.title}</h2>
+          )}
+          {isOwner && <span style={{ flex: 1 }} />}
           <button onClick={onClose} aria-label="Close" className="theme-toggle">
             <X size={18} strokeWidth={1.8} />
           </button>
@@ -474,70 +548,217 @@ function LostFoundDetailSheet({
           />
         </div>
 
-        <p style={{
-          margin: '0 0 14px', fontSize: 14, lineHeight: 1.55, color: 'var(--text-secondary)',
-          whiteSpace: 'pre-wrap',
-        }}>{item.description}</p>
-
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14,
-          padding: '12px 14px', background: 'var(--bg-inset)', borderRadius: 14,
-        }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: '50%', overflow: 'hidden',
-            background: item.user.color, flexShrink: 0,
-          }}>
-            <img
-              src={getAvatar(item.user.id)}
-              alt=""
-              width={38} height={38}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+        {isOwner ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
+            <LFEditField label="Title">
+              <input
+                value={eTitle}
+                onChange={e => setETitle(e.target.value)}
+                placeholder="What was lost / found?"
+                className="inline-edit inline-edit--h1"
+                aria-label="Title"
+              />
+            </LFEditField>
+            <LFEditField label="Status">
+              <div className="listing-type-segmented" role="radiogroup" aria-label="Status">
+                {(['lost','found'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    role="radio"
+                    aria-checked={eStatus === opt}
+                    data-active={eStatus === opt || undefined}
+                    onClick={() => setEStatus(opt)}
+                    className="listing-type-chip"
+                  >
+                    {opt === 'lost' ? 'Lost' : 'Found'}
+                  </button>
+                ))}
+              </div>
+            </LFEditField>
+            <LFEditField label="Last seen">
+              <input
+                value={eLastSeen}
+                onChange={e => setELastSeen(e.target.value)}
+                placeholder="e.g. KMC Library, 2nd floor"
+                className="inline-edit inline-edit--input"
+                aria-label="Last seen"
+              />
+            </LFEditField>
+            <LFEditField label="Reward (optional)">
+              <input
+                value={eReward}
+                onChange={e => setEReward(e.target.value)}
+                placeholder="e.g. ₹500 or a coffee on me"
+                className="inline-edit inline-edit--input"
+                aria-label="Reward"
+              />
+            </LFEditField>
+            <LFEditField label="Description">
+              <textarea
+                value={eDescription}
+                onChange={e => setEDescription(e.target.value)}
+                placeholder="Distinguishing details — colour, condition, exact spot…"
+                className="inline-edit inline-edit--body"
+                aria-label="Description"
+                rows={4}
+              />
+            </LFEditField>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenStorefront?.(item.user)}
-            style={{
-              all: 'unset', cursor: onOpenStorefront ? 'pointer' : 'default',
-              flex: 1, minWidth: 0,
-            }}
-          >
+        ) : (
+          <p style={{
+            margin: '0 0 14px', fontSize: 14, lineHeight: 1.55, color: 'var(--text-secondary)',
+            whiteSpace: 'pre-wrap',
+          }}>{item.description}</p>
+        )}
+
+        {/* Reporter card + intro + contact buttons are for VIEWERS only. The
+           owner sees their own dirty-state CTAs at the bottom of the sheet. */}
+        {!isOwner && (
+          <>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+              display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14,
+              padding: '12px 14px', background: 'var(--bg-inset)', borderRadius: 14,
             }}>
-              <span>{item.user.name}</span>
-              <OnlineBadge isOnline={item.user.isOnline} />
+              <div style={{
+                width: 38, height: 38, borderRadius: '50%', overflow: 'hidden',
+                background: item.user.color, flexShrink: 0,
+              }}>
+                <img
+                  src={getAvatar(item.user.id)}
+                  alt=""
+                  width={38} height={38}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenStorefront?.(item.user)}
+                style={{
+                  all: 'unset', cursor: onOpenStorefront ? 'pointer' : 'default',
+                  flex: 1, minWidth: 0,
+                }}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+                }}>
+                  <span>{item.user.name}</span>
+                  <OnlineBadge isOnline={item.user.isOnline} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  <MapPin size={11} strokeWidth={1.8} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />
+                  {item.lastSeen} · {item.timeAgo}
+                </div>
+              </button>
+              {item.reward && (
+                <span style={{
+                  background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
+                  padding: '4px 10px', borderRadius: 999, fontWeight: 600, fontSize: 12,
+                }}>
+                  {item.reward}
+                </span>
+              )}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              <MapPin size={11} strokeWidth={1.8} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />
-              {item.lastSeen} · {item.timeAgo}
-            </div>
-          </button>
-          {item.reward && (
-            <span style={{
-              background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
-              padding: '4px 10px', borderRadius: 999, fontWeight: 600, fontSize: 12,
+
+            <p style={{
+              margin: '0 0 12px',
+              fontSize: 13, lineHeight: 1.5,
+              color: 'var(--text-secondary)',
+              letterSpacing: '-0.005em',
             }}>
-              {item.reward}
-            </span>
-          )}
+              {introLine}
+            </p>
+          </>
+        )}
+
+        {/* Owner save error toast — sits above the action row. */}
+        {isOwner && saveError && (
+          <div role="alert" style={{
+            margin: '0 0 10px', padding: '8px 10px',
+            background: 'rgba(237,46,80,0.10)',
+            border: '1px solid rgba(237,46,80,0.25)',
+            borderRadius: 10,
+            color: 'var(--accent-rose)',
+            fontSize: 12, fontWeight: 500, textAlign: 'center',
+          }}>{saveError}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {isOwner ? (
+            isDirty ? (
+              <>
+                <button
+                  type="button"
+                  onClick={discard}
+                  disabled={!!saving}
+                  aria-label="Discard changes"
+                  style={{
+                    width: 48, height: 48, borderRadius: 14,
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-default)',
+                    color: 'var(--text-secondary)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <RotateCcw size={16} strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runSave('save')}
+                  disabled={!!saving}
+                  style={{
+                    flex: '1 1 140px', minWidth: 0, height: 48, borderRadius: 14,
+                    background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                    border: '1px solid var(--border-default)',
+                    cursor: saving ? 'wait' : 'pointer',
+                    fontSize: 14, fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  {saving === 'save'
+                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite' }} />Saving…</>
+                    : <><Save size={15} strokeWidth={2} />Save changes</>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runSave('repost')}
+                  disabled={!!saving}
+                  style={{
+                    flex: '1 1 140px', minWidth: 0, height: 48, borderRadius: 14,
+                    background: 'var(--text-primary)', color: 'var(--bg-base)',
+                    border: 'none',
+                    cursor: saving ? 'wait' : 'pointer',
+                    fontSize: 14, fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  {saving === 'repost'
+                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Reposting…</>
+                    : <>Save &amp; repost</>}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (typeof window !== 'undefined' && !window.confirm('Delete this post permanently?')) return;
+                  try { await onDelete?.(); } finally { onClose(); }
+                }}
+                style={{
+                  flex: 1, height: 48, padding: '0 18px', borderRadius: 14,
+                  background: 'transparent', color: 'var(--accent-rose)',
+                  border: '1px solid var(--accent-rose)', cursor: 'pointer',
+                  fontSize: 14, fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <Trash2 size={16} strokeWidth={2} /> Delete post
+              </button>
+            )
+          ) : null}
         </div>
-
-        {/* Intro line — explains why you're contacting, status-aware. */}
-        <p style={{
-          margin: '0 0 12px',
-          fontSize: 13, lineHeight: 1.5,
-          color: 'var(--text-secondary)',
-          letterSpacing: '-0.005em',
-        }}>
-          {introLine}
-        </p>
-
-        {/* Just two buttons: Email and WhatsApp. We use a consistent visual
-            language (primary dark button for the email path, WhatsApp brand
-            green for the messaging path) so the choice is obvious. When the
-            reporter only enabled one channel we still show only that one. */}
+        {!isOwner && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(() => {
             /* Sort so email is always shown first when both exist. */
@@ -581,7 +802,26 @@ function LostFoundDetailSheet({
             });
           })()}
         </div>
+        )}
       </div>
     </>
+  );
+}
+
+/* Owner-edit field row inside the L&F sheet — label above input, matches the
+ * inline-edit rhythm used on item + event detail screens. */
+function LFEditField({
+  label, children,
+}: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center',
+        fontSize: 11, fontWeight: 700,
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: 'var(--text-secondary)',
+      }}>{label}</span>
+      {children}
+    </div>
   );
 }

@@ -48,11 +48,16 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
   const userInteracted = useRef(false);
   const markInteracted = () => { userInteracted.current = true; };
 
-  /* Hydrate when profile loads */
+  /* Hydrate when profile loads. The email defaults from the SIGN-UP auth
+     email (user.email) — that's the college address they registered with —
+     and only falls back to profile.email if for some reason the auth user
+     isn't there. This keeps the field populated immediately on every visit
+     without the user needing to type it in. */
+  const authEmail = (user as { email?: string } | null)?.email ?? '';
   useEffect(() => {
     if (!profile) return;
     setName(profile.full_name ?? '');
-    setEmail((profile as { email?: string }).email ?? '');
+    setEmail((profile as { email?: string }).email ?? authEmail);
     setPhone(tenDigits(profile.phone ?? ''));
     setCollegeId((profile as { college_id?: string | null }).college_id ?? '');
     const gy = (profile as { graduating_year?: number | null }).graduating_year;
@@ -60,11 +65,12 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     setCourse((profile as { course?: string | null }).course ?? '');
     setDepartment((profile as { department?: string | null }).department ?? '');
     setResidence(((profile as { residence?: Residence | null }).residence ?? '') as Residence | '');
-  }, [profile]);
+  }, [profile, authEmail]);
 
-  /* Demo profiles don't carry the user's email directly (we use the synth user),
-     fall back to a friendly placeholder. */
-  const currentEmail = email || '';
+  /* Always show the address the user signed up with as the default; the
+     local `email` state can deviate (e.g. they're typing) but a fresh
+     profile load resets it. */
+  const currentEmail = email || authEmail;
 
   /* Phone is optional, but if present it must be exactly 10 digits. */
   const phoneValid = phone.length === 0 || phone.length === 10;
@@ -95,17 +101,24 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           residence: residence || undefined,
         });
       } else if (hasSupabaseEnv && user) {
+        /* Persist the form to the profiles row. We DON'T touch auth.email
+           here — Supabase auth has its own email change flow (with a
+           confirmation step) which is out of scope; the profiles row carries
+           a denormalized `email` column we use for display + contact. */
+        const update: Record<string, unknown> = {
+          full_name: name.trim() || null,
+          phone: storedPhone,
+          college_id: collegeId.trim() || null,
+          graduating_year: graduatingYear ? Number(graduatingYear) : null,
+          course: course.trim() || null,
+          department: department || null,
+          residence: residence || null,
+        };
+        const trimmedEmail = currentEmail.trim();
+        if (trimmedEmail) update.email = trimmedEmail;
         const { error: err } = await supabase
           .from('profiles')
-          .update({
-            full_name: name.trim() || null,
-            phone: storedPhone,
-            college_id: collegeId.trim() || null,
-            graduating_year: graduatingYear ? Number(graduatingYear) : null,
-            course: course.trim() || null,
-            department: department || null,
-            residence: residence || null,
-          })
+          .update(update as never)
           .eq('id', user.id);
         if (err) throw err;
         await refreshProfile();
@@ -128,7 +141,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     if (!canSave) return;
     const t = setTimeout(() => { void persist(); }, 700);
     return () => clearTimeout(t);
-  }, [name, phone, collegeId, graduatingYear, course, department, residence, canSave, persist]);
+  }, [name, phone, collegeId, currentEmail, graduatingYear, course, department, residence, canSave, persist]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -264,9 +277,15 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 inputMode="email"
                 className="form-input"
                 value={currentEmail}
+                /* 80-char cap mirrors the AuthModal sign-up rule. The email
+                 * column on profiles is text, so this is purely a UX guard. */
+                maxLength={80}
                 onChange={e => { setEmail(e.target.value); markInteracted(); }}
                 autoComplete="email"
               />
+              <span className="field-hint">
+                The college email you signed up with — visible on your storefront and used as the default contact channel.
+              </span>
             </div>
             <div className="field">
               <label htmlFor="acc-collegeid" className="field-label">

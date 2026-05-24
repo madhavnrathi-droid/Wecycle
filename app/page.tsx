@@ -7,7 +7,7 @@ import MarketplaceScreen from '../components/MarketplaceScreen';
 import EventsScreen from '../components/EventsScreen';
 import ImpactScreen from '../components/ImpactScreen';
 import InventoryScreen from '../components/InventoryScreen';
-import LostFoundScreen from '../components/LostFoundScreen';
+import LostFoundScreen, { LostFoundDetailSheet, type LFSavePatch } from '../components/LostFoundScreen';
 import ItemDetailScreen from '../components/ItemDetailScreen';
 import EventDetailScreen from '../components/EventDetailScreen';
 import AccountScreen from '../components/AccountScreen';
@@ -25,10 +25,10 @@ import SubmitEventModal from '../components/forms/SubmitEventModal';
 import AlertFormModal from '../components/forms/AlertFormModal';
 import AuthModal from '../components/AuthModal';
 import { useAuth } from '../lib/AuthContext';
-import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
+import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
-import { deletePostById, deleteEvent, purgeExpiredEvents } from '../lib/liveData';
+import { deletePostById, deleteEvent, purgeExpiredEvents, updateLostFoundFields, repostLostFound } from '../lib/liveData';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
@@ -47,13 +47,16 @@ type ModalKind =
   | 'alert-form';
 
 export default function WecycleApp() {
-  const { user, isDemo, isAdmin } = useAuth();
+  const { user, profile, isDemo, isAdmin } = useAuth();
   const storageMode = isDemo ? 'demo' as const : 'supabase' as const;
   const [activeScreen, setActiveScreen] = useState<Screen>('feed');
   const [modal, setModal] = useState<ModalKind>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openItem, setOpenItem] = useState<MarketplaceItem | null>(null);
   const [openEvent, setOpenEvent] = useState<CommunityEvent | null>(null);
+  /* L&F detail is a bottom sheet (not a full screen) — lifted to app-level
+   * so the same sheet can be opened from LostFoundScreen AND InventoryScreen. */
+  const [openLF, setOpenLF] = useState<LostItem | null>(null);
   /* Storefront takes over the viewport when set — clicking any author avatar
      or owner card lands here. Cleared on back. */
   const [openStorefront, setOpenStorefront] = useState<User | null>(null);
@@ -405,6 +408,7 @@ export default function WecycleApp() {
               onOpenAccount={goToAccount}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
+              onOpenLF={(it) => setOpenLF(it)}
             />
           )}
           {/* Activity is still reachable via Settings → Notifications hint
@@ -425,6 +429,7 @@ export default function WecycleApp() {
               onPostNew={() => requireAuth('post-picker')}
               onOpenItem={setOpenItem}
               onOpenEvent={setOpenEvent}
+              onOpenLF={(lf) => setOpenLF(lf)}
             />
           )}
           {activeScreen === 'account' && (
@@ -477,6 +482,32 @@ export default function WecycleApp() {
           />
         )}
         <AuthModal open={modal === 'auth'} onClose={closeModal} />
+
+        {/* ── LOST & FOUND DETAIL SHEET ──
+           Lifted from LostFoundScreen so it can also be opened from Inventory.
+           Owner-aware: when the signed-in user is the reporter, the sheet
+           renders inline-editable fields with Save changes / Save & repost
+           / Delete CTAs. Otherwise it shows the contact buttons. */}
+        {openLF && (
+          <LostFoundDetailSheet
+            item={openLF}
+            onClose={() => setOpenLF(null)}
+            onRequireAuth={() => setModal('auth')}
+            onOpenStorefront={openStorefrontFor}
+            viewerName={profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined}
+            isOwner={!!user && openLF.user.id === user.id}
+            onSaveChanges={isDemoMode() ? undefined : async (patch: LFSavePatch) => {
+              await updateLostFoundFields(openLF.id, patch);
+            }}
+            onSaveAndRepost={isDemoMode() ? undefined : async (patch: LFSavePatch) => {
+              await repostLostFound(openLF.id, patch);
+            }}
+            onDelete={(!!user && openLF.user.id === user.id) || isAdmin ? async () => {
+              if (isDemoMode()) { setOpenLF(null); return; }
+              await deletePostById(openLF.id, 'lostfound');
+            } : undefined}
+          />
+        )}
       </div>
     </>
   );
