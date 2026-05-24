@@ -367,17 +367,73 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         </div>
       </section>
 
-      {/* ── TITLE + META ── */}
-      <section style={{ padding: '20px 20px 0' }}>
-        {canManage ? (
-          <input
-            value={eTitle}
-            onChange={e => setETitle(e.target.value)}
-            placeholder="Title"
-            className="inline-edit inline-edit--h1"
-            aria-label="Title"
-          />
-        ) : (
+      {/* ── TITLE + META ──
+         Owner-edit mode breaks the meta into one-field-per-row so each
+         input has room to breathe. Read-only mode keeps the compact "title
+         + meta strip" layout from before. */}
+      {canManage ? (
+        <section style={{ padding: '24px 20px 0', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <EditFieldRow label="Title">
+            <input
+              value={eTitle}
+              onChange={e => setETitle(e.target.value)}
+              placeholder="What are you sharing?"
+              className="inline-edit inline-edit--h1"
+              aria-label="Title"
+            />
+          </EditFieldRow>
+
+          {!isRequestPost && (
+            <EditFieldRow label="Pricing">
+              <OwnerPriceEditor
+                listingType={eListingType}
+                priceStr={ePriceStr}
+                onListingType={setEListingType}
+                onPriceStr={setEPriceStr}
+              />
+            </EditFieldRow>
+          )}
+
+          {!isRequestPost && (
+            <EditFieldRow label="Location" icon={<MapPin size={14} strokeWidth={1.8} />}>
+              <input
+                value={eLocation}
+                onChange={e => setELocation(e.target.value)}
+                placeholder="Where can it be picked up?"
+                className="inline-edit inline-edit--input"
+                aria-label="Location"
+              />
+            </EditFieldRow>
+          )}
+
+          <EditFieldRow label="Category">
+            <select
+              value={eCategory}
+              onChange={e => setECategory(e.target.value)}
+              className="inline-edit inline-edit--pill"
+              aria-label="Category"
+            >
+              {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </EditFieldRow>
+
+          {isRequestPost && (
+            <EditFieldRow label="Urgency">
+              <label className="inline-edit-toggle">
+                <input
+                  type="checkbox"
+                  checked={eUrgent}
+                  onChange={e => setEUrgent(e.target.checked)}
+                />
+                <span>Mark as urgent</span>
+              </label>
+            </EditFieldRow>
+          )}
+        </section>
+      ) : (
+        <section style={{ padding: '20px 20px 0' }}>
           <h1 style={{
             margin: 0,
             fontSize: 22, fontWeight: 600,
@@ -387,33 +443,12 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           }}>
             {item.title}
           </h1>
-        )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13, minWidth: 0, flex: 1 }}>
-            <MapPin size={14} strokeWidth={1.8} />
-            {canManage && !isRequestPost ? (
-              <input
-                value={eLocation}
-                onChange={e => setELocation(e.target.value)}
-                placeholder="Location"
-                className="inline-edit inline-edit--meta"
-                aria-label="Location"
-              />
-            ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13, minWidth: 0, flex: 1 }}>
+              <MapPin size={14} strokeWidth={1.8} />
               <span>{item.location}</span>
-            )}
-          </div>
-          {/* Price / listing-type editor for owner sell posts; otherwise the
-             read-only chip. Requests skip pricing entirely. */}
-          {canManage && !isRequestPost ? (
-            <OwnerPriceEditor
-              listingType={eListingType}
-              priceStr={ePriceStr}
-              onListingType={setEListingType}
-              onPriceStr={setEPriceStr}
-            />
-          ) : (
+            </div>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               fontSize: 14, fontWeight: 600,
@@ -425,48 +460,23 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               {isPriced && <IndianRupee size={12} strokeWidth={2.2} />}
               <span>{isPriced ? item.price : priceLabel}</span>
             </div>
-          )}
-        </div>
-        {canManage && (
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Category
-            </span>
-            <select
-              value={eCategory}
-              onChange={e => setECategory(e.target.value)}
-              className="inline-edit inline-edit--pill"
-              aria-label="Category"
-            >
-              {CATEGORIES.filter(c => c.id !== 'all').map(c => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
-            {isRequestPost && (
-              <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                <input
-                  type="checkbox"
-                  checked={eUrgent}
-                  onChange={e => setEUrgent(e.target.checked)}
-                />
-                Urgent
-              </label>
-            )}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ── DESCRIPTION ── */}
-      <section style={{ padding: '20px 20px 0' }}>
+      <section style={{ padding: '18px 20px 0' }}>
         {canManage ? (
-          <textarea
-            value={eDescription}
-            onChange={e => setEDescription(e.target.value)}
-            placeholder="Describe the item — condition, why you're letting it go, pickup notes…"
-            className="inline-edit inline-edit--body"
-            aria-label="Description"
-            rows={4}
-          />
+          <EditFieldRow label="Description">
+            <textarea
+              value={eDescription}
+              onChange={e => setEDescription(e.target.value)}
+              placeholder="Condition, pickup notes, why you're letting it go…"
+              className="inline-edit inline-edit--body"
+              aria-label="Description"
+              rows={4}
+            />
+          </EditFieldRow>
         ) : (
           <>
             <p style={{
@@ -1361,6 +1371,32 @@ function ItemMetrics({ item }: { item: MarketplaceItem }) {
   );
 }
 
+/* Tiny labelled wrapper for an owner-edit field. Renders the field label
+ * above the input with consistent vertical rhythm — gives every editable
+ * field its own clear "card" rather than letting them stack into a wall. */
+function EditFieldRow({
+  label, icon, children,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 11, fontWeight: 700,
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: 'var(--text-secondary)',
+      }}>
+        {icon}
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 /* Listing-type segmented switch + optional price input. Used in the title
  * row when the owner is editing a sell/free/borrow/swap post. */
 function OwnerPriceEditor({
@@ -1372,6 +1408,7 @@ function OwnerPriceEditor({
   onPriceStr: (v: string) => void;
 }) {
   const isSell = listingType === 'sell';
+  /* Segmented chips — bigger, clearer hit targets than a dropdown. */
   const TYPES: { id: 'free' | 'sell' | 'borrow' | 'swap'; label: string }[] = [
     { id: 'free',   label: 'Free' },
     { id: 'sell',   label: 'Sell' },
@@ -1379,36 +1416,36 @@ function OwnerPriceEditor({
     { id: 'swap',   label: 'Swap' },
   ];
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-      <select
-        value={listingType}
-        onChange={e => onListingType(e.target.value as 'free' | 'sell' | 'borrow' | 'swap')}
-        className="inline-edit inline-edit--pill"
-        aria-label="Listing type"
-      >
-        {TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-      </select>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="listing-type-segmented" role="radiogroup" aria-label="Listing type">
+        {TYPES.map(t => (
+          <button
+            key={t.id}
+            type="button"
+            role="radio"
+            aria-checked={listingType === t.id}
+            data-active={listingType === t.id || undefined}
+            onClick={() => onListingType(t.id)}
+            className="listing-type-chip"
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
       {isSell && (
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 2,
-          background: 'rgba(245,132,0,0.10)',
-          borderRadius: 999,
-          padding: '5px 10px 5px 8px',
-          color: 'var(--accent-amber)',
-          fontWeight: 600, fontSize: 14,
-        }}>
-          <IndianRupee size={12} strokeWidth={2.2} />
+        <label className="price-input-wrap">
+          <IndianRupee size={14} strokeWidth={2.2} />
           <input
             type="number"
             inputMode="numeric"
             min={0}
             value={priceStr}
             onChange={e => onPriceStr(e.target.value)}
-            placeholder="—"
-            className="inline-edit inline-edit--price"
-            aria-label="Price"
+            placeholder="Set a price (or leave empty for 'Selling')"
+            className="inline-edit inline-edit--price-input"
+            aria-label="Price in rupees"
           />
-        </span>
+        </label>
       )}
     </div>
   );

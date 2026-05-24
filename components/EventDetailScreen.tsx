@@ -311,101 +311,87 @@ export default function EventDetailScreen({
         <div style={isDesktop ? { minWidth: 0 } : { display: 'contents' }}>
 
       {/* ── TITLE + KEY FACTS ── */}
-      <section style={{ padding: '20px 20px 0' }}>
+      <section style={{ padding: '24px 20px 0' }}>
         {isOwner ? (
-          <input
-            value={eTitle}
-            onChange={e => setETitle(e.target.value)}
-            placeholder="Event title"
-            className="inline-edit inline-edit--h1"
-            aria-label="Event title"
-          />
-        ) : (
-          <h1 style={{
-            margin: 0,
-            fontSize: 22, fontWeight: 600,
-            letterSpacing: '-0.025em',
-            color: 'var(--text-primary)',
-            lineHeight: 1.2,
-          }}>
-            {event.title}
-          </h1>
-        )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <EventEditField label="Event title">
+              <input
+                value={eTitle}
+                onChange={e => setETitle(e.target.value)}
+                placeholder="What's happening?"
+                className="inline-edit inline-edit--h1"
+                aria-label="Event title"
+              />
+            </EventEditField>
 
-        {isOwner && (
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Type
-            </span>
-            <select
-              value={eType}
-              onChange={e => setEType(e.target.value as CommunityEvent['eventType'])}
-              className="inline-edit inline-edit--pill"
-              aria-label="Event type"
-            >
-              {EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-          </div>
-        )}
-
-        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {isOwner ? (
-            <>
-              <EditableFactRow
-                icon={<CalendarDays size={14} strokeWidth={1.8} />}
-                label="Date"
+            <EventEditField label="Type">
+              <select
+                value={eType}
+                onChange={e => setEType(e.target.value as CommunityEvent['eventType'])}
+                className="inline-edit inline-edit--pill"
+                aria-label="Event type"
               >
+                {EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+            </EventEditField>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <EventEditField label="Date" icon={<CalendarDays size={13} strokeWidth={1.8} />}>
                 <input
                   type="date"
                   value={eDate}
                   onChange={e => setEDate(e.target.value)}
-                  className="inline-edit inline-edit--meta"
+                  className="inline-edit inline-edit--input"
                   aria-label="Date"
                 />
-              </EditableFactRow>
-              <EditableFactRow
-                icon={<Clock size={14} strokeWidth={1.8} />}
-                label="Time"
-              >
+              </EventEditField>
+              <EventEditField label="Time" icon={<Clock size={13} strokeWidth={1.8} />}>
                 <input
                   type="time"
                   value={eTime}
                   onChange={e => setETime(e.target.value)}
-                  className="inline-edit inline-edit--meta"
+                  className="inline-edit inline-edit--input"
                   aria-label="Time"
                 />
-              </EditableFactRow>
-              <EditableFactRow
-                icon={<MapPin size={14} strokeWidth={1.8} />}
-                label="Location"
-              >
-                <input
-                  value={eLocation}
-                  onChange={e => setELocation(e.target.value)}
-                  placeholder="Where it's happening"
-                  className="inline-edit inline-edit--meta"
-                  aria-label="Location"
-                />
-              </EditableFactRow>
-              <EditableFactRow
-                icon={<Users size={14} strokeWidth={1.8} />}
-                label="Max attendees"
-              >
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={eMaxAttendeesStr}
-                  onChange={e => setEMaxAttendeesStr(e.target.value)}
-                  placeholder="Open RSVP"
-                  className="inline-edit inline-edit--meta"
-                  aria-label="Maximum attendees"
-                  style={{ maxWidth: 80 }}
-                />
-              </EditableFactRow>
-            </>
-          ) : (
-            <>
+              </EventEditField>
+            </div>
+
+            <EventEditField label="Location" icon={<MapPin size={13} strokeWidth={1.8} />}>
+              <input
+                value={eLocation}
+                onChange={e => setELocation(e.target.value)}
+                placeholder="Where it's happening"
+                className="inline-edit inline-edit--input"
+                aria-label="Location"
+              />
+            </EventEditField>
+
+            <EventEditField label="Max attendees" icon={<Users size={13} strokeWidth={1.8} />}>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={eMaxAttendeesStr}
+                onChange={e => setEMaxAttendeesStr(e.target.value)}
+                placeholder="Leave empty for open RSVP"
+                className="inline-edit inline-edit--input"
+                aria-label="Maximum attendees"
+              />
+            </EventEditField>
+          </div>
+        ) : (
+          <>
+            <h1 style={{
+              margin: 0,
+              fontSize: 22, fontWeight: 600,
+              letterSpacing: '-0.025em',
+              color: 'var(--text-primary)',
+              lineHeight: 1.2,
+            }}>
+              {event.title}
+            </h1>
+
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <FactRow
                 icon={<CalendarDays size={14} strokeWidth={1.8} />}
                 label="Date"
@@ -427,9 +413,9 @@ export default function EventDetailScreen({
                 value={event.maxAttendees ? `${Math.round(pct)}% full` : 'Open RSVP'}
                 trailing
               />
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
 
         {event.maxAttendees && (
           <div style={{ marginTop: 12, height: 3, background: 'var(--border-subtle)', borderRadius: 99, overflow: 'hidden' }}>
@@ -446,25 +432,28 @@ export default function EventDetailScreen({
 
       {/* ── DESCRIPTION ── */}
       <section style={{ padding: '24px 20px 0' }}>
-        <h3 style={{
-          margin: '0 0 10px',
-          fontSize: 11, fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-        }}>
-          About this event
-        </h3>
         {isOwner ? (
-          <textarea
-            value={eDescription}
-            onChange={e => setEDescription(e.target.value)}
-            placeholder="Tell people what's happening, who it's for, what to bring…"
-            className="inline-edit inline-edit--body"
-            aria-label="Description"
-            rows={5}
-          />
+          /* The EventEditField provides its own label — no separate h3. */
+          <EventEditField label="About this event">
+            <textarea
+              value={eDescription}
+              onChange={e => setEDescription(e.target.value)}
+              placeholder="Tell people what's happening, who it's for, what to bring…"
+              className="inline-edit inline-edit--body"
+              aria-label="Description"
+              rows={5}
+            />
+          </EventEditField>
         ) : (
           <>
+            <h3 style={{
+              margin: '0 0 10px',
+              fontSize: 11, fontWeight: 700,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+            }}>
+              About this event
+            </h3>
             <p style={{
               margin: 0,
               fontSize: 14, color: 'var(--text-secondary)',
@@ -786,27 +775,24 @@ export default function EventDetailScreen({
   );
 }
 
-/* Owner-only fact row — same visual rhythm as FactRow but the right-hand
- * slot is editable (text/date/time/number input). */
-function EditableFactRow({
-  icon, label, children,
-}: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+/* Labelled wrapper for an owner-edit event field — label above the input,
+ * matching the rhythm of the item-detail screen. Optional icon sits next
+ * to the label so each field is visually identifiable at a glance. */
+function EventEditField({
+  label, icon, children,
+}: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <span style={{
-        width: 28, height: 28, borderRadius: 8,
-        background: 'var(--bg-inset)',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        color: 'var(--text-secondary)', flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 11, fontWeight: 700,
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: 'var(--text-secondary)',
       }}>
         {icon}
-      </span>
-      <span style={{ flex: '0 0 96px', fontSize: 12, color: 'var(--text-muted)' }}>
         {label}
       </span>
-      <span style={{ flex: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center' }}>
-        {children}
-      </span>
+      {children}
     </div>
   );
 }
