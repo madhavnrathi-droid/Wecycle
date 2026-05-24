@@ -220,13 +220,6 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
           </p>
         </div>
 
-        {/* Compact carousel — sits next to the greeting on mobile widths
-           (hidden on desktop ≥1280px, where the wide variant below takes
-           over instead). */}
-        <div className="marketing-banner-mount-mobile">
-          <MarketingBanner slides={bannerSlides} variant="compact" />
-        </div>
-
         {/* Search lives inline with the greeting on desktop */}
         <div className="feed-greeting-search desktop-only" style={{ position: 'relative' }}>
           <Search size={14} strokeWidth={1.8} style={{
@@ -258,16 +251,22 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
         </div>
       </section>
 
+      {/* ── MOBILE MARKETING BANNER ──
+         Wide variant sized down for mobile. Sits BETWEEN the greeting and
+         the search bar so it reads like a hero strip. Hidden on desktop —
+         the desktop mount below the search row takes over there. */}
+      <section className="marketing-banner-mount-mobile" style={{ padding: '0 16px 16px' }}>
+        <MarketingBanner slides={bannerSlides} variant="wide" />
+      </section>
+
       {/* ── DESKTOP MARKETING BANNER ──
          Wider, richer variant of the carousel. Sits below the search row so
-         the marketing strip gets its own real estate on big screens. Hidden
-         on mobile widths — the compact variant inside the greeting row
-         covers those instead. */}
+         the marketing strip gets its own real estate on big screens. */}
       <section className="marketing-banner-mount-desktop" style={{ padding: '0 16px 20px' }}>
         <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
 
-      {/* ── MOBILE SEARCH (under greeting) ── */}
+      {/* ── MOBILE SEARCH (under banner) ── */}
       <section className="mobile-only" style={{ padding: '0 16px 14px' }}>
         <div style={{ position: 'relative' }}>
           <Search size={15} strokeWidth={1.8} style={{

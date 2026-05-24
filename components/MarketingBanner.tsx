@@ -185,7 +185,9 @@ export default function MarketingBanner({
             </span>
 
             <span className="marketing-banner-arrow" aria-hidden="true">
-              <ArrowUpRight size={variant === 'wide' ? 16 : 13} strokeWidth={2.4} />
+              {/* Size adapts via CSS for the wide variant; the SVG size here
+                 is the medium-of-both so it scales crisp on either device. */}
+              <ArrowUpRight size={variant === 'wide' ? 15 : 13} strokeWidth={2.4} />
             </span>
           </button>
         ))}
