@@ -33,7 +33,11 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
   useEffect(() => { setMounted(true); }, []);
 
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeType, setActiveType] = useState<'all' | 'requests' | 'uploads'>('uploads');
+  /* Always start a new session on Requests — "put others' needs before
+     theirs". FeedScreen unmounts when the user navigates to another
+     bottom-nav screen, so coming back here re-initialises this default,
+     which is exactly the "every session starts on Requests" behaviour. */
+  const [activeType, setActiveType] = useState<'all' | 'requests' | 'uploads'>('requests');
   const [query, setQuery] = useState('');
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 

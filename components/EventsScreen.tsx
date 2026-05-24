@@ -267,22 +267,11 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
         </div>
       </section>
 
-      {/* ── TYPE FILTER ── */}
-      <section style={{ padding: '4px 0 14px' }}>
-        <div className="chip-row" role="tablist" aria-label="Event type">
-          {TYPE_FILTERS.map(t => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={type === t.id}
-              onClick={() => setType(t.id)}
-              className={`pill pill-soft ${type === t.id ? 'pill-soft-active' : ''}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* ── TYPE FILTER (hidden until we have more event data) ──
+         We kept TYPE_FILTERS + the `type` state below for when this comes
+         back; the chip row was just visual noise on a screen that currently
+         only shows a handful of events. Add the section back once there are
+         enough events to meaningfully filter by category. */}
 
       {/* ── YOUR UPCOMING (RSVP'd events carousel) ── */}
       <section style={{ padding: '8px 20px 8px' }}>
