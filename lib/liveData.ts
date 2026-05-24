@@ -293,6 +293,9 @@ export interface NewRequestInput {
   description?: string;
   urgency: 'normal' | 'urgent';
   needByDate?: string;     /* ISO date or '' */
+  /** Auto-expire window in hours. Defaults to 168 (7d) when omitted. The
+   *  slider in PostRequestModal lets users pick 24–168 in 1h increments. */
+  durationHours?: number;
   media: CompressedMedia[];
 }
 
@@ -314,6 +317,12 @@ export async function createRequest(input: NewRequestInput) {
     ? await uploadMedia('listings', input.media)
     : { photoUrls: [], videoUrls: [] };
 
+  /* Clamp duration to the allowed window [24, 168]. Anything missing
+     defaults to a full week — long enough that nobody loses a post by
+     accident, short enough that the requests board stays fresh. */
+  const hours = Math.max(24, Math.min(168, input.durationHours ?? 168));
+  const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+
   const { error } = await supabase.from('requests').insert({
     user_id: user.id,
     community_id: communityId,
@@ -325,7 +334,8 @@ export async function createRequest(input: NewRequestInput) {
     status: 'open',
     photo_urls: photoUrls,
     video_urls: videoUrls,
-  });
+    expires_at: expiresAt,
+  } as never);
   if (error) throw error;
   notifyPostsChanged();
 }
@@ -480,10 +490,15 @@ const REQUEST_SELECT = `
 
 export async function fetchRequests(filter: FeedFilter = {}): Promise<MarketplaceItem[]> {
   if (!hasSupabaseEnv) return [];
+  /* Only return requests that haven't expired. We use server-side `gt`
+     for the cheap index hit; the .or() also surfaces legacy rows where
+     expires_at is still null. */
+  const nowIso = new Date().toISOString();
   let q = supabase
     .from('requests')
     .select(REQUEST_SELECT)
     .eq('status', 'open')
+    .or(`expires_at.gt.${nowIso},expires_at.is.null`)
     .order('posted_at', { ascending: false })
     .limit(filter.limit ?? 60);
   if (filter.category && filter.category !== 'all') q = q.eq('category_id', filter.category);
@@ -491,6 +506,15 @@ export async function fetchRequests(filter: FeedFilter = {}): Promise<Marketplac
   const { data, error } = await q;
   if (error || !data) return [];
   return notRemoved((data as unknown as RequestRowLite[]).map(mapRequestRow));
+}
+
+/** Best-effort sweep of past-due requests. Fire-and-forget on app open —
+ *  RLS lets a user delete their own; admin nukes anyone's. */
+export async function purgeExpiredRequests() {
+  if (!hasSupabaseEnv) return;
+  const cutoff = new Date().toISOString();
+  await supabase.from('requests').delete().lt('expires_at', cutoff);
+  notifyPostsChanged();
 }
 
 export async function fetchMyRequests(userId: string): Promise<MarketplaceItem[]> {

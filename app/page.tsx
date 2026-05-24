@@ -28,7 +28,7 @@ import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
-import { deletePostById, deleteEvent, purgeExpiredEvents, updateLostFoundFields, repostLostFound } from '../lib/liveData';
+import { deletePostById, deleteEvent, purgeExpiredEvents, purgeExpiredRequests, updateLostFoundFields, repostLostFound } from '../lib/liveData';
 import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
@@ -146,11 +146,14 @@ export default function WecycleApp() {
     }
   }, []);
 
-  /* On app open, fire a one-time janitor that drops past-dated events from
-     the DB. Best-effort: RLS lets organizers/admin nuke their own; expired
-     ones that we can't delete are still filtered client-side in fetchEvents. */
+  /* On app open, fire one-time janitors that drop past-dated events and
+     expired requests from the DB. Best-effort: RLS lets the owner/admin
+     nuke their own; anything we can't delete is still filtered client-side
+     in the fetch helpers. */
   useEffect(() => {
-    if (!isDemoMode()) purgeExpiredEvents();
+    if (isDemoMode()) return;
+    purgeExpiredEvents();
+    purgeExpiredRequests();
   }, []);
 
   const closeModal = () => setModal(null);

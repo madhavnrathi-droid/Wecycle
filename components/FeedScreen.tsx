@@ -468,8 +468,90 @@ function FeedCard({
      when the user swipes to a video slide. Real listings carry their own
      uploaded URLs; mock items fall back to the hardcoded sets. */
   const photos = resolveItemMedia(item);
-  const isPriced = item.listingType === 'sell';
+  const hasMedia = photos.length > 0;
+  const isPriced = item.listingType === 'sell' && typeof item.price === 'number';
   const ar = VARIANT_RATIOS[variant];
+
+  /* Build the price/status label once so both layouts (image + text-only)
+     stay in sync. */
+  const priceLabel = item.isRequest
+    ? (item.urgent ? 'Urgent' : 'Wanted')
+    : isPriced && hidePrice                  ? 'Sell'
+    : isPriced                                ? `₹${item.price}`
+    : item.listingType === 'sell'             ? 'Selling'
+    : item.listingType === 'free'             ? 'Free'
+    : item.listingType[0].toUpperCase() + item.listingType.slice(1);
+
+  /* ── Text-only card ──
+     When a post has no media we render a plain card with a clear hierarchy
+     instead of stretching an empty image frame. The title is the biggest
+     element, followed by the author's name + small avatar, then the
+     description, and finally the location/price meta on the footer line.
+     This is what the user spec'd: "name biggest, then person, description
+     last; plain card if no image". */
+  if (!hasMedia) {
+    return (
+      <article
+        className="feed-card feed-card--text"
+        style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}
+      >
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={`Open ${item.title}`}
+          className="feed-card-text-button"
+        >
+          <span className="feed-card-text-body">
+            <span className="feed-card-text-title">{item.title}</span>
+            <span className="feed-card-text-author">
+              <span
+                className="feed-card-text-avatar"
+                style={{ background: item.user.color }}
+                aria-hidden="true"
+              >
+                <img src={getAvatar(item.user.id)} alt="" width={22} height={22} draggable={false} />
+              </span>
+              <span className="feed-card-text-author-name">{item.user.name}</span>
+            </span>
+            {item.description && (
+              <span className="feed-card-text-desc">{item.description}</span>
+            )}
+          </span>
+          <span className="feed-card-text-meta">
+            <span>
+              {item.isRequest ? null : (
+                <>
+                  <MapPin size={10} strokeWidth={2} />
+                  {item.location}
+                </>
+              )}
+            </span>
+            <span
+              className="feed-card-text-price"
+              style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
+            >
+              {priceLabel}
+            </span>
+          </span>
+        </button>
+        {/* Save heart stays in the top-right corner, same affordance as
+           image cards. */}
+        <span
+          onClick={e => { e.stopPropagation(); onToggleSave(); }}
+          role="button"
+          tabIndex={0}
+          aria-label={isSaved ? 'Unsave' : 'Save'}
+          aria-pressed={isSaved}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSave(); } }}
+          className="feed-card-save"
+          data-saved={isSaved || undefined}
+          style={{ zIndex: 3 }}
+        >
+          <Heart size={14} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+        </span>
+      </article>
+    );
+  }
 
   return (
     <div className="feed-card" style={{ aspectRatio: ar, padding: 0 }} aria-label={`Open ${item.title}`}>
@@ -506,17 +588,7 @@ function FeedCard({
                   className="feed-card-price"
                   style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
                 >
-                  {item.isRequest
-                    /* Requests show "Wanted" (or "Urgent" when flagged) — never
-                       a price or a listing-type verb. */
-                    ? (item.urgent ? 'Urgent' : 'Wanted')
-                    : isPriced && hidePrice
-                      ? 'Sell'
-                      : isPriced
-                        ? `₹${item.price}`
-                        : item.listingType === 'free'
-                          ? 'Free'
-                          : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+                  {priceLabel}
                 </span>
               </div>
             </div>

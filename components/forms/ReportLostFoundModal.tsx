@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
@@ -40,6 +40,16 @@ export default function ReportLostFoundModal({
     name: '', status: defaultStatus ?? '', category: '',
     location: '', dateLastSeen: '', description: '', contact: '', photos: [],
   });
+
+  /* When the modal opens (or its defaultStatus changes between opens —
+     e.g. user taps Report lost, closes, then taps Report found), sync the
+     status field so the dropdown reflects what they chose on the L&F
+     screen instead of stale initial state. */
+  useEffect(() => {
+    if (open && defaultStatus) {
+      setForm(f => (f.status === defaultStatus ? f : { ...f, status: defaultStatus }));
+    }
+  }, [open, defaultStatus]);
   const [errors, setErrors] = useState<Partial<Record<keyof ReportLFForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);

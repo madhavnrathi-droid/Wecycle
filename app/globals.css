@@ -1208,6 +1208,89 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
+   DURATION SLIDER (PostRequestModal)
+   ───────────────────────────────────────────────
+   Custom range input styled to match the Wecycle neon-green "Post request"
+   CTA. The fill before the thumb is brighter green, the rest of the track
+   is a low-contrast inset rail. Thumb is a chunky pill with a glow ring on
+   focus so keyboard users can see where they are. */
+.duration-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  --neon: #A8DD00;
+  --neon-glow: rgba(168, 221, 0, 0.35);
+  /* Track fill driven by the value via background-size; works in WebKit
+     and Firefox without needing JS for the fill colour. */
+}
+
+/* WebKit / Blink track */
+.duration-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--neon), var(--neon)) 0 / var(--fill, 50%) 100% no-repeat,
+    var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+}
+/* Firefox track + fill */
+.duration-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+}
+.duration-slider::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--neon);
+}
+
+/* Thumb — same shape in both engines */
+.duration-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--neon);
+  margin-top: -8px; /* (thumb 22 - track 8) / -2 ≈ centers it */
+  cursor: grab;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.duration-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--neon);
+  cursor: grab;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.duration-slider:active::-webkit-slider-thumb,
+.duration-slider:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 6px var(--neon-glow), 0 2px 6px rgba(0, 0, 0, 0.22);
+  cursor: grabbing;
+}
+.duration-slider:active::-moz-range-thumb,
+.duration-slider:focus-visible::-moz-range-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 6px var(--neon-glow), 0 2px 6px rgba(0, 0, 0, 0.22);
+  cursor: grabbing;
+}
+
+/* ═══════════════════════════════════════════════
    USER SEARCH RESULTS — preview row above the masonry feed
    ═══════════════════════════════════════════════ */
 
@@ -2896,6 +2979,106 @@ body {
   color: #ED2E50;
 }
 .feed-card-save:active { transform: scale(0.88); }
+
+/* ── Text-only feed card variant ──
+   Used when a post carries no photo/video. Same outer dimensions as an
+   image card so the masonry stays balanced, but the content is laid out
+   as a plain typographic card: big title, small author chip, description
+   body, footer meta. */
+.feed-card--text {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+.feed-card-text-button {
+  all: unset;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.feed-card-text-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+.feed-card-text-title {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.feed-card-text-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 0;
+}
+.feed-card-text-avatar {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.feed-card-text-avatar img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.feed-card-text-author-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.feed-card-text-desc {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.feed-card-text-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.feed-card-text-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.feed-card-text-price {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
 
 .feed-card-overlay {
   position: absolute;

@@ -26,13 +26,31 @@ export interface RequestForm {
   description: string;
   needByDate: string;
   photos: string[];
+  /** Hours until the request auto-expires (24–168). */
+  durationHours: number;
 }
 
 const MAX_PHOTOS = 3;
 
+/* Human-friendly duration label for the slider. Below 48h we render in
+ * hours; once we're a day or more in we shift to "Nd" / "Nd Mh" so the
+ * label stays short and predictable in the green pill. */
+function formatDuration(hours: number): string {
+  const h = Math.max(24, Math.min(168, Math.round(hours)));
+  if (h < 48) return `${h}h`;
+  const days = Math.floor(h / 24);
+  const rem  = h - days * 24;
+  if (rem === 0) return `${days}d`;
+  return `${days}d ${rem}h`;
+}
+
 export default function PostRequestModal({ open, onClose, onSubmit }: PostRequestModalProps) {
   const [form, setForm] = useState<RequestForm>({
-    title: '', category: '', urgency: 'normal', description: '', needByDate: '', photos: [],
+    title: '', category: '', urgency: 'normal', description: '',
+    needByDate: '', photos: [],
+    /* Default to 3 days — comfortable middle of the 24h–7d range, matches
+     * the "request feels active but not eternal" community norm. */
+    durationHours: 72,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof RequestForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +84,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
           description: form.description,
           urgency: form.urgency,
           needByDate: form.needByDate,
+          durationHours: form.durationHours,
           media: pickerRef.current?.getMedia() ?? [],
         });
       } else {
@@ -73,7 +92,10 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
       }
       onSubmit?.(form);
       pickerRef.current?.clear();
-      setForm({ title: '', category: '', urgency: 'normal', description: '', needByDate: '', photos: [] });
+      setForm({
+        title: '', category: '', urgency: 'normal', description: '',
+        needByDate: '', photos: [], durationHours: 72,
+      });
       onClose();
     } catch (err) {
       setSubmitError((err as Error).message || 'Could not post — please try again.');
@@ -195,6 +217,68 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
               <span style={{ fontSize: 22 }}>⚡</span>
               <span style={{ fontWeight: 600, fontSize: 13 }}>Urgent</span>
             </button>
+          </div>
+        </fieldset>
+
+        {/* ── Post duration slider (24h–7d) ──
+             Auto-expire windowed to keep the requests board fresh and shave
+             Supabase storage costs. We snap to discrete steps + ping the
+             haptics actuator on each step change so the slider feels
+             tactile on phones. Same neon-green as the Post-request CTA so
+             the control feels at home. */}
+        <fieldset style={{ border: 'none', padding: 0, margin: '0 0 18px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+            marginBottom: 8,
+          }}>
+            <legend className="field-label">Auto-delete after</legend>
+            <span style={{
+              fontSize: 13, fontWeight: 700,
+              color: '#A8DD00',
+              letterSpacing: '-0.01em',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {formatDuration(form.durationHours)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={24}
+            max={168}
+            step={1}
+            value={form.durationHours}
+            onChange={e => {
+              const next = Number(e.target.value);
+              /* Light haptic tick at each step — `navigator.vibrate` is a
+                 no-op on iOS Safari but lands on every Android browser, and
+                 on iOS PWAs that opt into it. Wrapped in a guard so it
+                 doesn't throw on browsers without the API. */
+              if (next !== form.durationHours && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                try { (navigator as Navigator & { vibrate: (p: number) => boolean }).vibrate(4); } catch {/*noop*/}
+              }
+              update('durationHours', next);
+            }}
+            className="duration-slider"
+            aria-label="Auto-delete duration in hours"
+            aria-valuetext={formatDuration(form.durationHours)}
+            /* Drives the WebKit fill via a CSS variable — Firefox uses
+               ::-moz-range-progress natively and ignores this. */
+            style={{
+              ['--fill' as string]:
+                `${Math.round(((form.durationHours - 24) / (168 - 24)) * 100)}%`,
+            } as React.CSSProperties}
+          />
+          <div style={{
+            display: 'flex', justifyContent: 'space-between',
+            marginTop: 6,
+            fontSize: 10, fontWeight: 500,
+            color: 'var(--text-muted)',
+            letterSpacing: '0.04em', textTransform: 'uppercase',
+          }}>
+            <span>24h</span>
+            <span>3d</span>
+            <span>5d</span>
+            <span>7d</span>
           </div>
         </fieldset>
 
