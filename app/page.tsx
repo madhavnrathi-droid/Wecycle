@@ -29,6 +29,7 @@ import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/moc
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { deletePostById, deleteEvent, purgeExpiredEvents, updateLostFoundFields, repostLostFound } from '../lib/liveData';
+import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
@@ -283,6 +284,7 @@ export default function WecycleApp() {
               onBack={() => setOpenStorefront(null)}
               onOpenItem={(item) => { setOpenStorefront(null); setOpenItem(item); }}
               onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
+              onOpenLF={(lf) => { setOpenStorefront(null); setOpenLF(lf); }}
             />
           </main>
         </div>
@@ -381,13 +383,56 @@ export default function WecycleApp() {
               onOpenAccount={goToAccount}
               onOpenItem={setOpenItem}
               onBannerAction={(kind) => {
-                /* Marketing-banner CTAs jump straight to the targeted feature
-                   instead of through the post-picker — that's the point of
-                   the banner: shave a step off the path-to-action. */
                 if (kind === 'share')       openShareItem();
                 else if (kind === 'request') openPostRequest();
                 else if (kind === 'events')  setActiveScreen('events');
                 else if (kind === 'lost-found') setActiveScreen('lost_found');
+              }}
+              onOpenUser={async (userId) => {
+                /* Search-result tap → load the full profile shape the
+                   storefront expects, then open it. We fetch a fresh row so
+                   we don't carry stale data from the search hit. */
+                const { data } = await supabase
+                  .from('profiles')
+                  .select('id, full_name, initials, avatar_color, role, is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled')
+                  .eq('id', userId)
+                  .single();
+                if (!data) return;
+                /* Cast through unknown — the generated Database types don't
+                   know about the new `email` column yet (added in the
+                   add_email_to_profiles migration). */
+                const p = data as unknown as {
+                  id: string;
+                  full_name: string | null;
+                  initials: string | null;
+                  avatar_color: string | null;
+                  role: string | null;
+                  is_online: boolean | null;
+                  email: string | null;
+                  phone: string | null;
+                  contact_email_enabled: boolean | null;
+                  contact_whatsapp_enabled: boolean | null;
+                };
+                openStorefrontFor({
+                  id: p.id,
+                  name: p.full_name || 'Wecycle member',
+                  initials: p.initials || 'W',
+                  color: p.avatar_color || '#6C63FF',
+                  role: p.role || 'Member',
+                  community: 'Wecycle',
+                  joinedDaysAgo: 0,
+                  itemsShared: 0,
+                  itemsReceived: 0,
+                  impactScore: 0,
+                  badges: [],
+                  isOnline: p.is_online ?? false,
+                  email: p.email ?? undefined,
+                  phone: p.phone ?? undefined,
+                  contact: {
+                    email: p.contact_email_enabled ?? true,
+                    whatsapp: p.contact_whatsapp_enabled ?? false,
+                  },
+                });
               }}
             />
           )}

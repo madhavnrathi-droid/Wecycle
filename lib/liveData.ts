@@ -1037,6 +1037,73 @@ export async function fetchProfileStats(userId: string): Promise<ProfileStats> {
   return { shared, received, impact };
 }
 
+/* ── User search ────────────────────────────────────
+   Powers the search bar on the home feed — looks up people by name, email,
+   or college ID (any of the three matches will surface the user). Capped at
+   8 results so the preview row stays scrollable.
+
+   Indexes (added in the add_email_to_profiles_and_search_indexes migration):
+     - full_name      → GIN trigram (ILIKE %q%)
+     - email          → GIN trigram (ILIKE %q%)
+     - lower(college_id) → btree (exact match)
+*/
+export interface UserSearchHit {
+  id: string;
+  name: string;
+  initials: string;
+  avatarColor: string;
+  email?: string;
+  collegeId?: string;
+  role?: string;
+  department?: string;
+  isOnline?: boolean;
+}
+
+export async function searchUsers(q: string, limit = 8): Promise<UserSearchHit[]> {
+  if (!hasSupabaseEnv) return [];
+  const trimmed = q.trim();
+  if (trimmed.length < 2) return [];
+
+  /* Pattern-match for trigram ILIKE; OR the three columns. We escape the
+     comma + closing paren that Supabase's PostgREST `.or()` parser treats
+     as separators inside values. */
+  const safe = trimmed.replace(/[%,()]/g, ' ');
+  const pat = `%${safe}%`;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, initials, avatar_color, email, college_id, role, department, is_online, hide_listings_from_search')
+    .or(`full_name.ilike.${pat},email.ilike.${pat},college_id.ilike.${pat}`)
+    .limit(limit);
+  if (error || !data) return [];
+
+  return (data as unknown as Array<{
+    id: string;
+    full_name: string | null;
+    initials: string | null;
+    avatar_color: string | null;
+    email: string | null;
+    college_id: string | null;
+    role: string | null;
+    department: string | null;
+    is_online: boolean | null;
+    hide_listings_from_search: boolean | null;
+  }>)
+    /* Respect the "hide me from search" pref. */
+    .filter(r => !r.hide_listings_from_search)
+    .map(r => ({
+      id: r.id,
+      name: r.full_name || r.email?.split('@')[0] || 'Wecycle member',
+      initials: r.initials || (r.full_name?.[0] ?? 'W').toUpperCase(),
+      avatarColor: r.avatar_color || '#6C63FF',
+      email: r.email ?? undefined,
+      collegeId: r.college_id ?? undefined,
+      role: r.role ?? undefined,
+      department: r.department ?? undefined,
+      isOnline: r.is_online ?? false,
+    }));
+}
+
 /* ── Pub/sub: refetch feeds after a post ───────────── */
 
 const CHANGE_EVENT = 'wecycle:posts-changed';

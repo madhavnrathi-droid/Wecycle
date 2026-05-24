@@ -17,31 +17,52 @@
  * empty state) since users will want to see "no requests right now". */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, MapPin, Calendar, Users, IndianRupee } from 'lucide-react';
+import {
+  ChevronLeft, MapPin, Calendar, Users, IndianRupee,
+  Mail, Phone, GraduationCap, Building2, Home, IdCard, Search,
+} from 'lucide-react';
 import type {
-  User, MarketplaceItem, CommunityEvent, FeedItem,
+  User, MarketplaceItem, CommunityEvent, FeedItem, LostItem,
 } from '../lib/mockData';
 import {
   MARKETPLACE_ITEMS, EVENTS, FEED_ITEMS, CATEGORIES, MY_EVENT_IDS,
 } from '../lib/mockData';
-import { getAvatar, resolveItemMedia, getEventPhoto } from '../lib/photos';
+import { getAvatar, resolveItemMedia, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
-import { hasSupabaseEnv } from '../lib/supabase';
-import { fetchListingsByUser, fetchEventsByUser, fetchProfileStats, onPostsChanged, type ProfileStats } from '../lib/liveData';
+import { hasSupabaseEnv, supabase } from '../lib/supabase';
+import {
+  fetchListingsByUser, fetchEventsByUser, fetchLostFoundByUser,
+  fetchProfileStats, onPostsChanged, type ProfileStats,
+} from '../lib/liveData';
 
 interface StorefrontScreenProps {
   user: User;
   onBack: () => void;
   onOpenItem: (item: MarketplaceItem) => void;
   onOpenEvent: (event: CommunityEvent) => void;
+  onOpenLF?: (item: LostItem) => void;
 }
 
-type Tab = 'uploads' | 'requests' | 'events';
+type Tab = 'uploads' | 'requests' | 'events' | 'lostfound';
+
+/* Extra profile fields we surface in the "About" block. The shape mirrors
+ * what the profiles table holds — we fetch them once when the storefront
+ * opens, separate from the joined-User payload that the cards carry. */
+interface PublicProfile {
+  email?: string;
+  phone?: string;
+  collegeId?: string;
+  graduatingYear?: number;
+  course?: string;
+  department?: string;
+  residence?: 'day_scholar' | 'hosteler';
+  showPhone?: boolean;
+}
 
 export default function StorefrontScreen({
-  user, onBack, onOpenItem, onOpenEvent,
+  user, onBack, onOpenItem, onOpenEvent, onOpenLF,
 }: StorefrontScreenProps) {
   const { user: viewer } = useAuth();
   const isMe = !!viewer && viewer.id === user.id;
@@ -62,6 +83,8 @@ export default function StorefrontScreen({
       ? EVENTS.filter(e => e.organizer.id === user.id || (user.id === 'u1' && MY_EVENT_IDS.includes(e.id)))
       : [],
   );
+  const [lostFound, setLostFound] = useState<LostItem[]>([]);
+  const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
 
   /* Live storefront stats — refetched whenever a post lands so the Shared
      counter updates the instant the user creates / deletes a post. */
@@ -73,7 +96,40 @@ export default function StorefrontScreen({
     const load = () => {
       fetchListingsByUser(user.id).then(rows => { if (!cancelled) setUploads(rows); });
       fetchEventsByUser(user.id).then(rows => { if (!cancelled) setEvents(rows); });
+      fetchLostFoundByUser(user.id).then(rows => { if (!cancelled) setLostFound(rows); });
       fetchProfileStats(user.id).then(s => { if (!cancelled) setStats(s); });
+      /* Public profile fields — separate one-shot fetch since the User
+         object joined onto listing rows doesn't carry the academic info. */
+      supabase
+        .from('profiles')
+        .select('email, phone, college_id, graduating_year, course, department, residence, show_phone_on_profile')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (cancelled || !data) return;
+          /* Cast through unknown — generated Database types pre-date the
+             email-column migration. Live DB has the column. */
+          const d = data as unknown as {
+            email: string | null;
+            phone: string | null;
+            college_id: string | null;
+            graduating_year: number | null;
+            course: string | null;
+            department: string | null;
+            residence: 'day_scholar' | 'hosteler' | null;
+            show_phone_on_profile: boolean | null;
+          };
+          setPublicProfile({
+            email: d.email ?? undefined,
+            phone: d.phone ?? undefined,
+            collegeId: d.college_id ?? undefined,
+            graduatingYear: d.graduating_year ?? undefined,
+            course: d.course ?? undefined,
+            department: d.department ?? undefined,
+            residence: d.residence ?? undefined,
+            showPhone: d.show_phone_on_profile ?? false,
+          });
+        });
     };
     load();
     const off = onPostsChanged(load);
@@ -95,12 +151,18 @@ export default function StorefrontScreen({
     ? (user.impactScore || (uploads.length * 10 + events.length * 25))
     : (stats?.impact ?? (uploads.length * 10 + events.length * 25));
 
-  /* Decide which tabs to surface. Events is conditional. */
+  /* Tab list — Uploads + Requests are always present (empty states cover the
+     no-posts cases). Events + Lost & Found only surface when the user has
+     actually posted in those, so guests don't see two empty tabs on every
+     storefront. */
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'uploads',  label: 'Uploads',  count: uploads.length },
     { id: 'requests', label: 'Requests', count: requests.length },
     ...(events.length > 0
       ? [{ id: 'events' as const, label: 'Events', count: events.length }]
+      : []),
+    ...(lostFound.length > 0
+      ? [{ id: 'lostfound' as const, label: 'Lost & Found', count: lostFound.length }]
       : []),
   ];
 
@@ -210,6 +272,13 @@ export default function StorefrontScreen({
         </div>
       </section>
 
+      {/* ── PUBLIC INFO ──
+         Mirrors the public-facing fields from the Account page so visitors
+         get a clear "who is this person" snapshot. Optional fields hide
+         themselves when the user hasn't filled them in. Phone is gated on
+         the show_phone_on_profile pref. */}
+      <PublicInfoSection profile={publicProfile} user={user} />
+
       {/* ── TABS ── */}
       <div style={{ padding: '0 16px 12px' }}>
         <div className="segmented" role="tablist">
@@ -292,8 +361,148 @@ export default function StorefrontScreen({
               </ul>
             )
         )}
+
+        {tab === 'lostfound' && (
+          lostFound.length === 0
+            ? <EmptyState label={`${user.name.split(' ')[0]} hasn't posted in Lost & Found`} />
+            : (
+              <div className="masonry-2" style={{ padding: '0 8px' }}>
+                {lostFound.map(lf => (
+                  <LostFoundTile
+                    key={lf.id}
+                    lf={lf}
+                    onClick={() => onOpenLF?.(lf)}
+                  />
+                ))}
+              </div>
+            )
+        )}
       </section>
     </div>
+  );
+}
+
+/* ── Public info section ─────────────────────────
+   Renders the user's optional academic / contact info as a clean key-value
+   grid. Each row hides itself when the field is empty so guests don't see
+   "Course: —" placeholders. Phone is gated on the user's privacy pref. */
+function PublicInfoSection({
+  profile, user,
+}: { profile: PublicProfile | null; user: User }) {
+  /* Build the rows in display order. Each entry is null when the field
+     isn't worth showing, then filtered out before render. */
+  type Row = { icon: React.ReactNode; label: string; value: string };
+  const rows: Row[] = [];
+  /* Email — always show if present (auth fallback already covered upstream). */
+  const email = profile?.email || user.email;
+  if (email) rows.push({ icon: <Mail size={13} strokeWidth={1.8} />, label: 'Email', value: email });
+  /* Phone — only when the user opted in via the storefront pref. */
+  if (profile?.showPhone && profile.phone) {
+    rows.push({ icon: <Phone size={13} strokeWidth={1.8} />, label: 'Phone', value: profile.phone });
+  }
+  if (profile?.collegeId) {
+    rows.push({ icon: <IdCard size={13} strokeWidth={1.8} />, label: 'College ID', value: profile.collegeId });
+  }
+  if (profile?.department) {
+    rows.push({ icon: <Building2 size={13} strokeWidth={1.8} />, label: 'Department', value: profile.department.toUpperCase() });
+  }
+  if (profile?.course) {
+    rows.push({ icon: <GraduationCap size={13} strokeWidth={1.8} />, label: 'Course', value: profile.course });
+  }
+  if (profile?.graduatingYear) {
+    rows.push({ icon: <Calendar size={13} strokeWidth={1.8} />, label: 'Graduating', value: String(profile.graduatingYear) });
+  }
+  if (profile?.residence) {
+    rows.push({
+      icon: <Home size={13} strokeWidth={1.8} />,
+      label: 'Residence',
+      value: profile.residence === 'day_scholar' ? 'Day scholar' : 'Hosteler',
+    });
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <section style={{ padding: '4px 20px 18px' }}>
+      <h3 style={{
+        margin: '0 0 10px', fontSize: 11, fontWeight: 700,
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: 'var(--text-muted)',
+      }}>
+        About
+      </h3>
+      <dl style={{
+        margin: 0, padding: '12px 14px',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 14,
+        display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 16, rowGap: 8,
+        alignItems: 'baseline',
+      }}>
+        {rows.map(r => (
+          <PublicInfoRow key={r.label} icon={r.icon} label={r.label} value={r.value} />
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function PublicInfoRow({
+  icon, label, value,
+}: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <>
+      <dt style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 12, fontWeight: 500, color: 'var(--text-muted)',
+        whiteSpace: 'nowrap',
+      }}>
+        {icon}
+        {label}
+      </dt>
+      <dd style={{
+        margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
+        overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {value}
+      </dd>
+    </>
+  );
+}
+
+/* ── Lost & Found tile (storefront variant) ── */
+function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
+  const isLost = lf.status === 'lost';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="feed-card"
+      style={{ aspectRatio: '0.82', padding: 0 }}
+      aria-label={`Open ${lf.title}`}
+    >
+      <img
+        src={getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls)}
+        alt="" className="feed-card-img" loading="lazy"
+      />
+      <span style={{
+        position: 'absolute', top: 10, left: 10,
+        background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
+        color: '#fff', borderRadius: 999,
+        padding: '4px 10px',
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+        textTransform: 'uppercase', zIndex: 3,
+      }}>{lf.status}</span>
+      <div className="feed-card-overlay">
+        <p className="feed-card-title">{lf.title}</p>
+        <div className="feed-card-meta">
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <MapPin size={10} strokeWidth={2} /> {lf.lastSeen}
+          </span>
+          <span className="feed-card-price">{lf.timeAgo}</span>
+        </div>
+      </div>
+    </button>
   );
 }
 

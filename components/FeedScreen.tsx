@@ -7,11 +7,12 @@ import { resolveItemMedia, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
-import { fetchMarketplaceItems, fetchRequests, onPostsChanged } from '../lib/liveData';
+import { fetchMarketplaceItems, fetchRequests, onPostsChanged, searchUsers, type UserSearchHit } from '../lib/liveData';
 import { getSettings, onSettingsChange } from '../lib/settings';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
+import UserSearchResults from './UserSearchResults';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -21,9 +22,12 @@ interface FeedScreenProps {
   /** Banner CTA — fired when a marketing-banner slide is tapped.
    *  kind = which feature the user wants to jump to. */
   onBannerAction?: (kind: 'share' | 'request' | 'events' | 'lost-found') => void;
+  /** Fired when a user-search-result card is tapped. Routes to the
+   *  matching storefront. */
+  onOpenUser?: (userId: string) => void;
 }
 
-export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenItem, onBannerAction }: FeedScreenProps) {
+export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenItem, onBannerAction, onOpenUser }: FeedScreenProps) {
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -84,6 +88,31 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
     const off = onPostsChanged(load);
     return () => { cancelled = true; off(); };
   }, [mounted]);
+
+  /* ── User search ──
+     Debounced lookup against the profiles table. We only hit Supabase
+     when the query has ≥2 characters AND we're in live mode — demo mode
+     can't search a backend that isn't there. */
+  const [userHits, setUserHits] = useState<UserSearchHit[]>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  useEffect(() => {
+    if (!mounted) return;
+    if (isDemoMode() || !hasSupabaseEnv) { setUserHits([]); return; }
+    const trimmed = query.trim();
+    if (trimmed.length < 2) { setUserHits([]); setUserSearchLoading(false); return; }
+    setUserSearchLoading(true);
+    /* 250ms debounce — typing-friendly without making the user wait. */
+    const t = setTimeout(() => {
+      searchUsers(trimmed).then(hits => {
+        setUserHits(hits);
+        setUserSearchLoading(false);
+      }, () => {
+        setUserHits([]);
+        setUserSearchLoading(false);
+      });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query, mounted]);
 
   /* The active tab decides which pool we render. Uploads → listings,
      Requests → open requests. */
@@ -296,6 +325,16 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
           )}
         </div>
       </section>
+
+      {/* ── USER SEARCH RESULTS ──
+         Appears above the tabs whenever the query yields one or more user
+         matches. Clicking a card opens that user's storefront. */}
+      <UserSearchResults
+        results={userHits}
+        query={query}
+        loading={userSearchLoading}
+        onPick={(hit) => onOpenUser?.(hit.id)}
+      />
 
       {/* ── PILL TABS: requests / uploads ── */}
       <section style={{ padding: '0 16px 14px' }}>

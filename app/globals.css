@@ -1208,6 +1208,111 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
+   USER SEARCH RESULTS — preview row above the masonry feed
+   ═══════════════════════════════════════════════ */
+
+.user-search-results {
+  padding: 0 16px 14px;
+}
+.user-search-header {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.user-search-header-title { display: inline-flex; align-items: baseline; gap: 4px; }
+.user-search-header svg   { color: var(--text-muted); }
+
+.user-search-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+/* Below tablet: switch to a horizontal scroll-snap row so 1–2 cards are
+   visible at once and the user can swipe to scrub more matches. */
+@media (max-width: 599px) {
+  .user-search-track {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .user-search-track::-webkit-scrollbar { display: none; }
+  .user-search-track > * {
+    flex: 0 0 86%;
+    scroll-snap-align: start;
+  }
+}
+
+.user-search-card {
+  all: unset;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  cursor: pointer;
+  min-width: 0;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.user-search-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-default);
+}
+.user-search-card:active { transform: scale(0.985); }
+.user-search-card:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.user-search-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 16px; font-weight: 700;
+}
+.user-search-avatar img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+
+.user-search-text {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+  line-height: 1.25;
+}
+.user-search-name {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.user-search-email {
+  font-size: 12px; font-weight: 500;
+  color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.user-search-meta {
+  font-size: 11px; font-weight: 500;
+  color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.user-search-chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════
    INVENTORY CARD STROKES — color-code post types
    ───────────────────────────────────────────────
    Inventory-only signal: a 2px outer ring tells you at a glance whether each
