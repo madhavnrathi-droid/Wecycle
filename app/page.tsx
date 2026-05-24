@@ -22,15 +22,14 @@ import ShareItemModal from '../components/forms/ShareItemModal';
 import PostRequestModal from '../components/forms/PostRequestModal';
 import ReportLostFoundModal from '../components/forms/ReportLostFoundModal';
 import SubmitEventModal from '../components/forms/SubmitEventModal';
-import EditItemModal from '../components/forms/EditItemModal';
 import AlertFormModal from '../components/forms/AlertFormModal';
 import AuthModal from '../components/AuthModal';
 import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
-import { updateListingFields, repostListing, deleteListingById, deletePostById, deleteEvent, purgeExpiredEvents } from '../lib/liveData';
-import { updateDemoPost, repostDemoPost, deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
+import { deletePostById, deleteEvent, purgeExpiredEvents } from '../lib/liveData';
+import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
   getSettings, onSettingsChange, applyTheme, watchSystemTheme,
@@ -45,7 +44,6 @@ type ModalKind =
   | 'report-lf'
   | 'submit-event'
   | 'auth'
-  | 'edit-item'
   | 'alert-form';
 
 export default function WecycleApp() {
@@ -73,7 +71,6 @@ export default function WecycleApp() {
     if (isDemoMode()) return demoOwnedIds().includes(it.id);
     return !!user && it.user.id === user.id;
   };
-  const [editItem, setEditItem] = useState<MarketplaceItem | null>(null);
   const [editingAlert, setEditingAlert] = useState<WecycleAlert | null>(null);
   /* Track RSVPs at app-level so EventsScreen + EventDetailScreen stay in sync */
   const [rsvpdEvents, setRsvpdEvents] = useState<Set<string>>(new Set(['e1', 'e4', 'e5']));
@@ -255,11 +252,10 @@ export default function WecycleApp() {
               onBack={() => setOpenItem(null)}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
-              /* Owner sees Edit + Delete instead of contact buttons.
-                 Admin gets Delete on every post (cross-account moderation). */
+              /* Owner edits inline (no Edit button — fields are editable
+                 in place). Admin gets Delete on any post for moderation. */
               isOwner={ownsItem(openItem)}
               isAdmin={isAdmin}
-              onEdit={ownsItem(openItem) && !openItem.isRequest ? () => { setEditItem(openItem); setModal('edit-item'); } : undefined}
               onDelete={(ownsItem(openItem) || isAdmin) ? async () => {
                 if (isDemoMode()) { deleteDemoPost(openItem.id); return; }
                 await deletePostById(openItem.id, openItem.isRequest ? 'request' : 'listing');
@@ -468,64 +464,9 @@ export default function WecycleApp() {
         <PostRequestModal open={modal === 'post-request'} onClose={closeModal} />
         <ReportLostFoundModal open={modal === 'report-lf'} onClose={closeModal} defaultStatus={lfDefaultStatus} />
         <SubmitEventModal open={modal === 'submit-event'} onClose={closeModal} />
-        {editItem && (
-          <EditItemModal
-            open={modal === 'edit-item'}
-            item={editItem}
-            initiallyHidden={false}
-            onClose={() => { closeModal(); setEditItem(null); }}
-            onSave={async (data) => {
-              if (!editItem) return;
-              if (isDemoMode()) {
-                /* Demo: mutate the in-memory store so the change reflects. */
-                updateDemoPost(editItem.id, {
-                  title: data.title, category: data.category,
-                  condition: data.condition as 'like_new' | 'good' | 'fair',
-                  description: data.description, location: data.location,
-                  listingType: data.pricing, price: data.price,
-                });
-                return;
-              }
-              await updateListingFields(editItem.id, {
-                title: data.title,
-                category: data.category,
-                condition: data.condition as 'like_new' | 'good' | 'fair',
-                description: data.description,
-                location: data.location,
-                listingType: data.pricing,
-                price: data.price,
-                isHidden: data.isHidden,
-              });
-            }}
-            onRepost={async (data) => {
-              if (!editItem) return;
-              if (isDemoMode()) {
-                repostDemoPost(editItem.id, {
-                  title: data.title, category: data.category,
-                  condition: data.condition as 'like_new' | 'good' | 'fair',
-                  description: data.description, location: data.location,
-                  listingType: data.pricing, price: data.price,
-                });
-                return;
-              }
-              await repostListing(editItem.id, {
-                title: data.title,
-                category: data.category,
-                condition: data.condition as 'like_new' | 'good' | 'fair',
-                description: data.description,
-                location: data.location,
-                listingType: data.pricing,
-                price: data.price,
-                isHidden: data.isHidden,
-              });
-            }}
-            onDelete={async () => {
-              if (!editItem) return;
-              if (isDemoMode()) { deleteDemoPost(editItem.id); return; }
-              await deleteListingById(editItem.id);
-            }}
-          />
-        )}
+        {/* EditItemModal removed — owners edit their posts inline directly
+           on the detail screen. Save changes / Save & repost CTAs swap in
+           when the form is dirty. */}
         {user && (
           <AlertFormModal
             open={modal === 'alert-form'}

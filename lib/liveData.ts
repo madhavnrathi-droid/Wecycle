@@ -760,6 +760,97 @@ export async function repostListing(id: string, patch?: EditListingPatch) {
   notifyPostsChanged();
 }
 
+/* Photos: replace the entire array of URLs (and the video array). The caller
+   has already uploaded any new blobs and constructed the final URL lists. */
+export async function updateListingMedia(
+  id: string,
+  photoUrls: string[],
+  videoUrls: string[],
+) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { error } = await supabase
+    .from('listings')
+    .update({
+      photo_urls: photoUrls,
+      video_urls: videoUrls,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+/* ── Requests: edit + repost (mirror of the listings helpers) ── */
+
+export interface EditRequestPatch {
+  title?: string;
+  category?: string;
+  description?: string;
+  urgency?: 'normal' | 'urgent';
+  needByDate?: string;     /* ISO date or '' to clear */
+}
+
+export async function updateRequestFields(id: string, patch: EditRequestPatch) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.title !== undefined)       update.title = patch.title.trim();
+  if (patch.category !== undefined)    update.category_id = patch.category.trim().toLowerCase();
+  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.urgency !== undefined)     update.urgency = patch.urgency;
+  if (patch.needByDate !== undefined)  update.need_by_date = patch.needByDate || null;
+  const { error } = await supabase.from('requests').update(update as never).eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+export async function repostRequest(id: string, patch?: EditRequestPatch) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  if (patch) await updateRequestFields(id, patch);
+  const { error } = await supabase
+    .from('requests')
+    .update({ posted_at: new Date().toISOString(), status: 'open' } as never)
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+export async function updateRequestMedia(
+  id: string,
+  photoUrls: string[],
+  videoUrls: string[],
+) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { error } = await supabase
+    .from('requests')
+    .update({
+      photo_urls: photoUrls,
+      video_urls: videoUrls,
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+/* ── Events: media update (alongside the existing updateEvent + deleteEvent) ── */
+export async function updateEventMedia(
+  id: string,
+  photoUrls: string[],
+  videoUrls: string[],
+) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { error } = await supabase
+    .from('events')
+    .update({
+      photo_urls: photoUrls,
+      video_urls: videoUrls,
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
 export async function deleteListingById(id: string) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   /* Optimistic: hide it from every read immediately, then refresh so the

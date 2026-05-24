@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { updateDemoSession, DEPARTMENTS, type Residence } from '../lib/demoAuth';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
@@ -35,9 +35,18 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
   const [department, setDepartment] = useState<string>('');
   const [residence, setResidence] = useState<Residence | ''>('');
 
-  const [savedFlash, setSavedFlash] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  /* Auto-save status — drives the tiny indicator in the header. We replaced
+     the manual "Save" button with debounced auto-save: every field edit kicks
+     off a 700ms debounce that, once expired, writes to Supabase / the demo
+     store. The status cycles idle → saving → saved → idle. */
+  type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  /* Only treat a change as "saveable" once the user has actually interacted
+     with the form — otherwise the initial profile hydration would itself fire
+     a save (no-op, but we'd flash "Saving…" on every visit). */
+  const userInteracted = useRef(false);
+  const markInteracted = () => { userInteracted.current = true; };
 
   /* Hydrate when profile loads */
   useEffect(() => {
@@ -65,14 +74,13 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     collegeId.trim().length >= 3 &&
     phoneValid;
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  /* Persist the current form snapshot. Called both from the debounce timer
+     and from onBlur for selects/toggles (immediate write feels right there). */
+  const persist = useCallback(async () => {
     if (!canSave) return;
-    setSubmitting(true);
+    setSaveStatus('saving');
     setError(null);
     try {
-      /* Store phone with the +91 country code so WhatsApp deep-links work,
-         but the UI only ever shows/accepts the 10-digit local number. */
       const storedPhone = phone.length === 10 ? `+91${phone}` : null;
 
       if (isDemo) {
@@ -87,7 +95,6 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           residence: residence || undefined,
         });
       } else if (hasSupabaseEnv && user) {
-        /* Live: persist to the profiles row immediately. */
         const { error: err } = await supabase
           .from('profiles')
           .update({
@@ -104,14 +111,24 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         await refreshProfile();
       }
 
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 1800);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(s => (s === 'saved' ? 'idle' : s)), 1600);
     } catch (e) {
       setError((e as Error).message ?? 'Could not save');
-    } finally {
-      setSubmitting(false);
+      setSaveStatus('error');
     }
-  };
+  }, [canSave, phone, isDemo, name, collegeId, currentEmail, graduatingYear, course, department, residence, user, refreshProfile]);
+
+  /* Debounced auto-save — fires 700ms after the last edit. We re-derive the
+     timer on every field change so rapid typing collapses into a single
+     write at the end. The userInteracted ref guards against the initial
+     hydration spuriously firing this. */
+  useEffect(() => {
+    if (!userInteracted.current) return;
+    if (!canSave) return;
+    const t = setTimeout(() => { void persist(); }, 700);
+    return () => clearTimeout(t);
+  }, [name, phone, collegeId, graduatingYear, course, department, residence, canSave, persist]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -148,25 +165,45 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         }}>
           Account
         </h1>
-        <button
-          form="account-form"
-          type="submit"
-          disabled={!canSave || submitting}
+        {/* Tiny live status — fades between idle / saving / saved. No button:
+           edits write automatically a moment after you stop typing. */}
+        <span
+          aria-live="polite"
+          aria-atomic="true"
           style={{
-            background: canSave ? 'var(--text-primary)' : 'var(--bg-inset)',
-            color: canSave ? 'var(--bg-base)' : 'var(--text-muted)',
-            border: 'none', borderRadius: 999,
-            padding: '8px 16px',
-            fontSize: 13, fontWeight: 600, cursor: canSave ? 'pointer' : 'default',
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            minWidth: 64, justifyContent: 'flex-end',
+            fontSize: 12, fontWeight: 500,
+            color:
+              saveStatus === 'saved'   ? 'var(--accent-mint, #22C55E)' :
+              saveStatus === 'error'   ? 'var(--accent-rose)'          :
+              saveStatus === 'saving'  ? 'var(--text-muted)'           :
+                                         'var(--text-muted)',
+            opacity: saveStatus === 'idle' ? 0 : 1,
+            transition: 'opacity 200ms ease',
             letterSpacing: '-0.01em',
-            transition: 'all 0.2s',
+            paddingRight: 8,
           }}
         >
-          {submitting ? 'Saving…' : savedFlash ? <><Check size={13} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />Saved</> : 'Save'}
-        </button>
+          {saveStatus === 'saving' && (
+            <>
+              <Loader2 size={12} strokeWidth={2} style={{ animation: 'spin 0.9s linear infinite' }} />
+              Saving…
+            </>
+          )}
+          {saveStatus === 'saved' && (
+            <>
+              <Check size={13} strokeWidth={2.5} />
+              Saved
+            </>
+          )}
+          {saveStatus === 'error' && 'Couldn’t save'}
+        </span>
       </header>
 
-      <form id="account-form" onSubmit={handleSave} noValidate>
+      {/* Form left in place for grouping + accessibility, but onSubmit is
+         disabled — there is no Submit button, edits auto-save. */}
+      <form id="account-form" onSubmit={(e) => e.preventDefault()} noValidate>
 
         {/* ── HERO: name preview ── */}
         <section style={{ padding: '20px 20px 24px' }}>
@@ -209,7 +246,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               type="text"
               className="form-input"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => { setName(e.target.value); markInteracted(); }}
               required
               autoComplete="name"
             />
@@ -227,7 +264,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 inputMode="email"
                 className="form-input"
                 value={currentEmail}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => { setEmail(e.target.value); markInteracted(); }}
                 autoComplete="email"
               />
             </div>
@@ -245,9 +282,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 className="form-input"
                 placeholder="e.g. 230905123"
                 value={collegeId}
-                /* Strip any non-digit on the fly so paste, autofill, and
-                   wrong keystrokes can't slip a letter in. */
-                onChange={e => setCollegeId(e.target.value.replace(/\D+/g, ''))}
+                onChange={e => { setCollegeId(e.target.value.replace(/\D+/g, '')); markInteracted(); }}
                 required
               />
             </div>
@@ -277,7 +312,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 className="form-input"
                 placeholder="98765 43210"
                 value={phone}
-                onChange={e => setPhone(tenDigits(e.target.value))}
+                onChange={e => { setPhone(tenDigits(e.target.value)); markInteracted(); }}
                 autoComplete="tel-national"
                 aria-invalid={!phoneValid}
                 style={{ flex: 1 }}
@@ -306,7 +341,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 className="form-input"
                 placeholder="2027"
                 value={graduatingYear}
-                onChange={e => setGraduatingYear(e.target.value)}
+                onChange={e => { setGraduatingYear(e.target.value); markInteracted(); }}
               />
             </div>
             <div className="field">
@@ -319,7 +354,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 className="form-input"
                 placeholder="e.g. B.Des Communication Design"
                 value={course}
-                onChange={e => setCourse(e.target.value)}
+                onChange={e => { setCourse(e.target.value); markInteracted(); }}
               />
             </div>
           </div>
@@ -333,7 +368,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               id="acc-dept"
               className="form-select"
               value={department}
-              onChange={e => setDepartment(e.target.value)}
+              onChange={e => { setDepartment(e.target.value); markInteracted(); }}
             >
               <option value="">Pick your school</option>
               {DEPARTMENTS.map(d => (
@@ -358,7 +393,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                     key={opt}
                     type="button"
                     aria-pressed={active}
-                    onClick={() => setResidence(active ? '' : opt)}
+                    onClick={() => { setResidence(active ? '' : opt); markInteracted(); }}
                     className="residence-chip"
                     data-active={active || undefined}
                   >

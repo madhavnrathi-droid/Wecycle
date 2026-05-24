@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
-  Heart, Share2, Mail, Check, Edit3, Tag, Trash2,
+  Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
@@ -14,6 +14,8 @@ import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 import { useBreakpoint } from '../lib/useBreakpoint';
+import { updateEvent } from '../lib/liveData';
+import { isDemoMode } from '../lib/demoMode';
 
 interface EventDetailScreenProps {
   event: CommunityEvent;
@@ -23,8 +25,37 @@ interface EventDetailScreenProps {
   onRsvp: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
-  onEdit?: () => void;
   onDelete?: () => void | Promise<void>;
+}
+
+const EVENT_TYPES: { id: CommunityEvent['eventType']; label: string }[] = [
+  { id: 'swap',      label: 'Swap drive' },
+  { id: 'repair',    label: 'Repair café' },
+  { id: 'cleanup',   label: 'Cleanup' },
+  { id: 'workshop',  label: 'Workshop' },
+  { id: 'drive',     label: 'Collection drive' },
+  { id: 'challenge', label: 'Challenge' },
+];
+
+/* Parse the human-formatted date/time string on a CommunityEvent into ISO
+ * components we can re-emit. Events store starts_at as ISO, but the mapper
+ * pretty-formats it for display — we don't have the raw ISO here. So we
+ * round-trip via the formatted strings: re-parse what we display. */
+function parseEventDateTime(dateStr: string, timeStr: string): { date: string; time: string } {
+  /* dateStr like "Sat, 24 May 2026"; timeStr like "5:30pm" */
+  try {
+    const combined = `${dateStr} ${timeStr.replace(/\s+/g, '')}`;
+    const d = new Date(combined);
+    if (Number.isNaN(d.getTime())) return { date: '', time: '' };
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${mi}` };
+  } catch {
+    return { date: '', time: '' };
+  }
 }
 
 function WhatsAppGlyph({ size = 14 }: { size?: number }) {
@@ -46,7 +77,7 @@ const TYPE_LABEL: Record<CommunityEvent['eventType'], string> = {
 };
 
 export default function EventDetailScreen({
-  event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onEdit, onDelete,
+  event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onDelete,
 }: EventDetailScreenProps) {
   /* Prefer the organizer's uploaded photos; mock events fall back to the
      curated Unsplash covers. Real events with no upload → empty array → we
@@ -64,6 +95,78 @@ export default function EventDetailScreen({
 
   const metrics = getEventMetrics(event.id);
   const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
+
+  /* ── Inline edit state (owner only) ── */
+  const initial = useMemo(() => parseEventDateTime(event.date, event.time), [event.date, event.time]);
+  const [eTitle, setETitle]             = useState(event.title);
+  const [eDescription, setEDescription] = useState(event.description ?? '');
+  const [eLocation, setELocation]       = useState(event.location);
+  const [eDate, setEDate]               = useState(initial.date);
+  const [eTime, setETime]               = useState(initial.time);
+  const [eType, setEType]               = useState<CommunityEvent['eventType']>(event.eventType);
+  const [eMaxAttendeesStr, setEMaxAttendeesStr] = useState(
+    event.maxAttendees ? String(event.maxAttendees) : '',
+  );
+
+  useEffect(() => {
+    setETitle(event.title);
+    setEDescription(event.description ?? '');
+    setELocation(event.location);
+    setEDate(initial.date);
+    setETime(initial.time);
+    setEType(event.eventType);
+    setEMaxAttendeesStr(event.maxAttendees ? String(event.maxAttendees) : '');
+  }, [event.id, event.title, event.description, event.location, event.eventType, event.maxAttendees, initial.date, initial.time]);
+
+  const isDirty =
+    eTitle !== event.title ||
+    eDescription !== (event.description ?? '') ||
+    eLocation !== event.location ||
+    eDate !== initial.date ||
+    eTime !== initial.time ||
+    eType !== event.eventType ||
+    (eMaxAttendeesStr ? Number(eMaxAttendeesStr) : null) !== (event.maxAttendees ?? null);
+
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSaveChanges = useCallback(async () => {
+    if (!isDirty || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      if (isDemoMode()) {
+        /* No demo store mutation for events yet — best-effort no-op so the
+           CTA still feels responsive. The page will continue to reflect the
+           in-memory state during this session. */
+        await new Promise(r => setTimeout(r, 200));
+      } else {
+        await updateEvent(event.id, {
+          title: eTitle,
+          eventType: eType,
+          date: eDate || undefined,
+          time: eTime || undefined,
+          location: eLocation,
+          description: eDescription,
+          maxAttendees: eMaxAttendeesStr ? Number(eMaxAttendeesStr) : undefined,
+        });
+      }
+    } catch (e) {
+      setSaveError((e as Error).message ?? 'Could not save');
+    } finally {
+      setSaving(false);
+    }
+  }, [isDirty, saving, event.id, eTitle, eType, eDate, eTime, eLocation, eDescription, eMaxAttendeesStr]);
+
+  const handleDiscard = useCallback(() => {
+    setETitle(event.title);
+    setEDescription(event.description ?? '');
+    setELocation(event.location);
+    setEDate(initial.date);
+    setETime(initial.time);
+    setEType(event.eventType);
+    setEMaxAttendeesStr(event.maxAttendees ? String(event.maxAttendees) : '');
+  }, [event, initial]);
 
   /* Contact links for messaging the organizer — same flow as item details. */
   const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
@@ -126,14 +229,11 @@ export default function EventDetailScreen({
         }}>
           {TYPE_LABEL[event.eventType]}
         </span>
+        {/* Header right-side: share for guests, RSVP confirmation for going.
+           Owners just see a spacer (their editing happens in-place below,
+           with the Save CTA at the bottom). */}
         {isOwner ? (
-          <button
-            onClick={onEdit}
-            aria-label="Edit event"
-            className="theme-toggle"
-          >
-            <Edit3 size={18} strokeWidth={1.8} />
-          </button>
+          <span style={{ width: 36 }} aria-hidden="true" />
         ) : (
           <button
             aria-label="Share event"
@@ -212,38 +312,123 @@ export default function EventDetailScreen({
 
       {/* ── TITLE + KEY FACTS ── */}
       <section style={{ padding: '20px 20px 0' }}>
-        <h1 style={{
-          margin: 0,
-          fontSize: 22, fontWeight: 600,
-          letterSpacing: '-0.025em',
-          color: 'var(--text-primary)',
-          lineHeight: 1.2,
-        }}>
-          {event.title}
-        </h1>
+        {isOwner ? (
+          <input
+            value={eTitle}
+            onChange={e => setETitle(e.target.value)}
+            placeholder="Event title"
+            className="inline-edit inline-edit--h1"
+            aria-label="Event title"
+          />
+        ) : (
+          <h1 style={{
+            margin: 0,
+            fontSize: 22, fontWeight: 600,
+            letterSpacing: '-0.025em',
+            color: 'var(--text-primary)',
+            lineHeight: 1.2,
+          }}>
+            {event.title}
+          </h1>
+        )}
+
+        {isOwner && (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Type
+            </span>
+            <select
+              value={eType}
+              onChange={e => setEType(e.target.value as CommunityEvent['eventType'])}
+              className="inline-edit inline-edit--pill"
+              aria-label="Event type"
+            >
+              {EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </div>
+        )}
 
         <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <FactRow
-            icon={<CalendarDays size={14} strokeWidth={1.8} />}
-            label="Date"
-            value={event.date}
-          />
-          <FactRow
-            icon={<Clock size={14} strokeWidth={1.8} />}
-            label="Time"
-            value={event.time}
-          />
-          <FactRow
-            icon={<MapPin size={14} strokeWidth={1.8} />}
-            label="Location"
-            value={event.location}
-          />
-          <FactRow
-            icon={<Users size={14} strokeWidth={1.8} />}
-            label={event.maxAttendees ? `${event.attendees} / ${event.maxAttendees} going` : `${event.attendees} going`}
-            value={event.maxAttendees ? `${Math.round(pct)}% full` : 'Open RSVP'}
-            trailing
-          />
+          {isOwner ? (
+            <>
+              <EditableFactRow
+                icon={<CalendarDays size={14} strokeWidth={1.8} />}
+                label="Date"
+              >
+                <input
+                  type="date"
+                  value={eDate}
+                  onChange={e => setEDate(e.target.value)}
+                  className="inline-edit inline-edit--meta"
+                  aria-label="Date"
+                />
+              </EditableFactRow>
+              <EditableFactRow
+                icon={<Clock size={14} strokeWidth={1.8} />}
+                label="Time"
+              >
+                <input
+                  type="time"
+                  value={eTime}
+                  onChange={e => setETime(e.target.value)}
+                  className="inline-edit inline-edit--meta"
+                  aria-label="Time"
+                />
+              </EditableFactRow>
+              <EditableFactRow
+                icon={<MapPin size={14} strokeWidth={1.8} />}
+                label="Location"
+              >
+                <input
+                  value={eLocation}
+                  onChange={e => setELocation(e.target.value)}
+                  placeholder="Where it's happening"
+                  className="inline-edit inline-edit--meta"
+                  aria-label="Location"
+                />
+              </EditableFactRow>
+              <EditableFactRow
+                icon={<Users size={14} strokeWidth={1.8} />}
+                label="Max attendees"
+              >
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={eMaxAttendeesStr}
+                  onChange={e => setEMaxAttendeesStr(e.target.value)}
+                  placeholder="Open RSVP"
+                  className="inline-edit inline-edit--meta"
+                  aria-label="Maximum attendees"
+                  style={{ maxWidth: 80 }}
+                />
+              </EditableFactRow>
+            </>
+          ) : (
+            <>
+              <FactRow
+                icon={<CalendarDays size={14} strokeWidth={1.8} />}
+                label="Date"
+                value={event.date}
+              />
+              <FactRow
+                icon={<Clock size={14} strokeWidth={1.8} />}
+                label="Time"
+                value={event.time}
+              />
+              <FactRow
+                icon={<MapPin size={14} strokeWidth={1.8} />}
+                label="Location"
+                value={event.location}
+              />
+              <FactRow
+                icon={<Users size={14} strokeWidth={1.8} />}
+                label={event.maxAttendees ? `${event.attendees} / ${event.maxAttendees} going` : `${event.attendees} going`}
+                value={event.maxAttendees ? `${Math.round(pct)}% full` : 'Open RSVP'}
+                trailing
+              />
+            </>
+          )}
         </div>
 
         {event.maxAttendees && (
@@ -269,31 +454,44 @@ export default function EventDetailScreen({
         }}>
           About this event
         </h3>
-        <p style={{
-          margin: 0,
-          fontSize: 14, color: 'var(--text-secondary)',
-          lineHeight: 1.6,
-          whiteSpace: 'pre-wrap',
-          display: shouldClamp && !expanded ? '-webkit-box' : 'block',
-          WebkitLineClamp: shouldClamp && !expanded ? 5 : undefined,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        }}>
-          {desc}
-        </p>
-        {shouldClamp && (
-          <button
-            onClick={() => setExpanded(e => !e)}
-            style={{
-              marginTop: 6,
-              background: 'none', border: 'none', padding: 0,
-              cursor: 'pointer',
-              fontSize: 13, fontWeight: 600,
-              color: 'var(--text-primary)',
-            }}
-          >
-            {expanded ? 'Show less' : 'Read more'}
-          </button>
+        {isOwner ? (
+          <textarea
+            value={eDescription}
+            onChange={e => setEDescription(e.target.value)}
+            placeholder="Tell people what's happening, who it's for, what to bring…"
+            className="inline-edit inline-edit--body"
+            aria-label="Description"
+            rows={5}
+          />
+        ) : (
+          <>
+            <p style={{
+              margin: 0,
+              fontSize: 14, color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+              display: shouldClamp && !expanded ? '-webkit-box' : 'block',
+              WebkitLineClamp: shouldClamp && !expanded ? 5 : undefined,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}>
+              {desc}
+            </p>
+            {shouldClamp && (
+              <button
+                onClick={() => setExpanded(e => !e)}
+                style={{
+                  marginTop: 6,
+                  background: 'none', border: 'none', padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {expanded ? 'Show less' : 'Read more'}
+              </button>
+            )}
+          </>
         )}
       </section>
 
@@ -435,24 +633,61 @@ export default function EventDetailScreen({
         pointerEvents: 'none',
         zIndex: 30,
       }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
+          {isOwner && saveError && (
+            <div role="alert" style={{
+              padding: '6px 10px',
+              background: 'rgba(237,46,80,0.1)',
+              border: '1px solid rgba(237,46,80,0.25)',
+              borderRadius: 8,
+              color: 'var(--accent-rose)',
+              fontSize: 11, fontWeight: 500, textAlign: 'center',
+            }}>{saveError}</div>
+          )}
         <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto', flexWrap: 'wrap' }}>
-          {/* OWNER: Edit + Delete instead of RSVP/contact. */}
+          {/* OWNER:
+             Clean → Delete full-width
+             Dirty → [Discard] [Save changes]  (no repost concept for events) */}
           {isOwner ? (
-            <>
-              {onEdit && (
+            isDirty ? (
+              <>
                 <button
-                  onClick={onEdit}
+                  type="button"
+                  onClick={handleDiscard}
+                  disabled={saving}
+                  aria-label="Discard changes"
+                  style={{
+                    width: 52, height: 52, borderRadius: 999,
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <RotateCcw size={16} strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveChanges}
+                  disabled={saving}
                   style={{
                     flex: 1, minWidth: 140, height: 52, borderRadius: 999,
                     background: 'var(--text-primary)', color: 'var(--bg-base)',
-                    border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                    border: 'none',
+                    cursor: saving ? 'wait' : 'pointer',
+                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}
                 >
-                  <Edit3 size={16} strokeWidth={2} /> Edit event
+                  {saving
+                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Saving…</>
+                    : <><Save size={15} strokeWidth={2} /> Save changes</>}
                 </button>
-              )}
-              {onDelete && (
+              </>
+            ) : (
+              onDelete && (
                 <button
                   onClick={async () => {
                     if (typeof window !== 'undefined' && !window.confirm('Delete this event permanently?')) return;
@@ -460,17 +695,17 @@ export default function EventDetailScreen({
                     onBack();
                   }}
                   style={{
-                    flex: '0 0 auto', minWidth: 52, height: 52, padding: '0 18px', borderRadius: 999,
+                    flex: 1, height: 52, padding: '0 18px', borderRadius: 999,
                     background: 'transparent', color: 'var(--accent-rose)',
                     border: '1px solid var(--accent-rose)', cursor: 'pointer',
                     fontSize: 14, fontWeight: 600,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}
                 >
-                  <Trash2 size={16} strokeWidth={2} /> Delete
+                  <Trash2 size={16} strokeWidth={2} /> Delete event
                 </button>
-              )}
-            </>
+              )
+            )
           ) : (
           <>
           <button
@@ -545,7 +780,33 @@ export default function EventDetailScreen({
           </>
           )}
         </div>
+        </div>
       </section>
+    </div>
+  );
+}
+
+/* Owner-only fact row — same visual rhythm as FactRow but the right-hand
+ * slot is editable (text/date/time/number input). */
+function EditableFactRow({
+  icon, label, children,
+}: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{
+        width: 28, height: 28, borderRadius: 8,
+        background: 'var(--bg-inset)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--text-secondary)', flexShrink: 0,
+      }}>
+        {icon}
+      </span>
+      <span style={{ flex: '0 0 96px', fontSize: 12, color: 'var(--text-muted)' }}>
+        {label}
+      </span>
+      <span style={{ flex: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center' }}>
+        {children}
+      </span>
     </div>
   );
 }

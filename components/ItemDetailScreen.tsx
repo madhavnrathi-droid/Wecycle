@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee, Edit3, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee, Trash2, RotateCcw, Save, Loader2 } from 'lucide-react';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
 import { getPostMetrics } from '../lib/metrics';
@@ -11,8 +11,14 @@ import CommentsSection from './CommentsSection';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, itemAction, actionLabel, type ContactLink } from '../lib/contactUser';
-import { incrementListingView, toggleListingSave } from '../lib/liveData';
+import {
+  incrementListingView, toggleListingSave,
+  updateListingFields, repostListing,
+  updateRequestFields, repostRequest,
+} from '../lib/liveData';
 import { isDemoMode } from '../lib/demoMode';
+import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
+import { CATEGORIES } from '../lib/mockData';
 
 interface ItemDetailScreenProps {
   item: MarketplaceItem;
@@ -21,13 +27,12 @@ interface ItemDetailScreenProps {
   onRequireAuth: () => void;
   /** Optional: tap an avatar/owner name to open their storefront. */
   onOpenStorefront?: (user: User) => void;
-  /** When the viewer owns this post, these enable the Edit + Delete actions
-   *  (shown in place of the contact buttons — you don't contact yourself). */
-  onEdit?: () => void;
+  /** When the viewer owns this post, inline editing turns on (fields become
+   *  inputs in place, dirty-state CTAs replace Delete). No standalone Edit
+   *  button — the post detail IS the editor. */
   onDelete?: () => void | Promise<void>;
-  /** True when the viewer is the post's author. Drives the "owner" UI branch
-   *  (Edit + Delete instead of contact). Distinct from isAdmin which is
-   *  cross-account moderation. */
+  /** True when the viewer is the post's author. Drives the inline-edit branch.
+   *  Distinct from isAdmin which is cross-account moderation. */
   isOwner?: boolean;
   /** When the viewer is the wecycle admin — adds an "Admin" delete affordance
    *  on every post, even posts they don't own. Shown alongside contact bar. */
@@ -45,15 +50,135 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onEdit, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  /* "Manage" UI = the owner's Edit + Delete bar. Admin moderation is rendered
-     INSIDE the regular contact bar so the admin still sees the contact CTAs. */
-  const canManage = !!isOwner && !!(onEdit || onDelete);
+  /* "Manage" UI = the owner's inline-edit fields + Delete bar. Admin
+     moderation renders INSIDE the regular contact bar so admins still
+     see contact CTAs alongside their delete affordance. */
+  const canManage = !!isOwner && !!onDelete;
   const photos = resolveItemMedia(item);
+
+  /* ── Inline edit state ──────────────────────────────────
+     Hydrated from the item; tracks dirty by comparison to the snapshot. */
+  const [eTitle, setETitle]             = useState(item.title);
+  const [eDescription, setEDescription] = useState(item.description ?? '');
+  const [eLocation, setELocation]       = useState(item.location ?? '');
+  const [ePriceStr, setEPriceStr]       = useState(
+    typeof item.price === 'number' ? String(item.price) : '',
+  );
+  const [eListingType, setEListingType] = useState<'free' | 'sell' | 'borrow' | 'swap'>(
+    item.listingType ?? 'free',
+  );
+  const [eCategory, setECategory]       = useState((item.category || '').toLowerCase());
+  const [eUrgent, setEUrgent]           = useState(!!item.urgent);
+
+  /* Re-hydrate when the item prop changes (e.g. after server refetch). We
+     deliberately reset edits on incoming changes — local edits don't survive
+     a fresh fetch, which prevents stale conflicts. */
+  useEffect(() => {
+    setETitle(item.title);
+    setEDescription(item.description ?? '');
+    setELocation(item.location ?? '');
+    setEPriceStr(typeof item.price === 'number' ? String(item.price) : '');
+    setEListingType(item.listingType ?? 'free');
+    setECategory((item.category || '').toLowerCase());
+    setEUrgent(!!item.urgent);
+  }, [item.id, item.title, item.description, item.location, item.price, item.listingType, item.category, item.urgent]);
+
+  const isRequestPost = !!item.isRequest;
+  const isDirty = useMemo(() => {
+    if (eTitle !== item.title) return true;
+    if (eDescription !== (item.description ?? '')) return true;
+    if (!isRequestPost && eLocation !== (item.location ?? '')) return true;
+    if (!isRequestPost) {
+      const origPriceStr = typeof item.price === 'number' ? String(item.price) : '';
+      if (ePriceStr !== origPriceStr) return true;
+      if (eListingType !== (item.listingType ?? 'free')) return true;
+    }
+    if (eCategory !== (item.category || '').toLowerCase()) return true;
+    if (isRequestPost && eUrgent !== !!item.urgent) return true;
+    return false;
+  }, [eTitle, eDescription, eLocation, ePriceStr, eListingType, eCategory, eUrgent, item, isRequestPost]);
+
+  const [saving, setSaving] = useState<null | 'save' | 'repost'>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  /* Save handlers — separated into request vs listing branches so each
+     constructs the right shape without TS-union gymnastics. */
+  const handleSaveChanges = useCallback(async () => {
+    if (!isDirty || saving) return;
+    setSaving('save');
+    setSaveError(null);
+    try {
+      const priceNum = ePriceStr ? Number(ePriceStr) : undefined;
+      if (isDemoMode()) {
+        updateDemoPost(item.id, {
+          title: eTitle, category: eCategory, description: eDescription,
+          ...(isRequestPost
+            ? { urgent: eUrgent }
+            : { location: eLocation, listingType: eListingType, price: priceNum }),
+        });
+      } else if (isRequestPost) {
+        await updateRequestFields(item.id, {
+          title: eTitle, category: eCategory, description: eDescription,
+          urgency: eUrgent ? 'urgent' : 'normal',
+        });
+      } else {
+        await updateListingFields(item.id, {
+          title: eTitle, category: eCategory, description: eDescription,
+          location: eLocation, listingType: eListingType, price: priceNum,
+        });
+      }
+    } catch (e) {
+      setSaveError((e as Error).message ?? 'Could not save');
+    } finally {
+      setSaving(null);
+    }
+  }, [isDirty, saving, item.id, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, ePriceStr]);
+
+  const handleSaveAndRepost = useCallback(async () => {
+    if (!isDirty || saving) return;
+    setSaving('repost');
+    setSaveError(null);
+    try {
+      const priceNum = ePriceStr ? Number(ePriceStr) : undefined;
+      if (isDemoMode()) {
+        repostDemoPost(item.id, {
+          title: eTitle, category: eCategory, description: eDescription,
+          ...(isRequestPost
+            ? { urgent: eUrgent }
+            : { location: eLocation, listingType: eListingType, price: priceNum }),
+        });
+      } else if (isRequestPost) {
+        await repostRequest(item.id, {
+          title: eTitle, category: eCategory, description: eDescription,
+          urgency: eUrgent ? 'urgent' : 'normal',
+        });
+      } else {
+        await repostListing(item.id, {
+          title: eTitle, category: eCategory, description: eDescription,
+          location: eLocation, listingType: eListingType, price: priceNum,
+        });
+      }
+    } catch (e) {
+      setSaveError((e as Error).message ?? 'Could not save');
+    } finally {
+      setSaving(null);
+    }
+  }, [isDirty, saving, item.id, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, ePriceStr]);
+
+  const handleDiscard = useCallback(() => {
+    setETitle(item.title);
+    setEDescription(item.description ?? '');
+    setELocation(item.location ?? '');
+    setEPriceStr(typeof item.price === 'number' ? String(item.price) : '');
+    setEListingType(item.listingType ?? 'free');
+    setECategory((item.category || '').toLowerCase());
+    setEUrgent(!!item.urgent);
+  }, [item]);
 
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -161,8 +286,26 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         handleContactClick={handleContactClick}
         hasBoth={hasBoth}
         canManage={canManage}
-        onEdit={onEdit}
         onDelete={onDelete}
+        isAdmin={isAdmin}
+        /* Inline-edit state, threaded down so the desktop layout's title /
+           description / price etc. become editable in the same way. */
+        editState={{
+          eTitle, setETitle,
+          eDescription, setEDescription,
+          eLocation, setELocation,
+          ePriceStr, setEPriceStr,
+          eListingType, setEListingType,
+          eCategory, setECategory,
+          eUrgent, setEUrgent,
+          isRequestPost,
+          isDirty,
+          saving,
+          saveError,
+          handleSaveChanges,
+          handleSaveAndRepost,
+          handleDiscard,
+        }}
       />
     );
   }
@@ -226,64 +369,134 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
 
       {/* ── TITLE + META ── */}
       <section style={{ padding: '20px 20px 0' }}>
-        <h1 style={{
-          margin: 0,
-          fontSize: 22, fontWeight: 600,
-          letterSpacing: '-0.025em',
-          color: 'var(--text-primary)',
-          lineHeight: 1.2,
-        }}>
-          {item.title}
-        </h1>
+        {canManage ? (
+          <input
+            value={eTitle}
+            onChange={e => setETitle(e.target.value)}
+            placeholder="Title"
+            className="inline-edit inline-edit--h1"
+            aria-label="Title"
+          />
+        ) : (
+          <h1 style={{
+            margin: 0,
+            fontSize: 22, fontWeight: 600,
+            letterSpacing: '-0.025em',
+            color: 'var(--text-primary)',
+            lineHeight: 1.2,
+          }}>
+            {item.title}
+          </h1>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13, minWidth: 0, flex: 1 }}>
             <MapPin size={14} strokeWidth={1.8} />
-            <span>{item.location}</span>
+            {canManage && !isRequestPost ? (
+              <input
+                value={eLocation}
+                onChange={e => setELocation(e.target.value)}
+                placeholder="Location"
+                className="inline-edit inline-edit--meta"
+                aria-label="Location"
+              />
+            ) : (
+              <span>{item.location}</span>
+            )}
           </div>
-          <div style={{ flex: 1 }} />
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 14, fontWeight: 600,
-            color: isPriced ? 'var(--accent-amber)' : '#16A34A',
-            background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
-            padding: '5px 12px',
-            borderRadius: 999,
-          }}>
-            {isPriced && <IndianRupee size={12} strokeWidth={2.2} />}
-            <span>{isPriced ? item.price : priceLabel}</span>
-          </div>
+          {/* Price / listing-type editor for owner sell posts; otherwise the
+             read-only chip. Requests skip pricing entirely. */}
+          {canManage && !isRequestPost ? (
+            <OwnerPriceEditor
+              listingType={eListingType}
+              priceStr={ePriceStr}
+              onListingType={setEListingType}
+              onPriceStr={setEPriceStr}
+            />
+          ) : (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 14, fontWeight: 600,
+              color: isPriced ? 'var(--accent-amber)' : '#16A34A',
+              background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
+              padding: '5px 12px',
+              borderRadius: 999,
+            }}>
+              {isPriced && <IndianRupee size={12} strokeWidth={2.2} />}
+              <span>{isPriced ? item.price : priceLabel}</span>
+            </div>
+          )}
         </div>
+        {canManage && (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Category
+            </span>
+            <select
+              value={eCategory}
+              onChange={e => setECategory(e.target.value)}
+              className="inline-edit inline-edit--pill"
+              aria-label="Category"
+            >
+              {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+            {isRequestPost && (
+              <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={eUrgent}
+                  onChange={e => setEUrgent(e.target.checked)}
+                />
+                Urgent
+              </label>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── DESCRIPTION ── */}
       <section style={{ padding: '20px 20px 0' }}>
-        <p style={{
-          margin: 0,
-          fontSize: 14,
-          color: 'var(--text-secondary)',
-          lineHeight: 1.55,
-          whiteSpace: 'pre-wrap',
-          display: shouldClamp && !expanded ? '-webkit-box' : 'block',
-          WebkitLineClamp: shouldClamp && !expanded ? 4 : undefined,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        }}>
-          {desc}
-        </p>
-        {shouldClamp && (
-          <button
-            onClick={() => setExpanded(e => !e)}
-            style={{
-              marginTop: 6,
-              background: 'none', border: 'none', padding: 0,
-              cursor: 'pointer',
-              fontSize: 13, fontWeight: 600,
-              color: 'var(--text-primary)',
-            }}
-          >
-            {expanded ? 'Show less' : 'Read more'}
-          </button>
+        {canManage ? (
+          <textarea
+            value={eDescription}
+            onChange={e => setEDescription(e.target.value)}
+            placeholder="Describe the item — condition, why you're letting it go, pickup notes…"
+            className="inline-edit inline-edit--body"
+            aria-label="Description"
+            rows={4}
+          />
+        ) : (
+          <>
+            <p style={{
+              margin: 0,
+              fontSize: 14,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.55,
+              whiteSpace: 'pre-wrap',
+              display: shouldClamp && !expanded ? '-webkit-box' : 'block',
+              WebkitLineClamp: shouldClamp && !expanded ? 4 : undefined,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}>
+              {desc}
+            </p>
+            {shouldClamp && (
+              <button
+                onClick={() => setExpanded(e => !e)}
+                style={{
+                  marginTop: 6,
+                  background: 'none', border: 'none', padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {expanded ? 'Show less' : 'Read more'}
+              </button>
+            )}
+          </>
         )}
         {isUnpricedSell && (
           <p style={{
@@ -374,47 +587,99 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
         background: 'linear-gradient(to bottom, transparent, var(--bg-base) 40%, var(--bg-base) 100%)',
       }}>
+        {canManage && saveError && (
+          <div role="alert" style={{
+            marginBottom: 8, padding: '6px 10px',
+            background: 'rgba(237,46,80,0.1)',
+            border: '1px solid rgba(237,46,80,0.25)',
+            borderRadius: 8,
+            color: 'var(--accent-rose)',
+            fontSize: 11, fontWeight: 500, textAlign: 'center',
+          }}>
+            {saveError}
+          </div>
+        )}
         <div style={{
           display: 'flex', gap: 8,
         }}>
-          {/* OWNER VIEW — Edit + Delete instead of contact (you can't message
-              yourself). Delete asks for one confirm tap. */}
+          {/* OWNER VIEW —
+             Clean state → Delete only, full width
+             Dirty state → [Save changes] [Save & repost] (Delete hides until clean)
+             Save & repost also bumps posted_at so the post jumps to the top
+             of the feed; useful when the owner relists an item that's been
+             sitting around. */}
           {canManage ? (
-            <>
-              {onEdit && (
+            isDirty ? (
+              <>
                 <button
-                  onClick={onEdit}
+                  type="button"
+                  onClick={handleDiscard}
+                  disabled={!!saving}
+                  aria-label="Discard changes"
                   style={{
-                    flex: 1, height: 52, borderRadius: 999,
-                    background: 'var(--text-primary)', color: 'var(--bg-base)',
-                    border: 'none', cursor: 'pointer',
-                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    width: 52, height: 52, borderRadius: 999,
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    flexShrink: 0,
                   }}
                 >
-                  <Edit3 size={16} strokeWidth={2} />
-                  Edit post
+                  <RotateCcw size={16} strokeWidth={1.8} />
                 </button>
-              )}
-              {onDelete && (
                 <button
-                  onClick={handleDelete}
-                  disabled={deleting}
+                  type="button"
+                  onClick={handleSaveChanges}
+                  disabled={!!saving}
                   style={{
-                    flex: 1,
-                    minWidth: 52, height: 52, padding: '0 16px', borderRadius: 999,
-                    background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
-                    color: confirmDelete ? '#fff' : 'var(--accent-rose)',
-                    border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
-                    cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                    flex: 1, height: 52, borderRadius: 999,
+                    background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                    border: '1px solid var(--border-default)',
+                    cursor: saving ? 'wait' : 'pointer',
+                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
-                  <Trash2 size={16} strokeWidth={2} />
-                  {deleting ? 'Deleting…' : confirmDelete ? 'Tap again to confirm' : 'Delete'}
+                  {saving === 'save'
+                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite' }} />Saving…</>
+                    : <><Save size={15} strokeWidth={2} />Save changes</>}
                 </button>
-              )}
-            </>
+                <button
+                  type="button"
+                  onClick={handleSaveAndRepost}
+                  disabled={!!saving}
+                  style={{
+                    flex: 1, height: 52, borderRadius: 999,
+                    background: 'var(--text-primary)', color: 'var(--bg-base)',
+                    border: 'none',
+                    cursor: saving ? 'wait' : 'pointer',
+                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  {saving === 'repost'
+                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Reposting…</>
+                    : <>Save &amp; repost</>}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  flex: 1, height: 52, padding: '0 16px', borderRadius: 999,
+                  background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
+                  color: confirmDelete ? '#fff' : 'var(--accent-rose)',
+                  border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
+                  cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Trash2 size={16} strokeWidth={2} />
+                {deleting ? 'Deleting…' : confirmDelete ? 'Tap again to confirm' : 'Delete'}
+              </button>
+            )
           ) : (
           <>
           <button
@@ -520,6 +785,24 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
    Photos column (sticky) on the left, info + actions on the right —
    matches the mental model people built browsing Amazon / Etsy. */
 
+interface EditState {
+  eTitle: string;           setETitle: (v: string) => void;
+  eDescription: string;     setEDescription: (v: string) => void;
+  eLocation: string;        setELocation: (v: string) => void;
+  ePriceStr: string;        setEPriceStr: (v: string) => void;
+  eListingType: 'free' | 'sell' | 'borrow' | 'swap';
+  setEListingType: (v: 'free' | 'sell' | 'borrow' | 'swap') => void;
+  eCategory: string;        setECategory: (v: string) => void;
+  eUrgent: boolean;         setEUrgent: (v: boolean) => void;
+  isRequestPost: boolean;
+  isDirty: boolean;
+  saving: null | 'save' | 'repost';
+  saveError: string | null;
+  handleSaveChanges: () => Promise<void>;
+  handleSaveAndRepost: () => Promise<void>;
+  handleDiscard: () => void;
+}
+
 interface DesktopLayoutProps {
   item: MarketplaceItem;
   /* Mixed media slides — photo URL strings or video records. */
@@ -541,16 +824,25 @@ interface DesktopLayoutProps {
   handleContactClick: (link: ContactLink) => void;
   hasBoth: boolean;
   canManage: boolean;
-  onEdit?: () => void;
   onDelete?: () => void | Promise<void>;
+  isAdmin?: boolean;
+  editState: EditState;
 }
 
 function DesktopLayout({
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   contactLinks, primaryActionLabel, handleContactClick, hasBoth,
-  canManage, onEdit, onDelete,
+  canManage, onDelete, isAdmin, editState,
 }: DesktopLayoutProps) {
+  void onRequireAuth;
+  void isAdmin;
+  const {
+    eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
+    ePriceStr, setEPriceStr, eListingType, setEListingType, eCategory, setECategory,
+    eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError,
+    handleSaveChanges, handleSaveAndRepost, handleDiscard,
+  } = editState;
   void setSaved; /* save state is driven through onToggleSave now */
   return (
     <div className="screen-transition" style={{ background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -646,48 +938,97 @@ function DesktopLayout({
         {/* ── RIGHT: Title, price, description, owner, actions ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
 
-          <div style={{
-            display: 'inline-flex', alignSelf: 'flex-start',
-            padding: '4px 10px',
-            background: 'var(--bg-inset)', borderRadius: 999,
-            fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
-            color: 'var(--text-secondary)',
-          }}>
-            {item.category}
-          </div>
+          {canManage ? (
+            <select
+              value={eCategory}
+              onChange={e => setECategory(e.target.value)}
+              className="inline-edit inline-edit--pill"
+              aria-label="Category"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          ) : (
+            <div style={{
+              display: 'inline-flex', alignSelf: 'flex-start',
+              padding: '4px 10px',
+              background: 'var(--bg-inset)', borderRadius: 999,
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
+              color: 'var(--text-secondary)',
+            }}>
+              {item.category}
+            </div>
+          )}
 
-          <h1 style={{
-            margin: 0,
-            fontSize: 30, fontWeight: 600,
-            letterSpacing: '-0.025em',
-            color: 'var(--text-primary)',
-            lineHeight: 1.18,
-          }}>
-            {item.title}
-          </h1>
+          {canManage ? (
+            <input
+              value={eTitle}
+              onChange={e => setETitle(e.target.value)}
+              placeholder="Title"
+              className="inline-edit inline-edit--h1-desktop"
+              aria-label="Title"
+            />
+          ) : (
+            <h1 style={{
+              margin: 0,
+              fontSize: 30, fontWeight: 600,
+              letterSpacing: '-0.025em',
+              color: 'var(--text-primary)',
+              lineHeight: 1.18,
+            }}>
+              {item.title}
+            </h1>
+          )}
 
           <div style={{
             display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 14 }}>
               <MapPin size={14} strokeWidth={1.8} />
-              <span>{item.location}</span>
+              {canManage && !isRequestPost ? (
+                <input
+                  value={eLocation}
+                  onChange={e => setELocation(e.target.value)}
+                  placeholder="Location"
+                  className="inline-edit inline-edit--meta"
+                  aria-label="Location"
+                />
+              ) : (
+                <span>{item.location}</span>
+              )}
             </div>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 18, fontWeight: 700,
-              color: isPriced ? 'var(--accent-amber)' : '#16A34A',
-              background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
-              padding: '6px 14px',
-              borderRadius: 999,
-              letterSpacing: '-0.01em',
-            }}>
-              {isPriced && <IndianRupee size={14} strokeWidth={2.2} />}
-              <span>{isPriced ? item.price : priceLabel}</span>
-            </div>
+            {canManage && !isRequestPost ? (
+              <OwnerPriceEditor
+                listingType={eListingType}
+                priceStr={ePriceStr}
+                onListingType={setEListingType}
+                onPriceStr={setEPriceStr}
+              />
+            ) : (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 18, fontWeight: 700,
+                color: isPriced ? 'var(--accent-amber)' : '#16A34A',
+                background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
+                padding: '6px 14px',
+                borderRadius: 999,
+                letterSpacing: '-0.01em',
+              }}>
+                {isPriced && <IndianRupee size={14} strokeWidth={2.2} />}
+                <span>{isPriced ? item.price : priceLabel}</span>
+              </div>
+            )}
+            {canManage && isRequestPost && (
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
+                <input type="checkbox" checked={eUrgent} onChange={e => setEUrgent(e.target.checked)} />
+                Urgent
+              </label>
+            )}
           </div>
 
-          {desc && (
+          {(canManage || desc) && (
             <div>
               <h2 style={{
                 margin: '0 0 8px',
@@ -695,30 +1036,43 @@ function DesktopLayout({
                 letterSpacing: '0.08em', textTransform: 'uppercase',
                 color: 'var(--text-secondary)',
               }}>About this item</h2>
-              <p style={{
-                margin: 0,
-                fontSize: 15,
-                color: 'var(--text-secondary)',
-                lineHeight: 1.6,
-                whiteSpace: 'pre-wrap',
-                display: shouldClamp && !expanded ? '-webkit-box' : 'block',
-                WebkitLineClamp: shouldClamp && !expanded ? 5 : undefined,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}>{desc}</p>
-              {shouldClamp && (
-                <button
-                  onClick={() => setExpanded(e => !e)}
-                  style={{
-                    marginTop: 6,
-                    background: 'none', border: 'none', padding: 0,
-                    cursor: 'pointer',
-                    fontSize: 13, fontWeight: 600,
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  {expanded ? 'Show less' : 'Read more'}
-                </button>
+              {canManage ? (
+                <textarea
+                  value={eDescription}
+                  onChange={e => setEDescription(e.target.value)}
+                  placeholder="Describe the item — condition, why you're letting it go, pickup notes…"
+                  className="inline-edit inline-edit--body inline-edit--body-desktop"
+                  aria-label="Description"
+                  rows={6}
+                />
+              ) : (
+                <>
+                  <p style={{
+                    margin: 0,
+                    fontSize: 15,
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                    display: shouldClamp && !expanded ? '-webkit-box' : 'block',
+                    WebkitLineClamp: shouldClamp && !expanded ? 5 : undefined,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>{desc}</p>
+                  {shouldClamp && (
+                    <button
+                      onClick={() => setExpanded(e => !e)}
+                      style={{
+                        marginTop: 6,
+                        background: 'none', border: 'none', padding: 0,
+                        cursor: 'pointer',
+                        fontSize: 13, fontWeight: 600,
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      {expanded ? 'Show less' : 'Read more'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -768,33 +1122,80 @@ function DesktopLayout({
           </button>
 
           {/* Action buttons — inline on desktop, no fixed bar.
-              Owners get Edit + Delete; everyone else gets contact. */}
+              Owners get inline-edit + Save/Delete; everyone else gets contact. */}
+          {canManage && saveError && (
+            <div role="alert" style={{
+              padding: '8px 12px',
+              background: 'rgba(237,46,80,0.1)',
+              border: '1px solid rgba(237,46,80,0.25)',
+              borderRadius: 10,
+              color: 'var(--accent-rose)',
+              fontSize: 12, fontWeight: 500,
+            }}>{saveError}</div>
+          )}
           <div style={{
             display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap',
           }}>
             {canManage ? (
-              <>
-                {onEdit && (
+              isDirty ? (
+                <>
                   <button
-                    onClick={onEdit}
+                    type="button"
+                    onClick={handleDiscard}
+                    disabled={!!saving}
+                    aria-label="Discard changes"
                     style={{
-                      flex: 1, minWidth: 160, height: 52, borderRadius: 14,
-                      background: 'var(--text-primary)', color: 'var(--bg-base)',
-                      border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600,
+                      flex: '0 0 auto', height: 52, padding: '0 14px', borderRadius: 14,
+                      background: 'var(--bg-surface)', color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-subtle)',
+                      cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    <RotateCcw size={15} strokeWidth={1.8} /> Discard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveChanges}
+                    disabled={!!saving}
+                    style={{
+                      flex: 1, minWidth: 140, height: 52, borderRadius: 14,
+                      background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                      border: '1px solid var(--border-default)',
+                      cursor: saving ? 'wait' : 'pointer', fontSize: 15, fontWeight: 600,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
-                    <Edit3 size={16} strokeWidth={2} /> Edit post
+                    {saving === 'save'
+                      ? <><Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />Saving…</>
+                      : <><Save size={16} strokeWidth={2} /> Save changes</>}
                   </button>
-                )}
-                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={handleSaveAndRepost}
+                    disabled={!!saving}
+                    style={{
+                      flex: 1, minWidth: 140, height: 52, borderRadius: 14,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none',
+                      cursor: saving ? 'wait' : 'pointer', fontSize: 15, fontWeight: 600,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    {saving === 'repost'
+                      ? <><Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Reposting…</>
+                      : <>Save &amp; repost</>}
+                  </button>
+                </>
+              ) : (
+                onDelete && (
                   <button
                     onClick={async () => {
                       if (typeof window !== 'undefined' && !window.confirm('Delete this post permanently?')) return;
                       await onDelete();
                     }}
                     style={{
-                      flex: '0 0 auto', height: 52, padding: '0 18px', borderRadius: 14,
+                      flex: 1, height: 52, padding: '0 18px', borderRadius: 14,
                       background: 'transparent', color: 'var(--accent-rose)',
                       border: '1px solid var(--accent-rose)', cursor: 'pointer',
                       fontSize: 15, fontWeight: 600,
@@ -803,8 +1204,8 @@ function DesktopLayout({
                   >
                     <Trash2 size={16} strokeWidth={2} /> Delete
                   </button>
-                )}
-              </>
+                )
+              )
             ) : hasBoth ? (
               contactLinks.map(link => (
                 <button
@@ -957,6 +1358,59 @@ function ItemMetrics({ item }: { item: MarketplaceItem }) {
         <MiniStat label="Inquiries" value={inquiries} />
       </div>
     </section>
+  );
+}
+
+/* Listing-type segmented switch + optional price input. Used in the title
+ * row when the owner is editing a sell/free/borrow/swap post. */
+function OwnerPriceEditor({
+  listingType, priceStr, onListingType, onPriceStr,
+}: {
+  listingType: 'free' | 'sell' | 'borrow' | 'swap';
+  priceStr: string;
+  onListingType: (v: 'free' | 'sell' | 'borrow' | 'swap') => void;
+  onPriceStr: (v: string) => void;
+}) {
+  const isSell = listingType === 'sell';
+  const TYPES: { id: 'free' | 'sell' | 'borrow' | 'swap'; label: string }[] = [
+    { id: 'free',   label: 'Free' },
+    { id: 'sell',   label: 'Sell' },
+    { id: 'borrow', label: 'Borrow' },
+    { id: 'swap',   label: 'Swap' },
+  ];
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+      <select
+        value={listingType}
+        onChange={e => onListingType(e.target.value as 'free' | 'sell' | 'borrow' | 'swap')}
+        className="inline-edit inline-edit--pill"
+        aria-label="Listing type"
+      >
+        {TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+      </select>
+      {isSell && (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 2,
+          background: 'rgba(245,132,0,0.10)',
+          borderRadius: 999,
+          padding: '5px 10px 5px 8px',
+          color: 'var(--accent-amber)',
+          fontWeight: 600, fontSize: 14,
+        }}>
+          <IndianRupee size={12} strokeWidth={2.2} />
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={priceStr}
+            onChange={e => onPriceStr(e.target.value)}
+            placeholder="—"
+            className="inline-edit inline-edit--price"
+            aria-label="Price"
+          />
+        </span>
+      )}
+    </div>
   );
 }
 

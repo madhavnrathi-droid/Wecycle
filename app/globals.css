@@ -1198,6 +1198,124 @@ body {
   .marketing-banner-track { scroll-behavior: auto; }
 }
 
+/* Generic spin — used by the AccountScreen save-status loader and anywhere
+   else we need a rotating glyph. */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════
+   INLINE EDIT — fields on owner detail pages
+   ───────────────────────────────────────────────
+   Goal: the input LOOKS like the display text, but reveals its edit nature
+   on hover/focus (subtle background highlight + caret). No box-drawing in
+   the resting state — keeps the page from feeling like a form. */
+
+.inline-edit {
+  font-family: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  width: 100%;
+  outline: none;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+.inline-edit:hover {
+  background: var(--bg-inset);
+  border-color: var(--border-subtle);
+}
+.inline-edit:focus,
+.inline-edit:focus-visible {
+  background: var(--bg-inset);
+  border-color: var(--border-default);
+  border-style: solid;
+  outline: none;
+}
+.inline-edit::placeholder { color: var(--text-muted); opacity: 0.7; }
+
+/* H1 variant — mobile post title */
+.inline-edit--h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+/* H1 variant — desktop post title (bigger) */
+.inline-edit--h1-desktop {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  line-height: 1.18;
+}
+
+/* Meta variant — location, etc. — fits inline beside an icon */
+.inline-edit--meta {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Body variant — description textarea */
+.inline-edit--body {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 80px;
+}
+.inline-edit--body-desktop {
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 96px;
+}
+
+/* Pill variant — small chip-like select (category, listing type) */
+.inline-edit--pill {
+  display: inline-block;
+  width: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.inline-edit--pill:hover { background: var(--bg-card); }
+.inline-edit--pill:focus { border-color: var(--border-default); }
+
+/* Price input — sits inside the orange pill, looks like a number */
+.inline-edit--price {
+  width: 4.5ch;
+  background: transparent;
+  border: none;
+  color: var(--accent-amber);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  text-align: left;
+}
+.inline-edit--price::-webkit-outer-spin-button,
+.inline-edit--price::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.inline-edit--price[type=number] { -moz-appearance: textfield; }
+
 /* Tablet — minor adjustments only, mobile sizes are already balanced */
 @media (min-width: 768px) {
   .search-pill { padding-top: 12px; padding-bottom: 12px; }
