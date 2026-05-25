@@ -476,6 +476,10 @@ export default function FeedScreen({
                       variant={variant}
                       isSaved={savedIds.has(it.id)}
                       hidePrice={hidePrice}
+                      /* Green stroke for both marketplace + requests so the
+                         All-tab masonry colour-codes every post-type at a
+                         glance (events purple, L&F amber, posts green). */
+                      strokeKind={entry.kind === 'request' ? 'request' : 'marketplace'}
                       onToggleSave={() => {
                         setSavedIds(prev => {
                           const next = new Set(prev);
@@ -594,7 +598,7 @@ const VARIANT_RATIOS: Record<FeedCardVariant, string> = {
 };
 
 function FeedCard({
-  item, variant, isSaved, onToggleSave, onClick, hidePrice,
+  item, variant, isSaved, onToggleSave, onClick, hidePrice, strokeKind,
 }: {
   item: MarketplaceItem;
   variant: FeedCardVariant;
@@ -604,6 +608,11 @@ function FeedCard({
   /** Settings → Marketplace → "Hide prices on feed" — when true we still
    *  show the listing type chip (Free / Borrow / Swap) but suppress numbers. */
   hidePrice: boolean;
+  /** When set, paints a coloured stroke around the card. Used on the
+   *  All-tab feed to colour-code listings + requests (green) alongside
+   *  events (purple) and L&F (amber). Undefined on the dedicated tabs
+   *  so they're not redundantly stroked. */
+  strokeKind?: 'marketplace' | 'request';
 }) {
   /* Use the media (photo+video) gallery so cards autoplay videos inline
      when the user swipes to a video slide. Real listings carry their own
@@ -638,6 +647,7 @@ function FeedCard({
     return (
       <article
         className="feed-card feed-card--text"
+        data-stroke={strokeKind}
         style={{ padding: 0, position: 'relative', overflow: 'hidden' }}
       >
         <button
@@ -699,7 +709,12 @@ function FeedCard({
   }
 
   return (
-    <div className="feed-card" style={{ aspectRatio: ar, padding: 0 }} aria-label={`Open ${item.title}`}>
+    <div
+      className="feed-card"
+      data-stroke={strokeKind}
+      style={{ aspectRatio: ar, padding: 0 }}
+      aria-label={`Open ${item.title}`}
+    >
       <PhotoCarousel
         photos={photos}
         aspectRatio={ar}

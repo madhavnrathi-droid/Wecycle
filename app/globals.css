@@ -1456,6 +1456,16 @@ body {
   border-color: #F58400;
   box-shadow: 0 0 0 1px rgba(245,132,0,0.22) inset;
 }
+/* Marketplace + requests both ring green on the All-tab feed — matches
+   the inventory ring system so post-type is consistently colour-coded. */
+.feed-card[data-stroke="marketplace"]::after {
+  border-color: #22C55E;
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.20) inset;
+}
+.feed-card[data-stroke="request"]::after {
+  border-color: #16A34A;
+  box-shadow: 0 0 0 1px rgba(22,163,74,0.20) inset;
+}
 
 /* ═══════════════════════════════════════════════
    INLINE EDIT — owner-editable fields on detail screens
@@ -2840,9 +2850,15 @@ body {
    SEGMENTED CONTROL (Requests / Uploads)
    ═══════════════════════════════════════════════ */
 
+/* Segmented control auto-sizes to however many tabs it holds — was hard-
+   locked to 2 columns which broke when the home feed grew to [All]
+   [Requests] [Uploads] and InventoryScreen's tabs grew to 4-5. Using
+   `grid-auto-columns: 1fr` + `grid-auto-flow: column` keeps every tab
+   the same width regardless of count. */
 .segmented {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   background: var(--bg-inset);
   padding: 4px;
   border-radius: 999px;
@@ -2859,6 +2875,18 @@ body {
   color: var(--text-secondary);
   transition: all 0.18s var(--ease-smooth);
   font-family: inherit;
+  /* Override the global :focus-visible outline — on this control the
+     active pill IS the focus indicator (filled black against the inset
+     track), and the outer 2px lime ring reads as a "weird stuck" state
+     instead of an accessibility cue. We still surface focus via the
+     pill's own state. */
+  outline: none;
+}
+.segmented button:focus-visible {
+  outline: 2px solid var(--accent-lime-dim);
+  outline-offset: 0;
+  /* Inset offset so the ring sits inside the rounded pill instead of
+     leaking past the container's border-radius. */
 }
 .segmented button[data-active] {
   background: var(--text-primary);
