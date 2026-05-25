@@ -1434,6 +1434,29 @@ body {
   box-shadow: 0 0 0 1px rgba(245,132,0,0.22) inset;
 }
 
+/* Same colour-code logic applied to event + L&F cards on the home feed
+   (the "All" tab) so visitors can tell post-types apart at a glance. We
+   piggyback on the same data-stroke attribute. */
+.feed-card[data-stroke] { position: relative; }
+.feed-card[data-stroke]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid transparent;
+  pointer-events: none;
+  z-index: 5;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.feed-card[data-stroke="event"]::after {
+  border-color: #A855F7;
+  box-shadow: 0 0 0 1px rgba(168,85,247,0.20) inset;
+}
+.feed-card[data-stroke="lostfound"]::after {
+  border-color: #F58400;
+  box-shadow: 0 0 0 1px rgba(245,132,0,0.22) inset;
+}
+
 /* ═══════════════════════════════════════════════
    INLINE EDIT — owner-editable fields on detail screens
    ───────────────────────────────────────────────

@@ -6,12 +6,20 @@ import { supabase } from './supabase';
 import type { Profile } from './api/types';
 import { getDemoSession, clearDemoSession, onDemoSessionChange, type DemoSession, initialsOf } from './demoAuth';
 
-/* Single admin account — hard-coded by request. Anyone signed in with this
-   email gets isAdmin=true and can delete any post/comment regardless of
-   ownership. Combined with RLS: see SQL migration in BACKEND.md. */
-export const ADMIN_EMAIL = 'wecycle.page@gmail.com';
+/* Admin allow-list — hard-coded by request. Anyone signed in with one
+   of these emails gets isAdmin=true and can delete any post/comment
+   regardless of ownership. Mirrored server-side by `public.is_wecycle_admin()`
+   in Supabase, which is wired into DELETE RLS policies on listings,
+   requests, events, lost_found_reports, and comments. */
+export const ADMIN_EMAILS: ReadonlyArray<string> = [
+  'wecycle.page@gmail.com',
+  'madhav.n.rathi@gmail.com',
+] as const;
+/** Back-compat: callers that only need a single canonical address. */
+export const ADMIN_EMAIL = ADMIN_EMAILS[0];
 export function isAdminEmail(email?: string | null): boolean {
-  return (email ?? '').trim().toLowerCase() === ADMIN_EMAIL;
+  const e = (email ?? '').trim().toLowerCase();
+  return e !== '' && ADMIN_EMAILS.includes(e);
 }
 
 interface AuthContextValue {

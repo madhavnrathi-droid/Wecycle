@@ -385,6 +385,8 @@ export default function WecycleApp() {
               onOpenMenu={() => setDrawerOpen(true)}
               onOpenAccount={goToAccount}
               onOpenItem={setOpenItem}
+              onOpenEvent={setOpenEvent}
+              onOpenLF={(lf) => setOpenLF(lf)}
               onBannerAction={(kind) => {
                 if (kind === 'share')       openShareItem();
                 else if (kind === 'request') openPostRequest();

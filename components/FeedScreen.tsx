@@ -1,13 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Menu, Search, MapPin, Heart, X } from 'lucide-react';
-import { MARKETPLACE_ITEMS, CATEGORIES, type MarketplaceItem } from '../lib/mockData';
-import { resolveItemMedia, getAvatar } from '../lib/photos';
+import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye } from 'lucide-react';
+import {
+  MARKETPLACE_ITEMS, EVENTS, LOST_FOUND_ITEMS, CATEGORIES,
+  type MarketplaceItem, type CommunityEvent, type LostItem,
+} from '../lib/mockData';
+import { resolveItemMedia, getAvatar, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
-import { fetchMarketplaceItems, fetchRequests, onPostsChanged, searchUsers, type UserSearchHit } from '../lib/liveData';
+import {
+  fetchMarketplaceItems, fetchRequests, fetchEvents, fetchLostFound,
+  onPostsChanged, searchUsers, type UserSearchHit,
+} from '../lib/liveData';
+import { getEventMetrics } from '../lib/metrics';
 import { getSettings, onSettingsChange } from '../lib/settings';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
@@ -19,6 +26,10 @@ interface FeedScreenProps {
   onOpenMenu: () => void;
   onOpenAccount: () => void;
   onOpenItem: (item: MarketplaceItem) => void;
+  /** Open an event detail screen — used when an event card on the All tab is tapped. */
+  onOpenEvent?: (event: CommunityEvent) => void;
+  /** Open the Lost & Found sheet — used when an L&F card on the All tab is tapped. */
+  onOpenLF?: (lf: LostItem) => void;
   /** Banner CTA — fired when a marketing-banner slide is tapped.
    *  kind = which feature the user wants to jump to. */
   onBannerAction?: (kind: 'share' | 'request' | 'events' | 'lost-found') => void;
@@ -27,17 +38,20 @@ interface FeedScreenProps {
   onOpenUser?: (userId: string) => void;
 }
 
-export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenItem, onBannerAction, onOpenUser }: FeedScreenProps) {
+export default function FeedScreen({
+  onPost, onOpenMenu, onOpenAccount, onOpenItem, onOpenEvent, onOpenLF,
+  onBannerAction, onOpenUser,
+}: FeedScreenProps) {
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const [activeCategory, setActiveCategory] = useState('all');
-  /* Always start a new session on Requests — "put others' needs before
-     theirs". FeedScreen unmounts when the user navigates to another
-     bottom-nav screen, so coming back here re-initialises this default,
-     which is exactly the "every session starts on Requests" behaviour. */
-  const [activeType, setActiveType] = useState<'all' | 'requests' | 'uploads'>('requests');
+  /* Default tab = "All" — a chronological mix of every Wecycle activity
+     (uploads, requests, events, lost-found). FeedScreen unmounts when the
+     user navigates to another bottom-nav screen, so the next visit reseeds
+     this default — that's the "every new session starts on All" behaviour. */
+  const [activeType, setActiveType] = useState<'all' | 'requests' | 'uploads'>('all');
   const [query, setQuery] = useState('');
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
@@ -49,12 +63,13 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
     return onSettingsChange(s => setHidePrice(s.marketplace.hidePriceOnFeed));
   }, []);
 
-  /* Source of truth for the marketplace cards:
-       - demo mode → the seeded mock catalogue
-       - live (Supabase env) → real listings, refetched whenever a post lands
-       - neither → empty (first-mover prompt) */
+  /* Source of truth for the cards on each tab. Marketplace + requests
+     feed the dedicated tabs; events + L&F join only on the "All" tab
+     (which is the default first view of every session). */
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [requests, setRequests] = useState<MarketplaceItem[]>([]);
+  const [events, setEvents] = useState<CommunityEvent[]>([]);
+  const [lostFound, setLostFound] = useState<LostItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,12 +79,16 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
     if (isDemoMode()) {
       setItems(MARKETPLACE_ITEMS);
       setRequests([]);
+      setEvents(EVENTS);
+      setLostFound(LOST_FOUND_ITEMS);
       setLoading(false);
       return;
     }
     if (!hasSupabaseEnv) {
       setItems([]);
       setRequests([]);
+      setEvents([]);
+      setLostFound([]);
       setLoading(false);
       return;
     }
@@ -79,11 +98,15 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
       Promise.all([
         fetchMarketplaceItems({ limit: 60 }),
         fetchRequests({ limit: 60 }),
+        fetchEvents(),
+        fetchLostFound(),
       ])
-        .then(([listingRows, requestRows]) => {
+        .then(([listingRows, requestRows, eventRows, lfRows]) => {
           if (cancelled) return;
           setItems(listingRows);
           setRequests(requestRows);
+          setEvents(eventRows);
+          setLostFound(lfRows);
         })
         .finally(() => { if (!cancelled) setLoading(false); });
     };
@@ -118,14 +141,64 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
     return () => clearTimeout(t);
   }, [query, mounted]);
 
-  /* The active tab decides which pool we render. Uploads → listings,
-     Requests → open requests. */
+  /* The active tab decides which pool we render:
+       - 'all'      → mixed feed of items + requests + events + L&F by recency
+       - 'requests' → open requests only
+       - 'uploads'  → marketplace listings only */
   const source = activeType === 'requests' ? requests : items;
   const filtered = source.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
     if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
+
+  /* ── "All" tab entries ──────────────────────────────
+     Mix every content type into a single masonry, ordered by recency. The
+     discriminated union lets the renderer pick the right tile component
+     per kind. Each entry carries a sortKey so we can interleave items
+     chronologically; live rows have real timestamps, demo rows fall back
+     to a positional sort. */
+  type AllEntry =
+    | { kind: 'item';    item: MarketplaceItem;    sortKey: number }
+    | { kind: 'request'; item: MarketplaceItem;    sortKey: number }
+    | { kind: 'event';   event: CommunityEvent;    sortKey: number }
+    | { kind: 'lf';      lf: LostItem;             sortKey: number };
+
+  const allEntries = useMemo<AllEntry[]>(() => {
+    /* "Recent" sort key — older posts carry larger postedDaysAgo numbers,
+       so smaller days-ago wins. For events we use the days-until-start so
+       upcoming events feel "new". L&F uses position in the array since
+       timeAgo is already a human string. */
+    const itemEntries: AllEntry[] = items.map((it, i) => ({
+      kind: 'item' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
+    }));
+    const requestEntries: AllEntry[] = requests.map((it, i) => ({
+      kind: 'request' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
+    }));
+    const eventEntries: AllEntry[] = events.map((ev, i) => ({
+      kind: 'event' as const, event: ev, sortKey: -1000 + i,  /* events surface earliest */
+    }));
+    const lfEntries: AllEntry[] = lostFound.map((lf, i) => ({
+      kind: 'lf' as const, lf, sortKey: i * 1000,
+    }));
+
+    const merged = [...itemEntries, ...requestEntries, ...eventEntries, ...lfEntries];
+
+    /* Filter by category + query — events / L&F skip the category filter
+       since they don't carry one, but they still honour the title query. */
+    const matchesQuery = (t: string) => !query || t.toLowerCase().includes(query.toLowerCase());
+    const matchesCategory = (cat?: string) =>
+      activeCategory === 'all' || (cat ?? '').toLowerCase() === activeCategory;
+
+    return merged
+      .filter(e => {
+        if (e.kind === 'item')    return matchesCategory(e.item.category) && matchesQuery(e.item.title);
+        if (e.kind === 'request') return matchesCategory(e.item.category) && matchesQuery(e.item.title);
+        if (e.kind === 'event')   return activeCategory === 'all' && matchesQuery(e.event.title);
+        return                              activeCategory === 'all' && matchesQuery(e.lf.title);
+      })
+      .sort((a, b) => a.sortKey - b.sortKey);
+  }, [items, requests, events, lostFound, activeCategory, query]);
 
   const greetingName = (profile?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0];
 
@@ -340,9 +413,16 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
         onPick={(hit) => onOpenUser?.(hit.id)}
       />
 
-      {/* ── PILL TABS: requests / uploads ── */}
+      {/* ── PILL TABS: all / requests / uploads ── */}
       <section style={{ padding: '0 16px 14px' }}>
         <div className="segmented">
+          <button
+            onClick={() => setActiveType('all')}
+            aria-pressed={activeType === 'all'}
+            data-active={activeType === 'all' || undefined}
+          >
+            All
+          </button>
           <button
             onClick={() => setActiveType('requests')}
             aria-pressed={activeType === 'requests'}
@@ -377,64 +457,125 @@ export default function FeedScreen({ onPost, onOpenMenu, onOpenAccount, onOpenIt
 
       {/* ── MASONRY (Pinterest-style waterfall) ──
          Tight side padding so the grid reads as edge-to-edge on desktop —
-         the .app-container already gives us the outer gutter. */}
+         the .app-container already gives us the outer gutter. The "All" tab
+         renders a mixed feed (items + requests + events + L&F); other tabs
+         render their dedicated pool. */}
       <section className="masonry-shell" style={{ padding: '0 8px' }}>
         <div className="masonry-2">
-          {filtered.map((item, idx) => (
-            <FeedCard
-              key={item.id}
-              item={item}
-              /* Pinterest-style: cycle through 5 aspect ratios so the waterfall
-                 has the irregular puzzle-piece flow instead of a 2-state stripe. */
-              variant={(['xtall','tall','portrait','square','landscape'] as const)[idx % 5]}
-              isSaved={savedIds.has(item.id)}
-              hidePrice={hidePrice}
-              onToggleSave={() => {
-                setSavedIds(prev => {
-                  const next = new Set(prev);
-                  next.has(item.id) ? next.delete(item.id) : next.add(item.id);
-                  return next;
-                });
-              }}
-              onClick={() => onOpenItem(item)}
-            />
-          ))}
+          {activeType === 'all'
+            ? allEntries.map((entry, idx) => {
+                /* Cycle aspect-ratio variants so the masonry stays
+                   irregular and the user's eye keeps moving. */
+                const variant = (['xtall','tall','portrait','square','landscape'] as const)[idx % 5];
+                if (entry.kind === 'item' || entry.kind === 'request') {
+                  const it = entry.item;
+                  return (
+                    <FeedCard
+                      key={`${entry.kind}-${it.id}`}
+                      item={it}
+                      variant={variant}
+                      isSaved={savedIds.has(it.id)}
+                      hidePrice={hidePrice}
+                      onToggleSave={() => {
+                        setSavedIds(prev => {
+                          const next = new Set(prev);
+                          next.has(it.id) ? next.delete(it.id) : next.add(it.id);
+                          return next;
+                        });
+                      }}
+                      onClick={() => onOpenItem(it)}
+                    />
+                  );
+                }
+                if (entry.kind === 'event') {
+                  return (
+                    <EventFeedCard
+                      key={`event-${entry.event.id}`}
+                      event={entry.event}
+                      variant={variant}
+                      onClick={() => onOpenEvent?.(entry.event)}
+                    />
+                  );
+                }
+                return (
+                  <LostFoundFeedCard
+                    key={`lf-${entry.lf.id}`}
+                    lf={entry.lf}
+                    variant={variant}
+                    onClick={() => onOpenLF?.(entry.lf)}
+                  />
+                );
+              })
+            : filtered.map((item, idx) => (
+              <FeedCard
+                key={item.id}
+                item={item}
+                variant={(['xtall','tall','portrait','square','landscape'] as const)[idx % 5]}
+                isSaved={savedIds.has(item.id)}
+                hidePrice={hidePrice}
+                onToggleSave={() => {
+                  setSavedIds(prev => {
+                    const next = new Set(prev);
+                    next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+                    return next;
+                  });
+                }}
+                onClick={() => onOpenItem(item)}
+              />
+            ))}
         </div>
 
-        {loading && filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
-            Loading the feed…
-          </div>
-        )}
+        {(() => {
+          /* Decide which "is this empty?" pipeline to use for the empty
+             state. The "All" tab merges 4 sources, so we check the merged
+             entries; other tabs check their single source/filtered pair. */
+          const isAll = activeType === 'all';
+          const visibleCount = isAll ? allEntries.length : filtered.length;
+          const poolCount    = isAll
+            ? items.length + requests.length + events.length + lostFound.length
+            : source.length;
 
-        {!loading && filtered.length === 0 && (
-          source.length === 0 ? (
+          if (loading && visibleCount === 0) {
+            return (
+              <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
+                Loading the feed…
+              </div>
+            );
+          }
+          if (visibleCount > 0) return null;
+
+          if (poolCount === 0) {
             /* Truly empty pool — first-mover prompt, tab-aware copy. */
-            activeType === 'requests' ? (
-              <EmptyState
-                icon="🙋"
-                prompt="No open requests yet. Need something? Ask away!"
-                sub="Posting a request is usually faster (and cheaper) than buying new."
-                cta={{ label: 'Post a request', onClick: onPost }}
-              />
-            ) : (
+            if (activeType === 'requests') {
+              return (
+                <EmptyState
+                  icon="🙋"
+                  prompt="No open requests yet. Need something? Ask away!"
+                  sub="Posting a request is usually faster (and cheaper) than buying new."
+                  cta={{ label: 'Post a request', onClick: onPost }}
+                />
+              );
+            }
+            return (
               <EmptyState
                 icon="🌱"
                 prompt="Looks like the feed's just sprouting. Be the first to share something!"
                 sub="Post a free find, a borrow request, or an event — your community's waiting."
                 cta={{ label: 'Post the first thing', onClick: onPost }}
               />
-            )
-          ) : (
-            /* Filter / search returned no rows — softer "no match" copy. */
+            );
+          }
+
+          /* Filter / search returned no rows — softer "no match" copy. */
+          return (
             <EmptyState
               icon="🔍"
               prompt="No matches for that search."
               sub="Try a different keyword or clear the category filter."
               compact
             />
-          )
-        )}
+          );
+        })()}
       </section>
     </div>
   );
@@ -600,5 +741,97 @@ function FeedCard({
         }
       />
     </div>
+  );
+}
+
+/* ── Event tile (All-tab variant) ──────────────────
+   Mirrors the inventory event card shape but uses the public organizer
+   info + RSVP/attendee snippet. Purple data-stroke so the All tab still
+   colour-codes by post type. */
+function EventFeedCard({
+  event, variant, onClick,
+}: { event: CommunityEvent; variant: FeedCardVariant; onClick: () => void }) {
+  const ar = VARIANT_RATIOS[variant];
+  const uploaded = (event as { photoUrls?: string[] }).photoUrls;
+  const photo = uploaded && uploaded.length > 0
+    ? uploaded[0]
+    : getEventPhoto(event.id, event.eventType);
+  const metrics = getEventMetrics(event.id);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="feed-card feed-card--event"
+      data-stroke="event"
+      style={{ aspectRatio: ar, padding: 0 }}
+      aria-label={`Open event ${event.title}`}
+    >
+      <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+      <span style={{
+        position: 'absolute', top: 10, left: 10,
+        background: 'rgba(168,85,247,0.92)', color: '#fff',
+        backdropFilter: 'blur(8px)', borderRadius: 999,
+        padding: '4px 10px',
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        display: 'inline-flex', alignItems: 'center', gap: 4, zIndex: 3,
+      }}>
+        <CalendarDays size={10} strokeWidth={2} /> Event
+      </span>
+      <div className="feed-card-overlay">
+        <p className="feed-card-title">{event.title}</p>
+        <div className="feed-card-meta" style={{ gap: 10 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <UsersIcon size={10} strokeWidth={2} /> {metrics.rsvps}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <Eye size={10} strokeWidth={2} /> {metrics.views}
+          </span>
+          <span className="feed-card-price">{event.date.split(' ').slice(0, 3).join(' ')}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* ── Lost & Found tile (All-tab variant) ──────────────
+   Orange-stroked card mirroring the inventory L&F tile but rendered in the
+   public feed flow. Status badge top-left (rose for Lost, green for Found). */
+function LostFoundFeedCard({
+  lf, variant, onClick,
+}: { lf: LostItem; variant: FeedCardVariant; onClick: () => void }) {
+  const ar = VARIANT_RATIOS[variant];
+  const photo = getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls);
+  const isLost = lf.status === 'lost';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="feed-card feed-card--lostfound"
+      data-stroke="lostfound"
+      style={{ aspectRatio: ar, padding: 0 }}
+      aria-label={`Open ${lf.title}`}
+    >
+      <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+      <span style={{
+        position: 'absolute', top: 10, left: 10,
+        background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
+        color: '#fff', borderRadius: 999,
+        padding: '4px 10px',
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+        textTransform: 'uppercase', zIndex: 3,
+      }}>
+        {lf.status}
+      </span>
+      <div className="feed-card-overlay">
+        <p className="feed-card-title">{lf.title}</p>
+        <div className="feed-card-meta">
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <MapPin size={10} strokeWidth={2} /> {lf.lastSeen}
+          </span>
+          <span className="feed-card-price">{lf.timeAgo}</span>
+        </div>
+      </div>
+    </button>
   );
 }
