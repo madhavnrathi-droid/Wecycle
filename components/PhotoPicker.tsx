@@ -302,7 +302,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
       <input
         ref={libraryRef}
         type="file"
-        accept={allowVideo ? 'image/*,video/*' : 'image/*'}
+        accept={allowVideo ? 'image/*,.heic,.heif,video/*' : 'image/*,.heic,.heif'}
         multiple
         style={{ display: 'none' }}
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
@@ -310,7 +310,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
       <input
         ref={cameraRef}
         type="file"
-        accept={allowVideo ? 'image/*,video/*' : 'image/*'}
+        accept={allowVideo ? 'image/*,.heic,.heif,video/*' : 'image/*,.heic,.heif'}
         capture="environment"
         style={{ display: 'none' }}
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}

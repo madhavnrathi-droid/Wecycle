@@ -1,349 +1,412 @@
 'use client';
 
-/* Password-based authentication.
+/* OTP-based authentication — no passwords.
  *
- *   - **Sign in** mode: existing users enter email + password.
- *   - **Sign up** mode: new users enter full name + college ID + email +
- *     password. We hand the extra profile fields to Supabase as user_metadata
- *     so the profiles trigger can persist them on first login.
+ *   Step 1 — Email: user enters any valid email + (on sign-up) name.
+ *            Click "Send code" → Supabase signInWithOtp() fires off a
+ *            6-digit code to the address. shouldCreateUser:true auto-
+ *            provisions the auth.users + profiles rows if it's a first-
+ *            time visitor.
  *
- * Password policy: minimum 6 characters, no character-class requirements.
- * The Supabase project's GoTrue config must mirror this (password_min_length=6)
- * so the server doesn't reject what the client accepts.
+ *   Step 2 — Code: user pastes / types the code from their inbox.
+ *            verifyOtp({ type: 'email' }) succeeds → they're signed in.
  *
- * Fallback: when Supabase env vars are missing (the stub client is in play),
- * we drop into the localStorage demo path so the screens are still navigable
- * for early UX testing.
+ * The single flow handles both sign-up and sign-in — Supabase decides
+ * which based on whether the email already exists.
+ *
+ * Email sender: the OTP comes from whatever address is configured under
+ * Supabase Project → Auth → SMTP. To use wecycle.page@gmail.com:
+ *   1. Generate an App Password for the Google account
+ *   2. Add SMTP host=smtp.gmail.com, port=587, user=wecycle.page@gmail.com,
+ *      pass=<app-pwd>, sender_email=wecycle.page@gmail.com, sender_name=Wecycle
+ *
+ * Demo fallback: when Supabase env vars are missing we drop into the
+ * localStorage demo session as before so the screens stay navigable.
  */
 
-import { useState } from 'react';
-import { Mail, User, ArrowLeft, IdCard, Lock, Eye, EyeOff } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Mail, User, ArrowLeft, IdCard, KeyRound, Loader2 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
 
-type Tab = 'signin' | 'signup';
+type Step = 'email' | 'code';
 
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-/* Single source of truth for the password rule — keep this in sync with the
-   `password_min_length` setting on the Supabase project. */
-export const PASSWORD_MIN_LENGTH = 6;
-
-/* Accept either a MAHE learner address (`@learner.manipal.edu`) or a
-   faculty / staff address (`@manipal.edu`). */
-const MAHE_EMAIL = /^[^\s@]+@(learner\.)?manipal\.edu$/i;
-/* Admin escape hatch — the single hard-coded moderation account. We allow it
-   alongside MAHE addresses so the admin can sign in from this same modal. */
-const ADMIN_EMAIL = 'wecycle.page@gmail.com';
-const isAllowedEmail = (e: string) =>
-  MAHE_EMAIL.test(e.trim()) || e.trim().toLowerCase() === ADMIN_EMAIL;
+/* Simple "looks like an email" check. We deliberately stay permissive —
+   anything more elaborate just rejects real addresses with + tags, sub-
+   domains, etc. Real validation happens server-side when the OTP fails
+   to deliver. */
+const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/* OTP from Supabase is exactly 6 digits. */
+const OTP_LENGTH = 6;
+/* Cool-down between resends so users don't spam the SMTP server (which
+   would also trip Supabase's own rate limiter). */
+const RESEND_SECONDS = 30;
 
 export default function AuthModal({ open, onClose }: AuthModalProps) {
-  const [tab, setTab] = useState<Tab>('signin');
-  const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState<Step>('email');
 
-  /* Form state — kept on the parent so toggling tabs doesn't wipe entered values */
+  /* Form state — preserved across step transitions so users can go back. */
   const [name, setName] = useState('');
   const [collegeId, setCollegeId] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const [resendSecs, setResendSecs] = useState(0);
+  const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const codeInputRef = useRef<HTMLInputElement | null>(null);
+
+  /* When the user lands on the code step, autofocus the input so they can
+     paste the code from their email straight in. */
+  useEffect(() => {
+    if (step === 'code') {
+      const t = setTimeout(() => codeInputRef.current?.focus(), 80);
+      return () => clearTimeout(t);
+    }
+  }, [step]);
+
+  /* Resend cooldown ticker — drives the disabled state + label on the
+     "Resend code" link. Cleaned up on unmount + close. */
+  useEffect(() => () => {
+    if (resendTimer.current) clearInterval(resendTimer.current);
+  }, []);
+  const startResendCooldown = () => {
+    setResendSecs(RESEND_SECONDS);
+    if (resendTimer.current) clearInterval(resendTimer.current);
+    resendTimer.current = setInterval(() => {
+      setResendSecs(s => {
+        if (s <= 1) {
+          if (resendTimer.current) clearInterval(resendTimer.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
 
   const resetAll = () => {
-    setTab('signin');
-    setShowPassword(false);
+    setStep('email');
     setName('');
     setCollegeId('');
     setEmail('');
-    setPassword('');
+    setCode('');
     setSubmitting(false);
     setError(null);
+    setInfo(null);
+    setResendSecs(0);
+    if (resendTimer.current) clearInterval(resendTimer.current);
   };
-
   const handleClose = () => { resetAll(); onClose(); };
 
   /* ── Validation ─────────────────────────────── */
+  const emailOk = EMAIL_LIKE.test(email.trim());
+  const codeOk  = code.replace(/\D/g, '').length === OTP_LENGTH;
 
-  const emailOk    = isAllowedEmail(email);
-  const passwordOk = password.length >= PASSWORD_MIN_LENGTH;
-  const nameOk     = name.trim().length >= 2;
-  const collegeOk  = collegeId.trim().length >= 3;
-
-  const canSubmit =
-    tab === 'signin'
-      ? emailOk && passwordOk
-      : emailOk && passwordOk && nameOk && collegeOk;
-
-  /* ── Submit handlers ───────────────────────── */
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit || submitting) return;
+  /* ── Send OTP ───────────────────────────────── */
+  const sendCode = async () => {
+    if (!emailOk || submitting) return;
     setError(null);
+    setInfo(null);
     setSubmitting(true);
     try {
       if (!hasSupabaseEnv) {
-        /* Demo deploy (no env vars) — drop into localStorage session so the
-           tester can navigate the app. Password isn't checked because there's
-           no auth backend to check it against. */
-        await new Promise(r => setTimeout(r, 280));
+        /* No backend → drop into the demo session like the old auth did. */
+        await new Promise(r => setTimeout(r, 250));
         createDemoSession({
-          name: nameOk ? name.trim() : email.split('@')[0],
+          name: name.trim() || email.split('@')[0],
           email: email.trim(),
-          collegeId: collegeOk ? collegeId.trim() : '',
+          collegeId: collegeId.trim(),
         });
         handleClose();
         return;
       }
-
-      if (tab === 'signin') {
-        const { error: err } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (err) throw err;
-        handleClose();
-      } else {
-        /* Sign up → immediate sign-in. Our DB trigger `wecycle_autoconfirm`
-           pre-fills email_confirmed_at on every new auth.users row, so no
-           confirmation link is ever sent and the credentials are usable on
-           the very next request. */
-        const { data, error: err } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            /* Forwarded to the profiles row via the on-auth-user-created
-               trigger / RLS-friendly upsert in lib/api/auth.ts. */
-            data: {
-              full_name: name.trim(),
-              initials:  initialsOf(name),
-              college_id: collegeId.trim(),
-            },
+      const { error: err } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          /* Auto-create the auth.users row if this is a new visitor. The
+             on-auth-user-created trigger handles the profile insert; we
+             pass name + initials + (optional) college_id so the profile
+             row is meaningful from the first verify. */
+          shouldCreateUser: true,
+          data: {
+            full_name: name.trim() || undefined,
+            initials:  name.trim() ? initialsOf(name) : undefined,
+            college_id: collegeId.trim() || undefined,
           },
-        });
-        if (err) throw err;
-
-        /* When the project's "Confirm email" toggle happens to still be on,
-           signUp returns `data.session === null`. Our trigger has already
-           confirmed the user at the DB level, so an immediate password-based
-           sign-in resolves to a real session without the user noticing. */
-        if (!data.session) {
-          const { error: signInErr } = await supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password,
-          });
-          if (signInErr) throw signInErr;
-        }
-        handleClose();
-      }
+        },
+      });
+      if (err) throw err;
+      setStep('code');
+      setInfo(`We sent a 6-digit code to ${email.trim()}. It expires in 10 minutes.`);
+      startResendCooldown();
     } catch (err) {
-      const msg = (err as Error).message || 'Something went wrong';
-      /* Translate the most common Supabase error strings into friendlier copy. */
-      if (/invalid login credentials/i.test(msg)) {
-        setError("That email and password don't match — try again, or sign up if you're new.");
-      } else if (/user already registered/i.test(msg)) {
-        setError("That email already has an account. Switch to Sign in.");
-      } else if (/password.*should be at least/i.test(msg)) {
-        setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
-      } else if (/network/i.test(msg)) {
-        setError("Couldn't reach the server. Check your connection and try again.");
-      } else {
-        setError(msg);
-      }
+      handleAuthError(err);
     } finally {
       setSubmitting(false);
     }
   };
 
-  /* ── Render ─────────────────────────────────── */
+  /* ── Verify OTP ─────────────────────────────── */
+  const verifyCode = async () => {
+    if (!codeOk || submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const cleaned = code.replace(/\D/g, '');
+      const { error: err } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: cleaned,
+        /* `email` works for both sign-in and the first verify of a
+           fresh user. Supabase no longer distinguishes the two for OTP. */
+        type: 'email',
+      });
+      if (err) throw err;
+      handleClose();
+    } catch (err) {
+      handleAuthError(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  const submitLabel =
-    submitting
-      ? (tab === 'signin' ? 'Signing in…' : 'Creating account…')
-      : (tab === 'signin' ? 'Sign in'    : 'Create account');
+  /* ── Resend ─────────────────────────────────── */
+  const resendCode = async () => {
+    if (resendSecs > 0 || submitting) return;
+    /* Reuse sendCode — it'll just push a fresh OTP to the same address. */
+    await sendCode();
+  };
+
+  /* Translate raw Supabase error strings into copy that doesn't look like
+     a stack trace to a community-app user. */
+  const handleAuthError = (err: unknown) => {
+    const msg = (err as Error).message || 'Something went wrong';
+    if (/rate limit|too many requests/i.test(msg)) {
+      setError("We've sent too many codes recently — try again in a minute.");
+    } else if (/expired/i.test(msg)) {
+      setError('That code has expired. Tap "Resend code" to get a fresh one.');
+    } else if (/invalid|incorrect|token/i.test(msg)) {
+      setError("That code didn't match. Double-check it (or resend).");
+    } else if (/email/i.test(msg) && /valid/i.test(msg)) {
+      setError("That doesn't look like a valid email. Try again.");
+    } else if (/network/i.test(msg)) {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } else {
+      setError(msg);
+    }
+  };
+
+  /* Allow Enter to advance from email → code on the first step. */
+  const onFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (step === 'email') void sendCode();
+    else                   void verifyCode();
+  };
 
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title={tab === 'signin' ? 'Welcome back' : 'Join Wecycle'}
+      title={step === 'email' ? 'Sign in to Wecycle' : 'Enter the code'}
       footer={
-        <button
-          type="submit"
-          form="auth-form"
-          disabled={!canSubmit || submitting}
-          className="btn btn-primary"
-          style={{ flex: 1 }}
-        >
-          {submitLabel}
-        </button>
+        step === 'email' ? (
+          <button
+            type="submit"
+            form="auth-form"
+            disabled={!emailOk || submitting}
+            className="btn btn-primary"
+            style={{ flex: 1 }}
+          >
+            {submitting
+              ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', marginRight: 6, verticalAlign: '-2px' }} />Sending…</>
+              : 'Send code'}
+          </button>
+        ) : (
+          <button
+            type="submit"
+            form="auth-form"
+            disabled={!codeOk || submitting}
+            className="btn btn-primary"
+            style={{ flex: 1 }}
+          >
+            {submitting
+              ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', marginRight: 6, verticalAlign: '-2px' }} />Verifying…</>
+              : 'Verify & sign in'}
+          </button>
+        )
       }
     >
-      <form id="auth-form" onSubmit={submit} noValidate
+      <form id="auth-form" onSubmit={onFormSubmit} noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
       >
-        {/* Tab toggle */}
-        <div className="segmented" role="tablist" aria-label="Sign in or sign up">
-          <button
-            type="button"
-            role="tab"
-            onClick={() => { setTab('signin'); setError(null); }}
-            aria-selected={tab === 'signin'}
-            data-active={tab === 'signin' || undefined}
-          >
-            Sign in
-          </button>
-          <button
-            type="button"
-            role="tab"
-            onClick={() => { setTab('signup'); setError(null); }}
-            aria-selected={tab === 'signup'}
-            data-active={tab === 'signup' || undefined}
-          >
-            Sign up
-          </button>
-        </div>
-
-        {tab === 'signup' && (
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            We just need a couple of details to set up your profile.
-          </p>
-        )}
-
-        {/* ── Sign-up only: name + college ID ── */}
-        {tab === 'signup' && (
+        {step === 'email' ? (
           <>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Use any email — we'll send you a 6-digit code to sign in.
+              No password to remember.
+            </p>
+
+            {/* Optional profile fields — they help your profile feel
+               more "you" from day one, but the OTP works without them
+               too. Skippable on first sign-in; can be filled in later
+               on the Account page. */}
             <div className="field">
               <label htmlFor="auth-name" className="field-label">
                 <User size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                Full name <span className="required" aria-hidden="true">*</span>
+                Full name <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
               </label>
               <input
                 id="auth-name"
-                type="text"
                 className="form-input"
-                placeholder="Ananya Sharma"
+                placeholder="What should we call you?"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 autoComplete="name"
-                required
-                autoFocus
+                maxLength={60}
               />
             </div>
 
             <div className="field">
+              <label htmlFor="auth-email" className="field-label">
+                <Mail size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                Email <span className="required" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="auth-email"
+                type="email"
+                inputMode="email"
+                className="form-input"
+                placeholder="you@gmail.com"
+                value={email}
+                maxLength={80}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+                autoFocus
+              />
+              <span className="field-hint">
+                Any email works — your college address, a Gmail, anything you check often.
+              </span>
+            </div>
+
+            {/* College ID is still useful for storefronts to surface but
+               we drop the requirement — set it later in Account if you
+               don't want to type it now. */}
+            <div className="field">
               <label htmlFor="auth-collegeid" className="field-label">
                 <IdCard size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                College ID <span className="required" aria-hidden="true">*</span>
+                College ID <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
               </label>
               <input
                 id="auth-collegeid"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
                 className="form-input"
                 placeholder="e.g. 230905123"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={collegeId}
                 onChange={e => setCollegeId(e.target.value.replace(/\D+/g, ''))}
                 autoComplete="off"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Check{' '}
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{email}</span>{' '}
+              for a 6-digit code. Paste it below.
+            </p>
+
+            <div className="field">
+              <label htmlFor="auth-code" className="field-label">
+                <KeyRound size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                Verification code <span className="required" aria-hidden="true">*</span>
+              </label>
+              <input
+                ref={codeInputRef}
+                id="auth-code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={OTP_LENGTH}
+                autoComplete="one-time-code"
+                className="form-input"
+                placeholder="••••••"
+                value={code}
+                /* Strip non-digits live so paste cleans up automatically. */
+                onChange={e => setCode(e.target.value.replace(/\D+/g, '').slice(0, OTP_LENGTH))}
+                style={{
+                  textAlign: 'center',
+                  fontSize: 22, fontWeight: 600,
+                  letterSpacing: '0.4em',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
                 required
               />
+            </div>
+
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 8,
+            }}>
+              <button
+                type="button"
+                onClick={() => { setStep('email'); setCode(''); setError(null); setInfo(null); }}
+                className="btn btn-ghost"
+                style={{ fontSize: 13, padding: '6px 10px' }}
+              >
+                <ArrowLeft size={13} strokeWidth={1.8} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+                Change email
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void resendCode()}
+                disabled={resendSecs > 0 || submitting}
+                className="btn btn-ghost"
+                style={{
+                  fontSize: 13, padding: '6px 10px',
+                  opacity: resendSecs > 0 ? 0.6 : 1,
+                  cursor: resendSecs > 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {resendSecs > 0 ? `Resend in ${resendSecs}s` : 'Resend code'}
+              </button>
             </div>
           </>
         )}
 
-        {/* ── Email ── */}
-        <div className="field">
-          <label htmlFor="auth-email" className="field-label">
-            <Mail size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-            Email <span className="required" aria-hidden="true">*</span>
-          </label>
-          <input
-            id="auth-email"
-            type="email"
-            inputMode="email"
-            className="form-input"
-            placeholder="ananya@learner.manipal.edu"
-            value={email}
-            /* Max 80 chars during sign-up keeps the email column from being
-             * abused; matches typical max-length of the email column on
-             * Supabase (255) while staying well within MAHE-mail bounds. */
-            maxLength={80}
-            onChange={e => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-            autoFocus={tab === 'signin'}
-          />
-          <span className="field-hint">
-            Use your MAHE email — <strong>@learner.manipal.edu</strong> or <strong>@manipal.edu</strong>.
-          </span>
-        </div>
-
-        {/* ── Password ── */}
-        <div className="field">
-          <label htmlFor="auth-password" className="field-label">
-            <Lock size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-            Password <span className="required" aria-hidden="true">*</span>
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              id="auth-password"
-              type={showPassword ? 'text' : 'password'}
-              className="form-input"
-              placeholder={tab === 'signup' ? `At least ${PASSWORD_MIN_LENGTH} characters` : 'Your password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoComplete={tab === 'signin' ? 'current-password' : 'new-password'}
-              minLength={PASSWORD_MIN_LENGTH}
-              required
-              style={{ paddingRight: 40 }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(s => !s)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              style={{
-                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--text-muted)', padding: 6,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              {showPassword ? <EyeOff size={15} strokeWidth={1.8} /> : <Eye size={15} strokeWidth={1.8} />}
-            </button>
+        {/* Info + error banners — short, friendly, dismissible by next action */}
+        {info && !error && (
+          <div role="status" style={{
+            padding: '8px 12px', borderRadius: 10,
+            background: 'rgba(34,197,94,0.10)',
+            border: '1px solid rgba(34,197,94,0.22)',
+            color: '#16A34A',
+            fontSize: 12, fontWeight: 500, lineHeight: 1.45,
+          }}>
+            {info}
           </div>
-          {tab === 'signup' && (
-            <span className="field-hint">
-              Minimum {PASSWORD_MIN_LENGTH} characters. No other restrictions.
-            </span>
-          )}
-        </div>
-
-        {/* ── Status ── */}
+        )}
         {error && (
           <div role="alert" style={{
-            padding: '10px 12px',
+            padding: '8px 12px', borderRadius: 10,
             background: 'rgba(237,46,80,0.10)',
-            border: '1px solid rgba(237,46,80,0.25)',
-            borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(237,46,80,0.22)',
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500,
+            fontSize: 12, fontWeight: 500, lineHeight: 1.45,
           }}>
             {error}
           </div>
         )}
-        <p style={{
-          margin: '4px 0 0',
-          fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5,
-        }}>
-          By continuing you agree to our terms. We never share your contact.
-        </p>
       </form>
     </Modal>
   );

@@ -233,10 +233,16 @@ export default function FeedScreen({
 
     return merged
       .filter(e => {
+        /* Items + requests carry categories — respect the active filter.
+         * Events and L&F don't have a category field, so they're always
+         * visible regardless of the chip the user picked. This avoids
+         * the "lost football vanishes under the Sports filter" trap
+         * the user flagged: an L&F post without a category shouldn't
+         * disappear just because there's no category to match against. */
         if (e.kind === 'item')    return matchesCategory(e.item.category) && matchesQuery(e.item.title);
         if (e.kind === 'request') return matchesCategory(e.item.category) && matchesQuery(e.item.title);
-        if (e.kind === 'event')   return activeCategory === 'all' && matchesQuery(e.event.title);
-        return                              activeCategory === 'all' && matchesQuery(e.lf.title);
+        if (e.kind === 'event')   return matchesQuery(e.event.title);
+        return                              matchesQuery(e.lf.title);
       })
       .sort((a, b) => a.sortKey - b.sortKey);
   }, [items, requests, events, lostFound, activeCategory, query]);
@@ -679,6 +685,15 @@ function FeedCard({
         data-stroke={strokeKind}
         style={{ padding: 0, position: 'relative', overflow: 'hidden' }}
       >
+        {strokeKind && (
+          <span
+            className="feed-card-type-chip"
+            data-kind={strokeKind}
+            aria-hidden="true"
+          >
+            {strokeKind === 'request' ? 'Request' : 'Upload'}
+          </span>
+        )}
         <button
           type="button"
           onClick={onClick}
@@ -752,6 +767,21 @@ function FeedCard({
         onClick={onClick}
         overlay={
           <>
+            {/* Top-left type sticker — matches the LOST/FOUND badge on
+                L&F cards + the calendar chip on event cards so users can
+                scan the masonry without having to read each card. Only
+                paints when strokeKind is set (i.e. on the All tab); the
+                dedicated Uploads/Requests tabs don't need redundant
+                labels because the tab itself answers the question. */}
+            {strokeKind && (
+              <span
+                className="feed-card-type-chip"
+                data-kind={strokeKind}
+                aria-hidden="true"
+              >
+                {strokeKind === 'request' ? 'Request' : 'Upload'}
+              </span>
+            )}
             <span
               onClick={e => { e.stopPropagation(); onToggleSave(); }}
               role="button"

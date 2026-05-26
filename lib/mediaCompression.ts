@@ -64,7 +64,39 @@ export async function compressMedia(
   if (file.type.startsWith(VIDEO_MIME_PREFIX)) {
     return processVideo(file);
   }
+  /* iPhone-default HEIC / HEIF needs a one-off decode pass before the
+   * canvas pipeline because browsers can't paint these formats natively.
+   * Convert to JPEG first, then run through the normal compress flow. */
+  if (isHeicLike(file)) {
+    const converted = await convertHeicToJpeg(file);
+    return compressPhoto(converted, opts);
+  }
   return compressPhoto(file, opts);
+}
+
+/** Detects HEIC / HEIF inputs by MIME type, and by file extension when the
+ *  browser drops the MIME (Chromium-on-Windows often hands us "" for HEIC). */
+function isHeicLike(file: File): boolean {
+  const t = (file.type || '').toLowerCase();
+  if (t === 'image/heic' || t === 'image/heif'
+      || t === 'image/heic-sequence' || t === 'image/heif-sequence') return true;
+  const n = (file.name || '').toLowerCase();
+  return n.endsWith('.heic') || n.endsWith('.heif');
+}
+
+/** Decode a HEIC/HEIF file into a JPEG File. Dynamically imports the
+ *  ~150KB heic2any decoder so it only ships to users who actually need it. */
+async function convertHeicToJpeg(file: File): Promise<File> {
+  /* heic2any is browser-only (uses Web APIs) — guard against any
+   * accidental server-side call so the dynamic import doesn't blow up. */
+  if (typeof window === 'undefined') return file;
+  const mod = await import('heic2any');
+  const heic2any = (mod as { default: (opts: { blob: Blob; toType?: string; quality?: number }) => Promise<Blob | Blob[]> }).default
+    ?? (mod as unknown as (opts: { blob: Blob; toType?: string; quality?: number }) => Promise<Blob | Blob[]>);
+  const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+  const out = Array.isArray(result) ? result[0] : result;
+  const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
+  return new File([out], newName, { type: 'image/jpeg', lastModified: Date.now() });
 }
 
 /** Batch-compress, with bounded concurrency. Errors propagate per-item so
