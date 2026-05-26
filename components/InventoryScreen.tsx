@@ -9,7 +9,8 @@ import { getEventMetrics } from '../lib/metrics';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import {
-  fetchMyUploads, fetchMyRequests, fetchEventsByUser, fetchLostFoundByUser, onPostsChanged,
+  fetchMyUploads, fetchMyRequests, fetchEventsByUser, fetchLostFoundByUser,
+  fetchMySaves, onPostsChanged,
   markListingSold, markRequestCompleted, markLostFoundResolved, deleteEvent,
 } from '../lib/liveData';
 import { getDemoUploads, getDemoRequests, deleteDemoPost } from '../lib/demoInventory';
@@ -55,6 +56,10 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
   const [myLiveRequests, setMyLiveRequests] = useState<MarketplaceItem[]>([]);
   const [myLiveEvents, setMyLiveEvents] = useState<CommunityEvent[]>([]);
   const [myLiveLF, setMyLiveLF] = useState<LostItem[]>([]);
+  /* Saved listings — fetched via the saves table JOIN. Refreshes on every
+     post-change so a deleted listing automatically drops out (saves
+     CASCADE on delete; this refetch is the visible side of that). */
+  const [myLiveSaves, setMyLiveSaves] = useState<MarketplaceItem[]>([]);
   useEffect(() => {
     if (!mounted || isDemoMode() || !hasSupabaseEnv || !user) return;
     let cancelled = false;
@@ -63,6 +68,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       fetchMyRequests(user.id).then(rows => { if (!cancelled) setMyLiveRequests(rows); });
       fetchEventsByUser(user.id).then(rows => { if (!cancelled) setMyLiveEvents(rows); });
       fetchLostFoundByUser(user.id).then(rows => { if (!cancelled) setMyLiveLF(rows); });
+      fetchMySaves(user.id).then(rows => { if (!cancelled) setMyLiveSaves(rows); });
     };
     load();
     const off = onPostsChanged(load);
@@ -128,7 +134,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
     const pool =
       activeTab === 'uploads'  ? myLiveUploads :
       activeTab === 'requests' ? myLiveRequests :
-      activeTab === 'saved'    ? [] :
+      activeTab === 'saved'    ? myLiveSaves :
       [...myLiveUploads, ...myLiveRequests];   /* all */
     const itemEntries = pool
       .filter(i => matchesQuery(i.title))
@@ -143,7 +149,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       return [...itemEntries, ...eventEntriesFor(myEvents)];
     }
     return itemEntries;
-  }, [activeTab, query, mounted, myLiveUploads, myLiveRequests, myEvents, myLiveLF, demoTick]);
+  }, [activeTab, query, mounted, myLiveUploads, myLiveRequests, myEvents, myLiveLF, myLiveSaves, demoTick]);
 
   const uploadItemCount  = mounted && isDemoMode() ? getDemoUploads().length : myLiveUploads.length;
   const uploadEventCount = myEvents.length;

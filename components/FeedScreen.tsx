@@ -12,6 +12,7 @@ import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import {
   fetchMarketplaceItems, fetchRequests, fetchEvents, fetchLostFound,
+  fetchSavedListingIds, toggleListingSave,
   onPostsChanged, searchUsers, type UserSearchHit,
 } from '../lib/liveData';
 import { getEventMetrics } from '../lib/metrics';
@@ -53,6 +54,10 @@ export default function FeedScreen({
      this default — that's the "every new session starts on All" behaviour. */
   const [activeType, setActiveType] = useState<'all' | 'requests' | 'uploads'>('all');
   const [query, setQuery] = useState('');
+  /* Saved-listing IDs for the heart icon's filled state. Hydrated from
+     Supabase on mount + after every post-change event (a delete drops
+     stale saves from the server side, this resync keeps the heart in
+     step). */
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
   /* Settings: hide-prices toggle (Settings → Marketplace). We subscribe so
@@ -115,6 +120,42 @@ export default function FeedScreen({
     const off = onPostsChanged(load);
     return () => { cancelled = true; off(); };
   }, [mounted]);
+
+  /* Hydrate the user's existing saves so the heart shows filled for any
+     post they've previously saved. Refetched on every post-change in case
+     the underlying listings table changed (a delete cascades the saves). */
+  useEffect(() => {
+    if (!mounted || isDemoMode() || !hasSupabaseEnv || !user) return;
+    let cancelled = false;
+    const load = () => {
+      fetchSavedListingIds(user.id).then(ids => { if (!cancelled) setSavedIds(ids); });
+    };
+    load();
+    const off = onPostsChanged(load);
+    return () => { cancelled = true; off(); };
+  }, [mounted, user]);
+
+  /* Single toggle handler shared by every FeedCard. Optimistically flips
+     the local set, fires the Supabase RPC, and reverts on failure. Demo
+     mode skips the RPC and just keeps the local heart state. */
+  const handleToggleSave = (listingId: string) => {
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(listingId)) next.delete(listingId);
+      else next.add(listingId);
+      return next;
+    });
+    if (isDemoMode() || !hasSupabaseEnv || !user) return;
+    toggleListingSave(listingId).catch(() => {
+      /* Revert on failure so the heart never lies about server state. */
+      setSavedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(listingId)) next.delete(listingId);
+        else next.add(listingId);
+        return next;
+      });
+    });
+  };
 
   /* ── User search ──
      Debounced lookup against the profiles table. We only hit Supabase
@@ -480,13 +521,7 @@ export default function FeedScreen({
                          All-tab masonry colour-codes every post-type at a
                          glance (events purple, L&F amber, posts green). */
                       strokeKind={entry.kind === 'request' ? 'request' : 'marketplace'}
-                      onToggleSave={() => {
-                        setSavedIds(prev => {
-                          const next = new Set(prev);
-                          next.has(it.id) ? next.delete(it.id) : next.add(it.id);
-                          return next;
-                        });
-                      }}
+                      onToggleSave={() => handleToggleSave(it.id)}
                       onClick={() => onOpenItem(it)}
                     />
                   );
@@ -517,13 +552,7 @@ export default function FeedScreen({
                 variant={(['xtall','tall','portrait','square','landscape'] as const)[idx % 5]}
                 isSaved={savedIds.has(item.id)}
                 hidePrice={hidePrice}
-                onToggleSave={() => {
-                  setSavedIds(prev => {
-                    const next = new Set(prev);
-                    next.has(item.id) ? next.delete(item.id) : next.add(item.id);
-                    return next;
-                  });
-                }}
+                onToggleSave={() => handleToggleSave(item.id)}
                 onClick={() => onOpenItem(item)}
               />
             ))}

@@ -990,6 +990,64 @@ export async function toggleListingSave(id: string): Promise<boolean> {
   return !!data;
 }
 
+/** Set of listing IDs the signed-in user has saved. Cheap query (saves
+ *  table is small per user) that the feed reads on mount so the heart
+ *  icon's initial state matches the server.
+ *
+ *  Stale saves whose underlying listings have been deleted resolve to
+ *  nothing in the JOIN below; we filter them out so the Saved tab doesn't
+ *  show ghosts. The saves table has ON DELETE CASCADE on listing_id so
+ *  the row is dropped automatically when the listing dies — this filter
+ *  is belt-and-braces in case a stray row survives. */
+export async function fetchSavedListingIds(userId: string): Promise<Set<string>> {
+  if (!hasSupabaseEnv || !userId) return new Set();
+  const { data, error } = await supabase
+    .from('saves')
+    .select('listing_id')
+    .eq('user_id', userId);
+  if (error || !data) return new Set();
+  return new Set(
+    (data as unknown as Array<{ listing_id: string }>).map(r => r.listing_id),
+  );
+}
+
+/** Full saved listings for the inventory "Saved" tab — JOINs through the
+ *  saves table to get only listings that still exist (CASCADE on delete
+ *  handles the stale case, but the inner join here also acts as a guard). */
+export async function fetchMySaves(userId: string): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv || !userId) return [];
+  /* Query the saves table and pull in the joined listing row so we get
+     the full MarketplaceItem shape — same join the feed uses. */
+  const { data, error } = await supabase
+    .from('saves')
+    .select(`
+      saved_at,
+      listing:listings!saves_listing_id_fkey(
+        *,
+        user:profiles!listings_user_id_fkey(
+          id, username, full_name, initials, avatar_url, avatar_color, role,
+          is_online, contact_email_enabled, contact_whatsapp_enabled
+        ),
+        category:categories(id, label, icon)
+      )
+    `)
+    .eq('user_id', userId)
+    .order('saved_at', { ascending: false });
+
+  if (error || !data) return [];
+  /* ListingRow doesn't carry the `status` column in its local type (the
+     mapper doesn't need it), so we cast to a tagged superset for the
+     filter step then map back. */
+  type Row = { saved_at: string; listing: (ListingRow & { status?: string }) | null };
+  const items = (data as unknown as Row[])
+    .map(r => r.listing)
+    .filter((l): l is ListingRow & { status?: string } =>
+      l !== null && l.status !== 'removed')
+    .map(mapListingRow)
+    .map(it => ({ ...it, saved: true }));
+  return notRemoved(items);
+}
+
 /* ── Storefront stats ──────────────────────────────
    Pulls the three numbers shown on a storefront's hero (Shared / Received /
    Impact). We prefer values from the profile row (computed by DB triggers
