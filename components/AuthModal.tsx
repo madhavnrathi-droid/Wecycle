@@ -4,7 +4,7 @@
  *
  *   Step 1 — Email: user enters any valid email + (on sign-up) name.
  *            Click "Send code" → Supabase signInWithOtp() fires off a
- *            6-digit code to the address. shouldCreateUser:true auto-
+ *            8-character code to the address. shouldCreateUser:true auto-
  *            provisions the auth.users + profiles rows if it's a first-
  *            time visitor.
  *
@@ -42,8 +42,15 @@ interface AuthModalProps {
    domains, etc. Real validation happens server-side when the OTP fails
    to deliver. */
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/* OTP from Supabase is exactly 6 digits. */
-const OTP_LENGTH = 6;
+/* OTP length matches Supabase's built-in email sender output:
+ *   - Supabase's default Magic-Link / OTP template emits an **8-character**
+ *     code (alphanumeric, mostly digits but occasionally letters depending
+ *     on the project's GOTRUE_OTP_LENGTH).
+ *   - If/when we move to a custom SMTP with a different code length, this
+ *     is the only knob to change.
+ * The input also accepts letters now (some Supabase codes are alphanumeric),
+ * not just digits — see the `cleaned` normalisation in handleVerify below. */
+const OTP_LENGTH = 8;
 /* Cool-down between resends so users don't spam the SMTP server (which
    would also trip Supabase's own rate limiter). */
 const RESEND_SECONDS = 30;
@@ -109,7 +116,12 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
 
   /* ── Validation ─────────────────────────────── */
   const emailOk = EMAIL_LIKE.test(email.trim());
-  const codeOk  = code.replace(/\D/g, '').length === OTP_LENGTH;
+  /* Normalise to alphanumeric — Supabase's built-in OTP is *usually*
+   * digits but can include letters depending on project config. We strip
+   * whitespace + punctuation but keep letters so the user can paste the
+   * code as-is from their email. */
+  const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const codeOk    = cleanCode.length === OTP_LENGTH;
 
   /* ── Send OTP ───────────────────────────────── */
   const sendCode = async () => {
@@ -146,7 +158,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
       });
       if (err) throw err;
       setStep('code');
-      setInfo(`We sent a 6-digit code to ${email.trim()}. It expires in 10 minutes.`);
+      setInfo(`We sent an ${OTP_LENGTH}-character code to ${email.trim()}. It expires in 10 minutes.`);
       startResendCooldown();
     } catch (err) {
       handleAuthError(err);
@@ -161,10 +173,10 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     setError(null);
     setSubmitting(true);
     try {
-      const cleaned = code.replace(/\D/g, '');
+      /* Send the alphanumeric-cleaned code (handles paste-with-spaces). */
       const { error: err } = await supabase.auth.verifyOtp({
         email: email.trim(),
-        token: cleaned,
+        token: cleanCode,
         /* `email` works for both sign-in and the first verify of a
            fresh user. Supabase no longer distinguishes the two for OTP. */
         type: 'email',
@@ -250,7 +262,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         {step === 'email' ? (
           <>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Use any email — we'll send you a 6-digit code to sign in.
+              Use any email — we'll send you an {OTP_LENGTH}-character code to sign in.
               No password to remember.
             </p>
 
@@ -322,7 +334,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
               Check{' '}
               <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{email}</span>{' '}
-              for a 6-digit code. Paste it below.
+              for an {OTP_LENGTH}-character code. Paste it below.
             </p>
 
             <div className="field">
@@ -334,20 +346,30 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 ref={codeInputRef}
                 id="auth-code"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                /* Switched from numeric-only to text — Supabase's built-in
+                   OTP sender can include letters, so we accept alphanumeric.
+                   The cleanCode normaliser handles spaces / dashes if the
+                   user pastes the code formatted. */
+                inputMode="text"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
                 maxLength={OTP_LENGTH}
                 autoComplete="one-time-code"
                 className="form-input"
-                placeholder="••••••"
+                placeholder={'•'.repeat(OTP_LENGTH)}
                 value={code}
-                /* Strip non-digits live so paste cleans up automatically. */
-                onChange={e => setCode(e.target.value.replace(/\D+/g, '').slice(0, OTP_LENGTH))}
+                /* Strip whitespace + punctuation live; keep alphanumerics. */
+                onChange={e =>
+                  setCode(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, OTP_LENGTH))
+                }
                 style={{
                   textAlign: 'center',
-                  fontSize: 22, fontWeight: 600,
-                  letterSpacing: '0.4em',
-                  fontVariantNumeric: 'tabular-nums',
+                  /* Tightened from 22/0.4em (sized for 6 chars) so the
+                     new 8-char code fits cleanly on narrow phones. */
+                  fontSize: 20, fontWeight: 600,
+                  letterSpacing: '0.22em',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                 }}
                 required
               />
