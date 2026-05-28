@@ -281,7 +281,11 @@ export default function StorefrontScreen({
 
       {/* ── TABS ── */}
       <div style={{ padding: '0 16px 12px' }}>
-        <div className="segmented" role="tablist">
+        <div
+          className="segmented storefront-tabs"
+          role="tablist"
+          style={{ maxWidth: 640, marginInline: 'auto' }}
+        >
           {tabs.map(t => (
             <button
               key={t.id}

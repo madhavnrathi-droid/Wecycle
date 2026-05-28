@@ -22,6 +22,7 @@ import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchLostFound, onPostsChanged } from '../lib/liveData';
 import EmptyState from './EmptyState';
 import { useAuth } from '../lib/AuthContext';
+import { useBreakpoint } from '../lib/useBreakpoint';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
@@ -404,6 +405,7 @@ export function LostFoundDetailSheet({
   isOwner, onSaveChanges, onSaveAndRepost, onDelete,
 }: LostFoundDetailSheetProps) {
   const { user } = useAuth();
+  const { isDesktop } = useBreakpoint();
   const isLost = item.status === 'lost';
   const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
 
@@ -499,21 +501,65 @@ export function LostFoundDetailSheet({
           zIndex: 100,
         }}
       />
-      <div role="dialog" aria-label={item.title} style={{
-        position: 'fixed', left: '50%', bottom: 0,
-        transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 520,
-        background: 'var(--bg-card)',
-        borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: '14px 20px calc(20px + env(safe-area-inset-bottom, 0px))',
-        zIndex: 101,
-        maxHeight: '88svh',
-        overflowY: 'auto',
-      }}>
+      <div role="dialog" aria-label={item.title} style={
+        isDesktop ? {
+          /* Desktop: centered 2-column modal — image left, content right —
+             matching the look of ItemDetailScreen / EventDetailScreen so all
+             three detail surfaces feel like the same family. */
+          position: 'fixed', left: '50%', top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 'min(1080px, 94vw)',
+          maxHeight: '90vh',
+          background: 'var(--bg-card)',
+          borderRadius: 24,
+          padding: 0,
+          zIndex: 101,
+          overflow: 'hidden',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.24)',
+        } : {
+          /* Mobile: original bottom-sheet behaviour. */
+          position: 'fixed', left: '50%', bottom: 0,
+          transform: 'translateX(-50%)',
+          width: '100%', maxWidth: 520,
+          background: 'var(--bg-card)',
+          borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          padding: '14px 20px calc(20px + env(safe-area-inset-bottom, 0px))',
+          zIndex: 101,
+          maxHeight: '88svh',
+          overflowY: 'auto',
+        }
+      }>
+        {/* Desktop: hero image fills the left column. */}
+        {isDesktop && (
+          <div style={{
+            position: 'relative',
+            background: 'var(--bg-inset)',
+            minHeight: '70vh',
+            overflow: 'hidden',
+          }}>
+            <img
+              src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        )}
+
+        {/* Right column on desktop / whole sheet on mobile. Owns the scroll. */}
         <div style={{
-          width: 38, height: 4, background: 'var(--border-default)',
-          borderRadius: 999, margin: '0 auto 14px',
-        }} aria-hidden="true" />
+          padding: isDesktop ? '22px 26px 26px' : 0,
+          overflowY: isDesktop ? 'auto' : 'visible',
+          maxHeight: isDesktop ? '90vh' : undefined,
+          display: 'flex', flexDirection: 'column',
+        }}>
+        {!isDesktop && (
+          <div style={{
+            width: 38, height: 4, background: 'var(--border-default)',
+            borderRadius: 999, margin: '0 auto 14px',
+          }} aria-hidden="true" />
+        )}
 
         <header style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <span style={{
@@ -525,7 +571,7 @@ export function LostFoundDetailSheet({
           }}>{isOwner ? eStatus : item.status}</span>
           {!isOwner && (
             <h2 style={{
-              margin: 0, fontSize: 18, fontWeight: 600,
+              margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 600,
               letterSpacing: '-0.025em', color: 'var(--text-primary)',
               flex: 1, minWidth: 0,
             }}>{item.title}</h2>
@@ -536,17 +582,20 @@ export function LostFoundDetailSheet({
           </button>
         </header>
 
-        <div style={{
-          aspectRatio: '4 / 3', borderRadius: 16, overflow: 'hidden',
-          background: 'var(--bg-inset)',
-          marginBottom: 14,
-        }}>
-          <img
-            src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        </div>
+        {/* Mobile image (desktop renders it in the left column already). */}
+        {!isDesktop && (
+          <div style={{
+            aspectRatio: '4 / 3', borderRadius: 16, overflow: 'hidden',
+            background: 'var(--bg-inset)',
+            marginBottom: 14,
+          }}>
+            <img
+              src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        )}
 
         {isOwner ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
@@ -803,6 +852,7 @@ export function LostFoundDetailSheet({
           })()}
         </div>
         )}
+        </div>{/* /right column */}
       </div>
     </>
   );

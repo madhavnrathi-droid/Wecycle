@@ -329,6 +329,7 @@ export default function FeedScreen({
           <button
             aria-label="Your profile"
             onClick={onOpenAccount}
+            data-tour="topnav-account"
             style={{
               width: 34, height: 34, borderRadius: '50%',
               background: 'var(--bg-inset)',
@@ -386,6 +387,7 @@ export default function FeedScreen({
             onChange={e => setQuery(e.target.value)}
             className="search-pill"
             aria-label="Search items"
+            data-tour="feed-search"
             style={{ width: '100%' }}
           />
           {query && (
@@ -461,7 +463,7 @@ export default function FeedScreen({
       />
 
       {/* ── PILL TABS: all / requests / uploads ── */}
-      <section style={{ padding: '0 16px 14px' }}>
+      <section style={{ padding: '0 16px 14px' }} data-tour="feed-tabs">
         <div className="segmented">
           <button
             onClick={() => setActiveType('all')}

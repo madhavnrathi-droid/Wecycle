@@ -24,6 +24,7 @@ import ReportLostFoundModal from '../components/forms/ReportLostFoundModal';
 import SubmitEventModal from '../components/forms/SubmitEventModal';
 import AlertFormModal from '../components/forms/AlertFormModal';
 import AuthModal from '../components/AuthModal';
+import OnboardingTour, { hasCompletedOnboarding, type TourScreen } from '../components/OnboardingTour';
 import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
@@ -84,6 +85,24 @@ export default function WecycleApp() {
     return next;
   });
   const [lfDefaultStatus, setLfDefaultStatus] = useState<'lost' | 'found' | undefined>();
+
+  /* First-time onboarding tour — fires only when the local "done" flag is
+   * missing. Mounted after a small delay so the feed has time to paint
+   * before the spotlight tries to measure target elements. */
+  const [showTour, setShowTour] = useState(false);
+  useEffect(() => {
+    if (hasCompletedOnboarding()) return;
+    const t = setTimeout(() => setShowTour(true), 650);
+    return () => clearTimeout(t);
+  }, []);
+  const handleTourJump = (s: TourScreen) => {
+    /* Route the tour through the same screen state the bottom nav uses. */
+    setOpenItem(null);
+    setOpenEvent(null);
+    setOpenLF(null);
+    setOpenStorefront(null);
+    setActiveScreen(s);
+  };
 
   /* Sub-screens that take over the viewport. We keep a stack so "back" always
      returns to the previous screen (e.g. Settings → Notifications → back → Settings),
@@ -211,6 +230,7 @@ export default function WecycleApp() {
       if (id === 'settings')  { setSubStack(['settings']);      return; }
       if (id === 'notifs')    { setSubStack(['notifications']); return; }
       if (id === 'feedback')  { setSubStack(['feedback']);      return; }
+      if (id === 'tour')      { setActiveScreen('feed'); setShowTour(true); return; }
       if (id === 'invite') {
         if (typeof window === 'undefined') return;
         const shareUrl = window.location.origin || 'https://wecycle.page';
@@ -538,6 +558,14 @@ export default function WecycleApp() {
            Owner-aware: when the signed-in user is the reporter, the sheet
            renders inline-editable fields with Save changes / Save & repost
            / Delete CTAs. Otherwise it shows the contact buttons. */}
+        {/* ── FIRST-TIME ONBOARDING TOUR ── */}
+        {showTour && (
+          <OnboardingTour
+            onJumpTo={handleTourJump}
+            onClose={() => setShowTour(false)}
+          />
+        )}
+
         {openLF && (
           <LostFoundDetailSheet
             item={openLF}

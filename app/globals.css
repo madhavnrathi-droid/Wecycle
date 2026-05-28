@@ -2900,6 +2900,13 @@ body {
   color: var(--text-secondary);
   transition: all 0.18s var(--ease-smooth);
   font-family: inherit;
+  /* Keep tab labels on a single line — when there are 4+ tabs ("Uploads ·
+     12" / "Requests · 3" / "Events · 1" / "Lost & Found · 2") the words
+     would otherwise wrap and force every other tab to grow taller. */
+  white-space: nowrap;
+  min-width: 0;
+  text-overflow: ellipsis;
+  overflow: hidden;
   /* Override the global :focus-visible outline — on this control the
      active pill IS the focus indicator (filled black against the inset
      track), and the outer 2px lime ring reads as a "weird stuck" state

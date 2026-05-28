@@ -17,12 +17,13 @@ interface BottomNavProps {
 
 export default function BottomNav({ active, onChange, onPost }: BottomNavProps) {
   return (
-    <nav aria-label="Primary" className="mobile-only-nav bottom-nav">
+    <nav aria-label="Primary" className="mobile-only-nav bottom-nav" data-tour="bottom-nav">
       <div className="bottom-nav-inner">
         <NavButton
           label="Home"
           isActive={active === 'feed' || active === 'market'}
           onClick={() => onChange('feed')}
+          tourId="nav-home"
         >
           <Home size={20} strokeWidth={(active === 'feed' || active === 'market') ? 2 : 1.7} />
         </NavButton>
@@ -31,6 +32,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           label="Events"
           isActive={active === 'events'}
           onClick={() => onChange('events')}
+          tourId="nav-events"
         >
           <CalendarDays size={20} strokeWidth={active === 'events' ? 2 : 1.7} />
         </NavButton>
@@ -39,6 +41,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           onClick={onPost}
           aria-label="Create post"
           className="bottom-nav-post"
+          data-tour="nav-post"
         >
           <Plus size={22} strokeWidth={2} />
         </button>
@@ -47,6 +50,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           label="Lost & Found"
           isActive={active === 'lost_found'}
           onClick={() => onChange('lost_found')}
+          tourId="nav-lostfound"
         >
           <Search size={20} strokeWidth={active === 'lost_found' ? 2 : 1.7} />
         </NavButton>
@@ -55,6 +59,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           label="Inventory"
           isActive={active === 'inventory'}
           onClick={() => onChange('inventory')}
+          tourId="nav-inventory"
         >
           <Package size={20} strokeWidth={active === 'inventory' ? 2 : 1.7} />
         </NavButton>
@@ -64,9 +69,10 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
 }
 
 function NavButton({
-  label, isActive, onClick, children,
+  label, isActive, onClick, children, tourId,
 }: {
   label: string; isActive: boolean; onClick: () => void; children: React.ReactNode;
+  tourId?: string;
 }) {
   return (
     <button
@@ -75,6 +81,7 @@ function NavButton({
       aria-current={isActive ? 'page' : undefined}
       className="bottom-nav-btn"
       data-active={isActive || undefined}
+      data-tour={tourId}
     >
       {children}
     </button>

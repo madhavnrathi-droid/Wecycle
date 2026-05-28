@@ -23,5 +23,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "Wecycle Circular Economy Platform"]
+  "exclude": ["node_modules", "Wecycle Circular Economy Platform", "mobile-expo"]
 }

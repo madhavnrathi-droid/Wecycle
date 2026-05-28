@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Wecycle",
+    "slug": "wecycle",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "wecycle",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "page.wecycle.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Wecycle uses the camera so you can post photos of items you'd like to share.",
+        "NSPhotoLibraryUsageDescription": "Wecycle needs photo library access so you can attach photos to your posts.",
+        "NSMicrophoneUsageDescription": "Wecycle records audio when you capture a video clip for a post.",
+        "NSLocationWhenInUseUsageDescription": "Wecycle uses location to show items near you on campus."
+      }
+    },
+    "android": {
+      "package": "page.wecycle.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "extra": {
+      "webUrl": "https://wecycle-seven.vercel.app"
+    }
+  }
+}

@@ -126,6 +126,7 @@ export default function TopNav({
           </button>
           <button
             onClick={onPost}
+            data-tour="topnav-post"
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
               background: 'var(--accent-lime)', color: '#0C0C0B',

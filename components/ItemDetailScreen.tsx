@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee, Trash2, RotateCcw, Save, Loader2 } from 'lucide-react';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
-import { getPostMetrics } from '../lib/metrics';
 import PhotoCarousel from './PhotoCarousel';
 import OnlineBadge from './OnlineBadge';
 import CommentsSection from './CommentsSection';
@@ -585,11 +584,6 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           )}
         </button>
       </section>
-
-      {/* ── ACTIVITY METRICS ──
-         Visible to everyone, not just the owner. Matches the event-detail
-         pattern so the social proof story stays consistent. */}
-      <ItemMetrics item={item} />
 
       {/* ── COMMENTS (mobile) ── */}
       <section style={{ padding: '20px 20px 0' }}>
@@ -1305,35 +1299,6 @@ function DesktopLayout({
             </button>
           </div>
 
-          {/* Trust strip */}
-          <ul style={{
-            margin: '6px 0 0', padding: 0, listStyle: 'none',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-            gap: 10,
-          }}>
-            {[
-              { title: 'Pickup in person', sub: 'Verified pickup point' },
-              { title: 'Community-vetted', sub: 'Posted by a member' },
-              { title: 'No platform fee',  sub: 'Wecycle stays free' },
-            ].map(b => (
-              <li key={b.title} style={{
-                padding: '12px 14px',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 12,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{b.title}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.sub}</div>
-              </li>
-            ))}
-          </ul>
-
-          {/* Activity metrics — visible to everyone */}
-          <div style={{ marginTop: 12 }}>
-            <ItemMetrics item={item} />
-          </div>
-
           {/* Comments thread — full width below the right column on desktop */}
           <div style={{ marginTop: 8 }}>
             <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
@@ -1341,48 +1306,6 @@ function DesktopLayout({
         </div>
       </div>
     </div>
-  );
-}
-
-/* ── ItemMetrics ───────────────────────────────────
-   Compact 4-stat strip showing how a listing is performing. We render it on
-   both mobile and desktop layouts, owner or not — viewers get social proof
-   ("this has 312 views, 18 saves"), and owners get a quick health check
-   without bouncing to the Activity tab. */
-function ItemMetrics({ item }: { item: MarketplaceItem }) {
-  /* Real listings carry actual DB counts (viewCount/saveCount/responses).
-     Mock items have none → deterministic pseudo-random fallback. */
-  const isLive = item.viewCount !== undefined || item.saveCount !== undefined;
-  const mock = getPostMetrics(item.id);
-  const views     = isLive ? (item.viewCount ?? 0) : mock.views;
-  const saves     = isLive ? (item.saveCount ?? 0) : mock.saves;
-  const inquiries = isLive ? item.responses        : mock.inquiries;
-  /* The schema has no share counter yet; show 0 for live posts. */
-  const shares    = isLive ? 0 : mock.shares;
-  return (
-    <section style={{ padding: '24px 20px 0' }}>
-      <h3 style={{
-        margin: '0 0 10px',
-        fontSize: 11, fontWeight: 700,
-        letterSpacing: '0.08em', textTransform: 'uppercase',
-        color: 'var(--text-muted)',
-      }}>
-        Activity on this post
-      </h3>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 16,
-        padding: '14px 12px',
-        gap: 8,
-      }}>
-        <MiniStat label="Views"     value={views}     />
-        <MiniStat label="Saves"     value={saves}     />
-        <MiniStat label="Shares"    value={shares}    />
-        <MiniStat label="Inquiries" value={inquiries} />
-      </div>
-    </section>
   );
 }
 
@@ -1466,19 +1389,3 @@ function OwnerPriceEditor({
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={{ textAlign: 'center', minWidth: 0 }}>
-      <div style={{
-        fontSize: 18, fontWeight: 700,
-        letterSpacing: '-0.02em',
-        color: 'var(--text-primary)',
-        fontVariantNumeric: 'tabular-nums',
-        lineHeight: 1.15,
-      }}>{value}</div>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, letterSpacing: '0.02em' }}>
-        {label.toUpperCase()}
-      </div>
-    </div>
-  );
-}

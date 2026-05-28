@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
-import { getEventMetrics } from '../lib/metrics';
 import OnlineBadge from './OnlineBadge';
 import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
@@ -93,7 +92,6 @@ export default function EventDetailScreen({
   const { user, profile } = useAuth();
   const { isDesktop } = useBreakpoint();
 
-  const metrics = getEventMetrics(event.id);
   const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
 
   /* ── Inline edit state (owner only) ── */
@@ -583,33 +581,6 @@ export default function EventDetailScreen({
         />
       </section>
 
-      {/* ── METRICS ──
-         Surfaced on every event page now (not gated by ownership) — viewers
-         get social proof from the same numbers the organizer sees. Label
-         shifts from "Your event metrics" to "Event activity" for non-owners. */}
-      <section style={{ padding: '24px 20px 0' }}>
-        <h3 style={{
-          margin: '0 0 10px',
-          fontSize: 11, fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-        }}>
-          {isOwner ? 'Your event metrics' : 'Event activity'}
-        </h3>
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 16,
-          padding: '14px 12px',
-          gap: 8,
-        }}>
-          <MiniStat label="Views"    value={metrics.views} />
-          <MiniStat label="RSVPs"    value={metrics.rsvps} />
-          <MiniStat label="Shares"   value={metrics.shares} />
-          <MiniStat label="Questions" value={metrics.questions} />
-        </div>
-      </section>
         </div>{/* /right column */}
       </div>{/* /desktop grid wrapper */}
 
@@ -820,19 +791,3 @@ function FactRow({
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <p style={{
-        margin: 0, fontSize: 18, fontWeight: 700,
-        letterSpacing: '-0.025em', color: 'var(--text-primary)',
-        lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
-      }}>
-        {value.toLocaleString()}
-      </p>
-      <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>
-        {label}
-      </p>
-    </div>
-  );
-}
