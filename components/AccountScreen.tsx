@@ -75,9 +75,14 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
   /* Phone is optional, but if present it must be exactly 10 digits. */
   const phoneValid = phone.length === 0 || phone.length === 10;
 
+  /* Auto-save is allowed as long as the name is set and any provided phone /
+   * college ID looks reasonable. College ID is optional at signup so we
+   * must not block the save when the user never set one — that would silently
+   * eat every other field's edit. */
+  const collegeIdValid = collegeId.trim().length === 0 || collegeId.trim().length >= 3;
   const canSave =
     name.trim().length >= 2 &&
-    collegeId.trim().length >= 3 &&
+    collegeIdValid &&
     phoneValid;
 
   /* Persist the current form snapshot. Called both from the debounce timer

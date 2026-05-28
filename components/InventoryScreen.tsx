@@ -333,10 +333,18 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                       if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}? This removes the post.`)) return;
                       if (isDemoMode()) {
                         deleteDemoPost(entry.item.id);
-                      } else if (entry.item.isRequest) {
-                        try { await markRequestCompleted(entry.item.id); } catch {/*noop*/}
                       } else {
-                        try { await markListingSold(entry.item.id); } catch {/*noop*/}
+                        try {
+                          if (entry.item.isRequest) await markRequestCompleted(entry.item.id);
+                          else                      await markListingSold(entry.item.id);
+                        } catch (e) {
+                          /* Surface the failure — silent failures here gave the
+                           * impression nothing happened, then the post would
+                           * reappear and confuse the user. */
+                          if (typeof window !== 'undefined') {
+                            window.alert((e as Error).message || 'Could not remove the post — please try again.');
+                          }
+                        }
                       }
                     } : undefined}
                   />
@@ -352,7 +360,14 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     onDelete={async () => {
                       if (typeof window !== 'undefined' && !window.confirm(`Delete event "${entry.event.title}"?`)) return;
                       if (isDemoMode()) deleteDemoPost(entry.event.id);
-                      else try { await deleteEvent(entry.event.id); } catch {/*noop*/}
+                      else {
+                        try { await deleteEvent(entry.event.id); }
+                        catch (e) {
+                          if (typeof window !== 'undefined') {
+                            window.alert((e as Error).message || 'Could not delete event — please try again.');
+                          }
+                        }
+                      }
                     }}
                   />
                 );
@@ -372,7 +387,12 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     if (isDemoMode()) {
                       /* Demo store doesn't track L&F separately yet; no-op. */
                     } else {
-                      try { await markLostFoundResolved(entry.lf.id); } catch {/*noop*/}
+                      try { await markLostFoundResolved(entry.lf.id); }
+                      catch (e) {
+                        if (typeof window !== 'undefined') {
+                          window.alert((e as Error).message || 'Could not resolve — please try again.');
+                        }
+                      }
                     }
                   }}
                 />

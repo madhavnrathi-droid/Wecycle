@@ -34,7 +34,7 @@ import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv, supabase } from '../lib/supabase';
 import {
   fetchListingsByUser, fetchEventsByUser, fetchLostFoundByUser,
-  fetchProfileStats, onPostsChanged, type ProfileStats,
+  fetchMyRequests, fetchProfileStats, onPostsChanged, type ProfileStats,
 } from '../lib/liveData';
 
 interface StorefrontScreenProps {
@@ -70,10 +70,39 @@ export default function StorefrontScreen({
   /* Demo mode slices the seeded catalogue by author; live mode fetches the
      user's real listings + events from Supabase. */
   const demo = isDemoMode();
-  const requests = useMemo(
+  /* Demo requests come from the seeded FEED_ITEMS pool; live requests are
+   * fetched below in the effect — `setRequests` keeps both modes in sync.
+   * This was previously hard-wired to empty in live mode, which made the
+   * Requests tab on every storefront look broken in production. */
+  const demoRequests = useMemo(
     () => (demo ? FEED_ITEMS.filter(f => f.type === 'request' && f.user.id === user.id) : []),
     [user.id, demo],
   );
+  const [liveRequests, setLiveRequests] = useState<MarketplaceItem[]>([]);
+  /* Map live request rows into the FeedItem shape RequestRow expects. The
+   * mapper only fills the fields the row card reads (id, type, timeAgo,
+   * user, item, timestamp); the rest stay undefined which the renderer is
+   * tolerant of. */
+  const requests: FeedItem[] = demo ? demoRequests : liveRequests.map(item => ({
+    id: item.id,
+    type: 'request' as const,
+    user: item.user,
+    timestamp: new Date().toISOString(),
+    timeAgo: item.postedDaysAgo === 0 ? 'today' : `${item.postedDaysAgo}d ago`,
+    item: {
+      title: item.title,
+      description: item.description,
+      category: item.category,
+      listingType: item.listingType,
+      price: item.price,
+      condition: item.condition,
+      photoColor: item.photoColor,
+      photoIcon: item.photoIcon,
+      location: item.location,
+      saved: item.saved ?? false,
+      responses: item.responses,
+    },
+  }));
 
   const [uploads, setUploads] = useState<MarketplaceItem[]>(
     demo ? MARKETPLACE_ITEMS.filter(i => i.user.id === user.id) : [],
@@ -95,6 +124,7 @@ export default function StorefrontScreen({
     let cancelled = false;
     const load = () => {
       fetchListingsByUser(user.id).then(rows => { if (!cancelled) setUploads(rows); });
+      fetchMyRequests(user.id).then(rows => { if (!cancelled) setLiveRequests(rows); });
       fetchEventsByUser(user.id).then(rows => { if (!cancelled) setEvents(rows); });
       fetchLostFoundByUser(user.id).then(rows => { if (!cancelled) setLostFound(rows); });
       fetchProfileStats(user.id).then(s => { if (!cancelled) setStats(s); });
@@ -167,6 +197,13 @@ export default function StorefrontScreen({
   ];
 
   const [tab, setTab] = useState<Tab>('uploads');
+  /* If the active tab loses its data (e.g. user deletes last event while on
+   * the Events tab), fall back to Uploads — otherwise the masonry just sits
+   * empty and the user can't tell why. */
+  useEffect(() => {
+    if (tab === 'events' && events.length === 0) setTab('uploads');
+    if (tab === 'lostfound' && lostFound.length === 0) setTab('uploads');
+  }, [tab, events.length, lostFound.length]);
   /* Category filter is shared across uploads/requests; events have their
      own type filter handled inline. */
   const [category, setCategory] = useState<string>('all');
