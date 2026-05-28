@@ -67,6 +67,25 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     setResidence(((profile as { residence?: Residence | null }).residence ?? '') as Residence | '');
   }, [profile, authEmail]);
 
+  /* One-time backfill — many existing profile rows have email=null because the
+   * on-auth-create trigger predates the email column. Without this, every
+   * listing they post joins with profile.email=null and the Contact Seller
+   * button silently has nothing to email. We push the auth user's email into
+   * the profile row the moment we notice the gap. */
+  useEffect(() => {
+    if (isDemo) return;
+    if (!hasSupabaseEnv) return;
+    if (!user || !authEmail) return;
+    const profileEmail = (profile as { email?: string | null } | null)?.email;
+    if (profileEmail) return;
+    /* Fire-and-forget; refresh profile so the form picks up the new value. */
+    supabase
+      .from('profiles')
+      .update({ email: authEmail } as never)
+      .eq('id', user.id)
+      .then(() => { void refreshProfile(); }, () => { /* swallow — best-effort */ });
+  }, [isDemo, user, authEmail, profile, refreshProfile]);
+
   /* Always show the address the user signed up with as the default; the
      local `email` state can deviate (e.g. they're typing) but a fresh
      profile load resets it. */

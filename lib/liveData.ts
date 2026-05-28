@@ -117,7 +117,7 @@ const SELECT_WITH_JOINS = `
   *,
   user:profiles!listings_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, contact_email_enabled, contact_whatsapp_enabled
+    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
   ),
   category:categories(id, label, icon)
 `;
@@ -484,7 +484,7 @@ const REQUEST_SELECT = `
   *,
   user:profiles!requests_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, contact_email_enabled, contact_whatsapp_enabled
+    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
 
@@ -536,7 +536,7 @@ const EVENT_SELECT = `
   *,
   organizer:profiles!events_organizer_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, contact_email_enabled, contact_whatsapp_enabled
+    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
 
@@ -677,7 +677,7 @@ const LF_SELECT = `
   *,
   user:profiles!lost_found_reports_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, contact_email_enabled, contact_whatsapp_enabled
+    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
 
@@ -1026,7 +1026,7 @@ export async function fetchMySaves(userId: string): Promise<MarketplaceItem[]> {
         *,
         user:profiles!listings_user_id_fkey(
           id, username, full_name, initials, avatar_url, avatar_color, role,
-          is_online, contact_email_enabled, contact_whatsapp_enabled
+          is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
         ),
         category:categories(id, label, icon)
       )

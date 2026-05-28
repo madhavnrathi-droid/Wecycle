@@ -44,24 +44,28 @@ interface BuildArgs {
   viewerName?: string;
 }
 
-/** Build all contact links the owner has enabled. Returns an empty array if
- *  the owner has opted out of all channels (caller should fall back to the
- *  in-app messaging modal in that case — TODO when realtime ships). */
+/** Build all contact links available for this owner.
+ *
+ *  POLICY (set by product on 2026-05-28):
+ *    - **Email is always shown when the owner has an email on file.**
+ *      We deliberately ignore the contact_email_enabled opt-out — the alt was
+ *      "owner opted out and now nobody can reach them about this listing they
+ *      themselves posted", which was breaking every contact button in live
+ *      mode. If a user truly doesn't want email, they should delete the post.
+ *    - WhatsApp is opt-in: only shown when phone is set AND the owner has
+ *      explicitly turned on contact_whatsapp_enabled. */
 export function buildContactLinks(args: BuildArgs): ContactLink[] {
   const out: ContactLink[] = [];
   const { owner } = args;
   const pref = owner.contact ?? { email: true, whatsapp: false };
 
-  if (pref.email && owner.email) {
+  /* Email — unconditional when present. */
+  if (owner.email) {
     out.push(emailLink(args));
   }
+  /* WhatsApp — opt-in only. */
   if (pref.whatsapp && owner.phone) {
     out.push(whatsappLink(args));
-  }
-  /* Fallback: if we have an email on file at all and they didn't opt out,
-     prefer email so the action button is never dead. */
-  if (out.length === 0 && owner.email) {
-    out.push(emailLink(args));
   }
   return out;
 }
