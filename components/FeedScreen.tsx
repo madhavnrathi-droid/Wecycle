@@ -17,6 +17,7 @@ import {
 } from '../lib/liveData';
 import { getEventMetrics } from '../lib/metrics';
 import { getSettings, onSettingsChange } from '../lib/settings';
+import { track, trackPostOpened, EVT } from '../lib/analytics';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
@@ -139,6 +140,8 @@ export default function FeedScreen({
      the local set, fires the Supabase RPC, and reverts on failure. Demo
      mode skips the RPC and just keeps the local heart state. */
   const handleToggleSave = (listingId: string) => {
+    const wasSaved = savedIds.has(listingId);
+    track(EVT.save_toggled, { post_id: listingId, saved: !wasSaved });
     setSavedIds(prev => {
       const next = new Set(prev);
       if (next.has(listingId)) next.delete(listingId);
@@ -171,9 +174,11 @@ export default function FeedScreen({
     setUserSearchLoading(true);
     /* 250ms debounce — typing-friendly without making the user wait. */
     const t = setTimeout(() => {
+      track(EVT.search_submitted, { query_length: trimmed.length });
       searchUsers(trimmed).then(hits => {
         setUserHits(hits);
         setUserSearchLoading(false);
+        track(EVT.user_search_submitted, { query_length: trimmed.length, result_count: hits.length });
       }, () => {
         setUserHits([]);
         setUserSearchLoading(false);
@@ -264,7 +269,7 @@ export default function FeedScreen({
       detail: 'Drop a photo, name your price (or free) — the right neighbour finds it in minutes.',
       gradient:
         'linear-gradient(135deg, rgba(34,197,94,0.92) 0%, rgba(13,148,136,0.85) 100%)',
-      onClick: () => onBannerAction?.('share'),
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'share' }); onBannerAction?.('share'); },
     },
     {
       id: 'request',
@@ -274,7 +279,7 @@ export default function FeedScreen({
       detail: 'Post a request and let the community come to you — books, tools, a kettle, anything.',
       gradient:
         'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
-      onClick: () => onBannerAction?.('request'),
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'request' }); onBannerAction?.('request'); },
     },
     {
       id: 'events',
@@ -284,7 +289,7 @@ export default function FeedScreen({
       detail: 'See what your community is hosting this week. RSVP in one tap.',
       gradient:
         'linear-gradient(135deg, rgba(99,102,241,0.92) 0%, rgba(168,85,247,0.88) 100%)',
-      onClick: () => onBannerAction?.('events'),
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'events' }); onBannerAction?.('events'); },
     },
     {
       id: 'lost-found',
@@ -294,7 +299,7 @@ export default function FeedScreen({
       detail: 'A second board, side-by-side with the marketplace. Verified by the community.',
       gradient:
         'linear-gradient(135deg, rgba(234,179,8,0.92) 0%, rgba(217,119,6,0.88) 100%)',
-      onClick: () => onBannerAction?.('lost-found'),
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'lost-found' }); onBannerAction?.('lost-found'); },
     },
   ];
 
@@ -459,28 +464,28 @@ export default function FeedScreen({
         results={userHits}
         query={query}
         loading={userSearchLoading}
-        onPick={(hit) => onOpenUser?.(hit.id)}
+        onPick={(hit) => { track(EVT.user_card_opened, { user_id: hit.id, source: 'feed_search' }); onOpenUser?.(hit.id); }}
       />
 
       {/* ── PILL TABS: all / requests / uploads ── */}
       <section style={{ padding: '0 16px 14px' }} data-tour="feed-tabs">
         <div className="segmented">
           <button
-            onClick={() => setActiveType('all')}
+            onClick={() => { setActiveType('all'); track(EVT.feed_tab_changed, { tab: 'all' }); }}
             aria-pressed={activeType === 'all'}
             data-active={activeType === 'all' || undefined}
           >
             All
           </button>
           <button
-            onClick={() => setActiveType('requests')}
+            onClick={() => { setActiveType('requests'); track(EVT.feed_tab_changed, { tab: 'requests' }); }}
             aria-pressed={activeType === 'requests'}
             data-active={activeType === 'requests' || undefined}
           >
             Requests
           </button>
           <button
-            onClick={() => setActiveType('uploads')}
+            onClick={() => { setActiveType('uploads'); track(EVT.feed_tab_changed, { tab: 'uploads' }); }}
             aria-pressed={activeType === 'uploads'}
             data-active={activeType === 'uploads' || undefined}
           >
@@ -495,7 +500,7 @@ export default function FeedScreen({
           {CATEGORIES.slice(0, 7).map(cat => (
             <button
               key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+              onClick={() => { setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id }); }}
               className={`pill ${activeCategory === cat.id ? 'pill-active' : ''}`}
             >
               {cat.label}
@@ -530,7 +535,7 @@ export default function FeedScreen({
                          glance (events purple, L&F amber, posts green). */
                       strokeKind={entry.kind === 'request' ? 'request' : 'marketplace'}
                       onToggleSave={() => handleToggleSave(it.id)}
-                      onClick={() => onOpenItem(it)}
+                      onClick={() => { trackPostOpened(entry.kind === 'request' ? 'item' : 'item', it.id, { source: 'feed_all', is_request: !!it.isRequest }); onOpenItem(it); }}
                     />
                   );
                 }
@@ -540,7 +545,7 @@ export default function FeedScreen({
                       key={`event-${entry.event.id}`}
                       event={entry.event}
                       variant={variant}
-                      onClick={() => onOpenEvent?.(entry.event)}
+                      onClick={() => { trackPostOpened('event', entry.event.id, { source: 'feed_all' }); onOpenEvent?.(entry.event); }}
                     />
                   );
                 }
@@ -549,7 +554,7 @@ export default function FeedScreen({
                     key={`lf-${entry.lf.id}`}
                     lf={entry.lf}
                     variant={variant}
-                    onClick={() => onOpenLF?.(entry.lf)}
+                    onClick={() => { trackPostOpened('lostfound', entry.lf.id, { source: 'feed_all', lf_status: entry.lf.status }); onOpenLF?.(entry.lf); }}
                   />
                 );
               })
@@ -561,7 +566,7 @@ export default function FeedScreen({
                 isSaved={savedIds.has(item.id)}
                 hidePrice={hidePrice}
                 onToggleSave={() => handleToggleSave(item.id)}
-                onClick={() => onOpenItem(item)}
+                onClick={() => { trackPostOpened('item', item.id, { source: `feed_${activeType}`, is_request: !!item.isRequest }); onOpenItem(item); }}
               />
             ))}
         </div>

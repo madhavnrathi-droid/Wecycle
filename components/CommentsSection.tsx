@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Send, CornerDownRight, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { addComment, deleteComment, getComments, timeAgo, type Comment } from '../lib/comments';
+import { track, EVT } from '../lib/analytics';
 import { USERS, type User } from '../lib/mockData';
 import { getAvatar } from '../lib/photos';
 
@@ -116,6 +117,12 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
       body,
       parentId: replyTo?.id,
       mentions,
+    });
+    track(EVT.comment_posted, {
+      post_id: postId,
+      is_reply: !!replyTo,
+      body_length: body.length,
+      has_mention: !!mentions?.length,
     });
     /* Refresh from the store so we pick up the auto-generated id + createdAt */
     setComments(getComments(postId));

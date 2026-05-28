@@ -1,6 +1,7 @@
 'use client';
 
 import { Home, Plus, Package, CalendarDays, Search } from 'lucide-react';
+import { track, EVT } from '../lib/analytics';
 
 /* Activity dropped from the bottom nav — its post-level metrics now live
    inline on each Inventory card (and on the item-detail page for the owner).
@@ -16,13 +17,19 @@ interface BottomNavProps {
 }
 
 export default function BottomNav({ active, onChange, onPost }: BottomNavProps) {
+  /* Wraps the parent's onChange so we get a single source of nav events. */
+  const navigate = (next: Screen) => {
+    if (next === active) return;
+    track(EVT.nav_switched, { from: active, to: next });
+    onChange(next);
+  };
   return (
     <nav aria-label="Primary" className="mobile-only-nav bottom-nav" data-tour="bottom-nav">
       <div className="bottom-nav-inner">
         <NavButton
           label="Home"
           isActive={active === 'feed' || active === 'market'}
-          onClick={() => onChange('feed')}
+          onClick={() => navigate('feed')}
           tourId="nav-home"
         >
           <Home size={20} strokeWidth={(active === 'feed' || active === 'market') ? 2 : 1.7} />
@@ -31,7 +38,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
         <NavButton
           label="Events"
           isActive={active === 'events'}
-          onClick={() => onChange('events')}
+          onClick={() => navigate('events')}
           tourId="nav-events"
         >
           <CalendarDays size={20} strokeWidth={active === 'events' ? 2 : 1.7} />
@@ -49,7 +56,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
         <NavButton
           label="Lost & Found"
           isActive={active === 'lost_found'}
-          onClick={() => onChange('lost_found')}
+          onClick={() => navigate('lost_found')}
           tourId="nav-lostfound"
         >
           <Search size={20} strokeWidth={active === 'lost_found' ? 2 : 1.7} />
@@ -58,7 +65,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
         <NavButton
           label="Inventory"
           isActive={active === 'inventory'}
-          onClick={() => onChange('inventory')}
+          onClick={() => navigate('inventory')}
           tourId="nav-inventory"
         >
           <Package size={20} strokeWidth={active === 'inventory' ? 2 : 1.7} />

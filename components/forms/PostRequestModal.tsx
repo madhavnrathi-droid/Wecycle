@@ -7,6 +7,7 @@ import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createRequest } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
+import { track, EVT } from '../../lib/analytics';
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
@@ -90,6 +91,14 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
       } else {
         await new Promise(r => setTimeout(r, 400));
       }
+      track(EVT.post_form_submitted, {
+        post_kind: 'request',
+        urgency: form.urgency,
+        has_need_by: !!form.needByDate,
+        duration_hours: form.durationHours,
+        has_description: form.description.trim().length > 0,
+        category: form.category,
+      });
       onSubmit?.(form);
       pickerRef.current?.clear();
       setForm({
@@ -98,6 +107,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
       });
       onClose();
     } catch (err) {
+      track(EVT.post_form_failed, { post_kind: 'request', reason: (err as Error).message?.slice(0, 80) });
       setSubmitError((err as Error).message || 'Could not post — please try again.');
     } finally {
       setSubmitting(false);

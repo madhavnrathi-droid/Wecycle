@@ -25,6 +25,8 @@ import SubmitEventModal from '../components/forms/SubmitEventModal';
 import AlertFormModal from '../components/forms/AlertFormModal';
 import AuthModal from '../components/AuthModal';
 import OnboardingTour, { hasCompletedOnboarding, type TourScreen } from '../components/OnboardingTour';
+import { track, EVT } from '../lib/analytics';
+import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
@@ -50,6 +52,10 @@ type ModalKind =
 
 export default function WecycleApp() {
   const { user, profile, isDemo, isAdmin } = useAuth();
+  /* `isDesktop` decides between full-page takeover (mobile) and modal-
+   * theatre overlay (desktop) for item/event/storefront detail surfaces.
+   * The L&F sheet already branches internally; the others wrap below. */
+  const { isDesktop } = useBreakpoint();
   const storageMode = isDemo ? 'demo' as const : 'supabase' as const;
   const [activeScreen, setActiveScreen] = useState<Screen>('feed');
   const [modal, setModal] = useState<ModalKind>(null);
@@ -69,6 +75,14 @@ export default function WecycleApp() {
     setOpenItem(null);
     setOpenEvent(null);
     setOpenStorefront(u);
+    /* THE second-most-important conversion event after contact_clicked —
+     * if users browse storefronts, the marketplace has the "people" texture
+     * we want. Tag `self_view` so we can split "I'm checking my own
+     * storefront" from "I'm checking somebody else's." */
+    track(EVT.storefront_opened, {
+      user_id: u.id,
+      self_view: !!user && user.id === u.id,
+    });
   };
   /* Does the signed-in user own this post? Demo: it's one of the demo-store
      posts. Live: the listing's author id matches the auth user. */
@@ -175,6 +189,39 @@ export default function WecycleApp() {
     purgeExpiredRequests();
   }, []);
 
+  /* ─ App-open analytics ────────────────────────────────────────
+     Fire-once-per-load events that give GA4 the visit context: first vs
+     returning user, UTM source/medium/campaign if the link carried them,
+     and the platform shell. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    /* first vs return — flag in localStorage so we don't double-count a
+       refresh as a new visit. */
+    let isFirst = false;
+    try {
+      const seen = localStorage.getItem('wecycle.fv');
+      isFirst = !seen;
+      if (isFirst) localStorage.setItem('wecycle.fv', '1');
+    } catch { /* private mode etc. — assume returning */ }
+    track(EVT.app_open, { is_first_visit: isFirst });
+
+    /* UTM detection — surfaces "where did this user come from" in GA4. We
+       parse the *current* URL once (next/script's gtag has already fired
+       the initial page_view so source attribution is already wired, but
+       this gives us a custom event we can also filter Clarity sessions by). */
+    const params = new URLSearchParams(window.location.search);
+    const utm = {
+      utm_source:   params.get('utm_source')   ?? undefined,
+      utm_medium:   params.get('utm_medium')   ?? undefined,
+      utm_campaign: params.get('utm_campaign') ?? undefined,
+      utm_term:     params.get('utm_term')     ?? undefined,
+      utm_content:  params.get('utm_content')  ?? undefined,
+    };
+    if (Object.values(utm).some(Boolean)) {
+      track(EVT.app_open as never, { ...utm, kind: 'utm_detected' });
+    }
+  }, []);
+
   const closeModal = () => setModal(null);
 
   const requireAuth = (next: ModalKind) => {
@@ -230,7 +277,7 @@ export default function WecycleApp() {
       if (id === 'settings')  { setSubStack(['settings']);      return; }
       if (id === 'notifs')    { setSubStack(['notifications']); return; }
       if (id === 'feedback')  { setSubStack(['feedback']);      return; }
-      if (id === 'tour')      { setActiveScreen('feed'); setShowTour(true); return; }
+      if (id === 'tour')      { track(EVT.tour_replayed); setActiveScreen('feed'); setShowTour(true); return; }
       if (id === 'invite') {
         if (typeof window === 'undefined') return;
         const shareUrl = window.location.origin || 'https://wecycle.page';
@@ -265,10 +312,12 @@ export default function WecycleApp() {
     }, 80);
   };
 
-  /* Item detail screen takes over the viewport. Logged-out viewers can read
-     everything; the contact buttons gate via `onRequireAuth`. Tapping the
-     owner card opens their storefront. */
-  if (openItem) {
+  /* Item detail screen takes over the viewport on MOBILE. On desktop we
+   * fall through and render it as a modal-theatre overlay at the bottom of
+   * the JSX (after the main shell) so the underlying feed stays visible —
+   * matching the Lost & Found pattern the user picked as the canonical
+   * desktop look. */
+  if (openItem && !isDesktop) {
     return (
       <>
         <a href="#main" className="skip-link">Skip to main content</a>
@@ -295,8 +344,8 @@ export default function WecycleApp() {
     );
   }
 
-  /* Storefront screen — accessed from any owner card / commenter avatar */
-  if (openStorefront) {
+  /* Storefront — same split. Modal on desktop, full takeover on mobile. */
+  if (openStorefront && !isDesktop) {
     return (
       <>
         <a href="#main" className="skip-link">Skip to main content</a>
@@ -362,8 +411,8 @@ export default function WecycleApp() {
     );
   }
 
-  /* Event detail screen takes over the viewport */
-  if (openEvent) {
+  /* Event detail — full takeover on mobile, modal overlay on desktop. */
+  if (openEvent && !isDesktop) {
     /* Ownership: demo flag relies on MY_EVENT_IDS; live mode trusts the
        organizer.id matching the signed-in user. */
     const isOwner = (isDemoMode() && MY_EVENT_IDS.includes(openEvent.id))
@@ -586,6 +635,137 @@ export default function WecycleApp() {
             } : undefined}
           />
         )}
+
+        {/* ── DESKTOP MODAL THEATRE ──
+           On desktop ≥1024px the item / event / storefront detail surfaces
+           render as a centered modal overlay — same vibe as the Lost &
+           Found sheet — instead of replacing the full app shell. The feed
+           stays visible (dimmed) behind so the user keeps spatial context.
+           On mobile these branches don't render (the early-return takeover
+           up top fires instead). */}
+        {isDesktop && openItem && (
+          <DesktopDetailModal onClose={() => setOpenItem(null)} ariaLabel={openItem.title}>
+            <ItemDetailScreen
+              item={openItem}
+              onBack={() => setOpenItem(null)}
+              onRequireAuth={() => setModal('auth')}
+              onOpenStorefront={openStorefrontFor}
+              isOwner={ownsItem(openItem)}
+              isAdmin={isAdmin}
+              onDelete={(ownsItem(openItem) || isAdmin) ? async () => {
+                if (isDemoMode()) { deleteDemoPost(openItem.id); return; }
+                await deletePostById(openItem.id, openItem.isRequest ? 'request' : 'listing');
+              } : undefined}
+            />
+          </DesktopDetailModal>
+        )}
+
+        {isDesktop && openEvent && (() => {
+          const isOwner = (isDemoMode() && MY_EVENT_IDS.includes(openEvent.id))
+            || (!!user && openEvent.organizer.id === user.id);
+          return (
+            <DesktopDetailModal onClose={() => setOpenEvent(null)} ariaLabel={openEvent.title}>
+              <EventDetailScreen
+                event={openEvent}
+                isRsvpd={rsvpdEvents.has(openEvent.id)}
+                isOwner={isOwner || isAdmin}
+                onBack={() => setOpenEvent(null)}
+                onRsvp={() => toggleRsvp(openEvent.id)}
+                onRequireAuth={() => setModal('auth')}
+                onOpenStorefront={openStorefrontFor}
+                onDelete={(isOwner || isAdmin) ? async () => {
+                  if (isDemoMode()) { deleteDemoPost(openEvent.id); return; }
+                  await deleteEvent(openEvent.id);
+                } : undefined}
+              />
+            </DesktopDetailModal>
+          );
+        })()}
+
+        {isDesktop && openStorefront && (
+          <DesktopDetailModal onClose={() => setOpenStorefront(null)} ariaLabel={`${openStorefront.name}'s storefront`}>
+            <StorefrontScreen
+              user={openStorefront}
+              onBack={() => setOpenStorefront(null)}
+              onOpenItem={(item) => { setOpenStorefront(null); setOpenItem(item); }}
+              onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
+              onOpenLF={(lf) => { setOpenStorefront(null); setOpenLF(lf); }}
+            />
+          </DesktopDetailModal>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ── DesktopDetailModal ──
+ * Thin wrapper that mirrors the LostFoundDetailSheet's desktop layout:
+ * dim backdrop + centered 1080px-wide modal box that scrolls its own
+ * contents. Used to host the marketplace / event / storefront detail
+ * screens on desktop without making them replace the whole page.
+ *
+ * The backdrop swallows the click → close; the box stops propagation so
+ * clicks inside don't dismiss it. ESC also closes (via the keydown
+ * listener) so keyboard users can dismiss without aiming for the X.
+ */
+function DesktopDetailModal({
+  onClose, ariaLabel, children,
+}: {
+  onClose: () => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <>
+      {/* Dim + blur backdrop. */}
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          zIndex: 100,
+        }}
+      />
+      {/* Centered modal — fixed-position so it ignores page scroll. The
+         inner overflow handles content scroll. */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        style={{
+          position: 'fixed', left: '50%', top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 'min(1080px, 94vw)',
+          maxHeight: '90vh',
+          background: 'var(--bg-card)',
+          borderRadius: 24,
+          zIndex: 101,
+          overflow: 'hidden',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.32)',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Inner scroll shell — the hosted screens still expect a tall
+           scrollable container, so we give them one bounded by maxHeight. */}
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {children}
+        </div>
       </div>
     </>
   );

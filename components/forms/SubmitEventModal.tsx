@@ -8,6 +8,7 @@ import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createEvent } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
+import { track, EVT } from '../../lib/analytics';
 
 const EVENT_TYPES = [
   { value: 'swap',      label: '🔄 Swap Drive' },
@@ -83,11 +84,19 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
       } else {
         await new Promise(r => setTimeout(r, 400));
       }
+      track(EVT.post_form_submitted, {
+        post_kind: 'event',
+        event_type: form.eventType,
+        has_max_attendees: typeof form.maxAttendees === 'number',
+        has_description: form.description.trim().length > 0,
+        has_photos: form.photos.length > 0,
+      });
       onSubmit?.(form);
       pickerRef.current?.clear();
       setForm({ title: '', eventType: '', date: '', time: '', location: '', description: '', photos: [] });
       onClose();
     } catch (err) {
+      track(EVT.post_form_failed, { post_kind: 'event', reason: (err as Error).message?.slice(0, 80) });
       setSubmitError((err as Error).message || 'Could not submit — please try again.');
     } finally {
       setSubmitting(false);

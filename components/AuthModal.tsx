@@ -29,6 +29,7 @@ import { Mail, User, ArrowLeft, IdCard, KeyRound, Loader2 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
+import { track, EVT } from '../lib/analytics';
 
 type Step = 'email' | 'code';
 
@@ -129,6 +130,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     setError(null);
     setInfo(null);
     setSubmitting(true);
+    track(EVT.sign_up_email_submitted, { has_name: !!name.trim(), has_college_id: !!collegeId.trim() });
     try {
       if (!hasSupabaseEnv) {
         /* No backend → drop into the demo session like the old auth did. */
@@ -138,6 +140,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           email: email.trim(),
           collegeId: collegeId.trim(),
         });
+        track(EVT.login, { method: 'demo' });
         handleClose();
         return;
       }
@@ -157,10 +160,12 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         },
       });
       if (err) throw err;
+      track(EVT.sign_up_otp_sent);
       setStep('code');
       setInfo(`We sent an ${OTP_LENGTH}-character code to ${email.trim()}. It expires in 10 minutes.`);
       startResendCooldown();
     } catch (err) {
+      track(EVT.sign_in_failed, { phase: 'send_otp', reason: (err as Error).message?.slice(0, 80) });
       handleAuthError(err);
     } finally {
       setSubmitting(false);
@@ -182,8 +187,14 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         type: 'email',
       });
       if (err) throw err;
+      /* GA4 reserves `login` for every sign-in and `sign_up` for net-new
+       * users. We can't tell from verifyOtp's response which case applied,
+       * so we fire `login` always; `sign_up` is implicitly captured on
+       * GA4's side by their first-seen heuristic. */
+      track(EVT.login, { method: 'otp' });
       handleClose();
     } catch (err) {
+      track(EVT.sign_in_failed, { phase: 'verify_otp', reason: (err as Error).message?.slice(0, 80) });
       handleAuthError(err);
     } finally {
       setSubmitting(false);

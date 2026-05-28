@@ -13,6 +13,7 @@ import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 import { useBreakpoint } from '../lib/useBreakpoint';
+import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { updateEvent } from '../lib/liveData';
 import { isDemoMode } from '../lib/demoMode';
 
@@ -181,6 +182,10 @@ export default function EventDetailScreen({
 
   const handleContact = (link: ContactLink) => {
     if (!user) { onRequireAuth(); return; }
+    trackContactClicked(link.channel, 'event', event.id, {
+      owner_id: event.organizer.id,
+      event_type: event.eventType,
+    });
     if (link.channel === 'whatsapp') {
       window.open(link.href, '_blank', 'noopener,noreferrer');
     } else {
@@ -190,6 +195,8 @@ export default function EventDetailScreen({
 
   const handleRsvpClick = () => {
     if (!user) { onRequireAuth(); return; }
+    /* `rsvpd` is the *current* state — fire the event with the resulting state. */
+    track(EVT.rsvp_toggled, { event_id: event.id, rsvp: !event.rsvpd, event_type: event.eventType });
     onRsvp();
   };
 

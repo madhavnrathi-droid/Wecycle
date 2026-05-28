@@ -8,6 +8,7 @@ import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
+import { track, EVT } from '../../lib/analytics';
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
@@ -98,11 +99,24 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
         /* Demo path — no backend; just simulate latency. */
         await new Promise(r => setTimeout(r, 400));
       }
+      track(EVT.post_form_submitted, {
+        post_kind: 'share',
+        listing_type: form.pricing === 'sell' ? 'sell' : 'free',
+        has_photos: form.photos.length > 0,
+        photo_count: form.photos.length,
+        has_price: form.pricing === 'sell' && typeof form.price === 'number',
+        has_description: form.description.trim().length > 0,
+        category: form.category,
+      });
       onSubmit?.(form);
       pickerRef.current?.clear();
       reset();
       onClose();
     } catch (err) {
+      track(EVT.post_form_failed, {
+        post_kind: 'share',
+        reason: (err as Error).message?.slice(0, 80),
+      });
       setSubmitError((err as Error).message || 'Could not post — please try again.');
     } finally {
       setSubmitting(false);

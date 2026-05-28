@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { track, EVT } from '../lib/analytics';
 
 export type PostKind = 'share' | 'request' | 'event' | 'report-lf';
 
@@ -33,6 +35,8 @@ const POST_OPTIONS: { id: PostKind; icon: string; label: string; desc: string; c
 ];
 
 export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
+  /* Fire-once when the sheet opens — the parent decides whether to mount us. */
+  useEffect(() => { track(EVT.post_picker_opened); }, []);
   return (
     <>
       <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
@@ -67,7 +71,7 @@ export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
           {POST_OPTIONS.map(opt => (
             <button
               key={opt.id}
-              onClick={() => onSelect(opt.id)}
+              onClick={() => { track(EVT.post_kind_selected, { post_kind: opt.id }); onSelect(opt.id); }}
               className="press-scale"
               style={{
                 display: 'flex', alignItems: 'center', gap: 14,

@@ -11,6 +11,7 @@ import {
   type ThemeMode, type UserSettings,
 } from '../lib/settings';
 import { useAuth } from '../lib/AuthContext';
+import { track, EVT } from '../lib/analytics';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -34,18 +35,33 @@ export default function SettingsScreen({
 
   if (!mounted) return null;
 
+  /* Wrapped saver — every group emits one `settings_changed` event with the
+   * specific key + new value so we can see which toggles users actually flip
+   * in production. */
+  const fireSettings = (group: string, patch: Record<string, unknown>) => {
+    for (const [key, value] of Object.entries(patch)) {
+      track(EVT.settings_changed, { group, setting_key: key, value: String(value) });
+    }
+  };
   const setAppearance = (patch: Partial<UserSettings['appearance']>) => {
+    fireSettings('appearance', patch as Record<string, unknown>);
     saveSettings({ appearance: { ...settings.appearance, ...patch } });
     /* Apply text-size change instantly so the screen reflows under the user's
        finger — they don't have to wait for the next paint or close the tab. */
     if (patch.largerText !== undefined) applyLargerText(patch.largerText);
   };
-  const setPrivacy = (patch: Partial<UserSettings['privacy']>) =>
+  const setPrivacy = (patch: Partial<UserSettings['privacy']>) => {
+    fireSettings('privacy', patch as Record<string, unknown>);
     saveSettings({ privacy: { ...settings.privacy, ...patch } });
-  const setMarketplace = (patch: Partial<UserSettings['marketplace']>) =>
+  };
+  const setMarketplace = (patch: Partial<UserSettings['marketplace']>) => {
+    fireSettings('marketplace', patch as Record<string, unknown>);
     saveSettings({ marketplace: { ...settings.marketplace, ...patch } });
-  const setContact = (patch: Partial<UserSettings['contact']>) =>
+  };
+  const setContact = (patch: Partial<UserSettings['contact']>) => {
+    fireSettings('contact', patch as Record<string, unknown>);
     saveSettings({ contact: { ...settings.contact, ...patch } });
+  };
 
   const clearCache = () => {
     if (typeof window === 'undefined') return;

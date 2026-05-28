@@ -13,6 +13,7 @@ import {
   fetchMySaves, onPostsChanged,
   markListingSold, markRequestCompleted, markLostFoundResolved, deleteEvent,
 } from '../lib/liveData';
+import { track, EVT } from '../lib/analytics';
 import { getDemoUploads, getDemoRequests, deleteDemoPost } from '../lib/demoInventory';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
@@ -331,6 +332,11 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     completeLabel={isMine ? completeLabel : undefined}
                     onComplete={isMine ? async () => {
                       if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}? This removes the post.`)) return;
+                      track(EVT.post_marked_complete, {
+                        post_id: entry.item.id,
+                        post_kind: entry.item.isRequest ? 'request' : 'item',
+                        action: entry.item.isRequest ? 'completed' : 'sold',
+                      });
                       if (isDemoMode()) {
                         deleteDemoPost(entry.item.id);
                       } else {
@@ -359,6 +365,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     onClick={() => onOpenEvent(entry.event)}
                     onDelete={async () => {
                       if (typeof window !== 'undefined' && !window.confirm(`Delete event "${entry.event.title}"?`)) return;
+                      track(EVT.post_deleted, { post_id: entry.event.id, post_kind: 'event' });
                       if (isDemoMode()) deleteDemoPost(entry.event.id);
                       else {
                         try { await deleteEvent(entry.event.id); }
@@ -384,6 +391,12 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                   completeLabel={lfLabel}
                   onComplete={async () => {
                     if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.lf.title}" as resolved? This removes the post.`)) return;
+                    track(EVT.post_marked_complete, {
+                      post_id: entry.lf.id,
+                      post_kind: 'lostfound',
+                      action: 'resolved',
+                      lf_status: entry.lf.status,
+                    });
                     if (isDemoMode()) {
                       /* Demo store doesn't track L&F separately yet; no-op. */
                     } else {

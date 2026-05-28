@@ -19,6 +19,7 @@
 
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { X, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
+import { track, EVT } from '../lib/analytics';
 
 export const ONBOARDING_KEY = 'wecycle.onboarding.v1.done';
 
@@ -136,13 +137,24 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
   const current = STEPS[step];
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+    /* Fires once on mount — this is "tour was actually rendered for the
+     * user", which is what we want to compare against onboarding_completed
+     * to compute the abandonment rate. */
+    track(EVT.onboarding_started);
+  }, []);
 
   /* Jump the host screen, then wait one frame for the new screen to render
    * before we go hunting for the target node. */
   useEffect(() => {
     if (current.screen) onJumpTo(current.screen);
-  }, [step, current.screen, onJumpTo]);
+    track(EVT.onboarding_step_viewed, {
+      step_index: step,
+      step_count: STEPS.length,
+      step_title: current.title.slice(0, 40),
+    });
+  }, [step, current.screen, onJumpTo, current.title]);
 
   /* Locate the target element and track its bounding box. We recompute on
    * resize/scroll because the bottom nav is fixed and the page underneath
@@ -184,10 +196,17 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
   const isFirst = step === 0;
 
   const finish = () => {
+    track(EVT.onboarding_completed, { step_reached: step + 1, step_count: STEPS.length });
     markOnboardingDone();
     onClose();
   };
-  const skip = finish;
+  const skip = () => {
+    /* Distinct from completed — fires when the user bails before the last
+     * step. The step_reached lets us see where the funnel breaks. */
+    if (!isLast) track(EVT.onboarding_skipped, { step_reached: step + 1, step_count: STEPS.length });
+    markOnboardingDone();
+    onClose();
+  };
   const next = () => isLast ? finish() : setStep(s => s + 1);
   const prev = () => setStep(s => Math.max(0, s - 1));
 

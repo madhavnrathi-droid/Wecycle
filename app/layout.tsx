@@ -13,10 +13,17 @@ import "./globals.css";
 const CLARITY_PROJECT_ID = "wy1d87md22";
 
 /* Google Tag Manager container ID. Public-by-design like the Clarity ID —
- * it appears in the request URL the moment GTM loads. GA4 + any future
- * pixels (Facebook, LinkedIn, etc.) are configured *inside* the GTM UI,
- * which means we never need to touch this file again to add a new tag. */
+ * it appears in the request URL the moment GTM loads. Additional pixels
+ * (Facebook, LinkedIn ad conversions, etc.) get configured *inside* the
+ * GTM UI, which means we never need to touch this file again for those. */
 const GTM_ID = "GTM-T59PDHDF";
+
+/* Google Analytics 4 Measurement ID. We install gtag.js directly here
+ * (instead of through GTM) so basic page-view + event tracking works the
+ * moment we ship — no manual GTM publish step required. If you ever want
+ * GA4 *also* configured inside GTM, REMOVE THE GTM CONFIGURATION TAG
+ * there — otherwise every hit gets counted twice. */
+const GA4_MEASUREMENT_ID = "G-FR9104LN7N";
 
 export const metadata: Metadata = {
   title: "Wecycle — Community Operating System",
@@ -80,13 +87,12 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
         {/* ── Google Tag Manager ──
-            GTM is the canonical container for GA4 + every other tag we'll
-            ever wire up (Facebook Pixel, LinkedIn Insight, ad conversions).
-            Loading with strategy="afterInteractive" — the recommended
-            balance for analytics: fires before any user click can be missed
-            but after the page is interactive so it never blocks first paint.
-            (next/script doesn't allow third-party `beforeInteractive` in
-            app router, so this is the right setting.) */}
+            GTM is the canonical container for any non-GA4 tags we wire up
+            later (Facebook Pixel, LinkedIn Insight, ad conversions). GA4
+            itself is installed directly below — DO NOT also add a GA4
+            Configuration tag inside GTM or every hit will be counted twice.
+            Both GTM and gtag use the same `window.dataLayer` so events
+            pushed by `lib/analytics.ts` reach both pipelines. */}
         <Script id="gtm-init" strategy="afterInteractive">
           {`
             (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -94,6 +100,32 @@ export default function RootLayout({
             j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
             })(window,document,'script','dataLayer','${GTM_ID}');
+          `}
+        </Script>
+
+        {/* ── Google Analytics 4 (gtag.js) ──
+            Installed directly so basic page-view + custom events work the
+            second this ships, with no manual GTM publish step. The async
+            loader + the inline gtag init are the standard GA4 snippet,
+            wrapped in next/script. The inline init runs synchronously
+            against window.dataLayer (which GTM may have already created).
+            Custom events live in lib/analytics.ts. */}
+        <Script
+          id="ga4-loader"
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="ga4-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
+            gtag('js', new Date());
+            gtag('config', '${GA4_MEASUREMENT_ID}', {
+              /* Single-page-app: we'll send our own page_view events on
+                 screen changes via lib/analytics.ts → trackScreenView. */
+              send_page_view: true,
+            });
           `}
         </Script>
 

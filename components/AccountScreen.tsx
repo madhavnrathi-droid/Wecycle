@@ -5,6 +5,7 @@ import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Buildin
 import { useAuth } from '../lib/AuthContext';
 import { updateDemoSession, DEPARTMENTS, type Residence } from '../lib/demoAuth';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
+import { track, EVT } from '../lib/analytics';
 
 /* Strip everything down to the local 10-digit number, dropping a leading
    +91 / 91 / 0 if the user pasted one. */
@@ -148,6 +149,13 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         await refreshProfile();
       }
 
+      track(EVT.account_edited, {
+        has_phone: phone.length === 10,
+        has_college_id: collegeId.trim().length > 0,
+        has_year: !!graduatingYear,
+        has_course: !!course.trim(),
+        has_department: !!department,
+      });
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(s => (s === 'saved' ? 'idle' : s)), 1600);
     } catch (e) {

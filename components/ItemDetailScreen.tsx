@@ -16,6 +16,7 @@ import {
   updateRequestFields, repostRequest,
 } from '../lib/liveData';
 import { isDemoMode } from '../lib/demoMode';
+import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES } from '../lib/mockData';
 
@@ -245,6 +246,12 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       onRequireAuth();
       return;
     }
+    /* THE conversion event. This is the single best proxy for "real
+     * connection happened" until we wire in-app messaging. */
+    trackContactClicked(link.channel, item.isRequest ? 'request' : 'item', item.id, {
+      owner_id: item.user.id,
+      action: action,
+    });
     /* In-place navigation — opens the OS mail/WhatsApp handler reliably on
        iOS and Android, and a new tab on desktop browsers. */
     if (link.channel === 'whatsapp') {

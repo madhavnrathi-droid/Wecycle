@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getAvatar } from '../lib/photos';
+import { track, EVT } from '../lib/analytics';
 
 interface DrawerProps {
   open: boolean;
@@ -51,6 +52,7 @@ export default function Drawer({
 
   useEffect(() => {
     if (!open) return;
+    track(EVT.drawer_opened);
     previousFocus.current = document.activeElement as HTMLElement;
     const original = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -157,6 +159,7 @@ export default function Drawer({
                   className="drawer-item"
                   type="button"
                   onClick={() => {
+                    track(EVT.drawer_item_tapped, { item: id });
                     if (onNavigate) onNavigate(id);
                     onClose();
                   }}

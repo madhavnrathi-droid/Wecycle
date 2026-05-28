@@ -5,6 +5,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Profile } from './api/types';
 import { getDemoSession, clearDemoSession, onDemoSessionChange, type DemoSession, initialsOf } from './demoAuth';
+import { identify as analyticsIdentify, resetIdentity as analyticsReset, track, EVT } from './analytics';
 
 /* Admin allow-list — hard-coded by request. Anyone signed in with one
    of these emails gets isAdmin=true and can delete any post/comment
@@ -125,6 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    track(EVT.sign_out, { is_demo: isDemo });
+    analyticsReset();
     if (isDemo) {
       clearDemoSession();
       reset();
@@ -184,6 +187,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isAdmin = !isDemo && isAdminEmail(user?.email);
+
+  /* Identify the current user into every analytics destination whenever
+   * auth state stabilises. Fires once per (uid + adminness + demoness)
+   * change — re-running on profile reloads is cheap and idempotent. */
+  useEffect(() => {
+    if (!user) return;
+    analyticsIdentify({
+      userId: user.id,
+      displayName: profile?.full_name ?? (user.email ? user.email.split('@')[0] : undefined),
+      email: user.email ?? undefined,
+      isAdmin,
+      isDemo,
+    });
+  }, [user, profile?.full_name, isAdmin, isDemo]);
 
   return (
     <AuthContext.Provider value={{ user, session, profile, loading, refreshProfile, signOut, isDemo, isAdmin }}>
