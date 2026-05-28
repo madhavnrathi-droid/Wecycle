@@ -2,8 +2,15 @@ import type { Metadata } from "next";
 import type { Viewport } from "next/dist/lib/metadata/types/extra-types";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import Script from "next/script";
 import { AuthProvider } from "../lib/AuthContext";
 import "./globals.css";
+
+/* Microsoft Clarity project ID. Hard-coded because Clarity's snippet is
+ * public-by-design — the ID is embedded in the script URL on every page that
+ * loads it, so there's no secret to hide. Keeping it inline (not in env) so
+ * Vercel preview builds also report into the same dashboard. */
+const CLARITY_PROJECT_ID = "wy1d87md22";
 
 export const metadata: Metadata = {
   title: "Wecycle — Community Operating System",
@@ -65,6 +72,20 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+        {/* Microsoft Clarity — session replay + heatmaps + funnel analytics.
+            Loaded via next/script with strategy="afterInteractive" so it
+            never blocks the first paint, but still injects before the user
+            starts clicking around. */}
+        <Script id="ms-clarity" strategy="afterInteractive">
+          {`
+            (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "${CLARITY_PROJECT_ID}");
+          `}
+        </Script>
       </head>
       <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
         <AuthProvider>{children}</AuthProvider>
