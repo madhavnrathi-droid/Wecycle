@@ -12,6 +12,12 @@ import "./globals.css";
  * Vercel preview builds also report into the same dashboard. */
 const CLARITY_PROJECT_ID = "wy1d87md22";
 
+/* Google Tag Manager container ID. Public-by-design like the Clarity ID —
+ * it appears in the request URL the moment GTM loads. GA4 + any future
+ * pixels (Facebook, LinkedIn, etc.) are configured *inside* the GTM UI,
+ * which means we never need to touch this file again to add a new tag. */
+const GTM_ID = "GTM-T59PDHDF";
+
 export const metadata: Metadata = {
   title: "Wecycle — Community Operating System",
   description:
@@ -73,6 +79,24 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
+        {/* ── Google Tag Manager ──
+            GTM is the canonical container for GA4 + every other tag we'll
+            ever wire up (Facebook Pixel, LinkedIn Insight, ad conversions).
+            Loading with strategy="afterInteractive" — the recommended
+            balance for analytics: fires before any user click can be missed
+            but after the page is interactive so it never blocks first paint.
+            (next/script doesn't allow third-party `beforeInteractive` in
+            app router, so this is the right setting.) */}
+        <Script id="gtm-init" strategy="afterInteractive">
+          {`
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','${GTM_ID}');
+          `}
+        </Script>
+
         {/* Microsoft Clarity — session replay + heatmaps + funnel analytics.
             Loaded via next/script with strategy="afterInteractive" so it
             never blocks the first paint, but still injects before the user
@@ -88,6 +112,17 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+        {/* GTM noscript fallback — fires the container for browsers (and
+            crawlers) that have JS disabled. Must be the first child of
+            <body> per Google's spec. */}
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+          />
+        </noscript>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
