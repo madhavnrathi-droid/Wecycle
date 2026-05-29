@@ -54,7 +54,8 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
         </button>
 
         <NavButton
-          label="Lost & Found"
+          label="L&F"
+          ariaLabel="Lost & Found"
           isActive={active === 'lost_found'}
           onClick={() => navigate('lost_found')}
           tourId="nav-lostfound"
@@ -76,21 +77,33 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
 }
 
 function NavButton({
-  label, isActive, onClick, children, tourId,
+  label, ariaLabel, isActive, onClick, children, tourId,
 }: {
-  label: string; isActive: boolean; onClick: () => void; children: React.ReactNode;
+  label: string;
+  /** Screen-reader name, when the visible pill label is abbreviated
+   *  (e.g. "L&F" pill / "Lost & Found" for SR users). Defaults to label. */
+  ariaLabel?: string;
+  isActive: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
   tourId?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      aria-label={label}
+      aria-label={ariaLabel ?? label}
       aria-current={isActive ? 'page' : undefined}
       className="bottom-nav-btn"
       data-active={isActive || undefined}
       data-tour={tourId}
     >
       {children}
+      {/* Label rendered inline next to the icon. The pill-expansion CSS
+       *  animates max-width + opacity from 0 → 1, so when the button isn't
+       *  active the label collapses to a zero-width hidden state without
+       *  unmount jank. aria-hidden because the parent button already
+       *  carries the accessible label via aria-label. */}
+      <span className="bottom-nav-btn-label" aria-hidden="true">{label}</span>
     </button>
   );
 }

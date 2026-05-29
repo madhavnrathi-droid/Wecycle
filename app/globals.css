@@ -3247,23 +3247,72 @@ body {
     0 4px 12px rgba(0, 0, 0, 0.06);
   gap: 2px;
 }
+/* Pill-expanding nav button — borrowed from the Karya app.
+ * The button stays icon-only until it becomes active, at which point it
+ * expands into a horizontal pill and reveals its label next to the icon.
+ *
+ * Animation design notes:
+ *   - 280ms with a slight spring-overshoot easing makes the pill feel
+ *     "snappy" instead of "linear". The same curve drives padding, gap,
+ *     and the label's max-width so the three move as one shape.
+ *   - Background + color flip on a separate, shorter timing (180ms ease)
+ *     so the colour change reads as instant even while the pill grows.
+ *   - The label is rendered always (max-width:0, opacity:0 when inactive)
+ *     so React doesn't mount/unmount it on every nav change — that would
+ *     reset the transition and cause the first paint to flash.
+ */
 .bottom-nav-btn {
-  width: 44px;
+  min-width: 44px;
   height: 44px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0;
   background: transparent;
   border: none;
-  border-radius: 50%;
+  border-radius: 999px;
   cursor: pointer;
   color: var(--text-muted);
-  transition: color 0.15s, background 0.15s, transform 0.15s var(--ease-spring);
+  /* Snappy spring — light overshoot at the end of the curve. */
+  transition:
+    padding 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    gap 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 200ms ease-out,
+    color 180ms ease-out,
+    transform 0.15s var(--ease-spring);
+  /* SVG should never grow on its own — anchor it left so the layout
+     shifts feel like the pill is opening outward from the icon. */
+  flex-shrink: 0;
 }
 .bottom-nav-btn[data-active] {
-  color: var(--text-primary);
+  background: var(--text-primary);
+  color: var(--bg-base);
+  padding: 0 16px;
+  gap: 8px;
 }
 .bottom-nav-btn:active { transform: scale(0.92); }
+
+.bottom-nav-btn-label {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: inherit;
+  /* Label fades in on a slight delay so the pill begins expanding before
+     text appears — keeps the motion crisp. */
+  transition:
+    max-width 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 180ms ease-out 60ms;
+}
+.bottom-nav-btn[data-active] .bottom-nav-btn-label {
+  max-width: 120px;
+  opacity: 1;
+}
 
 .bottom-nav-post {
   width: 52px;
@@ -3283,20 +3332,22 @@ body {
 
 /* Tablet: slightly tighter pill, similar mobile feel */
 @media (min-width: 768px) {
-  .bottom-nav { max-width: 360px; }
+  .bottom-nav { max-width: 380px; }
   .bottom-nav-inner {
     padding: 8px 14px;
     gap: 4px;
     border-radius: 999px;
     margin: 0 0 20px;
   }
-  .bottom-nav-btn  { width: 40px; height: 40px; }
+  /* `min-width` (not width) so the inactive icons sit at 40px but the
+     active button can still expand into a pill. */
+  .bottom-nav-btn  { min-width: 40px; height: 40px; }
   .bottom-nav-post { width: 46px; height: 46px; }
 }
 
 /* Desktop: compact dock — small and unobtrusive (Apple-Dock-like) */
 @media (min-width: 1024px) {
-  .bottom-nav { max-width: 340px; }
+  .bottom-nav { max-width: 360px; }
   .bottom-nav-inner {
     padding: 6px 12px;
     gap: 4px;
@@ -3306,12 +3357,13 @@ body {
       0 12px 30px rgba(0, 0, 0, 0.10),
       0 4px 12px rgba(0, 0, 0, 0.06);
   }
-  .bottom-nav-btn  { width: 38px; height: 38px; }
+  .bottom-nav-btn  { min-width: 38px; height: 38px; }
   .bottom-nav-post { width: 42px; height: 42px; }
   .bottom-nav-btn  svg { width: 18px; height: 18px; }
   .bottom-nav-post svg { width: 18px; height: 18px; }
-  /* Hover affordance for mouse users */
-  .bottom-nav-btn:hover { background: var(--bg-inset); }
+  /* Hover affordance for mouse users — gated to inactive so it doesn't
+     fight the active pill's solid white background. */
+  .bottom-nav-btn:not([data-active]):hover { background: var(--bg-inset); }
   .bottom-nav-post:hover { transform: scale(1.05); }
 }
 
