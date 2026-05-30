@@ -86,7 +86,13 @@ export interface UserSettings {
 
 export const DEFAULT_SETTINGS: UserSettings = {
   appearance: {
-    theme: 'system',
+    /* First-time visitors land in light mode rather than auto-following the
+     * OS. Wecycle's brand reads as a bright, friendly community board first
+     * — handing the user a black screen on initial load (which is what most
+     * Macs / Androids default to at night) doesn't match the brand. Once
+     * the user toggles theme or signs in, their explicit choice persists
+     * via the saveSettings merge below. */
+    theme: 'light',
     largerText: false,
   },
   privacy: {

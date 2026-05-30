@@ -64,7 +64,7 @@ const STEPS: TourStep[] = [
     selector: '[data-tour="feed-tabs"]',
     title: 'Browse the feed',
     body:
-      'Switch between everything happening, requests from neighbours, and the latest uploads.',
+      'Switch between everything happening, requests from neighbours, and the latest items shared on campus.',
     screen: 'feed',
     placement: 'bottom',
   },

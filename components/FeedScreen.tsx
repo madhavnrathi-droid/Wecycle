@@ -50,10 +50,11 @@ export default function FeedScreen({
 
   const [activeCategory, setActiveCategory] = useState('all');
   /* Default tab = "All" — a chronological mix of every Wecycle activity
-     (uploads, requests, events, lost-found). FeedScreen unmounts when the
-     user navigates to another bottom-nav screen, so the next visit reseeds
-     this default — that's the "every new session starts on All" behaviour. */
-  const [activeType, setActiveType] = useState<'all' | 'requests' | 'uploads'>('all');
+     (shared items, requests, events, lost-found). FeedScreen unmounts when
+     the user navigates to another bottom-nav screen, so the next visit
+     reseeds this default — that's the "every new session starts on All"
+     behaviour. */
+  const [activeType, setActiveType] = useState<'all' | 'requests' | 'shared'>('all');
   const [query, setQuery] = useState('');
   /* Saved-listing IDs for the heart icon's filled state. Hydrated from
      Supabase on mount + after every post-change event (a delete drops
@@ -190,7 +191,7 @@ export default function FeedScreen({
   /* The active tab decides which pool we render:
        - 'all'      → mixed feed of items + requests + events + L&F by recency
        - 'requests' → open requests only
-       - 'uploads'  → marketplace listings only */
+       - 'shared'   → marketplace listings only (the "Shared" tab) */
   const source = activeType === 'requests' ? requests : items;
   const filtered = source.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
@@ -467,7 +468,7 @@ export default function FeedScreen({
         onPick={(hit) => { track(EVT.user_card_opened, { user_id: hit.id, source: 'feed_search' }); onOpenUser?.(hit.id); }}
       />
 
-      {/* ── PILL TABS: all / requests / uploads ── */}
+      {/* ── PILL TABS: all / requests / shared ── */}
       <section style={{ padding: '0 16px 14px' }} data-tour="feed-tabs">
         <div className="segmented">
           <button
@@ -485,11 +486,11 @@ export default function FeedScreen({
             Requests
           </button>
           <button
-            onClick={() => { setActiveType('uploads'); track(EVT.feed_tab_changed, { tab: 'uploads' }); }}
-            aria-pressed={activeType === 'uploads'}
-            data-active={activeType === 'uploads' || undefined}
+            onClick={() => { setActiveType('shared'); track(EVT.feed_tab_changed, { tab: 'shared' }); }}
+            aria-pressed={activeType === 'shared'}
+            data-active={activeType === 'shared' || undefined}
           >
-            Uploads
+            Shared
           </button>
         </div>
       </section>
@@ -698,7 +699,7 @@ function FeedCard({
             data-kind={strokeKind}
             aria-hidden="true"
           >
-            {strokeKind === 'request' ? 'Request' : 'Upload'}
+            {strokeKind === 'request' ? 'Request' : 'Shared'}
           </span>
         )}
         <button
@@ -778,7 +779,7 @@ function FeedCard({
                 L&F cards + the calendar chip on event cards so users can
                 scan the masonry without having to read each card. Only
                 paints when strokeKind is set (i.e. on the All tab); the
-                dedicated Uploads/Requests tabs don't need redundant
+                dedicated Shared/Requests tabs don't need redundant
                 labels because the tab itself answers the question. */}
             {strokeKind && (
               <span
@@ -786,7 +787,7 @@ function FeedCard({
                 data-kind={strokeKind}
                 aria-hidden="true"
               >
-                {strokeKind === 'request' ? 'Request' : 'Upload'}
+                {strokeKind === 'request' ? 'Request' : 'Shared'}
               </span>
             )}
             <span

@@ -18,7 +18,7 @@ import { getDemoUploads, getDemoRequests, deleteDemoPost } from '../lib/demoInve
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 
-type Tab = 'all' | 'requests' | 'uploads' | 'events' | 'saved';
+type Tab = 'all' | 'requests' | 'shared' | 'events' | 'saved';
 
 interface InventoryScreenProps {
   onOpenMenu: () => void;
@@ -118,7 +118,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
     if (isDemoMode()) {
       /* Read from the mutable demo store so edits + deletes reflect live. */
       const pool: MarketplaceItem[] =
-        activeTab === 'uploads'  ? getDemoUploads() :
+        activeTab === 'shared'  ? getDemoUploads() :
         activeTab === 'requests' ? getDemoRequests() :
         activeTab === 'saved'    ? MARKETPLACE_ITEMS.filter(i => MY_SAVED_IDS.includes(i.id)) :
         [...getDemoUploads(), ...getDemoRequests()];   /* all */
@@ -126,14 +126,14 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
         .filter(i => matchesQuery(i.title))
         .map(item => ({ kind: 'item', item }));
 
-      /* Events also appear under 'all' and 'uploads'. */
-      if (activeTab !== 'uploads' && activeTab !== 'all') return itemEntries;
+      /* Events also appear under 'all' and 'shared'. */
+      if (activeTab !== 'shared' && activeTab !== 'all') return itemEntries;
       return [...itemEntries, ...eventEntriesFor(myEvents)];
     }
 
     /* Live mode */
     const pool =
-      activeTab === 'uploads'  ? myLiveUploads :
+      activeTab === 'shared'  ? myLiveUploads :
       activeTab === 'requests' ? myLiveRequests :
       activeTab === 'saved'    ? myLiveSaves :
       [...myLiveUploads, ...myLiveRequests];   /* all */
@@ -145,8 +145,8 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
     if (activeTab === 'all') {
       return [...itemEntries, ...eventEntriesFor(myEvents), ...lfEntriesFor(myLiveLF)];
     }
-    /* "Uploaded" also joins events (you organized them). */
-    if (activeTab === 'uploads') {
+    /* "Shared" also joins events (you organized them). */
+    if (activeTab === 'shared') {
       return [...itemEntries, ...eventEntriesFor(myEvents)];
     }
     return itemEntries;
@@ -222,7 +222,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
           margin: '4px 0 0',
           fontSize: 13, color: 'var(--text-muted)',
         }}>
-          Manage uploads, requests and saved items
+          Manage what you've shared, requested, and saved
         </p>
       </section>
 
@@ -268,11 +268,11 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
             All
           </button>
           <button
-            onClick={() => setActiveTab('uploads')}
-            aria-pressed={activeTab === 'uploads'}
-            data-active={activeTab === 'uploads' || undefined}
+            onClick={() => setActiveTab('shared')}
+            aria-pressed={activeTab === 'shared'}
+            data-active={activeTab === 'shared' || undefined}
           >
-            Uploaded
+            Shared
           </button>
           <button
             onClick={() => setActiveTab('requests')}
@@ -300,8 +300,8 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
         </div>
       </section>
 
-      {/* ── UPLOADS SUMMARY (uploads tab only) ── */}
-      {activeTab === 'uploads' && (uploadItemCount + uploadEventCount > 0) && (
+      {/* ── SHARED-TAB SUMMARY ── */}
+      {activeTab === 'shared' && (uploadItemCount + uploadEventCount > 0) && (
         <section style={{ padding: '0 16px 14px', display: 'flex', gap: 8 }}>
           <SummaryPill icon="📦" label={`${uploadItemCount} ${uploadItemCount === 1 ? 'item' : 'items'}`} />
           <SummaryPill icon="📅" label={`${uploadEventCount} ${uploadEventCount === 1 ? 'event' : 'events'}`} />
@@ -616,7 +616,7 @@ function CompleteButton({
   );
 }
 
-/* ── Event tile for the Uploads tab ─────────────── */
+/* ── Event tile for the Shared tab ──────────────── */
 
 function InventoryEventCard({
   event, tall, onClick, onDelete,
@@ -780,7 +780,7 @@ function InventoryEmpty({ tab, onPostNew }: { tab: Tab; onPostNew: () => void })
       sub: 'Everything you share or request shows up here. Start with your first post.',
       ctaLabel: 'Create a post',
     } :
-    tab === 'uploads'  ? {
+    tab === 'shared'  ? {
       icon: '📦',
       prompt: 'Your shelves are empty for now.',
       sub: 'Drop the first thing you no longer use — someone next door is looking for it.',

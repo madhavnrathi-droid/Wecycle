@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Plus, Package, CalendarDays, Search } from 'lucide-react';
+import { Home, Plus, Package, CalendarDays, Backpack } from 'lucide-react';
 import { track, EVT } from '../lib/analytics';
 
 /* Activity dropped from the bottom nav — its post-level metrics now live
@@ -60,7 +60,10 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           onClick={() => navigate('lost_found')}
           tourId="nav-lostfound"
         >
-          <Search size={20} strokeWidth={active === 'lost_found' ? 2 : 1.7} />
+          {/* Backpack (not Search) — users were tapping the magnifying glass
+              expecting a search page. Backpack reads as "personal items you
+              carry on campus", which is exactly what L&F is about. */}
+          <Backpack size={20} strokeWidth={active === 'lost_found' ? 2 : 1.7} />
         </NavButton>
 
         <NavButton

@@ -7,7 +7,7 @@
  *     │  Avatar  Name + role + community + badge  │
  *     │  3 stat tiles: items, requests, impact    │
  *     └───────────────────────────────────────────┘
- *     ┌── Tabs: Uploads · Requests · Events ──────┐
+ *     ┌── Tabs: Shared · Requests · Events ───────┐
  *     │  Filter chips (categories etc.)           │
  *     │  Pinterest-style masonry of their posts   │
  *     └───────────────────────────────────────────┘
@@ -45,7 +45,7 @@ interface StorefrontScreenProps {
   onOpenLF?: (item: LostItem) => void;
 }
 
-type Tab = 'uploads' | 'requests' | 'events' | 'lostfound';
+type Tab = 'shared' | 'requests' | 'events' | 'lostfound';
 
 /* Extra profile fields we surface in the "About" block. The shape mirrors
  * what the profiles table holds — we fetch them once when the storefront
@@ -186,7 +186,7 @@ export default function StorefrontScreen({
      actually posted in those, so guests don't see two empty tabs on every
      storefront. */
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: 'uploads',  label: 'Uploads',  count: uploads.length },
+    { id: 'shared',   label: 'Shared',   count: uploads.length },
     { id: 'requests', label: 'Requests', count: requests.length },
     ...(events.length > 0
       ? [{ id: 'events' as const, label: 'Events', count: events.length }]
@@ -196,15 +196,15 @@ export default function StorefrontScreen({
       : []),
   ];
 
-  const [tab, setTab] = useState<Tab>('uploads');
+  const [tab, setTab] = useState<Tab>('shared');
   /* If the active tab loses its data (e.g. user deletes last event while on
-   * the Events tab), fall back to Uploads — otherwise the masonry just sits
+   * the Events tab), fall back to Shared — otherwise the masonry just sits
    * empty and the user can't tell why. */
   useEffect(() => {
-    if (tab === 'events' && events.length === 0) setTab('uploads');
-    if (tab === 'lostfound' && lostFound.length === 0) setTab('uploads');
+    if (tab === 'events' && events.length === 0) setTab('shared');
+    if (tab === 'lostfound' && lostFound.length === 0) setTab('shared');
   }, [tab, events.length, lostFound.length]);
-  /* Category filter is shared across uploads/requests; events have their
+  /* Category filter is shared across the Shared + Requests tabs; events have their
      own type filter handled inline. */
   const [category, setCategory] = useState<string>('all');
 
@@ -337,8 +337,8 @@ export default function StorefrontScreen({
         </div>
       </div>
 
-      {/* ── CATEGORY CHIPS (uploads + requests share these) ── */}
-      {(tab === 'uploads' || tab === 'requests') && (
+      {/* ── CATEGORY CHIPS (Shared + Requests tabs share these) ── */}
+      {(tab === 'shared' || tab === 'requests') && (
         <section style={{ padding: '0 0 12px' }}>
           <div className="chip-row">
             {CATEGORIES.slice(0, 8).map(cat => (
@@ -356,7 +356,7 @@ export default function StorefrontScreen({
 
       {/* ── CONTENT ── */}
       <section className="masonry-shell" style={{ padding: '0 8px' }}>
-        {tab === 'uploads' && (
+        {tab === 'shared' && (
           filteredUploads.length === 0
             ? <EmptyState label={isMe ? "You haven't shared anything yet" : `${user.name.split(' ')[0]} hasn't shared anything yet`} />
             : (
