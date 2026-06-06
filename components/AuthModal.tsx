@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Mail, User, ArrowLeft, IdCard, KeyRound, Loader2 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
+import { setDemoMode } from '../lib/demoMode';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
 
@@ -202,6 +203,10 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
          session (no backend call, no real data touched). */
       if (email.trim().toLowerCase() === REVIEW_EMAIL) {
         if (cleanCode === REVIEW_CODE) {
+          /* Flip demo mode ON so the app renders seeded data (createDemoSession
+             alone only creates the auth session — without this the reviewer
+             would hit empty live feeds). */
+          setDemoMode(true);
           createDemoSession({ name: 'Play Reviewer', email: REVIEW_EMAIL, collegeId: '' });
           track(EVT.login, { method: 'reviewer' });
           handleClose();
