@@ -56,6 +56,17 @@ const OTP_LENGTH = 8;
    would also trip Supabase's own rate limiter). */
 const RESEND_SECONDS = 30;
 
+/* ── App-review test account ──
+ * Wecycle signs in by emailing a one-time code, which means an external
+ * reviewer (e.g. Google Play's review team) can't receive the code. To give
+ * them working access without exposing a real inbox, this specific email +
+ * fixed code drops straight into Wecycle's local demo session — a fully
+ * functional, seeded version of the app that touches no real backend data.
+ * These credentials are intended to be shared ONLY in Play Console's
+ * "App access / sign-in details" field. */
+const REVIEW_EMAIL = 'playreview@wecycle.page';
+const REVIEW_CODE = 'REVIEW01';
+
 export default function AuthModal({ open, onClose }: AuthModalProps) {
   const [step, setStep] = useState<Step>('email');
 
@@ -132,6 +143,15 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     setSubmitting(true);
     track(EVT.sign_up_email_submitted, { has_name: !!name.trim(), has_college_id: !!collegeId.trim() });
     try {
+      /* Reviewer account → skip the real OTP send, just advance to the code
+         step. The fixed code is verified locally in verifyCode below. */
+      if (email.trim().toLowerCase() === REVIEW_EMAIL) {
+        await new Promise(r => setTimeout(r, 200));
+        setStep('code');
+        setInfo('Reviewer account — enter the access code provided in Play Console.');
+        startResendCooldown();
+        return;
+      }
       if (!hasSupabaseEnv) {
         /* No backend → drop into the demo session like the old auth did. */
         await new Promise(r => setTimeout(r, 250));
@@ -178,6 +198,18 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     setError(null);
     setSubmitting(true);
     try {
+      /* Reviewer account → verify the fixed code locally and open the demo
+         session (no backend call, no real data touched). */
+      if (email.trim().toLowerCase() === REVIEW_EMAIL) {
+        if (cleanCode === REVIEW_CODE) {
+          createDemoSession({ name: 'Play Reviewer', email: REVIEW_EMAIL, collegeId: '' });
+          track(EVT.login, { method: 'reviewer' });
+          handleClose();
+        } else {
+          setError("That code didn't match. Use the access code from Play Console.");
+        }
+        return;
+      }
       /* Send the alphanumeric-cleaned code (handles paste-with-spaces). */
       const { error: err } = await supabase.auth.verifyOtp({
         email: email.trim(),

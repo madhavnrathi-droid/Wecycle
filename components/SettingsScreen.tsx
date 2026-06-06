@@ -246,12 +246,14 @@ export default function SettingsScreen({
         <LinkCard
           icon={<Shield size={16} strokeWidth={1.8} />}
           title="Privacy policy"
-          onClick={() => window.open('https://wecycle.page/privacy', '_blank', 'noopener,noreferrer')}
+          /* Relative path → resolves on whatever origin serves the app
+             (vercel.app today, wecycle.page once the custom domain is wired). */
+          onClick={() => window.open('/privacy', '_blank', 'noopener,noreferrer')}
         />
         <LinkCard
           icon={<Globe size={16} strokeWidth={1.8} />}
           title="Terms of service"
-          onClick={() => window.open('https://wecycle.page/terms', '_blank', 'noopener,noreferrer')}
+          onClick={() => window.open('/terms', '_blank', 'noopener,noreferrer')}
         />
       </Section>
 
