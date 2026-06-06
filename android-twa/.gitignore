@@ -1,0 +1,8 @@
+node_modules/
+app/
+.gradle/
+build/
+*.keystore
+.keystore-password
+*.aab
+*.apk
