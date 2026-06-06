@@ -8,6 +8,7 @@ import { createLostFound } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
+import { haptics } from '../../lib/haptics';
 
 const CATEGORIES = [
   'Electronics', 'Bag/Wallet', 'Keys', 'ID/Card', 'Clothing',
@@ -91,6 +92,7 @@ export default function ReportLostFoundModal({
       } else {
         await new Promise(r => setTimeout(r, 400));
       }
+      haptics.success();
       track(EVT.post_form_submitted, {
         post_kind: 'lostfound',
         lf_status: form.status,
@@ -103,6 +105,7 @@ export default function ReportLostFoundModal({
       setForm({ name: '', status: defaultStatus ?? '', category: '', location: '', dateLastSeen: '', description: '', contact: '', photos: [] });
       onClose();
     } catch (err) {
+      haptics.error();
       track(EVT.post_form_failed, { post_kind: 'lostfound', reason: (err as Error).message?.slice(0, 80) });
       setSubmitError((err as Error).message || 'Could not submit — please try again.');
     } finally {

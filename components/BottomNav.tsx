@@ -2,6 +2,7 @@
 
 import { Home, Plus, Package, CalendarDays, PackageSearch } from 'lucide-react';
 import { track, EVT } from '../lib/analytics';
+import { haptics } from '../lib/haptics';
 
 /* Activity dropped from the bottom nav — its post-level metrics now live
    inline on each Inventory card (and on the item-detail page for the owner).
@@ -20,6 +21,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
   /* Wraps the parent's onChange so we get a single source of nav events. */
   const navigate = (next: Screen) => {
     if (next === active) return;
+    haptics.selection();   /* iOS-style light tick on tab change */
     track(EVT.nav_switched, { from: active, to: next });
     onChange(next);
   };
@@ -45,7 +47,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
         </NavButton>
 
         <button
-          onClick={onPost}
+          onClick={() => { haptics.medium(); onPost(); }}
           aria-label="Create post"
           className="bottom-nav-post"
           data-tour="nav-post"

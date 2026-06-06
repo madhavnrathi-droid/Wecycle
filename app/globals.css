@@ -3060,8 +3060,22 @@ body {
 }
 .feed-card-save[data-saved] {
   color: #ED2E50;
+  /* Satisfying spring "pop" the moment a card is saved — pairs with the
+     success haptic fired in FeedScreen.handleToggleSave for a combined
+     tactile + visual confirmation, the way iOS pairs Taptic + animation. */
+  animation: heart-pop 0.42s var(--ease-spring);
 }
 .feed-card-save:active { transform: scale(0.88); }
+
+@keyframes heart-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.32); }
+  60%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-card-save[data-saved] { animation: none; }
+}
 
 /* ── Text-only feed card variant ──
    Used when a post carries no photo/video. The card AUTO-SIZES to its

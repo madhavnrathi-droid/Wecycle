@@ -8,6 +8,7 @@ import { createRequest } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
+import { haptics } from '../../lib/haptics';
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
@@ -91,6 +92,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
       } else {
         await new Promise(r => setTimeout(r, 400));
       }
+      haptics.success();
       track(EVT.post_form_submitted, {
         post_kind: 'request',
         urgency: form.urgency,
@@ -107,6 +109,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
       });
       onClose();
     } catch (err) {
+      haptics.error();
       track(EVT.post_form_failed, { post_kind: 'request', reason: (err as Error).message?.slice(0, 80) });
       setSubmitError((err as Error).message || 'Could not post — please try again.');
     } finally {
@@ -259,13 +262,10 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
             value={form.durationHours}
             onChange={e => {
               const next = Number(e.target.value);
-              /* Light haptic tick at each step — `navigator.vibrate` is a
-                 no-op on iOS Safari but lands on every Android browser, and
-                 on iOS PWAs that opt into it. Wrapped in a guard so it
-                 doesn't throw on browsers without the API. */
-              if (next !== form.durationHours && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                try { (navigator as Navigator & { vibrate: (p: number) => boolean }).vibrate(4); } catch {/*noop*/}
-              }
+              /* Light haptic tick at each detent. Centralised through
+                 lib/haptics so it also fires on iOS via the Expo bridge,
+                 not just Android's Web Vibration API. */
+              if (next !== form.durationHours) haptics.selection();
               update('durationHours', next);
             }}
             className="duration-slider"

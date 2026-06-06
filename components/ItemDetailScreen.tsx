@@ -17,6 +17,8 @@ import {
 } from '../lib/liveData';
 import { isDemoMode } from '../lib/demoMode';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
+import { haptics } from '../lib/haptics';
+import { shareLink } from '../lib/share';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES } from '../lib/mockData';
 
@@ -248,6 +250,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     }
     /* THE conversion event. This is the single best proxy for "real
      * connection happened" until we wire in-app messaging. */
+    haptics.medium();
     trackContactClicked(link.channel, item.isRequest ? 'request' : 'item', item.id, {
       owner_id: item.user.id,
       action: action,
@@ -260,6 +263,17 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     } else {
       window.location.href = link.href;
     }
+  };
+
+  /* Native OS share sheet for the listing. Falls back to clipboard. */
+  const handleShare = () => {
+    track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : 'item' });
+    void shareLink({
+      title: item.title,
+      text: item.isRequest
+        ? `${item.user.name} is looking for "${item.title}" on Wecycle`
+        : `"${item.title}" on Wecycle${typeof item.price === 'number' ? ` — ₹${item.price}` : ''}`,
+    });
   };
 
   /* Convenience: when only one channel is on, the primary CTA carries the
@@ -735,6 +749,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           )}
           <button
             aria-label="Share"
+            onClick={handleShare}
             style={{
               width: 52, height: 52, borderRadius: 999,
               background: 'var(--bg-surface)',
@@ -1292,6 +1307,15 @@ function DesktopLayout({
             </button>
             <button
               aria-label="Share"
+              onClick={() => {
+                track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : 'item' });
+                void shareLink({
+                  title: item.title,
+                  text: item.isRequest
+                    ? `${item.user.name} is looking for "${item.title}" on Wecycle`
+                    : `"${item.title}" on Wecycle${typeof item.price === 'number' ? ` — ₹${item.price}` : ''}`,
+                });
+              }}
               style={{
                 width: 52, height: 52, borderRadius: 14,
                 background: 'var(--bg-surface)',

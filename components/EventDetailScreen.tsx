@@ -14,6 +14,8 @@ import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
+import { haptics } from '../lib/haptics';
+import { shareLink, addEventToCalendar } from '../lib/share';
 import { updateEvent } from '../lib/liveData';
 import { isDemoMode } from '../lib/demoMode';
 
@@ -182,6 +184,7 @@ export default function EventDetailScreen({
 
   const handleContact = (link: ContactLink) => {
     if (!user) { onRequireAuth(); return; }
+    haptics.medium();
     trackContactClicked(link.channel, 'event', event.id, {
       owner_id: event.organizer.id,
       event_type: event.eventType,
@@ -196,8 +199,34 @@ export default function EventDetailScreen({
   const handleRsvpClick = () => {
     if (!user) { onRequireAuth(); return; }
     /* `rsvpd` is the *current* state — fire the event with the resulting state. */
+    if (isRsvpd) haptics.selection(); else haptics.success();
     track(EVT.rsvp_toggled, { event_id: event.id, rsvp: !event.rsvpd, event_type: event.eventType });
     onRsvp();
+  };
+
+  /* Parse the event's display date + time back into a Date for the .ics
+   * hand-off. The event row stores a formatted string, so we lean on the
+   * native Date parser; if it can't parse, addToCalendar bails gracefully. */
+  const handleAddToCalendar = () => {
+    haptics.success();
+    track(EVT.share_clicked, { post_id: event.id, post_kind: 'event', action: 'add_to_calendar' });
+    const parsed = new Date(`${event.date} ${event.time}`);
+    const start = Number.isNaN(parsed.getTime()) ? new Date(event.date) : parsed;
+    addEventToCalendar({
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      start,
+      uid: `${event.id}@wecycle.page`,
+    });
+  };
+
+  const handleShareEvent = () => {
+    track(EVT.share_clicked, { post_id: event.id, post_kind: 'event' });
+    void shareLink({
+      title: event.title,
+      text: `${event.title} · ${event.date} at ${event.location} — on Wecycle`,
+    });
   };
 
   /* When both channels are accepted we render two named buttons inline with
@@ -240,12 +269,22 @@ export default function EventDetailScreen({
         {isOwner ? (
           <span style={{ width: 36 }} aria-hidden="true" />
         ) : (
-          <button
-            aria-label="Share event"
-            className="theme-toggle"
-          >
-            <Share2 size={17} strokeWidth={1.8} />
-          </button>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              aria-label="Add to calendar"
+              className="theme-toggle"
+              onClick={handleAddToCalendar}
+            >
+              <CalendarDays size={17} strokeWidth={1.8} />
+            </button>
+            <button
+              aria-label="Share event"
+              className="theme-toggle"
+              onClick={handleShareEvent}
+            >
+              <Share2 size={17} strokeWidth={1.8} />
+            </button>
+          </div>
         )}
       </header>
 

@@ -15,9 +15,10 @@
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, View, ActivityIndicator, Text, useColorScheme } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import Constants from 'expo-constants';
-import { useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useRef, useState, useCallback } from 'react';
 
 function resolveTargetUrl(): string {
   /* Highest priority: explicit env override (e.g. local LAN dev) */
@@ -36,6 +37,28 @@ export default function App() {
   const targetUrl = resolveTargetUrl();
   const webRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
+
+  /* ── Native haptic bridge ──
+   * The web app (lib/haptics.ts) posts { type:'haptic', style } messages.
+   * We map them onto expo-haptics so iOS finally gets the real Taptic
+   * Engine — something an installed PWA on iOS Safari can never do, since
+   * Safari doesn't implement the Web Vibration API. */
+  const onMessage = useCallback((e: WebViewMessageEvent) => {
+    try {
+      const msg = JSON.parse(e.nativeEvent.data) as { type?: string; style?: string };
+      if (msg.type !== 'haptic') return;
+      switch (msg.style) {
+        case 'selection': Haptics.selectionAsync(); break;
+        case 'light':     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); break;
+        case 'medium':    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); break;
+        case 'heavy':     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); break;
+        case 'success':   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); break;
+        case 'warning':   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); break;
+        case 'error':     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error); break;
+        default: break;
+      }
+    } catch { /* non-JSON message — ignore */ }
+  }, []);
 
   return (
     <SafeAreaProvider>
@@ -79,6 +102,8 @@ export default function App() {
           }}
           onLoadStart={() => setLoading(true)}
           onLoadEnd={() => setLoading(false)}
+          /* Receives haptic requests from the web app's lib/haptics.ts. */
+          onMessage={onMessage}
           /* Pull-to-refresh on Android. */
           pullToRefreshEnabled
         />

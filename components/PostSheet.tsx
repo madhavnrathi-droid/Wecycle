@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { track, EVT } from '../lib/analytics';
+import { haptics } from '../lib/haptics';
 
 export type PostKind = 'share' | 'request' | 'event' | 'report-lf';
 
@@ -71,7 +72,7 @@ export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
           {POST_OPTIONS.map(opt => (
             <button
               key={opt.id}
-              onClick={() => { track(EVT.post_kind_selected, { post_kind: opt.id }); onSelect(opt.id); }}
+              onClick={() => { haptics.selection(); track(EVT.post_kind_selected, { post_kind: opt.id }); onSelect(opt.id); }}
               className="press-scale"
               style={{
                 display: 'flex', alignItems: 'center', gap: 14,

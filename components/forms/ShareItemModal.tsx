@@ -9,6 +9,7 @@ import { createListingWithMedia } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
+import { haptics } from '../../lib/haptics';
 
 const CATEGORIES = [
   'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
@@ -99,6 +100,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
         /* Demo path — no backend; just simulate latency. */
         await new Promise(r => setTimeout(r, 400));
       }
+      haptics.success();
       track(EVT.post_form_submitted, {
         post_kind: 'share',
         listing_type: form.pricing === 'sell' ? 'sell' : 'free',
@@ -113,6 +115,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
       reset();
       onClose();
     } catch (err) {
+      haptics.error();
       track(EVT.post_form_failed, {
         post_kind: 'share',
         reason: (err as Error).message?.slice(0, 80),

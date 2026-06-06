@@ -194,6 +194,11 @@ export function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+/* The two surface colors the browser/OS chrome should tint to. Must match
+ * --bg-base in globals.css for light + dark so the status bar / PWA title
+ * bar blends seamlessly into the app instead of showing a seam. */
+const THEME_COLOR = { light: '#FAFAF6', dark: '#0C0C0B' } as const;
+
 /** Apply the theme to <html> by toggling the `.dark` class. */
 export function applyTheme(mode: ThemeMode) {
   if (!isBrowser()) return;
@@ -202,6 +207,20 @@ export function applyTheme(mode: ThemeMode) {
   /* Also expose the chosen mode + resolved for CSS that wants it */
   document.documentElement.dataset.theme = resolved;
   document.documentElement.dataset.themeMode = mode;
+
+  /* Drive the browser/PWA chrome tint from the app's ACTUAL theme, not the
+   * OS preference. Without this, a user whose phone is in dark mode but who
+   * sees Wecycle's light-default UI would get a black Android status bar
+   * over a cream app — a visible seam. We update (or create) the
+   * <meta name="theme-color"> live on every theme change. */
+  const color = THEME_COLOR[resolved];
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]:not([media])');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.content = color;
 }
 
 /** Apply the "larger text" preference by toggling a root class. CSS keys off

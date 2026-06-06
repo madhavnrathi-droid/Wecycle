@@ -24,6 +24,7 @@ import EmptyState from './EmptyState';
 import { useAuth } from '../lib/AuthContext';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
+import { haptics } from '../lib/haptics';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
@@ -482,6 +483,7 @@ export function LostFoundDetailSheet({
 
   const handleContact = (link: ContactLink) => {
     if (!user) { onRequireAuth(); return; }
+    haptics.medium();
     trackContactClicked(link.channel, 'lostfound', item.id, {
       owner_id: item.user.id,
       lf_status: item.status,

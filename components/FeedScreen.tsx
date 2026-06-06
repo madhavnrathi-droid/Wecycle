@@ -18,6 +18,7 @@ import {
 import { getEventMetrics } from '../lib/metrics';
 import { getSettings, onSettingsChange } from '../lib/settings';
 import { track, trackPostOpened, EVT } from '../lib/analytics';
+import { haptics } from '../lib/haptics';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
@@ -142,6 +143,8 @@ export default function FeedScreen({
      mode skips the RPC and just keeps the local heart state. */
   const handleToggleSave = (listingId: string) => {
     const wasSaved = savedIds.has(listingId);
+    /* Saving feels rewarding (success pop); un-saving is a quieter tick. */
+    if (wasSaved) haptics.selection(); else haptics.success();
     track(EVT.save_toggled, { post_id: listingId, saved: !wasSaved });
     setSavedIds(prev => {
       const next = new Set(prev);
