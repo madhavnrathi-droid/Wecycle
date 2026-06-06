@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "page.wecycle.app",
+      "sha256_cert_fingerprints": [
+        "90:6D:E3:42:66:44:94:69:AC:64:18:D6:D0:A0:BF:10:1F:56:04:2C:15:D7:CD:FF:10:D0:CA:99:C0:CE:29:01"
+      ]
+    }
+  }
+]
