@@ -3597,6 +3597,192 @@ textarea:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════
+   LIQUID GLASS + MOTION LAYER  (iOS 26-inspired)
+   ───────────────────────────────────────────────
+   Adapts Apple's Liquid Glass material to the web:
+   a translucent surface that blurs + saturates the
+   content behind it, catches light on its top edge,
+   and springs under touch. Appended as an additive
+   overlay — enhances existing chrome only; no layout
+   or logic is touched. Honors prefers-reduced-motion
+   via the universal block that follows.
+   ═══════════════════════════════════════════════ */
+
+:root {
+  --glass-blur: 22px;
+  --glass-saturate: 180%;
+  --glass-bg: rgba(255, 255, 255, 0.60);
+  --glass-bg-strong: rgba(255, 255, 255, 0.80);
+  --glass-bg-faint: rgba(255, 255, 255, 0.40);
+  --glass-border: rgba(255, 255, 255, 0.70);
+  /* inset = top "light catch" + hairline inner ring (the liquid-glass tell) */
+  --glass-inset:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  --glass-shadow:
+    0 8px 32px rgba(20, 20, 12, 0.12),
+    0 2px 8px rgba(20, 20, 12, 0.06);
+  /* Apple's signature deceleration spring */
+  --ease-glass: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.dark {
+  --glass-bg: rgba(30, 30, 28, 0.55);
+  --glass-bg-strong: rgba(30, 30, 28, 0.74);
+  --glass-bg-faint: rgba(30, 30, 28, 0.40);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-inset:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --glass-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Reusable material (opt-in via className) ── */
+.glass,
+.glass-strong {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+.glass-strong { background: var(--glass-bg-strong); }
+.glass-interactive {
+  transition: transform 0.22s var(--ease-glass), box-shadow 0.22s var(--ease-glass);
+}
+.glass-interactive:active { transform: scale(0.96); }
+
+/* ── Floating bottom dock → liquid glass ── */
+.bottom-nav-inner {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 12px 34px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.06),
+    var(--glass-inset);
+}
+/* active pill keeps a faint top sheen so it reads as a raised glass lozenge */
+.bottom-nav-btn[data-active] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* ── Modals & bottom sheets → glass surface ── */
+.modal {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(30px) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+.modal-header { border-bottom-color: var(--glass-border); }
+.modal-footer {
+  background: transparent;
+  border-top-color: var(--glass-border);
+}
+.modal-backdrop {
+  background: rgba(10, 10, 6, 0.45);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  backdrop-filter: blur(10px) saturate(120%);
+}
+
+/* ── Drawer → glass panel ── */
+.drawer {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-right: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* ── Segmented control → frosted track ── */
+.segmented {
+  background: var(--glass-bg-faint);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--glass-border);
+}
+
+/* ── Icon buttons & theme toggle → glass chips ── */
+.btn-icon,
+.theme-toggle {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
+}
+
+/* ── Glass card upgraded to real material ── */
+.card-glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
+}
+.dark .card-glass { background: var(--glass-bg); border-color: var(--glass-border); }
+
+/* ═══════════════════════════════════════════════
+   MOTION DESIGN
+   ═══════════════════════════════════════════════ */
+
+/* Primary CTA: dimensional gradient + glossy specular sweep on hover.
+   This is the "liquid" highlight rolling across the surface. */
+.btn-primary,
+.bottom-nav-post {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-primary {
+  background: linear-gradient(180deg, var(--accent-lime), var(--accent-lime-dim));
+  box-shadow: var(--shadow-accent), inset 0 1px 0 rgba(255, 255, 255, 0.40);
+}
+.btn-primary::after,
+.bottom-nav-post::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    120deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 68%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.65s var(--ease-glass);
+  pointer-events: none;
+  z-index: 1;
+}
+.btn-primary:hover::after,
+.bottom-nav-post:hover::after { transform: translateX(130%); }
+
+/* Cards lift toward the pointer (desktop) for tactile depth */
+@media (hover: hover) and (pointer: fine) {
+  .card,
+  .card-elevated {
+    transition: transform 0.3s var(--ease-glass), box-shadow 0.3s var(--ease-glass);
+  }
+  .card:hover,
+  .card-elevated:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+/* Spring entrance utility — fade + rise + de-blur. Opt-in via .motion-rise */
+@keyframes glass-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+.motion-rise { animation: glass-rise 0.5s var(--ease-glass) both; }
+
+/* ═══════════════════════════════════════════════
    REDUCED MOTION
    ═══════════════════════════════════════════════ */
 

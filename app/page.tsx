@@ -448,6 +448,9 @@ export default function WecycleApp() {
 
       <div className="app-container">
         <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+          {/* key={activeScreen} re-mounts on screen change so the Liquid-Glass
+              spring entrance (.motion-rise) replays for each view. */}
+          <div key={activeScreen} className="motion-rise">
           {activeScreen === 'feed' && (
             <FeedScreen
               onPost={() => requireAuth('post-picker')}
@@ -560,6 +563,7 @@ export default function WecycleApp() {
           {/* Desktop-only auxiliary screens */}
           {activeScreen === 'market'     && <MarketplaceScreen />}
           {activeScreen === 'impact'     && <ImpactScreen />}
+          </div>
         </main>
 
         <BottomNav
