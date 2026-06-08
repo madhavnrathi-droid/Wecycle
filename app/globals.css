@@ -3783,6 +3783,87 @@ textarea:focus-visible {
 .motion-rise { animation: glass-rise 0.5s var(--ease-glass) both; }
 
 /* ═══════════════════════════════════════════════
+   MOTION REFINEMENT  (slower · smoother · Apple HIG)
+   ───────────────────────────────────────────────
+   Softens the original spring overshoot, lengthens
+   durations a touch, and adds Apple-style staged
+   content reveals. Tuned to Apple's "emphasized"
+   easing — a long, gentle deceleration that feels
+   physical rather than snappy.
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* Gentler than the original 1.56 overshoot — calmer settle */
+  --ease-spring: cubic-bezier(0.34, 1.26, 0.54, 1);
+  /* Apple's emphasized deceleration for enter/move transitions */
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Floating dock pill: slower, smoother morph (was 280ms snappy spring) */
+.bottom-nav-btn {
+  transition:
+    padding 360ms var(--ease-emphasized),
+    gap 360ms var(--ease-emphasized),
+    background-color 240ms ease-out,
+    color 220ms ease-out,
+    transform 0.24s var(--ease-spring);
+}
+.bottom-nav-btn-label {
+  transition:
+    max-width 360ms var(--ease-emphasized),
+    opacity 240ms ease-out 80ms;
+}
+.bottom-nav-btn:active,
+.bottom-nav-post:active { transform: scale(0.94); }
+
+/* Sheets & dialogs ease in more gently */
+.modal { animation: slide-up 0.44s var(--ease-emphasized); }
+@media (min-width: 1024px) {
+  .modal { animation: scale-in 0.34s var(--ease-emphasized); }
+}
+.modal-backdrop { animation: fade-in 0.32s var(--ease-smooth); }
+
+/* Sheet/dialog content reveals in a soft top-down cascade */
+.modal-body > * { animation: glass-rise 0.5s var(--ease-emphasized) both; }
+.modal-body > *:nth-child(1) { animation-delay: 0.05s; }
+.modal-body > *:nth-child(2) { animation-delay: 0.10s; }
+.modal-body > *:nth-child(3) { animation-delay: 0.15s; }
+.modal-body > *:nth-child(4) { animation-delay: 0.20s; }
+.modal-body > *:nth-child(5) { animation-delay: 0.25s; }
+.modal-body > *:nth-child(n+6) { animation-delay: 0.30s; }
+
+/* Screen entrance: a touch slower + calmer */
+.motion-rise { animation: glass-rise 0.6s var(--ease-emphasized) both; }
+
+/* Specular sweeps: slower, glossier roll */
+.btn-primary::after,
+.bottom-nav-post::after { transition: transform 0.85s var(--ease-emphasized); }
+
+/* Card hover lift: gentler, longer */
+@media (hover: hover) and (pointer: fine) {
+  .card,
+  .card-elevated {
+    transition: transform 0.4s var(--ease-emphasized), box-shadow 0.4s var(--ease-emphasized);
+  }
+  .card:hover,
+  .card-elevated:hover { transform: translateY(-4px); }
+}
+
+/* Pill buttons: smoother spring press */
+.btn {
+  transition:
+    transform 0.24s var(--ease-spring),
+    background 0.2s var(--ease-smooth),
+    box-shadow 0.2s var(--ease-smooth);
+}
+.btn:active { transform: scale(0.96); }
+
+/* Segmented selection glides instead of snapping */
+.segmented button {
+  transition: color 0.25s var(--ease-emphasized), background 0.25s var(--ease-emphasized);
+}
+
+/* ═══════════════════════════════════════════════
    REDUCED MOTION
    ═══════════════════════════════════════════════ */
 

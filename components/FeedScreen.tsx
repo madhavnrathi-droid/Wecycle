@@ -608,7 +608,6 @@ export default function FeedScreen({
             }
             return (
               <EmptyState
-                icon="🌱"
                 prompt="Looks like the feed's just sprouting. Be the first to share something!"
                 sub="Post a free find, a borrow request, or an event — your community's waiting."
                 cta={{ label: 'Post the first thing', onClick: onPost }}

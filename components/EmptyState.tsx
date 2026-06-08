@@ -12,13 +12,14 @@
  * person through the door, not handing them a manual. */
 
 import type { ReactNode } from 'react';
+import LottiePlayer from './LottiePlayer';
 
 interface EmptyStateProps {
   /** Required. Tightly phrased, max ~80 chars, no punctuation tyranny. */
   prompt: string;
   /** Optional secondary line giving context. */
   sub?: string;
-  /** Emoji or compact icon node rendered above the prompt. */
+  /** Emoji or compact icon node. If omitted, a branded Lottie "bloom" plays. */
   icon?: ReactNode;
   /** Optional primary CTA. */
   cta?: {
@@ -45,13 +46,18 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
         gap: 10,
       }}
     >
-      <div style={{
-        fontSize: compact ? 30 : 40,
-        lineHeight: 1,
-        opacity: 0.92,
-      }} aria-hidden="true">
-        {icon ?? '✨'}
-      </div>
+      {icon ? (
+        <div style={{ fontSize: compact ? 30 : 40, lineHeight: 1, opacity: 0.92 }} aria-hidden="true">
+          {icon}
+        </div>
+      ) : (
+        <LottiePlayer
+          src="/animations/bloom.json"
+          size={compact ? 72 : 104}
+          aria-label="Nothing here yet"
+          fallback={<span style={{ fontSize: compact ? 30 : 40, lineHeight: 1 }} aria-hidden="true">✨</span>}
+        />
+      )}
       <p style={{
         margin: 0,
         fontSize: compact ? 14 : 15,
