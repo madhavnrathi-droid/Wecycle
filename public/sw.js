@@ -1,6 +1,6 @@
 /* Wecycle service worker — cache-first for static, network-first for HTML */
 
-const VERSION = 'wecycle-v1';
+const VERSION = 'wecycle-v2';
 const APP_SHELL = [
   '/',
   '/manifest.json',
@@ -78,4 +78,48 @@ self.addEventListener('fetch', (event) => {
       return cached || fetchPromise;
     })
   );
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+   WEB PUSH
+   Receives encrypted pushes from the Wecycle Edge Function and renders a
+   native notification. Tapping it focuses an existing tab (deep-linking to
+   the relevant screen) or opens a new one. Works in installed PWA + the
+   Android TWA (Chrome forwards these to the system notification tray).
+   ────────────────────────────────────────────────────────────────────────── */
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch (_e) { payload = {}; }
+
+  const title = payload.title || 'Wecycle';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: payload.tag || undefined,         /* collapse duplicates */
+    renotify: !!payload.tag,
+    data: { url: payload.url || '/', ...(payload.data || {}) },
+    vibrate: [60, 30, 60],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of all) {
+      /* Reuse an open Wecycle tab — focus it and tell the app where to go. */
+      if ('focus' in client) {
+        await client.focus();
+        if ('postMessage' in client) client.postMessage({ type: 'wecycle:navigate', url: target });
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
 });
