@@ -3295,7 +3295,12 @@ body {
   width: 100%;
   max-width: 430px;
   z-index: 40;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Use max() so we always lift at least 8px even when env() reports 0
+     (e.g. inside a WebView that hasn't propagated the home-indicator inset).
+     On iPhones with a home indicator env() reports ~34px → we get the
+     correct lift; on Android / older devices we still get clear breathing
+     room between the pill and the screen edge. */
+  padding-bottom: max(env(safe-area-inset-bottom, 8px), 8px);
   /* Short, opaque fade so scrolling content tucks cleanly under the pill —
      no milky/frosted veil over the cards (that read as "glass"). */
   background: linear-gradient(
@@ -3312,9 +3317,11 @@ body {
   align-items: center;
   justify-content: space-around;
   padding: 10px 12px;
-  /* Lifted ~3mm off the viewport edge (was 16px). Reads better above the
-     home-bar on iOS and gives the floating pill more breathing room on desktop. */
-  margin: 0 10px 27px;
+  /* Lift above home-bar on iOS. Combined with .bottom-nav's
+     `padding-bottom: max(env(safe-area-inset-bottom), 8px)` this gives the
+     pill ~62px clearance on iPhones with a home indicator and ~24px on
+     devices/contexts without one. */
+  margin: 0 10px 16px;
   /* SOLID surface — explicitly opaque, NO backdrop-filter / glass. The
      frosted material washed out over feed imagery; a clean white (light) /
      near-black (dark) pill reads far better and is what shipped earlier. */
