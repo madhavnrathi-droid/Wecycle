@@ -78,6 +78,15 @@ export default function App() {
           /* iOS — match the OS look behind the WebView, so any rubber-band
              pull-to-refresh doesn't flash white at the seam. */
           containerStyle={{ backgroundColor: isDark ? '#0C0C0B' : '#FAFAF8' }}
+          /* Stop iOS from auto-padding the WebView around the home indicator
+             — we want the document to extend to the very bottom so the web
+             app's own `env(safe-area-inset-bottom)` returns the real ~34px
+             inset on iPhones with a home indicator. Without these flags, RN
+             pads the WebView and env() reports 0, making the bottom nav sit
+             too low and feel cut-off on the simulator. */
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
+          contentInset={{ top: 0, left: 0, bottom: 0, right: 0 }}
           /* Allow camera / photo library / file uploads from the in-app
              browser so the Post flow works end to end. */
           mediaPlaybackRequiresUserAction={false}
