@@ -646,7 +646,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           </div>
         )}
         <div style={{
-          display: 'flex', gap: 8,
+          display: 'flex', gap: 8, flexWrap: 'wrap',
         }}>
           {/* OWNER VIEW —
              Clean state → Delete only, full width
@@ -777,7 +777,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           >
             <Share2 size={18} strokeWidth={1.8} />
           </button>
-          {/* ── PRIMARY: Message on Wecycle (in-app thread) ── */}
+          {/* ── Contact options — Message on Wecycle (primary) + WhatsApp/Email (always available) ── */}
           {!item.isClosed && onMessage && (
             <button
               onClick={() => {
@@ -790,7 +790,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               }}
               aria-label={`Message ${item.user.name} about ${item.title}`}
               style={{
-                flex: 1, height: 52, borderRadius: 999,
+                flex: '1 1 100%', height: 52, borderRadius: 999,
                 background: 'var(--text-primary)', color: 'var(--bg-base)',
                 border: 'none', cursor: 'pointer',
                 fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
@@ -801,46 +801,27 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               Message on Wecycle
             </button>
           )}
-          {/* ── SECONDARY: Email / WhatsApp fallbacks ── */}
-          {!item.isClosed && !onMessage && (hasBoth ? (
-            contactLinks.map(link => (
-              <button
-                key={link.channel}
-                onClick={() => handleContactClick(link)}
-                aria-label={link.ariaLabel}
-                style={{
-                  flex: 1, height: 52, borderRadius: 999,
-                  background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                  color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
-                  border: 'none', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600,
-                  letterSpacing: '-0.01em',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-              >
-                {link.channel === 'whatsapp' ? <WhatsAppGlyph size={15} /> : <Mail size={15} strokeWidth={2} />}
-                {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
-              </button>
-            ))
-          ) : contactLinks.length > 0 ? (
+          {!item.isClosed && contactLinks.map(link => (
             <button
-              onClick={() => handleContactClick(contactLinks[0])}
-              aria-label={contactLinks[0].ariaLabel}
+              key={link.channel}
+              onClick={() => handleContactClick(link)}
+              aria-label={link.ariaLabel}
               style={{
-                flex: 1, height: 52, borderRadius: 999,
-                background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: 600,
+                flex: 1, height: 46, borderRadius: 999,
+                background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
+                color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-primary)',
+                border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-default)',
+                cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
                 letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
-              {contactLinks[0].channel === 'whatsapp' && <WhatsAppGlyph size={15} />}
-              {primaryActionLabel}
+              {link.channel === 'whatsapp' ? <WhatsAppGlyph size={14} /> : <Mail size={14} strokeWidth={2} />}
+              {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
             </button>
-          ) : null)}
-          {/* Closed or no contact → profile fallback */}
+          ))}
+          {/* Fallback — closed item or no contact at all → profile */}
           {(item.isClosed || (!onMessage && contactLinks.length === 0)) && (
             <button
               onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
@@ -1299,26 +1280,7 @@ function DesktopLayout({
                   </button>
                 )
               )
-            ) : !item.isClosed && onMessage ? (
-              <button
-                onClick={() => {
-                  onMessage(
-                    { id: item.user.id, name: item.user.name, initials: item.user.initials, color: item.user.color },
-                    item.id, item.title,
-                  );
-                }}
-                aria-label={`Message ${item.user.name} about ${item.title}`}
-                style={{
-                  flex: 1, height: 52, borderRadius: 14,
-                  background: 'var(--text-primary)', color: 'var(--bg-base)',
-                  border: 'none', cursor: 'pointer',
-                  fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                <MessageCircle size={16} strokeWidth={2} /> Message on Wecycle
-              </button>
-            ) : (item.isClosed || contactLinks.length === 0) ? (
+            ) : item.isClosed ? (
               <button
                 onClick={() => onOpenStorefront?.(item.user)}
                 aria-label={`View ${item.user.name}'s profile`}
@@ -1333,24 +1295,63 @@ function DesktopLayout({
                 View seller&rsquo;s profile
               </button>
             ) : (
-              <button
-                onClick={() => handleContactClick(contactLinks[0])}
-                aria-label={contactLinks[0].ariaLabel}
-                style={{
-                  flex: 1, height: 52, borderRadius: 14,
-                  background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                  color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
-                  border: 'none', cursor: 'pointer',
-                  fontSize: 15, fontWeight: 600,
-                  letterSpacing: '-0.01em',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                {contactLinks[0].channel === 'whatsapp'
-                  ? <WhatsAppGlyph size={16} />
-                  : <MessageCircle size={16} strokeWidth={2} />}
-                {primaryActionLabel}
-              </button>
+              <>
+                {onMessage && (
+                  <button
+                    onClick={() => {
+                      onMessage(
+                        { id: item.user.id, name: item.user.name, initials: item.user.initials, color: item.user.color },
+                        item.id, item.title,
+                      );
+                    }}
+                    aria-label={`Message ${item.user.name} about ${item.title}`}
+                    style={{
+                      flex: '1 1 220px', minWidth: 0, height: 52, borderRadius: 14,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <MessageCircle size={16} strokeWidth={2} /> Message on Wecycle
+                  </button>
+                )}
+                {contactLinks.map(link => (
+                  <button
+                    key={link.channel}
+                    onClick={() => handleContactClick(link)}
+                    aria-label={link.ariaLabel}
+                    style={{
+                      flex: '1 1 200px', minWidth: 0, height: 52, borderRadius: 14,
+                      background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
+                      color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-primary)',
+                      border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-default)',
+                      cursor: 'pointer',
+                      fontSize: 15, fontWeight: 600,
+                      letterSpacing: '-0.01em',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    {link.channel === 'whatsapp' ? <WhatsAppGlyph size={16} /> : <Mail size={16} strokeWidth={2} />}
+                    {link.channel === 'whatsapp' ? `WhatsApp ${item.user.name.split(' ')[0]}` : `Email ${item.user.name.split(' ')[0]}`}
+                  </button>
+                ))}
+                {!onMessage && contactLinks.length === 0 && (
+                  <button
+                    onClick={() => onOpenStorefront?.(item.user)}
+                    aria-label={`View ${item.user.name}'s profile`}
+                    style={{
+                      flex: 1, height: 52, borderRadius: 14,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    View seller&rsquo;s profile
+                  </button>
+                )}
+              </>
             )}
             <button
               onClick={onToggleSave}
