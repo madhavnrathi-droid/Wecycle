@@ -110,6 +110,7 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     videoUrls: row.video_urls ?? [],
     viewCount: row.view_count ?? 0,
     saveCount: row.save_count ?? 0,
+    isClosed: (row as { status?: string }).status === 'completed',
   };
 }
 
@@ -144,7 +145,9 @@ export async function fetchMarketplaceItems(filter: FeedFilter = {}): Promise<Ma
   let q = supabase
     .from('listings')
     .select(SELECT_WITH_JOINS)
-    .eq('status', 'active')
+    /* Keep completed (sold/given) listings in the feed — they render dimmed
+       with a status ribbon rather than vanishing. */
+    .in('status', ['active', 'completed'])
     .order('posted_at', { ascending: false })
     .limit(filter.limit ?? 60);
 
@@ -174,7 +177,7 @@ export async function fetchListingsByUser(userId: string): Promise<MarketplaceIt
     .from('listings')
     .select(SELECT_WITH_JOINS)
     .eq('user_id', userId)
-    .eq('status', 'active')
+    .in('status', ['active', 'completed'])
     .order('posted_at', { ascending: false });
   if (error || !data) return [];
   return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
@@ -477,6 +480,7 @@ export function mapRequestRow(row: RequestRowLite): MarketplaceItem {
     isRequest: true,
     urgent: row.urgency === 'urgent',
     needBy: row.need_by_date ?? undefined,
+    isClosed: (row as { status?: string }).status === 'fulfilled',
   };
 }
 
@@ -497,7 +501,9 @@ export async function fetchRequests(filter: FeedFilter = {}): Promise<Marketplac
   let q = supabase
     .from('requests')
     .select(REQUEST_SELECT)
-    .eq('status', 'open')
+    /* Keep fulfilled requests visible (dimmed "Fulfilled" ribbon) so the
+       board reads as a place where asks actually get answered. */
+    .in('status', ['open', 'fulfilled'])
     .or(`expires_at.gt.${nowIso},expires_at.is.null`)
     .order('posted_at', { ascending: false })
     .limit(filter.limit ?? 60);
@@ -960,16 +966,32 @@ export async function deletePostById(id: string, kind: 'listing' | 'request' | '
 }
 
 /* ── Mark complete ──────────────────────────────────
-   "Sold" / "Completed" / "Found" all do the same thing: drop the post from
-   the system. We use delete (not a status flip) because the user's clear
-   intent is "remove this from my inventory". The optimistic overlay in
-   deletePostById ensures the masonry empties instantly. */
+   "Sold" / "Fulfilled" flip the post to a terminal status instead of deleting
+   it. The post STAYS in the feed — rendered dimmed with a status ribbon
+   ("Sold" / "Claimed" / "Fulfilled") — so the marketplace reads as an active,
+   trustworthy community where things actually move, rather than one where
+   posts silently disappear. The owner can still delete outright from the
+   detail screen if they truly want it gone. */
 export async function markListingSold(id: string) {
-  return deletePostById(id, 'listing');
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { error } = await supabase
+    .from('listings')
+    .update({ status: 'completed', updated_at: new Date().toISOString() } as never)
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
 }
 export async function markRequestCompleted(id: string) {
-  return deletePostById(id, 'request');
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { error } = await supabase
+    .from('requests')
+    .update({ status: 'fulfilled', updated_at: new Date().toISOString() } as never)
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
 }
+/* L&F still resolves by removal — it has its own dedicated status UI on the
+   L&F screen and isn't part of the marketplace masonry. */
 export async function markLostFoundResolved(id: string) {
   return deletePostById(id, 'lostfound');
 }

@@ -93,6 +93,8 @@ export const EVT = {
   category_filter_changed:  'category_filter_changed',
   search_submitted:         'search_submitted',
   user_search_submitted:    'user_search_submitted',
+  saved_search_added:       'saved_search_added',
+  saved_search_matched:     'saved_search_matched',
   marketing_banner_tapped:  'marketing_banner_tapped',
   listing_opened:           'listing_opened',
   event_opened:             'event_opened',

@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye } from 'lucide-react';
 import {
-  MARKETPLACE_ITEMS, EVENTS, LOST_FOUND_ITEMS, CATEGORIES,
+  MARKETPLACE_ITEMS, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
   type MarketplaceItem, type CommunityEvent, type LostItem,
 } from '../lib/mockData';
 import { resolveItemMedia, getAvatar, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
+import SavedSearchBar from './SavedSearchBar';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
@@ -498,6 +499,18 @@ export default function FeedScreen({
         </div>
       </section>
 
+      {/* ── SAVED SEARCH / NOTIFY-ME (Requests tab only) ──
+         Lets a student say "ping me when a cycle is posted" and shows a live
+         banner when open requests already match — the retention hook for a
+         board that's empty more often than not early on. */}
+      {activeType === 'requests' && (
+        <SavedSearchBar
+          requests={requests}
+          currentQuery={query}
+          onRunSearch={setQuery}
+        />
+      )}
+
       {/* ── CATEGORY CHIPS ── */}
       <section style={{ padding: '0 0 12px' }}>
         <div className="chip-row">
@@ -693,8 +706,12 @@ function FeedCard({
       <article
         className="feed-card feed-card--text"
         data-stroke={strokeKind}
+        data-closed={item.isClosed || undefined}
         style={{ padding: 0, position: 'relative', overflow: 'hidden' }}
       >
+        {item.isClosed && (
+          <span className="feed-card-closed-ribbon" aria-hidden="true">{closedLabelFor(item)}</span>
+        )}
         {strokeKind && (
           <span
             className="feed-card-type-chip"
@@ -762,13 +779,19 @@ function FeedCard({
     );
   }
 
+  const closedLabel = item.isClosed ? closedLabelFor(item) : null;
+
   return (
     <div
       className="feed-card"
       data-stroke={strokeKind}
+      data-closed={item.isClosed || undefined}
       style={{ aspectRatio: ar, padding: 0 }}
-      aria-label={`Open ${item.title}`}
+      aria-label={closedLabel ? `${item.title} — ${closedLabel}` : `Open ${item.title}`}
     >
+      {closedLabel && (
+        <span className="feed-card-closed-ribbon" aria-hidden="true">{closedLabel}</span>
+      )}
       <PhotoCarousel
         photos={photos}
         aspectRatio={ar}

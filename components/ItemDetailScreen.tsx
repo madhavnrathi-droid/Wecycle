@@ -20,7 +20,7 @@ import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { shareLink } from '../lib/share';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
-import { CATEGORIES } from '../lib/mockData';
+import { CATEGORIES, closedLabelFor } from '../lib/mockData';
 
 interface ItemDetailScreenProps {
   item: MarketplaceItem;
@@ -475,17 +475,29 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               <MapPin size={14} strokeWidth={1.8} />
               <span>{item.location}</span>
             </div>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 14, fontWeight: 600,
-              color: isPriced ? 'var(--accent-amber)' : '#16A34A',
-              background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
-              padding: '5px 12px',
-              borderRadius: 999,
-            }}>
-              {isPriced && <IndianRupee size={12} strokeWidth={2.2} />}
-              <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
-            </div>
+            {item.isClosed ? (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 13, fontWeight: 800, letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: '#fff', background: 'var(--text-primary)',
+                padding: '6px 14px', borderRadius: 999,
+              }}>
+                {closedLabelFor(item)}
+              </div>
+            ) : (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 14, fontWeight: 600,
+                color: isPriced ? 'var(--accent-amber)' : '#16A34A',
+                background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
+                padding: '5px 12px',
+                borderRadius: 999,
+              }}>
+                {isPriced && <IndianRupee size={12} strokeWidth={2.2} />}
+                <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -765,7 +777,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           {/* When the owner accepts both email + WhatsApp we surface two
               clearly-labelled buttons. When only one channel is on, the single
               CTA carries the action verb ("Request to borrow"). */}
-          {hasBoth ? (
+          {(hasBoth && !item.isClosed) ? (
             contactLinks.map(link => (
               <button
                 key={link.channel}
@@ -785,7 +797,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
               </button>
             ))
-          ) : contactLinks.length === 0 ? (
+          ) : (contactLinks.length === 0 || item.isClosed) ? (
             /* Seller exposed no contact channel — never show a dead grey CTA.
                Route to their profile so the viewer can still reach them /
                browse their other listings. */
@@ -1262,7 +1274,7 @@ function DesktopLayout({
                   </button>
                 )
               )
-            ) : hasBoth ? (
+            ) : (hasBoth && !item.isClosed) ? (
               contactLinks.map(link => (
                 <button
                   key={link.channel}
@@ -1282,9 +1294,9 @@ function DesktopLayout({
                   {link.channel === 'whatsapp' ? `WhatsApp ${item.user.name.split(' ')[0]}` : `Email ${item.user.name.split(' ')[0]}`}
                 </button>
               ))
-            ) : contactLinks.length === 0 ? (
-              /* No contact channel exposed — open the seller's profile rather
-                 than showing a dead disabled button. */
+            ) : (contactLinks.length === 0 || item.isClosed) ? (
+              /* No contact channel exposed, or the post is closed — open the
+                 seller's profile rather than showing a dead disabled button. */
               <button
                 onClick={() => onOpenStorefront?.(item.user)}
                 aria-label={`View ${item.user.name}'s profile`}

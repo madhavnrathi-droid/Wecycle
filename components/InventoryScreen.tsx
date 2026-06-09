@@ -14,7 +14,7 @@ import {
   markListingSold, markRequestCompleted, markLostFoundResolved, deleteEvent,
 } from '../lib/liveData';
 import { track, EVT } from '../lib/analytics';
-import { getDemoUploads, getDemoRequests, deleteDemoPost } from '../lib/demoInventory';
+import { getDemoUploads, getDemoRequests, deleteDemoPost, updateDemoPost } from '../lib/demoInventory';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 
@@ -331,14 +331,14 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     showHeart={activeTab === 'saved'}
                     completeLabel={isMine ? completeLabel : undefined}
                     onComplete={isMine ? async () => {
-                      if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}? This removes the post.`)) return;
+                      if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}? It stays on your storefront with a "${completeLabel}" ribbon — delete it from the post if you want it gone.`)) return;
                       track(EVT.post_marked_complete, {
                         post_id: entry.item.id,
                         post_kind: entry.item.isRequest ? 'request' : 'item',
                         action: entry.item.isRequest ? 'completed' : 'sold',
                       });
                       if (isDemoMode()) {
-                        deleteDemoPost(entry.item.id);
+                        updateDemoPost(entry.item.id, { isClosed: true });
                       } else {
                         try {
                           if (entry.item.isRequest) await markRequestCompleted(entry.item.id);

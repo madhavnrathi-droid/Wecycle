@@ -1467,6 +1467,44 @@ body {
   box-shadow: 0 0 0 1px rgba(22,163,74,0.20) inset;
 }
 
+/* ── Closed (sold / claimed / fulfilled) listing ──
+   The post stays in the feed, dimmed, with a clear "stamp" so a sold item
+   reads as resolved-but-real rather than disappearing. data-stroke uses
+   ::after, so the dim scrim rides on ::before to avoid clobbering it. */
+.feed-card[data-closed] { position: relative; }
+.feed-card[data-closed]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(12, 12, 10, 0.46);
+  z-index: 4;            /* above media, below the stroke ring + ribbon */
+  pointer-events: none;
+}
+.feed-card[data-closed] .feed-card-img,
+.feed-card[data-closed] .photo-carousel img,
+.feed-card[data-closed] .photo-carousel video {
+  filter: grayscale(0.4);
+}
+.feed-card-closed-ribbon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-4deg);
+  z-index: 6;
+  background: rgba(12, 12, 10, 0.9);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+
 /* Type chip — top-left badge on feed cards in the All tab, mirroring the
    LOST/FOUND badge on L&F cards and the calendar chip on events. */
 .feed-card-type-chip {
@@ -3258,10 +3296,12 @@ body {
   max-width: 430px;
   z-index: 40;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Short, opaque fade so scrolling content tucks cleanly under the pill —
+     no milky/frosted veil over the cards (that read as "glass"). */
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    var(--bg-base) 60%,
+    var(--bg-base) 38%,
     var(--bg-base) 100%
   );
   pointer-events: none;
@@ -3275,12 +3315,18 @@ body {
   /* Lifted ~3mm off the viewport edge (was 16px). Reads better above the
      home-bar on iOS and gives the floating pill more breathing room on desktop. */
   margin: 0 10px 27px;
+  /* SOLID surface — explicitly opaque, NO backdrop-filter / glass. The
+     frosted material washed out over feed imagery; a clean white (light) /
+     near-black (dark) pill reads far better and is what shipped earlier. */
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--border-default);
   border-radius: 32px;
   box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.10),
-    0 4px 12px rgba(0, 0, 0, 0.06);
+    0 8px 28px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.08);
   gap: 2px;
 }
 /* Pill-expanding nav button — borrowed from the Karya app.
@@ -3884,4 +3930,167 @@ textarea:focus-visible {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ═══════════════════════════════════════════════
+   SAVED SEARCH / NOTIFY-ME  (Requests tab)
+   Radix Dialog + custom chips. Touch targets ≥40px,
+   visible focus rings, AA-contrast text.
+   ═══════════════════════════════════════════════ */
+
+.ss-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+.ss-trigger:hover { background: var(--bg-inset); }
+.ss-trigger:active { transform: scale(0.97); }
+
+.ss-match {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-lime-dim);
+}
+
+.ss-match-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(168, 221, 0, 0.4);
+  background: rgba(168, 221, 0, 0.10);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ss-match-chip:active { transform: scale(0.97); }
+
+/* Radix Dialog overlay + content */
+.ss-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 6, 0.45);
+  z-index: 90;
+  animation: fade-in 0.2s ease;
+}
+.ss-content {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 460px;
+  z-index: 91;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  padding: 20px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.28);
+  animation: slide-up 0.32s var(--ease-emphasized);
+}
+@media (min-width: 768px) {
+  .ss-content {
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    animation: scale-in 0.24s var(--ease-emphasized);
+  }
+}
+
+.ss-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ss-input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 15px;            /* ≥16px-ish avoids iOS zoom; 15 is fine w/ meta */
+}
+.ss-input::placeholder { color: var(--text-muted); }
+
+.ss-add {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent-lime);
+  color: #0C0C0B;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ss-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ss-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 8px 0 14px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ss-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ss-chip-x:hover { color: var(--text-primary); background: var(--border-subtle); }
+
+/* Visible focus rings for keyboard users (WCAG 2.4.7) */
+.ss-trigger:focus-visible,
+.ss-match-chip:focus-visible,
+.ss-close:focus-visible,
+.ss-add:focus-visible,
+.ss-chip-x:focus-visible,
+.ss-input:focus-visible {
+  outline: 2px solid var(--accent-lime-dim);
+  outline-offset: 2px;
 }

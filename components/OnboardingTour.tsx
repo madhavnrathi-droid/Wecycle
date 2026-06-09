@@ -204,6 +204,27 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
     };
   }, [step, current.selector]);
 
+  /* Keyboard navigation (WCAG 2.1.1) — the tour is tap/click-driven (no
+   * auto-advance), but keyboard users get ←/→ to move and Esc to dismiss. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        e.preventDefault();
+        if (step === STEPS.length - 1) { markOnboardingDone(); onClose(); }
+        else setStep(s => s + 1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setStep(s => Math.max(0, s - 1));
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        markOnboardingDone();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [step, onClose]);
+
   if (!mounted) return null;
 
   const isLast = step === STEPS.length - 1;
@@ -308,7 +329,7 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
             fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
             textTransform: 'uppercase', color: 'var(--accent-lime-dim)',
           }}>
-            <Sparkles size={12} strokeWidth={2} /> Step {step + 1} of {STEPS.length}
+            <Sparkles size={12} strokeWidth={2} /> Step {step + 1} of {STEPS.length}{isFirst ? ' · ~30 sec' : ''}
           </span>
           <span style={{ flex: 1 }} />
           <button

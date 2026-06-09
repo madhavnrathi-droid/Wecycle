@@ -135,6 +135,24 @@ export interface MarketplaceItem {
   urgent?: boolean;
   /* Optional "need by" date string for requests. */
   needBy?: string;
+  /* Terminal state: a sell/free/borrow/swap listing that's been completed
+     (sold / given away / returned / swapped) or a request that's been
+     fulfilled. We keep these in the feed — dimmed with a status ribbon — so
+     it reads as an active, trustworthy community rather than one where posts
+     silently vanish. */
+  isClosed?: boolean;
+}
+
+/** Past-tense ribbon label for a closed listing/request, by type. */
+export function closedLabelFor(item: Pick<MarketplaceItem, 'isRequest' | 'listingType'>): string {
+  if (item.isRequest) return 'Fulfilled';
+  switch (item.listingType) {
+    case 'sell':   return 'Sold';
+    case 'free':   return 'Claimed';
+    case 'borrow': return 'Returned';
+    case 'swap':   return 'Swapped';
+    default:       return 'Closed';
+  }
 }
 
 export interface CommunityEvent {
@@ -496,6 +514,7 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     category: 'Electronics', listingType: 'sell', price: 4500, condition: 'like_new',
     photoColor: '#1A1A2E', photoIcon: '🖥️', location: 'Ram Bhawan',
     user: USERS[5], saved: false, responses: 3, postedDaysAgo: 2, tags: ['monitor', 'setup'],
+    isClosed: true,
   },
   {
     id: 'm6', title: 'Yoga Mat + Blocks Set', description: 'Barely used. Perfect condition. Moving hostels.',
