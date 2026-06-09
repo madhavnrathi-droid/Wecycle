@@ -213,7 +213,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   const isUnpricedSell = !isRequest && item.listingType === 'sell' && !isPriced;
   const priceLabel = isRequest
     ? (item.urgent ? 'Urgent request' : 'Wanted')
-    : isPriced ? `₹${item.price}`
+    : isPriced ? `₹${item.price!.toLocaleString('en-IN')}`
     : isUnpricedSell ? 'Selling'
     : item.listingType === 'free' ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
@@ -484,7 +484,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               borderRadius: 999,
             }}>
               {isPriced && <IndianRupee size={12} strokeWidth={2.2} />}
-              <span>{isPriced ? item.price : priceLabel}</span>
+              <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
             </div>
           </div>
         </section>
@@ -785,23 +785,38 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
               </button>
             ))
-          ) : (
+          ) : contactLinks.length === 0 ? (
+            /* Seller exposed no contact channel — never show a dead grey CTA.
+               Route to their profile so the viewer can still reach them /
+               browse their other listings. */
             <button
-              onClick={() => contactLinks[0] && handleContactClick(contactLinks[0])}
-              disabled={contactLinks.length === 0}
-              aria-label={contactLinks[0]?.ariaLabel ?? primaryActionLabel}
+              onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
+              aria-label={`View ${item.user.name}'s profile`}
               style={{
                 flex: 1, height: 52, borderRadius: 999,
-                background: contactLinks[0]?.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                color: contactLinks[0]?.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
-                border: 'none', cursor: contactLinks.length ? 'pointer' : 'not-allowed',
-                fontSize: 14, fontWeight: 600,
-                letterSpacing: '-0.01em',
-                opacity: contactLinks.length ? 1 : 0.6,
+                background: 'var(--text-primary)', color: 'var(--bg-base)',
+                border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
-              {contactLinks[0]?.channel === 'whatsapp' && <WhatsAppGlyph size={15} />}
+              View seller&rsquo;s profile
+            </button>
+          ) : (
+            <button
+              onClick={() => handleContactClick(contactLinks[0])}
+              aria-label={contactLinks[0].ariaLabel}
+              style={{
+                flex: 1, height: 52, borderRadius: 999,
+                background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600,
+                letterSpacing: '-0.01em',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {contactLinks[0].channel === 'whatsapp' && <WhatsAppGlyph size={15} />}
               {primaryActionLabel}
             </button>
           )}
@@ -1267,23 +1282,37 @@ function DesktopLayout({
                   {link.channel === 'whatsapp' ? `WhatsApp ${item.user.name.split(' ')[0]}` : `Email ${item.user.name.split(' ')[0]}`}
                 </button>
               ))
-            ) : (
+            ) : contactLinks.length === 0 ? (
+              /* No contact channel exposed — open the seller's profile rather
+                 than showing a dead disabled button. */
               <button
-                onClick={() => contactLinks[0] && handleContactClick(contactLinks[0])}
-                disabled={contactLinks.length === 0}
-                aria-label={contactLinks[0]?.ariaLabel ?? primaryActionLabel}
+                onClick={() => onOpenStorefront?.(item.user)}
+                aria-label={`View ${item.user.name}'s profile`}
                 style={{
                   flex: 1, height: 52, borderRadius: 14,
-                  background: contactLinks[0]?.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                  color: contactLinks[0]?.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
-                  border: 'none', cursor: contactLinks.length ? 'pointer' : 'not-allowed',
-                  fontSize: 15, fontWeight: 600,
-                  letterSpacing: '-0.01em',
-                  opacity: contactLinks.length ? 1 : 0.6,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >
-                {contactLinks[0]?.channel === 'whatsapp'
+                View seller&rsquo;s profile
+              </button>
+            ) : (
+              <button
+                onClick={() => handleContactClick(contactLinks[0])}
+                aria-label={contactLinks[0].ariaLabel}
+                style={{
+                  flex: 1, height: 52, borderRadius: 14,
+                  background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                  color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 15, fontWeight: 600,
+                  letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {contactLinks[0].channel === 'whatsapp'
                   ? <WhatsAppGlyph size={16} />
                   : <MessageCircle size={16} strokeWidth={2} />}
                 {primaryActionLabel}

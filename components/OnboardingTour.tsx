@@ -134,6 +134,9 @@ interface Props {
 export default function OnboardingTour({ onJumpTo, onClose }: Props) {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  /* Captured from the target's computed style so the halo matches its real
+   * shape — pill nav buttons are fully rounded, cards are ~16px, etc. */
+  const [radius, setRadius] = useState(14);
   const [mounted, setMounted] = useState(false);
   const current = STEPS[step];
 
@@ -162,11 +165,20 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
   useLayoutEffect(() => {
     if (!current.selector) { setRect(null); return; }
     let raf = 0;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const update = () => {
       const el = document.querySelector<HTMLElement>(current.selector!);
       if (el) {
         const r = el.getBoundingClientRect();
         setRect(r);
+        /* Match the target's real corner shape. The active nav button is a
+         * full pill (border-radius:999px) — a fixed 14px halo around it looks
+         * "wrong". Read the computed radius; for pill-ish shapes clamp to
+         * half the height so the halo is a clean lozenge. */
+        const cs = getComputedStyle(el);
+        const raw = parseFloat(cs.borderTopLeftRadius) || 0;
+        const half = r.height / 2;
+        setRadius(raw >= half ? Math.round(half) + 4 : Math.round(raw) + 4);
         /* Best-effort scroll-into-view for tall pages. */
         if (r.top < 0 || r.bottom > window.innerHeight) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -175,16 +187,18 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
         setRect(null);
       }
     };
-    /* Wait a frame to let the screen swap settle before measuring. */
+    /* Wait a frame to let the screen swap settle before measuring, then
+     * re-measure across the bottom-nav pill morph (≈360ms) so the halo locks
+     * onto the *settled* size rather than a mid-animation frame. */
     raf = requestAnimationFrame(() => {
       update();
-      /* Then poll once more 250ms later so we catch lazy-rendered nodes. */
-      setTimeout(update, 260);
+      [90, 220, 400].forEach(d => timers.push(setTimeout(update, d)));
     });
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
     return () => {
       cancelAnimationFrame(raf);
+      timers.forEach(clearTimeout);
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
     };
@@ -255,14 +269,16 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
           <div style={{ position: 'fixed', left: 0, top: rect.bottom, right: 0, bottom: 0, background: dimColor, pointerEvents: 'auto' }} onClick={skip} />
           <div style={{ position: 'fixed', left: 0, top: rect.top, width: rect.left, height: rect.height, background: dimColor, pointerEvents: 'auto' }} onClick={skip} />
           <div style={{ position: 'fixed', left: rect.right, top: rect.top, right: 0, height: rect.height, background: dimColor, pointerEvents: 'auto' }} onClick={skip} />
-          {/* Target glow ring. */}
+          {/* Target glow ring — hugs the element (4px halo) and mirrors its
+              real corner radius so pills stay pill-shaped. */}
           <div style={{
             position: 'fixed',
-            left: rect.left - 6, top: rect.top - 6,
-            width: rect.width + 12, height: rect.height + 12,
-            borderRadius: 14,
-            boxShadow: '0 0 0 3px rgba(196, 246, 73, 0.85), 0 0 0 9999px rgba(8, 10, 14, 0.0)',
+            left: rect.left - 4, top: rect.top - 4,
+            width: rect.width + 8, height: rect.height + 8,
+            borderRadius: radius,
+            boxShadow: '0 0 0 2.5px rgba(196, 246, 73, 0.9), 0 0 0 9999px rgba(8, 10, 14, 0.0)',
             pointerEvents: 'none',
+            transition: 'left 0.2s ease, top 0.2s ease, width 0.2s ease, height 0.2s ease',
             animation: 'wecycleTourPulse 1.6s ease-in-out infinite',
           }} />
         </>
@@ -394,8 +410,8 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
 
       <style>{`
         @keyframes wecycleTourPulse {
-          0%, 100% { box-shadow: 0 0 0 3px rgba(196, 246, 73, 0.85); }
-          50%      { box-shadow: 0 0 0 6px rgba(196, 246, 73, 0.35); }
+          0%, 100% { box-shadow: 0 0 0 2.5px rgba(196, 246, 73, 0.9); }
+          50%      { box-shadow: 0 0 0 6px rgba(196, 246, 73, 0.38); }
         }
       `}</style>
     </div>

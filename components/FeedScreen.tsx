@@ -672,7 +672,7 @@ function FeedCard({
   const priceLabel = item.isRequest
     ? (item.urgent ? 'Urgent' : 'Wanted')
     : isPriced && hidePrice                  ? 'Sell'
-    : isPriced                                ? `₹${item.price}`
+    : isPriced                                ? `₹${item.price!.toLocaleString('en-IN')}`
     : item.listingType === 'sell'             ? 'Selling'
     : item.listingType === 'free'             ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
@@ -727,11 +727,11 @@ function FeedCard({
             )}
           </span>
           <span className="feed-card-text-meta">
-            <span>
+            <span className="feed-card-loc">
               {item.isRequest ? null : (
                 <>
                   <MapPin size={10} strokeWidth={2} />
-                  {item.location}
+                  <span className="feed-card-loc-text">{item.location}</span>
                 </>
               )}
             </span>
@@ -809,9 +809,9 @@ function FeedCard({
             <div className="feed-card-overlay">
               <p className="feed-card-title">{item.title}</p>
               <div className="feed-card-meta">
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span className="feed-card-loc">
                   <MapPin size={10} strokeWidth={2} />
-                  {item.location}
+                  <span className="feed-card-loc-text">{item.location}</span>
                 </span>
                 <span
                   className="feed-card-price"

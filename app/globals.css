@@ -3182,11 +3182,14 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 30px 12px 12px;
+  padding: 38px 12px 12px;
+  /* Stronger, smoother scrim so white title/location text stays legible over
+     busy photos (the earlier 0→0.55 ramp washed out on light images). */
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.55) 100%
+    rgba(0, 0, 0, 0.28) 45%,
+    rgba(0, 0, 0, 0.72) 100%
   );
   color: #fff;
   pointer-events: none;
@@ -3211,15 +3214,34 @@ body {
   gap: 6px;
   margin-top: 4px;
   font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
 }
+/* Location: takes remaining width and truncates with an ellipsis so a long
+   place name can never wrap into / collide with the price pill. */
+.feed-card-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+}
+.feed-card-loc > svg { flex: 0 0 auto; }
+.feed-card-loc-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .feed-card-price {
-  background: rgba(255, 255, 255, 0.95);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.96);
   color: #0E0E08;
   border-radius: 999px;
   padding: 2px 8px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 10px;
 }
 
@@ -3654,21 +3676,11 @@ textarea:focus-visible {
 }
 .glass-interactive:active { transform: scale(0.96); }
 
-/* ── Floating bottom dock → liquid glass ── */
-.bottom-nav-inner {
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: 1px solid var(--glass-border);
-  box-shadow:
-    0 12px 34px rgba(0, 0, 0, 0.12),
-    0 4px 12px rgba(0, 0, 0, 0.06),
-    var(--glass-inset);
-}
-/* active pill keeps a faint top sheen so it reads as a raised glass lozenge */
-.bottom-nav-btn[data-active] {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
+/* ── Floating bottom dock ──
+   NOTE: intentionally NOT liquid glass. The frosted material washed out
+   against busy feed imagery and made the active pill hard to read. We keep
+   the original solid surface (see base `.bottom-nav-inner` rule above) — it
+   reads cleaner and is what shipped in the earlier, well-liked version. */
 
 /* ── Modals & bottom sheets → glass surface ── */
 .modal {

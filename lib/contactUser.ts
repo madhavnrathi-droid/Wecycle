@@ -112,7 +112,7 @@ function bodyFor(args: BuildArgs): string {
       break;
     case 'buy':
       lines.push(`I came across "${title}" on Wecycle and I'm interested in buying.`);
-      if (item?.price) lines.push(`Asking ₹${item.price} — happy to discuss. When can I pick up?`);
+      if (item?.price) lines.push(`Asking ₹${item.price.toLocaleString('en-IN')} — happy to discuss. When can I pick up?`);
       else lines.push('Could you share the price and pickup window?');
       break;
     case 'free':

@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wecycle Play Store Mockups</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: #111; color: #fff; }
+
+  .slide {
+    width: 1080px;
+    height: 2400px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 40px auto;
+  }
+
+  /* Backgrounds */
+  .slide-1 { background: linear-gradient(170deg, #111 0%, #1a3a0a 30%, #2d5a0f 60%, #3d6a1f 100%); }
+  .slide-2 { background: linear-gradient(170deg, #111 0%, #0a2a3a 30%, #0f3d5a 60%, #1f4d6a 100%); }
+  .slide-3 { background: linear-gradient(170deg, #111 0%, #3a2a0a 30%, #5a3d0f 60%, #6a4d1f 100%); }
+  .slide-4 { background: linear-gradient(170deg, #111 0%, #2a0a3a 30%, #3d0f5a 60%, #4d1f6a 100%); }
+  .slide-5 { background: linear-gradient(170deg, #111 0%, #0a3a2a 30%, #0f5a3d 60%, #1f6a4d 100%); }
+  .slide-6 { background: linear-gradient(170deg, #111 0%, #3a0a2a 30%, #5a0f3d 60%, #6a1f4d 100%); }
+  .slide-7 { background: linear-gradient(170deg, #111 0%, #2a2a0a 30%, #4a4a0f 60%, #5a5a1f 100%); }
+  .slide-8 { background: linear-gradient(170deg, #111 0%, #0a2a2a 30%, #0f4a4a 60%, #1f5a5a 100%); }
+
+  .glow {
+    position: absolute;
+    width: 700px; height: 700px;
+    border-radius: 50%;
+    filter: blur(180px);
+    opacity: 0.25;
+    z-index: 1;
+    bottom: 300px;
+    left: 50%; transform: translateX(-50%);
+  }
+  .slide-1 .glow { background: #A8DD00; }
+  .slide-2 .glow { background: #00AADD; }
+  .slide-3 .glow { background: #DD8800; }
+  .slide-4 .glow { background: #AA44DD; }
+  .slide-5 .glow { background: #00DDA8; }
+  .slide-6 .glow { background: #DD3366; }
+  .slide-7 .glow { background: #DDC800; }
+  .slide-8 .glow { background: #00BBCC; }
+
+  /* Header */
+  .sh {
+    padding: 90px 80px 30px;
+    text-align: center;
+    z-index: 2;
+    width: 100%;
+  }
+  .sh .badge {
+    display: inline-block;
+    background: rgba(168,221,0,0.12);
+    color: #A8DD00;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 10px 28px;
+    border-radius: 100px;
+    margin-bottom: 32px;
+    border: 1px solid rgba(168,221,0,0.2);
+  }
+  .sh h1 {
+    font-size: 64px;
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+    margin-bottom: 20px;
+    background: linear-gradient(180deg, #fff 30%, rgba(255,255,255,0.65) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .sh p {
+    font-size: 28px;
+    color: rgba(255,255,255,0.5);
+    max-width: 680px;
+    margin: 0 auto;
+    line-height: 1.45;
+  }
+
+  /* Samsung phone */
+  .phone {
+    position: relative;
+    width: 400px;
+    height: 860px;
+    margin-top: 36px;
+    z-index: 2;
+    background: linear-gradient(145deg, #2a2a2e 0%, #18181b 40%, #222225 80%, #2e2e32 100%);
+    border-radius: 50px;
+    padding: 11px;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.07),
+      0 50px 120px rgba(0,0,0,0.6),
+      0 20px 60px rgba(0,0,0,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%; transform: translateX(-50%);
+    width: 14px; height: 14px;
+    background: #0c0c0e;
+    border-radius: 50%;
+    z-index: 50;
+    box-shadow: 0 0 0 2.5px #1a1a1d;
+  }
+  .phone::after {
+    content: '';
+    position: absolute;
+    right: -3.5px; top: 175px;
+    width: 3.5px; height: 70px;
+    background: linear-gradient(180deg, #3a3a3e, #2a2a2e, #3a3a3e);
+    border-radius: 0 3px 3px 0;
+  }
+
+  .screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 40px;
+    overflow: hidden;
+    background: #F5F2EC;
+    position: relative;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #1a1a1a;
+  }
+
+  /* ── App chrome elements ── */
+  .app-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px 10px;
+  }
+  .app-bar .hamburger { width: 22px; height: 22px; opacity: 0.7; }
+  .app-bar .title { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .app-bar .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #f0e0e8;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .greeting { padding: 4px 18px 2px; }
+  .greeting h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  .greeting .date { font-size: 12px; color: #888; margin-top: 2px; }
+
+  .banner {
+    margin: 10px 14px;
+    border-radius: 16px;
+    padding: 18px 20px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    height: 110px;
+  }
+  .banner h3 { font-size: 16px; font-weight: 700; margin-bottom: 3px; position: relative; z-index: 1; }
+  .banner p { font-size: 11px; opacity: 0.85; line-height: 1.35; position: relative; z-index: 1; max-width: 200px; }
+  .banner .art {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 52px;
+    opacity: 0.9;
+  }
+
+  .search-bar {
+    margin: 10px 14px;
+    background: rgba(0,0,0,0.04);
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .seg-ctrl {
+    display: flex;
+    margin: 8px 14px;
+    background: rgba(0,0,0,0.04);
+    border-radius: 12px;
+    padding: 3px;
+  }
+  .seg-ctrl .seg {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 10px;
+    color: #777;
+  }
+  .seg-ctrl .seg.active {
+    background: #1a1a1a;
+    color: #fff;
+  }
+
+  .cat-pills {
+    display: flex;
+    gap: 6px;
+    padding: 6px 14px;
+    overflow: hidden;
+  }
+  .cat-pills .pill {
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    background: rgba(0,0,0,0.04);
+    color: #666;
+  }
+  .cat-pills .pill.active {
+    background: #1a1a1a;
+    color: #fff;
+  }
+
+  /* Cards grid */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 8px 14px 0;
+  }
+  .card {
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    background: #e8e4dc;
+  }
+  .card .img {
+    width: 100%;
+    aspect-ratio: 0.85;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 56px;
+    position: relative;
+  }
+  .card .badge-tag {
+    position: absolute;
+    top: 8px; left: 8px;
+    padding: 3px 9px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+    z-index: 2;
+  }
+  .card .badge-tag.sell { background: #2d8a4e; }
+  .card .badge-tag.free { background: #7c3aed; }
+  .card .badge-tag.lost { background: #e53e3e; }
+  .card .badge-tag.found { background: #38a169; }
+  .card .badge-tag.shared { background: #2d8a4e; }
+  .card .badge-tag.request { background: #dd6b20; }
+
+  .card .info {
+    padding: 8px 10px 10px;
+  }
+  .card .info .name { font-size: 12px; font-weight: 600; }
+  .card .info .loc { font-size: 10px; color: #888; margin-top: 2px; }
+  .card .info .price {
+    position: absolute;
+    bottom: 12px; right: 10px;
+    background: rgba(255,255,255,0.85);
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .card .heart {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 28px; height: 28px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    z-index: 2;
+  }
+
+  /* Stroke colours for card types */
+  .card.sell-card { box-shadow: inset 0 0 0 2px rgba(45,138,78,0.5); }
+  .card.free-card { box-shadow: inset 0 0 0 2px rgba(124,58,237,0.5); }
+  .card.lost-card { box-shadow: inset 0 0 0 2px rgba(229,62,62,0.5); }
+  .card.request-card { box-shadow: inset 0 0 0 2px rgba(221,107,32,0.5); }
+
+  /* Bottom nav */
+  .bnav {
+    position: absolute;
+    bottom: 12px; left: 12px; right: 12px;
+    background: #1a1a1a;
+    border-radius: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 10px 8px;
+    height: 60px;
+  }
+  .bnav .ni {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 9px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.45);
+  }
+  .bnav .ni.active {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    padding: 5px 14px;
+    border-radius: 16px;
+  }
+  .bnav .ni .ic { font-size: 16px; }
+  .bnav .plus {
+    width: 44px; height: 44px;
+    background: #1a1a1a;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 300;
+  }
+
+  /* Feature callouts */
+  .callouts {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 36px 60px 0;
+    z-index: 2;
+  }
+  .callout {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 12px 22px;
+    border-radius: 100px;
+    font-size: 20px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.75);
+  }
+  .callout .ci { font-size: 22px; }
+
+  /* Footer */
+  .sf {
+    position: absolute;
+    bottom: 50px;
+    left: 0; right: 0;
+    text-align: center;
+    z-index: 2;
+    font-size: 26px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: -0.02em;
+  }
+
+  /* Events screen inner */
+  .ev-header { padding: 16px 18px 8px; }
+  .ev-header h2 { font-size: 24px; font-weight: 800; }
+  .ev-header .sub { font-size: 11px; color: #888; margin-top: 2px; }
+  .ev-header .new-btn {
+    float: right;
+    background: #1a1a1a;
+    color: #fff;
+    padding: 7px 16px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: -28px;
+  }
+
+  .time-pills {
+    display: flex;
+    gap: 6px;
+    padding: 8px 18px;
+  }
+  .time-pills .tp {
+    padding: 7px 16px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 500;
+    background: rgba(0,0,0,0.04);
+    color: #666;
+  }
+  .time-pills .tp.active {
+    background: #1a1a1a;
+    color: #fff;
+  }
+
+  .rsvp-box {
+    margin: 12px 18px;
+    border: 1.5px dashed #ddd;
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+  }
+  .rsvp-box h4 { font-size: 13px; font-weight: 600; }
+  .rsvp-box p { font-size: 11px; color: #999; margin-top: 3px; }
+
+  .ev-empty {
+    text-align: center;
+    padding: 40px 30px 0;
+  }
+  .ev-empty .emoji { font-size: 48px; margin-bottom: 12px; }
+  .ev-empty h3 { font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .ev-empty p { font-size: 11px; color: #888; margin-top: 6px; line-height: 1.4; max-width: 240px; margin-left: auto; margin-right: auto; }
+  .ev-empty .cta {
+    display: inline-block;
+    margin-top: 14px;
+    background: #1a1a1a;
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 100px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  /* L&F screen */
+  .lf-header { padding: 16px 18px 4px; }
+  .lf-header h2 { font-size: 24px; font-weight: 800; }
+  .lf-header .sub { font-size: 11px; color: #888; margin-top: 2px; }
+
+  .lf-btns {
+    display: flex;
+    gap: 8px;
+    padding: 10px 18px;
+  }
+  .lf-btns .lb {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .lf-btns .lb.lost-btn { background: rgba(229,62,62,0.08); color: #c53030; border: 1px solid rgba(229,62,62,0.2); }
+  .lf-btns .lb.found-btn { background: rgba(56,161,105,0.08); color: #276749; border: 1px solid rgba(56,161,105,0.2); }
+
+  /* Auth sheet */
+  .auth-sheet {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: #fff;
+    border-radius: 24px 24px 0 0;
+    padding: 20px 22px 30px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.12);
+    z-index: 20;
+  }
+  .auth-sheet .handle {
+    width: 36px; height: 4px;
+    background: #ddd;
+    border-radius: 2px;
+    margin: 0 auto 16px;
+  }
+  .auth-sheet h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .auth-sheet .desc { font-size: 12px; color: #888; margin-bottom: 16px; line-height: 1.4; }
+  .auth-sheet label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 5px; }
+  .auth-sheet .field {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #f5f3ee;
+    border: none;
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 14px;
+  }
+  .auth-sheet .send-btn {
+    width: 100%;
+    padding: 14px;
+    background: #A8DD00;
+    color: #1a1a1a;
+    border: none;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* Realistic images via gradients */
+  .img-keyboard {
+    background: linear-gradient(135deg, #2a2a2a 0%, #444 30%, #333 60%, #222 100%);
+    position: relative;
+  }
+  .img-keyboard::after {
+    content: '';
+    position: absolute;
+    bottom: 20%; left: 10%; right: 10%; height: 45%;
+    background: repeating-linear-gradient(90deg, #555 0px, #555 3px, #333 3px, #333 6px);
+    border-radius: 4px;
+    opacity: 0.6;
+  }
+
+  .img-phone-old {
+    background: linear-gradient(135deg, #3a2a1a 0%, #5a4a3a 40%, #4a3a2a 100%);
+  }
+
+  .img-football {
+    background: linear-gradient(135deg, #1a1a4a 0%, #2a2a6a 40%, #3a1a5a 100%);
+    position: relative;
+  }
+  .img-football::after {
+    content: '';
+    position: absolute;
+    width: 60px; height: 60px;
+    background: radial-gradient(circle, #cc3333 0%, #992222 100%);
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .img-speaker {
+    background: linear-gradient(135deg, #eee 0%, #ddd 50%, #ccc 100%);
+    position: relative;
+  }
+  .img-speaker::after {
+    content: '';
+    position: absolute;
+    width: 70px; height: 50px;
+    background: #333;
+    border-radius: 20px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .img-gift { background: linear-gradient(135deg, #d4edda 0%, #a8dd00 30%, #8bc34a 100%); }
+  .img-books { background: linear-gradient(135deg, #e8d5b7 0%, #d4a76a 40%, #c19552 100%); }
+  .img-lamp { background: linear-gradient(135deg, #fff3cd 0%, #ffc107 40%, #e6ac00 100%); }
+  .img-cycle { background: linear-gradient(135deg, #cce5ff 0%, #66b2ff 40%, #3399ff 100%); }
+
+  /* Blur overlay for auth */
+  .blur-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(245,242,236,0.6);
+    backdrop-filter: blur(6px);
+    z-index: 15;
+  }
+
+  .index-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(17,17,17,0.92);
+    backdrop-filter: blur(20px);
+    padding: 14px 24px;
+    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .index-bar a {
+    color: #A8DD00; text-decoration: none; font-size: 13px; font-weight: 600;
+    padding: 5px 14px; border-radius: 100px; border: 1px solid rgba(168,221,0,0.25);
+  }
+  .tip { text-align: center; padding: 16px; color: rgba(255,255,255,0.35); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="index-bar">
+  <a href="#s1">1. Home Feed</a>
+  <a href="#s2">2. Marketplace</a>
+  <a href="#s3">3. Request</a>
+  <a href="#s4">4. Giveaway</a>
+  <a href="#s5">5. Lost & Found</a>
+  <a href="#s6">6. Events</a>
+  <a href="#s7">7. Connect</a>
+  <a href="#s8">8. Sign Up</a>
+</div>
+<p class="tip">Each slide = 1080 x 2400 px (Google Play screenshot spec). Right-click slide &rarr; Capture node screenshot.</p>
+
+<!-- ═══════════ SLIDE 1: HOME FEED ═══════════ -->
+<div class="slide slide-1" id="s1">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Your Campus Hub</div>
+    <h1>Buy, sell & share<br>on campus</h1>
+    <p>The circular-economy app built for college students.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">wecycle</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <div class="greeting">
+        <h2>Hi, there &#128075;</h2>
+        <div class="date">Monday, Jun 8, 2026</div>
+      </div>
+      <div class="banner" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);">
+        <h3>Join local events</h3>
+        <p>Repair cafes, swaps, cleanups. See what's happening this week.</p>
+        <div class="art">&#128197;</div>
+      </div>
+      <div class="search-bar">&#128269; Search items, materials...</div>
+      <div class="seg-ctrl">
+        <div class="seg active">All</div>
+        <div class="seg">Requests</div>
+        <div class="seg">Shared</div>
+      </div>
+      <div class="cat-pills">
+        <div class="pill active">All</div>
+        <div class="pill">Electronics</div>
+        <div class="pill">Furniture</div>
+        <div class="pill">Books</div>
+        <div class="pill">Sports</div>
+      </div>
+      <div class="card-grid">
+        <div class="card lost-card">
+          <div class="img img-football">
+            <div class="badge-tag lost">LOST</div>
+          </div>
+          <div class="info">
+            <div class="name">Red Football</div>
+            <div class="loc">&#128205; CSE or MAHE Campus</div>
+          </div>
+        </div>
+        <div class="card sell-card">
+          <div class="img img-keyboard">
+            <div class="badge-tag shared">SHARED</div>
+            <div class="heart">&#9825;</div>
+          </div>
+          <div class="info">
+            <div class="name">Keyboard</div>
+            <div class="loc">&#128205; Yelahanka New Town</div>
+            <div class="price">&#8377;19000</div>
+          </div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="ni active"><span class="ic">&#127968;</span> Home</div>
+        <div class="ni"><span class="ic">&#128197;</span></div>
+        <div class="plus">+</div>
+        <div class="ni"><span class="ic">&#128270;</span></div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+<!-- ═══════════ SLIDE 2: MARKETPLACE (Shared) ═══════════ -->
+<div class="slide slide-2" id="s2">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Marketplace</div>
+    <h1>Sell what you<br>don't need</h1>
+    <p>Electronics, furniture, books, sports gear. Set your price or list for free.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">wecycle</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <div class="greeting">
+        <h2>Hi, there &#128075;</h2>
+        <div class="date">Monday, Jun 8, 2026</div>
+      </div>
+      <div class="banner" style="background: linear-gradient(135deg, #38a169 0%, #48bb78 100%);">
+        <h3>Share what you don't use</h3>
+        <p>Give a second life nearby. Drop a photo, name your price.</p>
+        <div class="art">&#127873;</div>
+      </div>
+      <div class="search-bar">&#128269; Search items, materials...</div>
+      <div class="seg-ctrl">
+        <div class="seg">All</div>
+        <div class="seg">Requests</div>
+        <div class="seg active">Shared</div>
+      </div>
+      <div class="cat-pills">
+        <div class="pill active">All</div>
+        <div class="pill">Electronics</div>
+        <div class="pill">Furniture</div>
+        <div class="pill">Books</div>
+      </div>
+      <div class="card-grid">
+        <div class="card sell-card">
+          <div class="img img-keyboard">
+            <div class="badge-tag shared">SELLING</div>
+            <div class="heart">&#9825;</div>
+          </div>
+          <div class="info">
+            <div class="name">Keyboard</div>
+            <div class="loc">&#128205; Yelahanka</div>
+            <div class="price">&#8377;19,000</div>
+          </div>
+        </div>
+        <div class="card sell-card">
+          <div class="img img-phone-old">
+            <div class="badge-tag shared">SHARED</div>
+            <div class="heart">&#9825;</div>
+          </div>
+          <div class="info">
+            <div class="name">Telephone</div>
+            <div class="loc">&#128205; MIT Campus</div>
+            <div class="price">FREE</div>
+          </div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="ni active"><span class="ic">&#127968;</span> Home</div>
+        <div class="ni"><span class="ic">&#128197;</span></div>
+        <div class="plus">+</div>
+        <div class="ni"><span class="ic">&#128270;</span></div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="ci">&#128247;</span> Photo uploads</div>
+    <div class="callout"><span class="ci">&#128176;</span> Name your price</div>
+    <div class="callout"><span class="ci">&#127991;&#65039;</span> Category filters</div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+<!-- ═══════════ SLIDE 3: REQUESTS ═══════════ -->
+<div class="slide slide-3" id="s3">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Requests</div>
+    <h1>Ask for what<br>you need</h1>
+    <p>Post a request. Your entire campus sees it instantly.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">wecycle</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <div class="greeting">
+        <h2>Hi, there &#128075;</h2>
+        <div class="date">Monday, Jun 8, 2026</div>
+      </div>
+      <div class="banner" style="background: linear-gradient(135deg, #dd6b20 0%, #ed8936 100%);">
+        <h3>Need something?</h3>
+        <p>Post a request. It's usually faster and cheaper than buying new.</p>
+        <div class="art">&#128587;</div>
+      </div>
+      <div class="search-bar">&#128269; Search items, materials...</div>
+      <div class="seg-ctrl">
+        <div class="seg">All</div>
+        <div class="seg active">Requests</div>
+        <div class="seg">Shared</div>
+      </div>
+      <div class="cat-pills">
+        <div class="pill active">All</div>
+        <div class="pill">Electronics</div>
+        <div class="pill">Furniture</div>
+        <div class="pill">Books</div>
+      </div>
+      <div style="text-align:center; padding: 60px 30px 0;">
+        <div style="font-size: 48px; margin-bottom: 12px;">&#128587;</div>
+        <div style="font-size: 14px; font-weight: 600; line-height: 1.35;">No open requests yet.<br>Need something? Ask away!</div>
+        <div style="font-size: 11px; color: #999; margin-top: 8px; line-height: 1.4;">Posting a request is usually faster<br>(and cheaper) than buying new.</div>
+        <div style="display: inline-block; margin-top: 16px; background: #1a1a1a; color: #fff; padding: 10px 20px; border-radius: 100px; font-size: 12px; font-weight: 600;">Post a request</div>
+      </div>
+      <div class="bnav">
+        <div class="ni active"><span class="ic">&#127968;</span> Home</div>
+        <div class="ni"><span class="ic">&#128197;</span></div>
+        <div class="plus">+</div>
+        <div class="ni"><span class="ic">&#128270;</span></div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="ci">&#9997;&#65039;</span> Post in seconds</div>
+    <div class="callout"><span class="ci">&#9200;</span> Set a deadline</div>
+    <div class="callout"><span class="ci">&#128276;</span> Get notified</div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+<!-- ═══════════ SLIDE 4: GIVEAWAY ═══════════ -->
+<div class="slide slide-4" id="s4">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Free Stuff</div>
+    <h1>Give it away,<br>feel great</h1>
+    <p>Share what you're done with. Someone on campus needs exactly that.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">wecycle</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <div class="greeting">
+        <h2>Hi, there &#128075;</h2>
+        <div class="date">Monday, Jun 8, 2026</div>
+      </div>
+      <div class="banner" style="background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);">
+        <h3>Give it a second life</h3>
+        <p>List for free. Someone nearby will love it.</p>
+        <div class="art">&#127873;</div>
+      </div>
+      <div class="search-bar">&#128269; Search items, materials...</div>
+      <div class="seg-ctrl">
+        <div class="seg">All</div>
+        <div class="seg">Requests</div>
+        <div class="seg active">Shared</div>
+      </div>
+      <div class="cat-pills">
+        <div class="pill active">All</div>
+        <div class="pill">Electronics</div>
+        <div class="pill">Furniture</div>
+        <div class="pill">Books</div>
+      </div>
+      <div class="card-grid">
+        <div class="card free-card">
+          <div class="img img-books">
+            <div class="badge-tag free">FREE</div>
+            <div class="heart">&#10084;&#65039;</div>
+          </div>
+          <div class="info">
+            <div class="name">Study textbooks (3)</div>
+            <div class="loc">&#128205; MIT Hostel Block B</div>
+            <div class="price">FREE</div>
+          </div>
+        </div>
+        <div class="card free-card">
+          <div class="img img-lamp">
+            <div class="badge-tag free">FREE</div>
+            <div class="heart">&#9825;</div>
+          </div>
+          <div class="info">
+            <div class="name">Desk lamp</div>
+            <div class="loc">&#128205; KMC Area</div>
+            <div class="price">FREE</div>
+          </div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="ni active"><span class="ic">&#127968;</span> Home</div>
+        <div class="ni"><span class="ic">&#128197;</span></div>
+        <div class="plus">+</div>
+        <div class="ni"><span class="ic">&#128270;</span></div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="ci">&#127873;</span> Free listings</div>
+    <div class="callout"><span class="ci">&#127793;</span> Track impact</div>
+    <div class="callout"><span class="ci">&#9851;&#65039;</span> Zero waste</div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+<!-- ═══════════ SLIDE 5: LOST & FOUND ═══════════ -->
+<div class="slide slide-5" id="s5">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Lost & Found</div>
+    <h1>Lost something?<br>We've got you</h1>
+    <p>Report lost or found items. Your whole campus sees it instantly.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">Lost & Found</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <div class="lf-header">
+        <h2>Reunite lost things</h2>
+        <div class="sub">2 lost &middot; 0 found in your community</div>
+      </div>
+      <div class="search-bar" style="margin-top: 14px;">&#128269; Search lost or found...</div>
+      <div class="lf-btns">
+        <div class="lb lost-btn">&#9888;&#65039; Report lost</div>
+        <div class="lb found-btn">&#9989; Report found</div>
+      </div>
+      <div class="seg-ctrl" style="margin: 4px 14px;">
+        <div class="seg active">All</div>
+        <div class="seg">Lost</div>
+        <div class="seg">Found</div>
+      </div>
+      <div class="card-grid" style="padding-top: 6px;">
+        <div class="card lost-card">
+          <div class="img img-football">
+            <div class="badge-tag lost">LOST</div>
+          </div>
+          <div class="info">
+            <div class="name">Red Football</div>
+            <div class="loc">&#128205; CSE or MAHE Campus</div>
+          </div>
+        </div>
+        <div class="card lost-card">
+          <div class="img img-speaker">
+            <div class="badge-tag lost">LOST</div>
+          </div>
+          <div class="info">
+            <div class="name">JBL clip speaker</div>
+            <div class="loc">&#128205; Srishti Rta 004</div>
+          </div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="ni"><span class="ic">&#127968;</span></div>
+        <div class="ni"><span class="ic">&#128197;</span></div>
+        <div class="plus">+</div>
+        <div class="ni active"><span class="ic">&#128270;</span> L&F</div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="ci">&#128205;</span> Pin location</div>
+    <div class="callout"><span class="ci">&#128269;</span> Search & filter</div>
+    <div class="callout"><span class="ci">&#9989;</span> Mark found</div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+<!-- ═══════════ SLIDE 6: EVENTS ═══════════ -->
+<div class="slide slide-6" id="s6">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Campus Events</div>
+    <h1>Never miss<br>what's on</h1>
+    <p>Swap meets, repair cafes, cleanups. RSVP and rally your friends.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">wecycle</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <div class="ev-header">
+        <h2>Events</h2>
+        <div class="sub">Swaps, repair cafes, workshops & more</div>
+        <div class="new-btn">+ New</div>
+      </div>
+      <div class="search-bar">&#128269; Search events...</div>
+      <div class="time-pills">
+        <div class="tp active">Any time</div>
+        <div class="tp">Today</div>
+        <div class="tp">This week</div>
+        <div class="tp">Weekend</div>
+      </div>
+      <div style="padding: 4px 18px 0; font-size: 10px; font-weight: 700; text-transform: uppercase; color: #999; letter-spacing: 0.05em;">YOUR UPCOMING</div>
+      <div class="rsvp-box">
+        <h4>You haven't RSVP'd to anything yet</h4>
+        <p>Tap RSVP on any event below to add it here.</p>
+      </div>
+      <div class="ev-empty">
+        <div class="emoji">&#128197;</div>
+        <h3>No events on the calendar yet.<br>Plant a flag &mdash; start one?</h3>
+        <p>Repair cafe, swap drive, cleanup &mdash; every great community has someone who goes first.</p>
+        <div class="cta">Create an event</div>
+      </div>
+      <div class="bnav">
+        <div class="ni"><span class="ic">&#127968;</span></div>
+        <div class="ni active"><span class="ic">&#128197;</span> Events</div>
+        <div class="plus">+</div>
+        <div class="ni"><span class="ic">&#128270;</span></div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="ci">&#128197;</span> RSVP instantly</div>
+    <div class="callout"><span class="ci">&#128228;</span> Share events</div>
+    <div class="callout"><span class="ci">&#128467;&#65039;</span> Filter by date</div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+<!-- ═══════════ SLIDE 7: CONNECT (WhatsApp/Email) ═══════════ -->
+<div class="slide slide-7" id="s7">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Connect</div>
+    <h1>Chat via WhatsApp<br>or email</h1>
+    <p>Reach sellers and requesters directly. No in-app DMs needed.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">wecycle</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <!-- Simulate a detail screen -->
+      <div style="padding: 0 14px;">
+        <div style="width:100%; aspect-ratio: 1.2; background: linear-gradient(135deg, #2a2a2a 0%, #444 30%, #333 60%, #222 100%); border-radius: 18px; margin-top: 6px; display: flex; align-items: center; justify-content: center;">
+          <div style="font-size: 72px; opacity: 0.5;">&#127929;</div>
+        </div>
+        <div style="padding: 14px 0 6px;">
+          <div style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em;">Keyboard</div>
+          <div style="font-size: 12px; color: #888; margin-top: 3px;">&#128205; Yelahanka New Town &middot; Listed 2h ago</div>
+          <div style="font-size: 22px; font-weight: 800; margin-top: 8px; color: #2d8a4e;">&#8377;19,000</div>
+        </div>
+        <!-- Contact buttons -->
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <div style="flex:1; background: #25D366; color: #fff; padding: 13px; border-radius: 14px; text-align: center; font-size: 13px; font-weight: 700;">&#128172; WhatsApp</div>
+          <div style="flex:1; background: #1a1a1a; color: #fff; padding: 13px; border-radius: 14px; text-align: center; font-size: 13px; font-weight: 700;">&#9993;&#65039; Email</div>
+        </div>
+        <!-- Owner card -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px; background: rgba(0,0,0,0.03); border-radius: 14px;">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: #e8e4dc; display: flex; align-items: center; justify-content: center; font-size: 18px;">M</div>
+          <div>
+            <div style="font-size: 13px; font-weight: 600;">Madhav Rathi</div>
+            <div style="font-size: 10px; color: #38a169;">&#9679; Online now</div>
+          </div>
+          <div style="margin-left: auto; font-size: 10px; color: #888;">View profile &rarr;</div>
+        </div>
+      </div>
+      <div class="bnav">
+        <div class="ni active"><span class="ic">&#127968;</span> Home</div>
+        <div class="ni"><span class="ic">&#128197;</span></div>
+        <div class="plus">+</div>
+        <div class="ni"><span class="ic">&#128270;</span></div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="ci">&#128172;</span> WhatsApp</div>
+    <div class="callout"><span class="ci">&#128231;</span> Email</div>
+    <div class="callout"><span class="ci">&#128100;</span> Profiles</div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+<!-- ═══════════ SLIDE 8: SIGN UP ═══════════ -->
+<div class="slide slide-8" id="s8">
+  <div class="glow"></div>
+  <div class="sh">
+    <div class="badge">Get Started</div>
+    <h1>Join your<br>campus now</h1>
+    <p>Sign up with any email. No passwords to remember.</p>
+  </div>
+  <div class="phone">
+    <div class="screen">
+      <div class="app-bar" style="filter: blur(3px); opacity: 0.5;">
+        <div class="hamburger">&#9776;</div>
+        <div class="title">wecycle</div>
+        <div class="avatar">&#128100;</div>
+      </div>
+      <div class="greeting" style="filter: blur(3px); opacity: 0.5;">
+        <h2>Hi, there &#128075;</h2>
+        <div class="date">Monday, Jun 8, 2026</div>
+      </div>
+      <div class="banner" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); filter: blur(3px); opacity: 0.5;">
+        <h3>Join local events</h3>
+        <p>See what's happening.</p>
+        <div class="art">&#128197;</div>
+      </div>
+      <div class="blur-overlay"></div>
+      <div class="auth-sheet">
+        <div class="handle"></div>
+        <h3>Sign in to Wecycle</h3>
+        <div class="desc">Use any email &mdash; we'll send you an 8-character code to sign in. No password to remember.</div>
+        <label>&#128100; Full name <span style="color:#aaa; font-weight:400;">(optional)</span></label>
+        <div class="field">What should we call you?</div>
+        <label>&#9993;&#65039; Email <span style="color: #e53e3e;">*</span></label>
+        <div class="field">you@gmail.com</div>
+        <label>&#127891; College ID <span style="color:#aaa; font-weight:400;">(optional)</span></label>
+        <div class="field">e.g. 230905123</div>
+        <div class="send-btn">Send code</div>
+      </div>
+      <div class="bnav" style="z-index: 0;">
+        <div class="ni active"><span class="ic">&#127968;</span> Home</div>
+        <div class="ni"><span class="ic">&#128197;</span></div>
+        <div class="plus">+</div>
+        <div class="ni"><span class="ic">&#128270;</span></div>
+        <div class="ni"><span class="ic">&#128230;</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="ci">&#9889;</span> 10-second signup</div>
+    <div class="callout"><span class="ci">&#128274;</span> Secure OTP</div>
+    <div class="callout"><span class="ci">&#127891;</span> Campus verified</div>
+  </div>
+  <div class="sf">&#127793; wecycle</div>
+</div>
+
+</body>
+</html>

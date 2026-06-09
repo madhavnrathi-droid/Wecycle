@@ -10,20 +10,20 @@
     "tunnel": "expo start --tunnel"
   },
   "dependencies": {
-    "expo": "~54.0.0",
-    "expo-constants": "~18.0.0",
-    "expo-haptics": "~15.0.0",
-    "expo-status-bar": "~3.0.0",
-    "react": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-webview": "13.15.0"
+    "expo": "^56.0.9",
+    "expo-constants": "~56.0.17",
+    "expo-haptics": "~56.0.3",
+    "expo-status-bar": "~56.0.4",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@expo/ngrok": "^4.1.3",
-    "@types/react": "~19.1.0",
-    "babel-preset-expo": "~54.0.10",
-    "typescript": "~5.9.2"
+    "@types/react": "~19.2.14",
+    "babel-preset-expo": "~56.0.0",
+    "typescript": "~6.0.3"
   }
 }
