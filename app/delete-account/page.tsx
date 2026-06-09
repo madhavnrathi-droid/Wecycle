@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 
 /* Account & data deletion page — the URL Google Play's Data Safety form
  * requires for apps that let users create an account. Reachable without
- * installing the app, in English, describing exactly what is deleted. */
+ * installing the app, in English, describing exactly what is deleted.
+ * Also satisfies Apple App Store §5.1.1(v) account-deletion requirement. */
 
 export const metadata: Metadata = {
   title: 'Delete Your Account — Wecycle',
@@ -10,74 +11,103 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+const UPDATED = 'June 2026';
 const CONTACT = 'wecycle.page@gmail.com';
 
 export default function DeleteAccount() {
-  const subject = encodeURIComponent('Wecycle — Account deletion request');
-  const body = encodeURIComponent(
-    'Please delete my Wecycle account and all associated data.\n\n' +
-    'Account email (the one I sign in with): \n' +
-    'Display name (if known): \n',
-  );
+  const mailtoSubject = 'Account%20Deletion%20Request';
+  const mailtoBody = 'Please%20delete%20the%20Wecycle%20account%20associated%20with%20this%20email%20address.';
 
   return (
     <main style={page}>
       <div style={wrap}>
         <a href="/" style={back}>← Back to Wecycle</a>
-        <h1 style={h1}>Delete your account &amp; data</h1>
+        <h1 style={h1}>Delete your Wecycle account</h1>
         <p style={meta}>Wecycle · developer contact: {CONTACT}</p>
 
         <p style={p}>
-          You can permanently delete your Wecycle account and the data associated
+          You can permanently delete your Wecycle account and all data associated
           with it at any time, using either method below.
         </p>
 
-        <h2 style={h2}>Option 1 — In the app (instant)</h2>
+        <h2 style={h2}>Delete in the app (instant)</h2>
+        <p style={p}>
+          If you can sign in to your account, the fastest way to delete it is
+          directly in the app:
+        </p>
         <ol style={ol}>
           <li style={li}>Open Wecycle and sign in.</li>
-          <li style={li}>Go to the menu → <strong>Settings</strong>.</li>
-          <li style={li}>Scroll to <strong>Delete account</strong> and confirm.</li>
+          <li style={li}>Tap the menu and go to <strong>Settings</strong>.</li>
+          <li style={li}>Scroll to the <strong>Account</strong> section.</li>
+          <li style={li}>Tap <strong>Delete account</strong> and follow the confirmation prompts.</li>
         </ol>
         <p style={p}>
-          Your session ends immediately and your local data is cleared on the
-          device. Server-side removal completes as described below.
+          Deletion is immediate — your session ends right away and all your data
+          is removed from our servers as described below.
         </p>
 
-        <h2 style={h2}>Option 2 — By email</h2>
+        <h2 style={h2}>Can&apos;t sign in? Delete by email</h2>
         <p style={p}>
-          Send a deletion request from the email address tied to your account to{' '}
-          <a href={`mailto:${CONTACT}?subject=${subject}&body=${body}`} style={link}>{CONTACT}</a>.
-          We verify the request comes from your account email and complete deletion
-          within 30 days (usually much sooner).
+          If you no longer have access to your account, send a deletion request
+          from the email address tied to your Wecycle account:{' '}
+          <a
+            href={`mailto:${CONTACT}?subject=${mailtoSubject}&body=${mailtoBody}`}
+            style={link}
+          >
+            {CONTACT}
+          </a>
+          . We will verify the request and complete deletion within{' '}
+          <strong>7 days</strong>.
         </p>
 
         <h2 style={h2}>What gets deleted</h2>
+        <p style={p}>
+          Deleting your account permanently removes all of the following:
+        </p>
         <ul style={ul}>
-          <li style={li}>Your profile (name, email, phone, college ID, course/department, residence, avatar).</li>
-          <li style={li}>Your item listings, requests, events, and lost &amp; found reports.</li>
-          <li style={li}>Photos and videos you uploaded.</li>
-          <li style={li}>Your comments and saved items.</li>
+          <li style={li}>Your profile (name, email, phone, avatar, college, course, department, residence).</li>
+          <li style={li}>All item listings and marketplace posts you created.</li>
+          <li style={li}>All requests you posted.</li>
+          <li style={li}>All lost &amp; found reports you submitted.</li>
+          <li style={li}>Your comments on any post.</li>
+          <li style={li}>Your messages and conversation history.</li>
+          <li style={li}>Your saved searches and search alerts.</li>
+          <li style={li}>Your push notification subscriptions.</li>
+          <li style={li}>Your event RSVPs.</li>
+          <li style={li}>Your saved items.</li>
           <li style={li}>Your authentication record.</li>
         </ul>
 
-        <h2 style={h2}>What may be retained, and for how long</h2>
+        <h2 style={h2}>What may be retained</h2>
         <ul style={ul}>
-          <li style={li}>Encrypted backups are purged on a rolling basis and fully cleared <strong>within 30 days</strong>.</li>
-          <li style={li}>Aggregated, anonymized analytics that cannot identify you may be retained.</li>
-          <li style={li}>Records we are legally required to keep (e.g., to resolve disputes or prevent abuse) are kept only as long as required by law, then deleted.</li>
+          <li style={li}>
+            Deletion is <strong>immediate</strong> — there is no soft-delete or
+            grace period. Once confirmed, your account and data are gone.
+          </li>
+          <li style={li}>
+            Anonymized analytics logs (e.g., aggregate usage counts) that cannot
+            identify you may persist for <strong>up to 30 days</strong> before
+            rolling off our systems.
+          </li>
+          <li style={li}>
+            Records we are legally required to keep (e.g., to resolve active
+            disputes or prevent abuse) are retained only as long as required by
+            law, then deleted.
+          </li>
         </ul>
 
         <p style={p}>
-          Deletion is permanent and cannot be undone. After deletion you can
-          create a new account at any time with the same email.
+          Deletion is permanent and cannot be undone. You may create a new
+          Wecycle account with the same email address at any time after deletion.
         </p>
 
         <p style={p}>
-          Questions? Email <a href={`mailto:${CONTACT}`} style={link}>{CONTACT}</a> or
-          see our <a href="/privacy" style={link}>Privacy Policy</a>.
+          Questions? Email{' '}
+          <a href={`mailto:${CONTACT}`} style={link}>{CONTACT}</a> or see our{' '}
+          <a href="/privacy" style={link}>Privacy Policy</a>.
         </p>
 
-        <footer style={foot}>© {new Date().getFullYear()} Wecycle</footer>
+        <footer style={foot}>Last updated: {UPDATED} · © {new Date().getFullYear()} Wecycle</footer>
       </div>
     </main>
   );

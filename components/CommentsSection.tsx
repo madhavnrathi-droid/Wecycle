@@ -17,12 +17,13 @@
  * later — the Comment shape already matches what the table will look like. */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, Send, CornerDownRight, Trash2 } from 'lucide-react';
+import { MessageCircle, Send, CornerDownRight, Trash2, Flag } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { addComment, deleteComment, getComments, timeAgo, type Comment } from '../lib/comments';
 import { track, EVT } from '../lib/analytics';
 import { USERS, type User } from '../lib/mockData';
 import { getAvatar } from '../lib/photos';
+import ReportSheet from './ReportSheet';
 
 interface CommentsSectionProps {
   postId: string;
@@ -33,6 +34,7 @@ interface CommentsSectionProps {
 
 export default function CommentsSection({ postId, onRequireAuth, onOpenStorefront }: CommentsSectionProps) {
   const { user, profile, isAdmin } = useAuth();
+  const [reportTarget, setReportTarget] = useState<{ commentId: string; commentAuthorId: string; preview: string } | null>(null);
   const handleDelete = (c: Comment) => {
     if (typeof window !== 'undefined' && !window.confirm('Admin: delete this comment?')) return;
     deleteComment(postId, c.id);
@@ -171,6 +173,7 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
                 onReply={beginReply}
                 onAvatarClick={onOpenStorefront}
                 onDelete={isAdmin ? () => handleDelete(top) : undefined}
+                onReport={user && top.author.id !== user.id ? () => setReportTarget({ commentId: top.id, commentAuthorId: top.author.id, preview: top.body.slice(0, 80) }) : undefined}
               />
               {(repliesByParent.get(top.id) ?? []).length > 0 && (
                 <ol style={{
@@ -187,6 +190,7 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
                         onReply={beginReply}
                         onAvatarClick={onOpenStorefront}
                         onDelete={isAdmin ? () => handleDelete(r) : undefined}
+                        onReport={user && r.author.id !== user.id ? () => setReportTarget({ commentId: r.id, commentAuthorId: r.author.id, preview: r.body.slice(0, 80) }) : undefined}
                       />
                     </li>
                   ))}
@@ -295,6 +299,14 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
           Your name + photo show next to every comment — anonymous posts aren't allowed for safety.
         </p>
       </div>
+      <ReportSheet
+        open={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        targetType="comment"
+        targetId={reportTarget?.commentId ?? ''}
+        targetUserId={reportTarget?.commentAuthorId}
+        targetLabel={reportTarget ? `"${reportTarget.preview}"` : undefined}
+      />
     </section>
   );
 }
@@ -302,7 +314,7 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
 /* ── Comment row ──────────────────────────────── */
 
 function CommentRow({
-  comment, compact, onReply, onAvatarClick, onDelete,
+  comment, compact, onReply, onAvatarClick, onDelete, onReport,
 }: {
   comment: Comment;
   compact?: boolean;
@@ -310,6 +322,8 @@ function CommentRow({
   onAvatarClick?: (user: User) => void;
   /** Admin moderation: when present, shows a red trash button on the row. */
   onDelete?: () => void;
+  /** Present for non-own comments — opens the report sheet. */
+  onReport?: () => void;
 }) {
   const av = onAvatarClick
     ? () => onAvatarClick(comment.author)
@@ -397,6 +411,21 @@ function CommentRow({
               }}
             >
               <Trash2 size={11} strokeWidth={2} /> Delete
+            </button>
+          )}
+          {onReport && (
+            <button
+              type="button"
+              onClick={onReport}
+              aria-label="Report comment"
+              style={{
+                all: 'unset', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center',
+                color: 'var(--text-muted)',
+                padding: '4px',
+              }}
+            >
+              <Flag size={16} strokeWidth={1.8} />
             </button>
           )}
         </div>

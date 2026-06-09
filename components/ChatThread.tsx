@@ -7,7 +7,8 @@ import {
   useCallback,
   type KeyboardEvent,
 } from 'react';
-import { ChevronLeft, ArrowUp } from 'lucide-react';
+import { ChevronLeft, ArrowUp, Flag } from 'lucide-react';
+import ReportSheet from './ReportSheet';
 import { useAuth } from '../lib/AuthContext';
 import {
   fetchMessages,
@@ -54,6 +55,7 @@ export default function ChatThread({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -260,7 +262,27 @@ export default function ChatThread({
         >
           {otherUser.name}
         </span>
+        <button
+          onClick={() => setReportOpen(true)}
+          aria-label={`Report ${otherUser.name}`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 36, height: 36, borderRadius: '50%',
+            border: 'none', background: 'transparent',
+            color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          <Flag size={18} strokeWidth={1.8} />
+        </button>
       </header>
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="user"
+        targetId={otherUser.id}
+        targetUserId={otherUser.id}
+        targetLabel={otherUser.name}
+      />
 
       {/* Message list */}
       <div

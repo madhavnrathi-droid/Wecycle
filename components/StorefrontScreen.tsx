@@ -19,8 +19,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, MapPin, Calendar, Users, IndianRupee,
-  Mail, Phone, GraduationCap, Building2, Home, IdCard, Search,
+  Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal,
 } from 'lucide-react';
+import ReportSheet from './ReportSheet';
 import type {
   User, MarketplaceItem, CommunityEvent, FeedItem, LostItem,
 } from '../lib/mockData';
@@ -66,6 +67,7 @@ export default function StorefrontScreen({
 }: StorefrontScreenProps) {
   const { user: viewer } = useAuth();
   const isMe = !!viewer && viewer.id === user.id;
+  const [reportOpen, setReportOpen] = useState(false);
 
   /* Demo mode slices the seeded catalogue by author; live mode fetches the
      user's real listings + events from Supabase. */
@@ -240,7 +242,18 @@ export default function StorefrontScreen({
         }}>
           {isMe ? 'Your storefront' : `${user.name.split(' ')[0]}'s storefront`}
         </h1>
-        <span style={{ width: 36 }} aria-hidden="true" />
+        {viewer && !isMe ? (
+          <button
+            onClick={() => setReportOpen(true)}
+            aria-label={`More options for ${user.name}`}
+            className="theme-toggle"
+            style={{ width: 36, height: 36 }}
+          >
+            <MoreHorizontal size={20} strokeWidth={1.8} />
+          </button>
+        ) : (
+          <span style={{ width: 36 }} aria-hidden="true" />
+        )}
       </header>
 
       {/* ── HERO ── */}
@@ -419,6 +432,14 @@ export default function StorefrontScreen({
             )
         )}
       </section>
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="user"
+        targetId={user.id}
+        targetUserId={user.id}
+        targetLabel={user.name}
+      />
     </div>
   );
 }

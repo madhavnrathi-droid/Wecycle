@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee, Trash2, RotateCcw, Save, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee, Trash2, RotateCcw, Save, Loader2, Flag } from 'lucide-react';
+import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
 import PhotoCarousel from './PhotoCarousel';
@@ -57,6 +58,7 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
 export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onMessage, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
+  const [reportOpen, setReportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   /* "Manage" UI = the owner's inline-edit fields + Delete bar. Admin
@@ -311,6 +313,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         canManage={canManage}
         onDelete={onDelete}
         isAdmin={isAdmin}
+        isOwner={isOwner}
         /* Inline-edit state, threaded down so the desktop layout's title /
            description / price etc. become editable in the same way. */
         editState={{
@@ -777,6 +780,23 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           >
             <Share2 size={18} strokeWidth={1.8} />
           </button>
+          {!isOwner && (
+            <button
+              aria-label="Report this post"
+              onClick={() => setReportOpen(true)}
+              style={{
+                width: 52, height: 52, borderRadius: 999,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <Flag size={18} strokeWidth={1.8} />
+            </button>
+          )}
           {/* ── Contact options — Message on Wecycle (primary) + WhatsApp/Email (always available) ── */}
           {!item.isClosed && onMessage && (
             <button
@@ -841,6 +861,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           )}
         </div>
       </section>
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType={item.isRequest ? 'request' : 'listing'}
+        targetId={item.id}
+        targetUserId={item.user.id}
+        targetLabel={`"${item.title}"`}
+      />
     </div>
   );
 }
@@ -891,6 +919,7 @@ interface DesktopLayoutProps {
   canManage: boolean;
   onDelete?: () => void | Promise<void>;
   isAdmin?: boolean;
+  isOwner?: boolean;
   editState: EditState;
 }
 
@@ -898,10 +927,11 @@ function DesktopLayout({
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront, onMessage,
   contactLinks, primaryActionLabel, handleContactClick, hasBoth,
-  canManage, onDelete, isAdmin, editState,
+  canManage, onDelete, isAdmin, isOwner, editState,
 }: DesktopLayoutProps) {
   void onRequireAuth;
   void isAdmin;
+  const [reportOpen, setReportOpen] = useState(false);
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType, eCategory, setECategory,
@@ -1392,6 +1422,23 @@ function DesktopLayout({
             >
               <Share2 size={18} strokeWidth={1.8} />
             </button>
+            {!isOwner && (
+              <button
+                aria-label="Report this post"
+                onClick={() => setReportOpen(true)}
+                style={{
+                  width: 52, height: 52, borderRadius: 14,
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                <Flag size={18} strokeWidth={1.8} />
+              </button>
+            )}
           </div>
 
           {/* Comments thread — full width below the right column on desktop */}
@@ -1400,6 +1447,14 @@ function DesktopLayout({
           </div>
         </div>
       </div>
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType={item.isRequest ? 'request' : 'listing'}
+        targetId={item.id}
+        targetUserId={item.user.id}
+        targetLabel={`"${item.title}"`}
+      />
     </div>
   );
 }

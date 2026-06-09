@@ -18,6 +18,7 @@ import {
 } from '../lib/liveData';
 import { getEventMetrics } from '../lib/metrics';
 import { getSettings, onSettingsChange } from '../lib/settings';
+import { getBlockedUserIds, onBlocksChange } from '../lib/moderation';
 import { track, trackPostOpened, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import PhotoCarousel from './PhotoCarousel';
@@ -50,6 +51,12 @@ export default function FeedScreen({
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  useEffect(() => {
+    getBlockedUserIds().then(ids => setBlocked(new Set(ids)));
+    const off = onBlocksChange(() => getBlockedUserIds().then(ids => setBlocked(new Set(ids))));
+    return off;
+  }, []);
+
   const [activeCategory, setActiveCategory] = useState('all');
   /* Default tab = "All" — a chronological mix of every Wecycle activity
      (shared items, requests, events, lost-found). FeedScreen unmounts when
@@ -80,6 +87,7 @@ export default function FeedScreen({
   const [events, setEvents] = useState<CommunityEvent[]>([]);
   const [lostFound, setLostFound] = useState<LostItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!mounted) return;
@@ -196,7 +204,7 @@ export default function FeedScreen({
        - 'all'      → mixed feed of items + requests + events + L&F by recency
        - 'requests' → open requests only
        - 'shared'   → marketplace listings only (the "Shared" tab) */
-  const source = activeType === 'requests' ? requests : items;
+  const source = (activeType === 'requests' ? requests : items).filter(item => !blocked.has(item.user.id));
   const filtered = source.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
     if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
@@ -220,16 +228,16 @@ export default function FeedScreen({
        so smaller days-ago wins. For events we use the days-until-start so
        upcoming events feel "new". L&F uses position in the array since
        timeAgo is already a human string. */
-    const itemEntries: AllEntry[] = items.map((it, i) => ({
+    const itemEntries: AllEntry[] = items.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
       kind: 'item' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
     }));
-    const requestEntries: AllEntry[] = requests.map((it, i) => ({
+    const requestEntries: AllEntry[] = requests.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
       kind: 'request' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
     }));
-    const eventEntries: AllEntry[] = events.map((ev, i) => ({
+    const eventEntries: AllEntry[] = events.filter(ev => !blocked.has(ev.organizer.id)).map((ev, i) => ({
       kind: 'event' as const, event: ev, sortKey: -1000 + i,  /* events surface earliest */
     }));
-    const lfEntries: AllEntry[] = lostFound.map((lf, i) => ({
+    const lfEntries: AllEntry[] = lostFound.filter(lf => !blocked.has(lf.user.id)).map((lf, i) => ({
       kind: 'lf' as const, lf, sortKey: i * 1000,
     }));
 

@@ -10,10 +10,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "page.wecycle.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Wecycle uses the camera so you can post photos of items you'd like to share.",
-        "NSPhotoLibraryUsageDescription": "Wecycle needs photo library access so you can attach photos to your posts.",
-        "NSMicrophoneUsageDescription": "Wecycle records audio when you capture a video clip for a post.",
-        "NSLocationWhenInUseUsageDescription": "Wecycle uses location to show items near you on campus."
+        "NSCameraUsageDescription": "Wecycle uses your camera so you can take photos of items you're sharing, selling, or reporting as lost or found.",
+        "NSPhotoLibraryUsageDescription": "Wecycle accesses your photo library so you can attach existing photos to your listings, requests, and lost & found posts.",
+        "NSPhotoLibraryAddUsageDescription": "Wecycle saves screenshots and shared images to your photo library when you tap save.",
+        "NSMicrophoneUsageDescription": "Wecycle uses your microphone only when you record audio for a video post."
       }
     },
     "android": {

@@ -12,6 +12,7 @@ import {
   type ThemeMode, type UserSettings,
 } from '../lib/settings';
 import { useAuth } from '../lib/AuthContext';
+import { supabase } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
 
 interface SettingsScreenProps {
@@ -93,16 +94,44 @@ export default function SettingsScreen({
     window.alert('Cache cleared.');
   };
 
-  const deleteAccount = () => {
+  const deleteAccount = async () => {
     if (typeof window === 'undefined') return;
+
+    /* Stage 1 — clear warning. */
     const ok = window.confirm(
-      'Delete your account? This will sign you out and remove your local data. ' +
-      'Server-side deletion is processed within 30 days per our privacy policy.',
+      'Permanently delete your account?\n\n' +
+      'This removes all your posts, requests, comments, messages, saved searches, and profile.\n\n' +
+      'This cannot be undone.',
     );
     if (!ok) return;
-    /* Local-only wipe for demo. Real path posts to a delete-account edge fn. */
-    for (const k of Object.keys(localStorage)) if (k.startsWith('wecycle.')) localStorage.removeItem(k);
-    signOut().then(() => onBack());
+
+    /* Stage 2 — typed confirmation guards against fat-finger. */
+    const typed = window.prompt('Type DELETE in capitals to confirm.');
+    if ((typed ?? '').trim().toUpperCase() !== 'DELETE') return;
+
+    try {
+      /* Demo mode: nothing on the server to delete — just wipe local state. */
+      if (!isDemo) {
+        track(EVT.settings_changed, { group: 'account', setting_key: 'delete', value: 'true' });
+        const { error } = await (supabase.rpc as unknown as (
+          fn: string, args: Record<string, unknown>,
+        ) => Promise<{ error: unknown }>)('delete_my_account', {});
+        if (error) {
+          window.alert(`Couldn't delete your account: ${(error as { message?: string }).message ?? 'unknown error'}`);
+          return;
+        }
+      }
+      /* Server delete succeeded (or demo) — clear local & sign out. */
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith('wecycle.')) localStorage.removeItem(k);
+      }
+      await signOut();
+      onBack();
+      /* Defer the alert one tick so the screen transition completes first. */
+      setTimeout(() => window.alert('Your account has been deleted.'), 60);
+    } catch (e) {
+      window.alert(`Couldn't delete your account: ${(e as Error).message}`);
+    }
   };
 
   return (
