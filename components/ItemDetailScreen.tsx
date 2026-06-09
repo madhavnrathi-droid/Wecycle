@@ -29,6 +29,8 @@ interface ItemDetailScreenProps {
   onRequireAuth: () => void;
   /** Optional: tap an avatar/owner name to open their storefront. */
   onOpenStorefront?: (user: User) => void;
+  /** Open an in-app message thread with the item owner. */
+  onMessage?: (otherUser: { id: string; name: string; initials: string; color: string }, listingId?: string, subject?: string) => void;
   /** When the viewer owns this post, inline editing turns on (fields become
    *  inputs in place, dirty-state CTAs replace Delete). No standalone Edit
    *  button — the post detail IS the editor. */
@@ -52,7 +54,7 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onMessage, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -301,6 +303,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         onBack={onBack}
         onRequireAuth={onRequireAuth}
         onOpenStorefront={onOpenStorefront}
+        onMessage={onMessage}
         contactLinks={contactLinks}
         primaryActionLabel={primaryActionLabel}
         handleContactClick={handleContactClick}
@@ -774,10 +777,32 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           >
             <Share2 size={18} strokeWidth={1.8} />
           </button>
-          {/* When the owner accepts both email + WhatsApp we surface two
-              clearly-labelled buttons. When only one channel is on, the single
-              CTA carries the action verb ("Request to borrow"). */}
-          {(hasBoth && !item.isClosed) ? (
+          {/* ── PRIMARY: Message on Wecycle (in-app thread) ── */}
+          {!item.isClosed && onMessage && (
+            <button
+              onClick={() => {
+                if (!user) { onRequireAuth(); return; }
+                onMessage(
+                  { id: item.user.id, name: item.user.name, initials: item.user.initials, color: item.user.color },
+                  item.id,
+                  item.title,
+                );
+              }}
+              aria-label={`Message ${item.user.name} about ${item.title}`}
+              style={{
+                flex: 1, height: 52, borderRadius: 999,
+                background: 'var(--text-primary)', color: 'var(--bg-base)',
+                border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <MessageCircle size={15} strokeWidth={2} />
+              Message on Wecycle
+            </button>
+          )}
+          {/* ── SECONDARY: Email / WhatsApp fallbacks ── */}
+          {!item.isClosed && !onMessage && (hasBoth ? (
             contactLinks.map(link => (
               <button
                 key={link.channel}
@@ -797,24 +822,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
               </button>
             ))
-          ) : (contactLinks.length === 0 || item.isClosed) ? (
-            /* Seller exposed no contact channel — never show a dead grey CTA.
-               Route to their profile so the viewer can still reach them /
-               browse their other listings. */
-            <button
-              onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
-              aria-label={`View ${item.user.name}'s profile`}
-              style={{
-                flex: 1, height: 52, borderRadius: 999,
-                background: 'var(--text-primary)', color: 'var(--bg-base)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              View seller&rsquo;s profile
-            </button>
-          ) : (
+          ) : contactLinks.length > 0 ? (
             <button
               onClick={() => handleContactClick(contactLinks[0])}
               aria-label={contactLinks[0].ariaLabel}
@@ -830,6 +838,22 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             >
               {contactLinks[0].channel === 'whatsapp' && <WhatsAppGlyph size={15} />}
               {primaryActionLabel}
+            </button>
+          ) : null)}
+          {/* Closed or no contact → profile fallback */}
+          {(item.isClosed || (!onMessage && contactLinks.length === 0)) && (
+            <button
+              onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
+              aria-label={`View ${item.user.name}'s profile`}
+              style={{
+                flex: 1, height: 52, borderRadius: 999,
+                background: 'var(--text-primary)', color: 'var(--bg-base)',
+                border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              View seller&rsquo;s profile
             </button>
           )}
           </>
@@ -878,6 +902,7 @@ interface DesktopLayoutProps {
   onBack: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
+  onMessage?: (otherUser: { id: string; name: string; initials: string; color: string }, listingId?: string, subject?: string) => void;
   contactLinks: ContactLink[];
   primaryActionLabel: string;
   handleContactClick: (link: ContactLink) => void;
@@ -890,7 +915,7 @@ interface DesktopLayoutProps {
 
 function DesktopLayout({
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
-  shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
+  shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront, onMessage,
   contactLinks, primaryActionLabel, handleContactClick, hasBoth,
   canManage, onDelete, isAdmin, editState,
 }: DesktopLayoutProps) {
@@ -1274,29 +1299,26 @@ function DesktopLayout({
                   </button>
                 )
               )
-            ) : (hasBoth && !item.isClosed) ? (
-              contactLinks.map(link => (
-                <button
-                  key={link.channel}
-                  onClick={() => handleContactClick(link)}
-                  aria-label={link.ariaLabel}
-                  style={{
-                    flex: '1 1 220px', minWidth: 0, height: 52, borderRadius: 14,
-                    background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                    color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
-                    border: 'none', cursor: 'pointer',
-                    fontSize: 15, fontWeight: 600,
-                    letterSpacing: '-0.01em',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}
-                >
-                  {link.channel === 'whatsapp' ? <WhatsAppGlyph size={16} /> : <Mail size={16} strokeWidth={2} />}
-                  {link.channel === 'whatsapp' ? `WhatsApp ${item.user.name.split(' ')[0]}` : `Email ${item.user.name.split(' ')[0]}`}
-                </button>
-              ))
-            ) : (contactLinks.length === 0 || item.isClosed) ? (
-              /* No contact channel exposed, or the post is closed — open the
-                 seller's profile rather than showing a dead disabled button. */
+            ) : !item.isClosed && onMessage ? (
+              <button
+                onClick={() => {
+                  onMessage(
+                    { id: item.user.id, name: item.user.name, initials: item.user.initials, color: item.user.color },
+                    item.id, item.title,
+                  );
+                }}
+                aria-label={`Message ${item.user.name} about ${item.title}`}
+                style={{
+                  flex: 1, height: 52, borderRadius: 14,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <MessageCircle size={16} strokeWidth={2} /> Message on Wecycle
+              </button>
+            ) : (item.isClosed || contactLinks.length === 0) ? (
               <button
                 onClick={() => onOpenStorefront?.(item.user)}
                 aria-label={`View ${item.user.name}'s profile`}

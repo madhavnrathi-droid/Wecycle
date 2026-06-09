@@ -25,6 +25,9 @@ import SubmitEventModal from '../components/forms/SubmitEventModal';
 import AlertFormModal from '../components/forms/AlertFormModal';
 import AuthModal from '../components/AuthModal';
 import OnboardingTour, { hasCompletedOnboarding, type TourScreen } from '../components/OnboardingTour';
+import ConversationListScreen from '../components/ConversationListScreen';
+import ChatThread from '../components/ChatThread';
+import { getOrCreateConversation } from '../lib/messaging';
 import { track, EVT } from '../lib/analytics';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
@@ -121,6 +124,28 @@ export default function WecycleApp() {
   /* Sub-screens that take over the viewport. We keep a stack so "back" always
      returns to the previous screen (e.g. Settings → Notifications → back → Settings),
      and entering one directly from the drawer pops back to the main app. */
+  /* ── Messaging state ─────────────────────────── */
+  const [msgScreen, setMsgScreen] = useState<'list' | 'thread' | null>(null);
+  const [msgThread, setMsgThread] = useState<{
+    conversationId: string;
+    otherUser: { id: string; name: string; initials: string; color: string };
+  } | null>(null);
+
+  const openMessages = () => { setMsgThread(null); setMsgScreen('list'); };
+  const openThread = (conversationId: string, otherUser: { id: string; name: string; initials: string; color: string }) => {
+    setMsgThread({ conversationId, otherUser });
+    setMsgScreen('thread');
+  };
+  /** Open (or create) a conversation with a specific user, optionally tied to a listing. */
+  const openConversationWith = async (otherUser: { id: string; name: string; initials: string; color: string }, listingId?: string, subject?: string) => {
+    const convoId = await getOrCreateConversation(otherUser.id, listingId, subject);
+    if (convoId) {
+      openThread(convoId, otherUser);
+    } else {
+      openMessages();
+    }
+  };
+
   type SubScreen = 'settings' | 'notifications' | 'feedback';
   const [subStack, setSubStack] = useState<SubScreen[]>([]);
   const subScreen: SubScreen | null = subStack[subStack.length - 1] ?? null;
@@ -274,6 +299,7 @@ export default function WecycleApp() {
     /* Defer screen switch by one frame so the drawer close animation reads cleanly */
     setTimeout(() => {
       if (id === 'account')   { goToAccount(); return; }
+      if (id === 'messages')  { openMessages(); return; }
       if (id === 'settings')  { setSubStack(['settings']);      return; }
       if (id === 'notifs')    { setSubStack(['notifications']); return; }
       if (id === 'feedback')  { setSubStack(['feedback']);      return; }
@@ -328,6 +354,7 @@ export default function WecycleApp() {
               onBack={() => setOpenItem(null)}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
+              onMessage={(otherUser, listingId, subject) => openConversationWith(otherUser, listingId, subject)}
               /* Owner edits inline (no Edit button — fields are editable
                  in place). Admin gets Delete on any post for moderation. */
               isOwner={ownsItem(openItem)}
@@ -357,6 +384,39 @@ export default function WecycleApp() {
               onOpenItem={(item) => { setOpenStorefront(null); setOpenItem(item); }}
               onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
               onOpenLF={(lf) => { setOpenStorefront(null); setOpenLF(lf); }}
+            />
+          </main>
+        </div>
+      </>
+    );
+  }
+
+  /* ── Messaging screens ── */
+  if (msgScreen === 'thread' && msgThread) {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <ChatThread
+              conversationId={msgThread.conversationId}
+              otherUser={msgThread.otherUser}
+              onBack={() => setMsgScreen('list')}
+            />
+          </main>
+        </div>
+      </>
+    );
+  }
+  if (msgScreen === 'list') {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <ConversationListScreen
+              onBack={() => setMsgScreen(null)}
+              onOpenThread={openThread}
             />
           </main>
         </div>
@@ -654,6 +714,7 @@ export default function WecycleApp() {
               onBack={() => setOpenItem(null)}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
+              onMessage={(otherUser, listingId, subject) => { setOpenItem(null); openConversationWith(otherUser, listingId, subject); }}
               isOwner={ownsItem(openItem)}
               isAdmin={isAdmin}
               onDelete={(ownsItem(openItem) || isAdmin) ? async () => {

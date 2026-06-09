@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Sun, Moon, Monitor,
-  Bell, Shield, Tag, Info,
-  MessageSquare, Globe, EyeOff, Trash2,
+  Bell, BellRing, Shield, Tag, Info,
+  MessageSquare, Globe, EyeOff, Trash2, Loader2,
 } from 'lucide-react';
+import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push';
 import {
   getSettings, saveSettings, onSettingsChange, applyLargerText,
   type ThemeMode, type UserSettings,
@@ -26,8 +27,18 @@ export default function SettingsScreen({
   const { user, isDemo, signOut } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(getSettings());
+  const [pushOn, setPushOn] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const pushAvailable = pushSupported();
 
   useEffect(() => { setMounted(true); }, []);
+
+  /* Hydrate push state once on mount */
+  useEffect(() => {
+    let cancelled = false;
+    isPushEnabled().then(v => { if (!cancelled) setPushOn(v); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     return onSettingsChange(setSettings);
@@ -134,11 +145,43 @@ export default function SettingsScreen({
         </Card>
       </Section>
 
-      {/* ── NOTIFICATIONS LINK ── */}
-      <Section title="Notifications">
+      {/* ── NOTIFICATIONS ── */}
+      <Section title="Notifications" hint={pushAvailable ? undefined : 'Push notifications are not supported in this browser.'}>
+        {pushAvailable && (
+          <Card>
+            <Row
+              label="Push notifications"
+              hint={pushOn ? "You’ll get alerts for saved searches and messages." : 'Enable to get notified when someone matches your saved search or messages you.'}
+              icon={pushOn ? <BellRing size={13} strokeWidth={1.8} /> : undefined}
+            >
+              {pushLoading ? (
+                <Loader2 size={18} strokeWidth={1.8} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-muted)' }} />
+              ) : (
+                <Toggle on={pushOn} onChange={async (v) => {
+                  setPushLoading(true);
+                  try {
+                    if (v) {
+                      const result = await enablePush();
+                      setPushOn(result === 'enabled');
+                      if (result === 'denied') {
+                        window.alert('Notification permission was denied. You can enable it in your browser settings.');
+                      }
+                    } else {
+                      await disablePush();
+                      setPushOn(false);
+                    }
+                  } finally {
+                    setPushLoading(false);
+                  }
+                  fireSettings('notifications', { push: String(v) });
+                }} />
+              )}
+            </Row>
+          </Card>
+        )}
         <LinkCard
           icon={<Bell size={16} strokeWidth={1.8} />}
-          title="Notifications"
+          title="Notification preferences"
           subtitle="Choose channels, categories, and quiet hours"
           onClick={onOpenNotifications}
         />

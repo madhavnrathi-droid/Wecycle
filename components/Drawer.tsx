@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import {
-  X, User, Settings, MessageSquare, Send, Bell,
+  X, User, Settings, MessageSquare, MessageCircle, Send, Bell,
   Heart, Briefcase, LogOut, Moon, Sun, ChevronRight, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
@@ -23,6 +23,7 @@ const SECTIONS: { items: { id: string; label: string; icon: IconCmp; desc?: stri
   {
     items: [
       { id: 'account',  label: 'Account',         icon: User,         desc: 'Profile & community' },
+      { id: 'messages', label: 'Messages',        icon: MessageCircle, desc: 'In-app conversations' },
       { id: 'settings', label: 'Settings',        icon: Settings,     desc: 'Privacy, notifications' },
       { id: 'notifs',   label: 'Notifications',   icon: Bell,         desc: 'Manage alerts' },
     ],
