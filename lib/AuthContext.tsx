@@ -6,6 +6,7 @@ import { supabase } from './supabase';
 import type { Profile } from './api/types';
 import { getDemoSession, clearDemoSession, onDemoSessionChange, type DemoSession, initialsOf } from './demoAuth';
 import { identify as analyticsIdentify, resetIdentity as analyticsReset, track, EVT } from './analytics';
+import { clearBlockCache } from './moderation';
 
 /* Admin allow-list — hard-coded by request. Anyone signed in with one
    of these emails gets isAdmin=true and can delete any post/comment
@@ -128,6 +129,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     track(EVT.sign_out, { is_demo: isDemo });
     analyticsReset();
+    /* Per-account in-memory caches must not leak into the next session on
+       this device (e.g. a different user signing in would inherit the
+       previous user's block list until a refetch). */
+    clearBlockCache();
     if (isDemo) {
       clearDemoSession();
       reset();

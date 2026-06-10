@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Sun, Moon, Monitor,
   Bell, BellRing, Shield, Tag, Info,
-  MessageSquare, Globe, EyeOff, Trash2, Loader2,
+  MessageSquare, Globe, EyeOff, Trash2, Loader2, UserX,
 } from 'lucide-react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push';
+import { getBlockedUsers, unblockUser, onBlocksChange, type BlockedUser } from '../lib/moderation';
 import {
   getSettings, saveSettings, onSettingsChange, applyLargerText,
   type ThemeMode, type UserSettings,
@@ -39,6 +40,17 @@ export default function SettingsScreen({
     let cancelled = false;
     isPushEnabled().then(v => { if (!cancelled) setPushOn(v); });
     return () => { cancelled = true; };
+  }, []);
+
+  /* Blocked users — hydrate on mount and re-fetch when blocks change
+     anywhere in the app (e.g. blocked via a ReportSheet). */
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => { getBlockedUsers().then(v => { if (!cancelled) setBlockedUsers(v); }); };
+    load();
+    const off = onBlocksChange(load);
+    return () => { cancelled = true; off(); };
   }, []);
 
   useEffect(() => {
@@ -244,6 +256,42 @@ export default function SettingsScreen({
               onChange={(v) => setPrivacy({ hideListingsFromSearch: v })}
             />
           </Row>
+        </Card>
+      </Section>
+
+      {/* ── BLOCKED USERS ──
+         The block action lives in each post/profile's Report sheet; this is
+         the management surface to undo it. Always visible so users (and app
+         reviewers) can find where blocks are controlled. */}
+      <Section title="Blocked users" hint="People you've blocked can't message you, and their posts are hidden from your feeds.">
+        <Card>
+          {blockedUsers.length === 0 ? (
+            <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <UserX size={15} strokeWidth={1.8} color="var(--text-muted)" />
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                You haven&rsquo;t blocked anyone.
+              </span>
+            </div>
+          ) : (
+            blockedUsers.map((b, i) => (
+              <div key={b.id}>
+                {i > 0 && <Divider />}
+                <Row label={b.name} hint="Blocked">
+                  <button
+                    className="settings-btn-ghost"
+                    onClick={async () => {
+                      const ok = window.confirm(`Unblock ${b.name}? Their posts and messages become visible again.`);
+                      if (!ok) return;
+                      await unblockUser(b.id);
+                    }}
+                    aria-label={`Unblock ${b.name}`}
+                  >
+                    Unblock
+                  </button>
+                </Row>
+              </div>
+            ))
+          )}
         </Card>
       </Section>
 

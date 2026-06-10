@@ -86,7 +86,8 @@ export async function reportContent(input: ReportInput): Promise<boolean> {
       target_user_id: input.targetUserId ?? null,
       reason: input.reason.slice(0, 60),
       details: input.details ? input.details.slice(0, 1000) : null,
-      status: 'pending',
+      /* status omitted — DB defaults to 'open' (check constraint only
+         allows open/reviewing/actioned/dismissed). */
     } as never);
 
   return !error;
@@ -189,6 +190,38 @@ export async function getBlockedUserIds(): Promise<Set<string>> {
     (data as unknown as Array<{ target_id: string }>).map(r => r.target_id),
   );
   return _cache;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   getBlockedUsers (detailed — for the Settings manager UI)
+   ══════════════════════════════════════════════════════════════════ */
+
+export interface BlockedUser {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+}
+
+/** Blocked users joined with their profile display info. */
+export async function getBlockedUsers(): Promise<BlockedUser[]> {
+  const ids = [...(await getBlockedUserIds())];
+  if (!ids.length || isDemoMode() || !hasSupabaseEnv) return [];
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, initials, avatar_color')
+    .in('id', ids);
+
+  const rows = (data ?? []) as unknown as Array<{
+    id: string; full_name: string | null; initials: string | null; avatar_color: string | null;
+  }>;
+  return rows.map(r => ({
+    id: r.id,
+    name: r.full_name || 'Wecycle member',
+    initials: r.initials || 'W',
+    color: r.avatar_color || '#6C63FF',
+  }));
 }
 
 /* ══════════════════════════════════════════════════════════════════

@@ -20,7 +20,7 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Bell, BellPlus, X, Plus, Sparkles } from 'lucide-react';
 import {
   getSavedSearches, addSavedSearch, removeSavedSearch, onSavedSearchesChange,
-  matchesAnySavedSearch, type SavedSearch,
+  matchesAnySavedSearch, syncSavedSearches, type SavedSearch,
 } from '../lib/savedSearches';
 import type { MarketplaceItem } from '../lib/mockData';
 import { track, EVT } from '../lib/analytics';
@@ -41,6 +41,9 @@ export default function SavedSearchBar({ requests, currentQuery = '', onRunSearc
 
   useEffect(() => {
     setSearches(getSavedSearches());
+    /* Reconcile local mirror ↔ DB: pushes pre-sign-in keywords up so the
+       push-fanout Edge Function can match them, then pulls the server list. */
+    void syncSavedSearches();
     return onSavedSearchesChange(() => setSearches(getSavedSearches()));
   }, []);
 

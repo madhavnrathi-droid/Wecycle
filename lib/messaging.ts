@@ -185,6 +185,23 @@ export async function fetchConversations(): Promise<Conversation[]> {
 
   if (error || !data) return [];
 
+  /* Unread counts — one extra query instead of a nested aggregate (the
+     aggregate join blows up the generated types). RLS already scopes the
+     rows to this user's conversations, so we just tally client-side. */
+  const unreadByConvo = new Map<string, number>();
+  try {
+    const { data: unreadRows } = await (supabase
+      .from('messages' as never)
+      .select('conversation_id' as never)
+      .is('read_at' as never, null as never)
+      .neq('sender_id' as never, user.id as never) as unknown as Promise<{
+        data: Array<{ conversation_id: string }> | null;
+      }>);
+    for (const r of unreadRows ?? []) {
+      unreadByConvo.set(r.conversation_id, (unreadByConvo.get(r.conversation_id) ?? 0) + 1);
+    }
+  } catch { /* unread badges are progressive enhancement — list still renders */ }
+
   return (data as unknown as ConversationRow[]).map(row => {
     const isA = row.user_a === user.id;
     const otherProfile = isA ? row.profile_b : row.profile_a;
@@ -202,7 +219,7 @@ export async function fetchConversations(): Promise<Conversation[]> {
       lastMessage: row.last_message ?? '',
       lastMessageAt: row.last_message_at ?? row.created_at,
       lastSenderId: row.last_sender_id ?? '',
-      unreadCount: 0, /* computed separately if needed */
+      unreadCount: unreadByConvo.get(row.id) ?? 0,
       listingId: row.listing_id,
     };
   });

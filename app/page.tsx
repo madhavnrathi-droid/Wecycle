@@ -299,7 +299,12 @@ export default function WecycleApp() {
     /* Defer screen switch by one frame so the drawer close animation reads cleanly */
     setTimeout(() => {
       if (id === 'account')   { goToAccount(); return; }
-      if (id === 'messages')  { openMessages(); return; }
+      if (id === 'messages')  {
+        /* Inbox is meaningless signed-out — route to auth first. */
+        if (!user && !isDemo) { setModal('auth'); return; }
+        openMessages();
+        return;
+      }
       if (id === 'settings')  { setSubStack(['settings']);      return; }
       if (id === 'notifs')    { setSubStack(['notifications']); return; }
       if (id === 'feedback')  { setSubStack(['feedback']);      return; }
