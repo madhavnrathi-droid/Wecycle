@@ -360,6 +360,8 @@ export default function WecycleApp() {
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
               onMessage={(otherUser, listingId, subject) => openConversationWith(otherUser, listingId, subject)}
+              onOpenItem={setOpenItem}
+              onOpenLF={setOpenLF}
               /* Owner edits inline (no Edit button — fields are editable
                  in place). Admin gets Delete on any post for moderation. */
               isOwner={ownsItem(openItem)}
@@ -720,6 +722,8 @@ export default function WecycleApp() {
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
               onMessage={(otherUser, listingId, subject) => { setOpenItem(null); openConversationWith(otherUser, listingId, subject); }}
+              onOpenItem={setOpenItem}
+              onOpenLF={(lf) => { setOpenItem(null); setOpenLF(lf); }}
               isOwner={ownsItem(openItem)}
               isAdmin={isAdmin}
               onDelete={(ownsItem(openItem) || isAdmin) ? async () => {

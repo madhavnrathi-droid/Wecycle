@@ -8,6 +8,8 @@ import { resolveItemMedia, getAvatar } from '../lib/photos';
 import PhotoCarousel from './PhotoCarousel';
 import OnlineBadge from './OnlineBadge';
 import CommentsSection from './CommentsSection';
+import RelatedShelf from './RelatedShelf';
+import type { LostItem } from '../lib/mockData';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, itemAction, actionLabel, type ContactLink } from '../lib/contactUser';
@@ -32,6 +34,10 @@ interface ItemDetailScreenProps {
   onOpenStorefront?: (user: User) => void;
   /** Open an in-app message thread with the item owner. */
   onMessage?: (otherUser: { id: string; name: string; initials: string; color: string }, listingId?: string, subject?: string) => void;
+  /** Jump to another listing from the related-items shelf at the bottom. */
+  onOpenItem?: (item: MarketplaceItem) => void;
+  /** Jump to a Lost & Found item from the sponsored slot in the related shelf. */
+  onOpenLF?: (item: LostItem & { photoUrls?: string[] }) => void;
   /** When the viewer owns this post, inline editing turns on (fields become
    *  inputs in place, dirty-state CTAs replace Delete). No standalone Edit
    *  button — the post detail IS the editor. */
@@ -55,7 +61,7 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onMessage, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onMessage, onOpenItem, onOpenLF, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
   const [reportOpen, setReportOpen] = useState(false);
@@ -306,6 +312,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         onRequireAuth={onRequireAuth}
         onOpenStorefront={onOpenStorefront}
         onMessage={onMessage}
+        onOpenItem={onOpenItem}
+        onOpenLF={onOpenLF}
         contactLinks={contactLinks}
         primaryActionLabel={primaryActionLabel}
         handleContactClick={handleContactClick}
@@ -629,6 +637,18 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
       </section>
 
+      {/* ── RELATED SHELF (Amazon-style rails) ── */}
+      {(onOpenItem || onOpenLF) && (
+        <div style={{ marginTop: 28, paddingBottom: 100 /* clear of action bar */ }}>
+          <RelatedShelf
+            item={item}
+            onOpenItem={(it) => onOpenItem?.(it)}
+            onOpenLF={(lf) => onOpenLF?.(lf)}
+            onOpenSeller={onOpenStorefront ? () => onOpenStorefront(item.user) : undefined}
+          />
+        </div>
+      )}
+
       {/* ── ACTION BAR ── */}
       <section style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
@@ -912,6 +932,8 @@ interface DesktopLayoutProps {
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
   onMessage?: (otherUser: { id: string; name: string; initials: string; color: string }, listingId?: string, subject?: string) => void;
+  onOpenItem?: (item: MarketplaceItem) => void;
+  onOpenLF?: (item: LostItem & { photoUrls?: string[] }) => void;
   contactLinks: ContactLink[];
   primaryActionLabel: string;
   handleContactClick: (link: ContactLink) => void;
@@ -926,6 +948,7 @@ interface DesktopLayoutProps {
 function DesktopLayout({
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront, onMessage,
+  onOpenItem, onOpenLF,
   contactLinks, primaryActionLabel, handleContactClick, hasBoth,
   canManage, onDelete, isAdmin, isOwner, editState,
 }: DesktopLayoutProps) {
@@ -1447,6 +1470,20 @@ function DesktopLayout({
           </div>
         </div>
       </div>
+
+      {/* ── RELATED SHELF (Amazon-style rails — desktop variant spans full width
+           below the photo+info two-column grid) ── */}
+      {(onOpenItem || onOpenLF) && (
+        <div style={{ marginTop: 32 }}>
+          <RelatedShelf
+            item={item}
+            onOpenItem={(it) => onOpenItem?.(it)}
+            onOpenLF={(lf) => onOpenLF?.(lf)}
+            onOpenSeller={onOpenStorefront ? () => onOpenStorefront(item.user) : undefined}
+          />
+        </div>
+      )}
+
       <ReportSheet
         open={reportOpen}
         onClose={() => setReportOpen(false)}

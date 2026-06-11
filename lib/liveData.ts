@@ -95,6 +95,7 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     title: row.title,
     description: row.description ?? '',
     category: row.category?.label ?? row.category_id ?? 'Other',
+    categoryId: row.category_id ?? undefined,
     listingType: row.listing_type,
     price: row.price ?? undefined,
     condition: row.condition,
@@ -998,9 +999,157 @@ export async function markLostFoundResolved(id: string) {
 
 /** Bump a listing's view counter (fire-and-forget — never blocks the UI). */
 export function incrementListingView(id: string) {
+  /* Append to localStorage recently-viewed regardless of backend, so the
+     "Recently viewed" rail still works in demo and signed-out. */
+  pushRecentlyViewed(id);
   if (!hasSupabaseEnv) return;
   /* SECURITY DEFINER RPC — viewers can't UPDATE the row directly. */
   supabase.rpc('rpc_increment_listing_view', { _listing_id: id }).then(() => {}, () => {});
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RECENTLY VIEWED (localStorage-only, per device)
+   ══════════════════════════════════════════════════════════════════ */
+
+const RECENTLY_VIEWED_KEY = 'wecycle.recentlyViewed.v1';
+const RECENTLY_VIEWED_CAP = 30;
+
+function pushRecentlyViewed(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(RECENTLY_VIEWED_KEY);
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    const list = Array.isArray(arr) ? arr : [];
+    /* Dedupe + most-recent-first, cap at N. */
+    const next = [id, ...list.filter(x => x !== id)].slice(0, RECENTLY_VIEWED_CAP);
+    localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(next));
+  } catch { /* quota / private mode — fail soft */ }
+}
+
+function getRecentlyViewedIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(RECENTLY_VIEWED_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RELATED-ITEMS FETCHERS — Amazon-style detail-page rails
+   ──────────────────────────────────────────────────────────────────
+   Each fetcher returns 0..limit MarketplaceItems. All return [] in demo
+   mode / when Supabase isn't configured so the orchestrator can just
+   skip the rail when empty (per the user spec — no mock content).
+   ══════════════════════════════════════════════════════════════════ */
+
+/** More listings from the same seller (excluding the current one). */
+export async function fetchSellerListings(
+  userId: string, excludeId: string, limit = 8,
+): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv || !userId) return [];
+  const { data, error } = await supabase
+    .from('listings')
+    .select(SELECT_WITH_JOINS)
+    .eq('user_id', userId)
+    .neq('id', excludeId)
+    .in('status', ['active'])
+    .order('posted_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
+}
+
+/** Similar listings in the same category (excluding the current + same seller). */
+export async function fetchSimilarListings(
+  categoryId: string | null, excludeId: string, excludeUserId: string, limit = 10,
+): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv || !categoryId) return [];
+  const { data, error } = await supabase
+    .from('listings')
+    .select(SELECT_WITH_JOINS)
+    .eq('category_id', categoryId)
+    .neq('id', excludeId)
+    .neq('user_id', excludeUserId)
+    .in('status', ['active'])
+    .order('posted_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
+}
+
+/** Free items in the community (listing_type = 'free'). */
+export async function fetchFreeListings(
+  excludeId: string, limit = 10,
+): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv) return [];
+  const { data, error } = await supabase
+    .from('listings')
+    .select(SELECT_WITH_JOINS)
+    .eq('listing_type', 'free')
+    .neq('id', excludeId)
+    .in('status', ['active'])
+    .order('posted_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
+}
+
+/** Listings the user recently tapped (read from localStorage, fetched from DB
+ *  in one shot, returned in viewed-order so the most recent sits leftmost.
+ *  Skips the currently-open item and removed items. */
+export async function fetchRecentlyViewedListings(
+  excludeId: string, limit = 10,
+): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv) return [];
+  const ids = getRecentlyViewedIds().filter(id => id !== excludeId).slice(0, limit);
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from('listings')
+    .select(SELECT_WITH_JOINS)
+    .in('id', ids)
+    .in('status', ['active', 'completed']);
+  if (error || !data) return [];
+  const items = notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
+  /* Restore viewed-order from the localStorage list — the .in() query
+     comes back in arbitrary order. */
+  const byId = new Map(items.map(it => [it.id, it]));
+  return ids.map(id => byId.get(id)).filter((it): it is MarketplaceItem => !!it);
+}
+
+/** Open Lost & Found posts — rendered as native sponsored slots inside
+ *  the related shelf. Random sample of recent open items so the same 4
+ *  don't appear on every product page. */
+export async function fetchLostFoundForAds(limit = 6): Promise<(LostItem & { photoUrls?: string[] })[]> {
+  if (!hasSupabaseEnv) return [];
+  /* Pull a wider pool than we need, then shuffle client-side so each
+     product page surfaces a slightly different mix. */
+  const pool = Math.max(limit * 3, 18);
+  const { data, error } = await (supabase
+    .from('lost_found_reports' as never)
+    .select(LF_SELECT as never)
+    .in('status' as never, ['lost', 'found'] as never)
+    .order('posted_at' as never, { ascending: false })
+    .limit(pool) as unknown as Promise<{ data: unknown[] | null; error: unknown }>);
+  if (error || !data) return [];
+  const rows = (data as unknown as LostFoundRowLite[]).map(mapLostFoundRow);
+  /* Fisher-Yates would be cleaner but a single sort-by-random is plenty for
+     a 6-item ad rail. */
+  return rows
+    .map(r => ({ r, k: hashStr(r.id) }))
+    .sort((a, b) => a.k - b.k)
+    .slice(0, limit)
+    .map(x => x.r);
+}
+
+/* Deterministic per-id shuffle key — same item bucket stays stable across
+   re-mounts of the same page but varies across product pages because the
+   pool composition changes. (Date-of-day salt to refresh once a day.) */
+function hashStr(s: string): number {
+  const salt = Math.floor((typeof performance !== 'undefined' ? Date.now() : 0) / 86_400_000);
+  let h = salt | 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
 }
 
 /** Toggle a save on a listing for the signed-in user. Returns the new state. */

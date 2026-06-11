@@ -109,6 +109,9 @@ export interface MarketplaceItem {
   title: string;
   description: string;
   category: string;
+  /** DB category id (UUID). Optional because mock fixtures only have labels;
+   *  used by the related-items shelf to find listings in the same category. */
+  categoryId?: string;
   listingType: 'free' | 'swap' | 'borrow' | 'sell';
   price?: number;
   condition: 'like_new' | 'good' | 'fair';
