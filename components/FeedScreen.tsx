@@ -25,6 +25,7 @@ import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
+import LiveCounter from './LiveCounter';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -373,15 +374,18 @@ export default function FeedScreen({
       {/* ── GREETING + MARKETING BANNER + DESKTOP-INLINE SEARCH ── */}
       <section className="feed-greeting-row" style={{ padding: '14px 20px 16px' }}>
         <div className="feed-greeting-text" style={{ minWidth: 0 }}>
-          <h1 style={{
-            margin: 0,
-            fontSize: 26, fontWeight: 600,
-            letterSpacing: '-0.03em',
-            color: 'var(--text-primary)',
-            lineHeight: 1.15,
-          }} suppressHydrationWarning>
-            Hi, {mounted ? greetingName : 'there'} <span aria-hidden="true">👋</span>
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h1 style={{
+              margin: 0,
+              fontSize: 26, fontWeight: 600,
+              letterSpacing: '-0.03em',
+              color: 'var(--text-primary)',
+              lineHeight: 1.15,
+            }} suppressHydrationWarning>
+              Hi, {mounted ? greetingName : 'there'} <span aria-hidden="true">👋</span>
+            </h1>
+            {mounted && <LiveCounter />}
+          </div>
           <p style={{
             margin: '4px 0 0',
             fontSize: 13, color: 'var(--text-muted)',

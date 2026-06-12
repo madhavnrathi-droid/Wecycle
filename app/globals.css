@@ -1437,35 +1437,10 @@ body {
 /* Same colour-code logic applied to event + L&F cards on the home feed
    (the "All" tab) so visitors can tell post-types apart at a glance. We
    piggyback on the same data-stroke attribute. */
+/* Coloured bounding rings removed per design feedback — badges alone
+   carry the post-type signal now. `data-stroke` is left attached to the
+   element by the renderers, but renders nothing. */
 .feed-card[data-stroke] { position: relative; }
-.feed-card[data-stroke]::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  border: 2px solid transparent;
-  pointer-events: none;
-  z-index: 5;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
-}
-.feed-card[data-stroke="event"]::after {
-  border-color: #A855F7;
-  box-shadow: 0 0 0 1px rgba(168,85,247,0.20) inset;
-}
-.feed-card[data-stroke="lostfound"]::after {
-  border-color: #F58400;
-  box-shadow: 0 0 0 1px rgba(245,132,0,0.22) inset;
-}
-/* Marketplace + requests both ring green on the All-tab feed — matches
-   the inventory ring system so post-type is consistently colour-coded. */
-.feed-card[data-stroke="marketplace"]::after {
-  border-color: #22C55E;
-  box-shadow: 0 0 0 1px rgba(34,197,94,0.20) inset;
-}
-.feed-card[data-stroke="request"]::after {
-  border-color: #16A34A;
-  box-shadow: 0 0 0 1px rgba(22,163,74,0.20) inset;
-}
 
 /* ── Closed (sold / claimed / fulfilled) listing ──
    The post stays in the feed, dimmed, with a clear "stamp" so a sold item
@@ -2774,21 +2749,34 @@ body {
   z-index: 100;
   animation: fade-in 0.18s ease;
 }
+/* The picker sheet now appears at the TOP of the open modal panel,
+   not at the bottom of the viewport — so users don't have to scroll
+   down to find the source options after tapping "Add". The sheet
+   slides DOWN from the top edge instead of UP from the bottom. */
 .photo-source-sheet {
-  position: fixed; left: 50%; bottom: 0;
+  position: fixed; left: 50%; top: env(safe-area-inset-top, 0px);
   transform: translateX(-50%);
   width: 100%; max-width: 430px;
   background: var(--bg-card);
-  border-top-left-radius: 24px; border-top-right-radius: 24px;
-  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 16px;
   z-index: 101;
-  animation: slide-up 0.22s var(--ease-smooth);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+  animation: slide-down 0.22s var(--ease-smooth);
+  display: flex; flex-direction: column;
+}
+@keyframes slide-down {
+  from { transform: translate(-50%, -100%); }
+  to   { transform: translate(-50%, 0); }
 }
 .photo-source-sheet .grabber {
+  /* Pull-tab still helps the user grok "I can dismiss this", just
+     positioned at the bottom of the top-anchored sheet now. */
   width: 38px; height: 4px;
   background: var(--border-default);
   border-radius: 999px;
-  margin: 0 auto 12px;
+  margin: 14px auto 0;
+  order: 99;
 }
 .photo-source-option {
   all: unset; display: flex; align-items: center; gap: 14px;
@@ -2826,6 +2814,71 @@ body {
 @keyframes pulse-dot {
   0%, 100% { opacity: 0.5; }
   50%      { opacity: 1; }
+}
+
+/* ── Background-removal toggle pill ──────────── */
+
+.photo-bg-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+/* The pill itself — looks like an Instagram filter chip. */
+.photo-bg-toggle {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-default);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.photo-bg-toggle:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+.photo-bg-toggle--on {
+  border-color: var(--accent-green, #22c55e);
+  color: var(--accent-green, #22c55e);
+  background: color-mix(in srgb, var(--accent-green, #22c55e) 10%, transparent);
+}
+.photo-bg-toggle-beta {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-left: 2px;
+}
+.photo-bg-toggle-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  flex: 1;
+}
+
+/* Placeholder spinner tile while background removal is running */
+.photo-picker-tile--processing {
+  border-style: dashed;
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Loader2 spin — must match the style prop in JSX */
+@keyframes spin-loader {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 /* ═══════════════════════════════════════════════

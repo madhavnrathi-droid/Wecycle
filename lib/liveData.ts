@@ -237,6 +237,7 @@ export interface NewListingInput {
   listingType: 'free' | 'sell' | 'borrow' | 'swap';
   price?: number;
   media: CompressedMedia[];
+  notifyOnEngagement?: boolean;
 }
 
 export async function createListingWithMedia(input: NewListingInput): Promise<MarketplaceItem> {
@@ -278,7 +279,8 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       video_urls: videoUrls,
       tags: [],
       status: 'active',
-    })
+      notify_on_engagement: input.notifyOnEngagement ?? true,
+    } as never)
     .select(SELECT_WITH_JOINS)
     .single();
 
@@ -301,6 +303,9 @@ export interface NewRequestInput {
    *  slider in PostRequestModal lets users pick 24–168 in 1h increments. */
   durationHours?: number;
   media: CompressedMedia[];
+  /** When true, the backend will push a notification to the poster when
+   *  someone offers to fulfil the request. Optional — defaults to false. */
+  notifyOnEngagement?: boolean;
 }
 
 async function resolveCommunityId(userId: string): Promise<string> {
@@ -339,6 +344,7 @@ export async function createRequest(input: NewRequestInput) {
     photo_urls: photoUrls,
     video_urls: videoUrls,
     expires_at: expiresAt,
+    notify_on_engagement: input.notifyOnEngagement ?? true,
   } as never);
   if (error) throw error;
   notifyPostsChanged();
@@ -403,6 +409,8 @@ export interface NewLostFoundInput {
   lastSeen?: string;
   reward?: string;
   media: CompressedMedia[];
+  /** When true, notify the poster when someone responds. Optional. */
+  notifyOnEngagement?: boolean;
 }
 
 export async function createLostFound(input: NewLostFoundInput) {
@@ -426,7 +434,8 @@ export async function createLostFound(input: NewLostFoundInput) {
     reward: input.reward?.trim() || null,
     photo_urls: photoUrls,
     video_urls: videoUrls,
-  });
+    notify_on_engagement: input.notifyOnEngagement ?? true,
+  } as never);
   if (error) throw error;
   notifyPostsChanged();
 }
@@ -783,6 +792,16 @@ export async function repostLostFound(id: string, patch?: EditLostFoundPatch) {
   const { error } = await supabase
     .from('lost_found_reports')
     .update({ posted_at: new Date().toISOString() } as never)
+    .eq('id', id);
+  if (error) throw error;
+  notifyPostsChanged();
+}
+
+export async function updateLostFoundMedia(id: string, photoUrls: string[]) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { error } = await supabase
+    .from('lost_found_reports')
+    .update({ photo_urls: photoUrls, updated_at: new Date().toISOString() } as never)
     .eq('id', id);
   if (error) throw error;
   notifyPostsChanged();
@@ -1150,6 +1169,28 @@ function hashStr(s: string): number {
   let h = salt | 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return h;
+}
+
+/** Generic fallback: most-recent active listings, excluding the current item
+ *  and (optionally) a specific user. No category or type filter — used as the
+ *  safety net when specific rails return empty. */
+export async function fetchAnyOtherListings(
+  excludeId: string,
+  excludeUserId?: string,
+  limit = 10,
+): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv) return [];
+  let q = supabase
+    .from('listings')
+    .select(SELECT_WITH_JOINS)
+    .neq('id', excludeId)
+    .in('status', ['active'])
+    .order('posted_at', { ascending: false })
+    .limit(limit);
+  if (excludeUserId) q = (q as typeof q).neq('user_id', excludeUserId) as never;
+  const { data, error } = await (q as unknown as Promise<{ data: unknown[] | null; error: unknown }>);
+  if (error || !data) return [];
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
 }
 
 /** Toggle a save on a listing for the signed-in user. Returns the new state. */

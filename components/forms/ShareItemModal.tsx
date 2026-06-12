@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Gift, Tag, MapPin } from 'lucide-react';
+import { Gift, Tag, MapPin, Bell } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoCarousel from '../PhotoCarousel';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
@@ -53,6 +53,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     location: '', pricing: 'free', photos: [],
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ShareItemForm, string>>>({});
+  const [notifyOnEngagement, setNotifyOnEngagement] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const pickerRef = useRef<PhotoPickerHandle>(null);
@@ -73,9 +74,12 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     return Object.keys(e).length === 0;
   };
 
-  const reset = () => setForm({
-    title: '', category: '', condition: '', description: '', location: '', pricing: 'free', photos: [],
-  });
+  const reset = () => {
+    setForm({
+      title: '', category: '', condition: '', description: '', location: '', pricing: 'free', photos: [],
+    });
+    setNotifyOnEngagement(true);
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -95,6 +99,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           listingType: form.pricing === 'sell' ? 'sell' : 'free',
           price: form.price,
           media: pickerRef.current?.getMedia() ?? [],
+          notifyOnEngagement,
         });
       } else {
         /* Demo path — no backend; just simulate latency. */
@@ -301,6 +306,14 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           )}
         </fieldset>
 
+        {/* ── Engagement notification toggle ── */}
+        <NotifyToggle
+          checked={notifyOnEngagement}
+          onChange={setNotifyOnEngagement}
+          label="Alert me when someone comments"
+          onClose={onClose}
+        />
+
         {submitError && (
           <div role="alert" style={{
             marginTop: 4, padding: '10px 12px',
@@ -316,6 +329,85 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
 
       </form>
     </Modal>
+  );
+}
+
+/* ── Engagement notification toggle (shared across post modals) ─────────────
+   A simple inline toggle row with a Bell icon. No Radix dependency — built
+   from a native <input type="checkbox"> styled as a pill switch so it matches
+   the existing form-row visual language without pulling in a new library. */
+function NotifyToggle({
+  checked, onChange, label, onClose,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  onClose: () => void;
+}) {
+  return (
+    <div style={{
+      margin: '18px 0 4px',
+      padding: '12px 14px',
+      background: 'var(--bg-inset)',
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--border-subtle, rgba(255,255,255,0.07))',
+    }}>
+      {/* Row: icon + label + pill switch */}
+      <label style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        cursor: 'pointer', userSelect: 'none',
+      }}>
+        <Bell size={15} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+          {label}
+        </span>
+        {/* Pill toggle — CSS-only, no JS beyond the onChange */}
+        <span style={{ position: 'relative', display: 'inline-block', width: 40, height: 22, flexShrink: 0 }}>
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={e => onChange(e.target.checked)}
+            aria-label={label}
+            style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+          />
+          <span style={{
+            position: 'absolute', inset: 0,
+            borderRadius: 999,
+            background: checked ? 'var(--accent-green, #A8DD00)' : 'var(--border-subtle, rgba(255,255,255,0.15))',
+            transition: 'background 200ms',
+            cursor: 'pointer',
+          }} onClick={() => onChange(!checked)} />
+          <span style={{
+            position: 'absolute',
+            top: 3, left: checked ? 21 : 3,
+            width: 16, height: 16,
+            borderRadius: '50%',
+            background: '#fff',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            transition: 'left 200ms cubic-bezier(.2,.8,.2,1)',
+            pointerEvents: 'none',
+          }} />
+        </span>
+      </label>
+
+      {/* Hint */}
+      <p style={{ margin: '6px 0 0 25px', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        {"We'll send a push notification if you've turned that on in Settings, or an email otherwise."}
+        {' '}
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            background: 'none', border: 'none', padding: 0,
+            color: 'var(--accent-primary, #A8DD00)',
+            fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            textDecoration: 'underline', textDecorationStyle: 'dotted',
+          }}
+        >
+          Manage in Settings → Notifications
+        </button>
+      </p>
+    </div>
   );
 }
 

@@ -125,6 +125,10 @@ async function compressPhoto(file: File, opts: CompressOptions): Promise<Compres
     return passthroughPhoto(file);
   }
 
+  /* Transparent PNGs (e.g. from background-removal) must stay as PNG so the
+   * alpha channel is preserved — JPEG discards transparency entirely. */
+  const hasAlpha = file.type === 'image/png';
+
   try {
     const img = await loadBitmap(file);
     const { width: srcW, height: srcH } = img;
@@ -135,14 +139,20 @@ async function compressPhoto(file: File, opts: CompressOptions): Promise<Compres
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext('2d', { alpha: false });
+    /* Keep alpha context for transparent images; disable for everything else
+     * (saves memory and avoids accidental premult blending artefacts). */
+    const ctx = canvas.getContext('2d', { alpha: hasAlpha });
     if (!ctx) return passthroughPhoto(file);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, w, h);
 
+    const [outMime, outQuality] = hasAlpha
+      ? (['image/png', undefined] as const)
+      : (['image/jpeg', quality] as const);
+
     const blob = await new Promise<Blob | null>(resolve =>
-      canvas.toBlob(resolve, 'image/jpeg', quality),
+      canvas.toBlob(resolve, outMime, outQuality),
     );
     if (!blob || blob.size >= originalBytes) return passthroughPhoto(file, { width: w, height: h });
 

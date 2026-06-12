@@ -10,6 +10,9 @@
  *     pointer events with HTML5 drag-and-drop fallback.
  *   - First photo is always the "Cover" (first in array).
  *   - Object URLs are tracked so we can revoke them on unmount.
+ *   - Optional "Remove background" toggle — powered by @imgly/background-removal
+ *     (ONNX U2-Net via WebAssembly, Apache 2.0, model loaded from CDN on first
+ *     use, NOT bundled). Videos always pass through unchanged.
  *
  * Consumers receive the current array of object URLs via `onChange`; they
  * stay in charge of where to send the blobs (Supabase storage etc.).
@@ -20,7 +23,7 @@
 import {
   useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef,
 } from 'react';
-import { Plus, X, Camera, ImagePlus, Play } from 'lucide-react';
+import { Plus, X, Camera, ImagePlus, Play, Scissors, Loader2 } from 'lucide-react';
 import {
   compressMediaBatch, MAX_VIDEO_BYTES, MediaTooLargeError,
   type CompressedMedia,
@@ -61,9 +64,15 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(0); /* number of files currently compressing */
 
+  /* Per-tile processing state: count of files currently being background-removed.
+     We show this many spinner placeholder tiles in the grid. */
+  const [processingCount, setProcessingCount] = useState(0);
+
+  /* Background-removal toggle — default OFF */
+  const [removeBg, setRemoveBg] = useState(false);
+
   /* Two inputs — one per source. Both accept image + video; the OS picker
-     then surfaces the right capture/library UI. Less cognitive load than
-     forcing the user to pre-decide photo vs video before opening the picker. */
+     then surfaces the right capture/library UI. */
   const libraryRef = useRef<HTMLInputElement>(null);
   const cameraRef  = useRef<HTMLInputElement>(null);
 
@@ -98,6 +107,29 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
     },
   }), [photos]);
 
+  /* ── background removal ────────────────────── */
+
+  /** Strip the background from a single image File.
+   *  Returns a transparent-PNG File on success, or the original File on failure.
+   *  The library is lazy-imported only when the user actually enables the toggle,
+   *  so users who never use this feature pay zero first-paint cost. */
+  const stripBackground = async (file: File): Promise<File> => {
+    try {
+      const { removeBackground } = await import('@imgly/background-removal');
+      const resultBlob = await removeBackground(file);
+      /* removeBackground returns a Blob — wrap as File so mediaCompression
+         can inspect .type and detect the alpha channel. */
+      return new File([resultBlob], file.name.replace(/\.[^.]+$/, '.png'), {
+        type: 'image/png',
+        lastModified: Date.now(),
+      });
+    } catch (err) {
+      console.warn('[PhotoPicker] background removal failed, using original', err);
+      setError("Couldn't remove background — keeping the original.");
+      return file;
+    }
+  };
+
   /* ── adding ────────────────────────────────── */
 
   const remaining = Math.max(0, max - photos.length);
@@ -107,9 +139,31 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
     const toProcess = Array.from(files).slice(0, remaining);
     if (toProcess.length === 0) return;
 
+    const photoFiles = toProcess.filter(f => !f.type.startsWith('video/'));
+    const bgCount = removeBg ? photoFiles.length : 0;
+
+    if (bgCount > 0) setProcessingCount(c => c + bgCount);
     setBusy(prev => prev + toProcess.length);
+
     try {
-      const settled = await compressMediaBatch(toProcess);
+      let processedFiles: File[] = toProcess;
+
+      if (removeBg && photoFiles.length > 0) {
+        /* Run removals sequentially to avoid saturating WASM threads. */
+        const processedPhotos: File[] = [];
+        for (const f of photoFiles) {
+          const result = await stripBackground(f);
+          processedPhotos.push(result);
+          setProcessingCount(c => Math.max(0, c - 1));
+        }
+        /* Reconstruct array in original order. */
+        let pi = 0;
+        processedFiles = toProcess.map(f =>
+          f.type.startsWith('video/') ? f : processedPhotos[pi++],
+        );
+      }
+
+      const settled = await compressMediaBatch(processedFiles);
       const accepted: CompressedMedia[] = [];
       const errs: string[] = [];
       settled.forEach((res, idx) => {
@@ -129,6 +183,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
       if (errs.length) setError(errs.join(' · '));
     } finally {
       setBusy(prev => Math.max(0, prev - toProcess.length));
+      if (bgCount > 0) setProcessingCount(0); /* safety reset */
     }
   };
 
@@ -154,7 +209,6 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
 
   const onDragStart = (idx: number) => (e: React.DragEvent) => {
     setDragIdx(idx);
-    /* Firefox needs this set for drag to fire */
     e.dataTransfer.setData('text/plain', String(idx));
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -188,19 +242,19 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   const onAddClick = () => {
     if (defaultSource === 'camera')  { openCamera();  return; }
     if (defaultSource === 'library') { openLibrary(); return; }
-    /* On phones with a camera, show the choice. On desktop, just open file picker. */
     const hasCamera = typeof navigator !== 'undefined' &&
       'mediaDevices' in navigator &&
       !!navigator.mediaDevices?.getUserMedia;
-    /* On a touch device with a camera, show both choices. Desktop browsers
-       almost always lack a real camera — just open the file picker. */
     if (hasCamera) setSheetOpen(true);
     else openLibrary();
   };
 
   /* ── render ───────────────────────────────── */
 
+  const isProcessing = processingCount > 0 || busy > 0;
+
   const status = useMemo(() => {
+    if (processingCount > 0) return `Removing background on ${processingCount} photo${processingCount === 1 ? '' : 's'}…`;
     if (busy > 0) return `Compressing ${busy} item${busy === 1 ? '' : 's'}…`;
     if (photos.length === 0) return null;
     const types = photos.map(u => mediaRef.current.get(u)?.kind ?? 'photo');
@@ -213,13 +267,37 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
           ? `${videoCount} video${videoCount === 1 ? '' : 's'}`
           : `${photoCount} photo${photoCount === 1 ? '' : 's'}`;
     return `${summary} of ${max} · ${label}`;
-  }, [busy, photos, max, label]);
+  }, [processingCount, busy, photos, max, label]);
+
+  /* Shared toggle pill — rendered both inline and inside the source sheet */
+  const BgTogglePill = (
+    <button
+      type="button"
+      className={`photo-bg-toggle${removeBg ? ' photo-bg-toggle--on' : ''}`}
+      onClick={() => setRemoveBg(v => !v)}
+      aria-pressed={removeBg}
+    >
+      <Scissors size={13} strokeWidth={2} />
+      <span>Remove background</span>
+      {removeBg && <span className="photo-bg-toggle-beta">Beta</span>}
+    </button>
+  );
 
   return (
     <>
+      {/* Remove-background toggle pill — visible even before photos are added */}
+      <div className="photo-bg-toggle-row">
+        {BgTogglePill}
+        {removeBg && (
+          <span className="photo-bg-toggle-hint">
+            Best on clean subjects. Adds 2–5 sec per photo.
+          </span>
+        )}
+      </div>
+
       {status && (
         <div className="photo-picker-status">
-          {busy > 0 && <span className="dot" aria-hidden="true" />}
+          {isProcessing && <span className="dot" aria-hidden="true" />}
           {status}
         </div>
       )}
@@ -279,7 +357,18 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
           );
         })}
 
-        {photos.length < max && (
+        {/* Spinner placeholder tiles while background removal is running */}
+        {Array.from({ length: processingCount }).map((_, i) => (
+          <div key={`processing-${i}`} className="photo-picker-tile photo-picker-tile--processing">
+            <Loader2
+              size={22}
+              strokeWidth={2}
+              style={{ animation: 'spin-loader 0.9s linear infinite', color: 'var(--text-secondary)' }}
+            />
+          </div>
+        ))}
+
+        {photos.length + processingCount < max && processingCount === 0 && (
           <button
             type="button"
             className="photo-picker-tile"
@@ -295,10 +384,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         )}
       </div>
 
-      {/* Two hidden inputs — library and camera. Both accept image + video
-          (when allowVideo), so the user only has to pick *where* the media
-          comes from. The OS picker handles photo vs video selection within
-          each. */}
+      {/* Two hidden inputs — library and camera. */}
       <input
         ref={libraryRef}
         type="file"
@@ -316,7 +402,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
       />
 
-      {/* Soft error toast — invalid file (e.g. video over 5 MB) */}
+      {/* Soft error toast */}
       {error && (
         <div role="alert" style={{
           marginTop: 8, padding: '8px 12px',
@@ -358,7 +444,19 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
               </div>
             </button>
 
-            {/* Size hint — universal, sits below both options. */}
+            {/* Remove-background toggle inside the sheet too */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 8px 0', flexWrap: 'wrap',
+            }}>
+              {BgTogglePill}
+              {removeBg && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, flex: 1 }}>
+                  Best on clean subjects. Adds 2–5 sec per photo.
+                </span>
+              )}
+            </div>
+
             <p style={{
               margin: '6px 12px 0',
               fontSize: 11,

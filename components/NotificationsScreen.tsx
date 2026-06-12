@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, Bell, Volume2, Mail, Phone,
   MessageCircle, Sparkles, CalendarDays, Store, Search,
-  Megaphone, Newspaper, Info,
+  Megaphone, Newspaper, Info, MessageSquare, Reply,
+  ShieldCheck, MapPin,
 } from 'lucide-react';
 import {
   getSettings, saveSettings, onSettingsChange,
@@ -26,7 +27,6 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => onSettingsChange(setSettings), []);
 
-  /* Channel gating — toggle is dead until contact info exists. */
   const hasEmail = useMemo(() => {
     return !!(
       (profile as { email?: string | null } | null)?.email ||
@@ -35,7 +35,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
   }, [profile, user]);
   const hasPhone = useMemo(() => !!profile?.phone, [profile]);
 
-  /* Browser push permission — separate from our "in-app" toggle */
+  /* Browser push permission */
   const [pushPerm, setPushPerm] = useState<NotificationPermission | 'unsupported'>(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
     return Notification.permission;
@@ -67,9 +67,6 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
   const ch = settings.notifications.channels;
   const cat = settings.notifications.categories;
   const qh = settings.notifications.quietHours;
-
-  /* If a master channel is off, all categories collapse to "no delivery via that channel"
-     — but we keep category state intact so toggling channels back restores prefs. */
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 80, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -118,6 +115,27 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
             onChange={(v) => setChannels({ sound: v })}
           />
           <Divider />
+          {/* Push — integrated inside the Channels card */}
+          {pushPerm !== 'unsupported' && (
+            <>
+              <ChannelRow
+                icon={<Bell size={15} strokeWidth={1.8} />}
+                title="Push"
+                subtitle={
+                  pushPerm === 'granted' ? 'Device alerts even when the app is closed' :
+                  pushPerm === 'denied'  ? 'Blocked — re-enable in your browser settings' :
+                  'Tap Enable to allow device push alerts'
+                }
+                on={pushPerm === 'granted'}
+                disabled={pushPerm === 'denied'}
+                disabledHint="Re-enable in browser settings"
+                onChange={() => { if (pushPerm === 'default') requestPush(); }}
+                actionLabel={pushPerm === 'default' ? 'Enable' : undefined}
+                onActionClick={pushPerm === 'default' ? requestPush : undefined}
+              />
+              <Divider />
+            </>
+          )}
           <ChannelRow
             icon={<Mail size={15} strokeWidth={1.8} />}
             title="Email"
@@ -125,7 +143,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
             on={ch.email}
             disabled={!hasEmail}
             disabledHint="Add email in Account"
-            onAction={!hasEmail ? { label: 'Add email', onClick: onOpenAccount } : undefined}
+            onAction={!hasEmail ? { label: 'Add', onClick: onOpenAccount } : undefined}
             onChange={(v) => setChannels({ email: v })}
           />
           <Divider />
@@ -136,36 +154,10 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
             on={ch.sms}
             disabled={!hasPhone}
             disabledHint="Add phone in Account"
-            onAction={!hasPhone ? { label: 'Add phone', onClick: onOpenAccount } : undefined}
+            onAction={!hasPhone ? { label: 'Add', onClick: onOpenAccount } : undefined}
             onChange={(v) => setChannels({ sms: v })}
           />
         </Card>
-
-        {/* Browser push permission — surfaced when available */}
-        {pushPerm !== 'unsupported' && (
-          <div style={{
-            marginTop: 10, padding: '12px 14px',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 14,
-            display: 'flex', alignItems: 'center', gap: 12,
-          }}>
-            <Bell size={16} strokeWidth={1.8} color="var(--text-secondary)" />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
-                Browser push
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {pushPerm === 'granted' && 'Enabled — we can ping this device'}
-                {pushPerm === 'denied'  && 'Blocked — re-enable from your browser settings'}
-                {pushPerm === 'default' && 'Not yet requested'}
-              </div>
-            </div>
-            {pushPerm === 'default' && (
-              <button onClick={requestPush} className="notif-btn-primary">Enable</button>
-            )}
-          </div>
-        )}
       </Section>
 
       {/* ── EMAIL FREQUENCY (only when email is on) ── */}
@@ -174,10 +166,10 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           <Card>
             <div role="radiogroup" aria-label="Email frequency" style={{ padding: 8 }}>
               {([
-                { v: 'realtime', label: 'Real-time',   hint: 'One email per event' },
-                { v: 'daily',    label: 'Daily digest', hint: 'Once per evening' },
+                { v: 'realtime', label: 'Real-time',    hint: 'One email per event' },
+                { v: 'daily',    label: 'Daily digest',  hint: 'Once per evening' },
                 { v: 'weekly',   label: 'Weekly digest', hint: 'Sundays at 9am' },
-                { v: 'never',    label: 'Off',          hint: 'No email notifications' },
+                { v: 'never',    label: 'Off',           hint: 'No email notifications' },
               ] as Array<{ v: EmailFrequency; label: string; hint: string }>).map(o => (
                 <button
                   key={o.v}
@@ -216,6 +208,22 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
       <Section title="What to notify me about" hint="Pick the topics you actually care about.">
         <Card>
           <CategoryRow
+            icon={<MessageSquare size={15} strokeWidth={1.8} />}
+            title="Comments on my posts"
+            subtitle="Someone comments on or likes your listing"
+            on={cat.comments}
+            onChange={(v) => setCategories({ comments: v })}
+          />
+          <Divider />
+          <CategoryRow
+            icon={<Reply size={15} strokeWidth={1.8} />}
+            title="Responses to my requests"
+            subtitle="A reply comes in on a request you posted"
+            on={cat.requestReplies}
+            onChange={(v) => setCategories({ requestReplies: v })}
+          />
+          <Divider />
+          <CategoryRow
             icon={<MessageCircle size={15} strokeWidth={1.8} />}
             title="Direct messages"
             subtitle="Someone wants to swap, request, or chat"
@@ -225,15 +233,23 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           <Divider />
           <CategoryRow
             icon={<Sparkles size={15} strokeWidth={1.8} />}
-            title="Saved alert matches"
-            subtitle="A new post matches your alert criteria"
+            title="Saved-search alerts"
+            subtitle="A new post matches your saved search keywords"
             on={cat.matches}
             onChange={(v) => setCategories({ matches: v })}
           />
           <Divider />
           <CategoryRow
+            icon={<MapPin size={15} strokeWidth={1.8} />}
+            title="Lost & found nearby"
+            subtitle="A new report near you matches your keywords"
+            on={cat.lostFound}
+            onChange={(v) => setCategories({ lostFound: v })}
+          />
+          <Divider />
+          <CategoryRow
             icon={<CalendarDays size={15} strokeWidth={1.8} />}
-            title="Event reminders"
+            title="Events near me"
             subtitle="Day-of nudges for events you RSVP'd to"
             on={cat.events}
             onChange={(v) => setCategories({ events: v })}
@@ -248,19 +264,19 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<Search size={15} strokeWidth={1.8} />}
-            title="Lost & Found matches"
-            subtitle="A nearby report sounds like yours"
-            on={cat.lostFound}
-            onChange={(v) => setCategories({ lostFound: v })}
-          />
-          <Divider />
-          <CategoryRow
             icon={<Megaphone size={15} strokeWidth={1.8} />}
             title="Community announcements"
             subtitle="From your community admins"
             on={cat.community}
             onChange={(v) => setCategories({ community: v })}
+          />
+          <Divider />
+          <CategoryRow
+            icon={<ShieldCheck size={15} strokeWidth={1.8} />}
+            title="Account & security"
+            subtitle="Sign-ins, password changes, suspicious activity"
+            on={cat.accountSecurity}
+            onChange={(v) => setCategories({ accountSecurity: v })}
           />
           <Divider />
           <CategoryRow
@@ -274,43 +290,39 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
       </Section>
 
       {/* ── QUIET HOURS ── */}
-      <Section title="Quiet hours" hint="We'll hold notifications during this window.">
+      <Section title="Quiet hours" hint="Push and sound alerts are held during this window.">
         <Card>
-          <Row label="Enable quiet hours">
+          <Row label="Enable quiet hours" hint="No push or sound alerts during this time.">
             <Toggle on={qh.enabled} onChange={(v) => setQuiet({ enabled: v })} />
           </Row>
           {qh.enabled && (
             <>
               <Divider />
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 16px',
-              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>From</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Start of quiet window</div>
                 </div>
                 <input
                   type="time"
                   value={qh.from}
                   onChange={(e) => setQuiet({ from: e.target.value })}
                   className="form-input"
-                  style={{ width: 100, padding: '6px 8px', fontSize: 13 }}
+                  style={{ width: 104, padding: '6px 8px', fontSize: 13 }}
                 />
               </div>
               <Divider />
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 16px',
-              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>To</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>End of quiet window</div>
                 </div>
                 <input
                   type="time"
                   value={qh.to}
                   onChange={(e) => setQuiet({ to: e.target.value })}
                   className="form-input"
-                  style={{ width: 100, padding: '6px 8px', fontSize: 13 }}
+                  style={{ width: 104, padding: '6px 8px', fontSize: 13 }}
                 />
               </div>
             </>
@@ -359,6 +371,8 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
 }
 
 /* ──────────────────────────────────────────────── */
+/*  Layout primitives (mirror SettingsScreen)        */
+/* ──────────────────────────────────────────────── */
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -377,7 +391,9 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
           </p>
         )}
       </div>
-      {children}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -399,21 +415,25 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--border-default)', opacity: 0.6, marginLeft: 56 }} />;
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 16px',
-    }}>
-      <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
-        {label}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: 52 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+          {label}
+        </div>
+        {hint && (
+          <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+            {hint}
+          </p>
+        )}
       </div>
       <div style={{ flexShrink: 0 }}>{children}</div>
     </div>
   );
 }
 
-function ChannelRow({ icon, title, subtitle, on, onChange, disabled, disabledHint, onAction }: {
+function ChannelRow({ icon, title, subtitle, on, onChange, disabled, disabledHint, onAction, actionLabel, onActionClick }: {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
@@ -422,6 +442,8 @@ function ChannelRow({ icon, title, subtitle, on, onChange, disabled, disabledHin
   disabled?: boolean;
   disabledHint?: string;
   onAction?: { label: string; onClick: () => void };
+  actionLabel?: string;
+  onActionClick?: () => void;
 }) {
   return (
     <div style={{
@@ -448,6 +470,8 @@ function ChannelRow({ icon, title, subtitle, on, onChange, disabled, disabledHin
       </div>
       {onAction ? (
         <button onClick={onAction.onClick} className="notif-btn-primary">{onAction.label}</button>
+      ) : actionLabel && onActionClick ? (
+        <button onClick={onActionClick} className="notif-btn-primary">{actionLabel}</button>
       ) : (
         <Toggle on={on} onChange={onChange} disabled={disabled} />
       )}
@@ -472,10 +496,7 @@ function CategoryRow({ icon, title, subtitle, on, onChange }: {
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 16px',
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
       <div style={{
         width: 32, height: 32, borderRadius: 10,
         background: 'var(--bg-inset)',

@@ -14,12 +14,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Menu, Search, Plus, MapPin, AlertCircle, CheckCircle,
-  Mail, X, Trash2, Save, RotateCcw, Loader2,
+  Mail, X, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus,
 } from 'lucide-react';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
-import { fetchLostFound, onPostsChanged } from '../lib/liveData';
+import { fetchLostFound, onPostsChanged, updateLostFoundMedia } from '../lib/liveData';
+import PhotoEditDialog from './PhotoEditDialog';
 import EmptyState from './EmptyState';
 import { useAuth } from '../lib/AuthContext';
 import { useBreakpoint } from '../lib/useBreakpoint';
@@ -411,6 +412,18 @@ export function LostFoundDetailSheet({
   const isLost = item.status === 'lost';
   const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
 
+  /* Photo editing — only relevant when isOwner. */
+  const [photoEditOpen, setPhotoEditOpen] = useState(false);
+  const [localPhotoUrls, setLocalPhotoUrls] = useState<string[] | null>(null);
+  const currentPhotoUrls: string[] = (item as { photoUrls?: string[] }).photoUrls ?? [];
+  const displayPhotoUrl: string | undefined =
+    (localPhotoUrls !== null ? localPhotoUrls[0] : undefined) ??
+    getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls);
+  const handleSaveLFPhotos = async (photoUrls: string[]) => {
+    await updateLostFoundMedia(item.id, photoUrls);
+    setLocalPhotoUrls(photoUrls);
+  };
+
   /* Inline-edit state — only meaningful when isOwner. */
   const [eTitle, setETitle] = useState(item.title);
   const [eDescription, setEDescription] = useState(item.description ?? '');
@@ -546,11 +559,50 @@ export function LostFoundDetailSheet({
             minHeight: '70vh',
             overflow: 'hidden',
           }}>
-            <img
-              src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
+            {displayPhotoUrl ? (
+              <img
+                src={displayPhotoUrl}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : isOwner ? (
+              <button
+                type="button"
+                onClick={() => setPhotoEditOpen(true)}
+                aria-label="Add photo"
+                style={{
+                  width: '100%', height: '100%',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <ImagePlus size={36} strokeWidth={1.4} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>+ Add photo</span>
+              </button>
+            ) : null}
+            {isOwner && displayPhotoUrl && (
+              <button
+                type="button"
+                onClick={() => setPhotoEditOpen(true)}
+                aria-label="Edit photo"
+                style={{
+                  position: 'absolute', bottom: 12, right: 12,
+                  zIndex: 10,
+                  width: 36, height: 36, borderRadius: 999,
+                  background: 'var(--bg-overlay)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: 'var(--text-primary)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Camera size={16} strokeWidth={1.8} />
+              </button>
+            )}
           </div>
         )}
 
@@ -592,15 +644,56 @@ export function LostFoundDetailSheet({
         {/* Mobile image (desktop renders it in the left column already). */}
         {!isDesktop && (
           <div style={{
+            position: 'relative',
             aspectRatio: '4 / 3', borderRadius: 16, overflow: 'hidden',
             background: 'var(--bg-inset)',
             marginBottom: 14,
           }}>
-            <img
-              src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
+            {displayPhotoUrl ? (
+              <img
+                src={displayPhotoUrl}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : isOwner ? (
+              <button
+                type="button"
+                onClick={() => setPhotoEditOpen(true)}
+                aria-label="Add photo"
+                style={{
+                  width: '100%', height: '100%', minHeight: 140,
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: 'none', border: '2px dashed var(--border-default)',
+                  borderRadius: 16, cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <ImagePlus size={28} strokeWidth={1.5} />
+                <span style={{ fontSize: 12, fontWeight: 600 }}>+ Add photo</span>
+              </button>
+            ) : null}
+            {isOwner && displayPhotoUrl && (
+              <button
+                type="button"
+                onClick={() => setPhotoEditOpen(true)}
+                aria-label="Edit photo"
+                style={{
+                  position: 'absolute', bottom: 8, right: 8,
+                  zIndex: 5,
+                  width: 32, height: 32, borderRadius: 999,
+                  background: 'var(--bg-overlay)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: 'var(--text-primary)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Camera size={14} strokeWidth={1.8} />
+              </button>
+            )}
           </div>
         )}
 
@@ -861,6 +954,16 @@ export function LostFoundDetailSheet({
         )}
         </div>{/* /right column */}
       </div>
+      {isOwner && (
+        <PhotoEditDialog
+          open={photoEditOpen}
+          onOpenChange={setPhotoEditOpen}
+          initialUrls={currentPhotoUrls}
+          bucket="lost-found"
+          allowVideo={false}
+          onSave={handleSaveLFPhotos}
+        />
+      )}
     </>
   );
 }

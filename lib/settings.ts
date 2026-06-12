@@ -16,13 +16,16 @@ export interface NotifChannels {
 }
 
 export interface NotifCategories {
-  messages:    boolean;    /* DMs about items / events */
-  matches:     boolean;    /* saved alerts firing on new posts */
-  events:      boolean;    /* RSVP reminders + organizer updates */
-  marketplace: boolean;    /* price drops / reposts on items you saved */
-  lostFound:   boolean;    /* matches on something you lost or found */
-  community:   boolean;    /* announcements from your community */
-  digest:      boolean;    /* weekly recap email */
+  comments:        boolean;    /* replies / likes on your own posts */
+  requestReplies:  boolean;    /* someone responds to a request you posted */
+  messages:        boolean;    /* DMs about items / events */
+  matches:         boolean;    /* saved-search alerts firing on new posts */
+  events:          boolean;    /* RSVP reminders + organizer updates */
+  lostFound:       boolean;    /* matches on something you lost or found */
+  marketplace:     boolean;    /* price drops / reposts on items you saved */
+  community:       boolean;    /* announcements from your community */
+  accountSecurity: boolean;    /* sign-ins, password changes, suspicious activity */
+  digest:          boolean;    /* weekly recap email */
 }
 
 export interface QuietHours {
@@ -104,12 +107,15 @@ export const DEFAULT_SETTINGS: UserSettings = {
   notifications: {
     channels: { inApp: true, sound: true, email: true, sms: false },
     categories: {
+      comments: true,
+      requestReplies: true,
       messages: true,
       matches: true,
       events: true,
-      marketplace: true,
       lostFound: true,
+      marketplace: true,
       community: true,
+      accountSecurity: true,
       digest: true,
     },
     emailFrequency: 'realtime',

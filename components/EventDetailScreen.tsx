@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
-  Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2,
+  Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
@@ -16,7 +16,8 @@ import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { shareLink, addEventToCalendar } from '../lib/share';
-import { updateEvent } from '../lib/liveData';
+import { updateEvent, updateEventMedia } from '../lib/liveData';
+import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
 
 interface EventDetailScreenProps {
@@ -88,7 +89,15 @@ export default function EventDetailScreen({
   const photos: string[] = uploadedPhotos && uploadedPhotos.length > 0
     ? uploadedPhotos
     : (Array.isArray(uploadedPhotos) ? [] : getEventPhotos(event.id, event.eventType));
-  const hasPhotos = photos.length > 0;
+  /* Photo editing — owner can add/replace photos. */
+  const [photoEditOpen, setPhotoEditOpen] = useState(false);
+  const [localPhotoUrls, setLocalPhotoUrls] = useState<string[] | null>(null);
+  const displayPhotos: string[] = localPhotoUrls !== null ? localPhotoUrls : photos;
+  const handleSaveEventPhotos = useCallback(async (photoUrls: string[]) => {
+    if (isDemoMode()) { setLocalPhotoUrls(photoUrls); return; }
+    await updateEventMedia(event.id, photoUrls, []);
+    setLocalPhotoUrls(photoUrls);
+  }, [event.id]);
   const [expanded, setExpanded] = useState(false);
   const desc = event.description ?? '';
   const shouldClamp = desc.length > 220;
@@ -303,7 +312,7 @@ export default function EventDetailScreen({
         } : undefined}
       >
         {/* ── HERO PHOTO CAROUSEL ── */}
-        {hasPhotos && (
+        {displayPhotos.length > 0 ? (
           <section style={{ padding: isDesktop ? 0 : '12px 16px 0' }}>
             <div style={{
               position: 'relative',
@@ -315,7 +324,7 @@ export default function EventDetailScreen({
               background: 'var(--bg-inset)',
             }}>
               <PhotoCarousel
-                photos={photos}
+                photos={displayPhotos}
                 aspectRatio="4 / 5"
                 dotsPosition="bottom"
                 radius={24}
@@ -344,12 +353,56 @@ export default function EventDetailScreen({
                         <Check size={11} strokeWidth={2.5} /> Going
                       </div>
                     )}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setPhotoEditOpen(true)}
+                        aria-label="Edit photos"
+                        style={{
+                          position: 'absolute', bottom: 14, right: 14,
+                          zIndex: 10,
+                          width: 36, height: 36, borderRadius: 999,
+                          background: 'var(--bg-overlay)',
+                          backdropFilter: 'blur(10px)',
+                          WebkitBackdropFilter: 'blur(10px)',
+                          border: '1px solid rgba(255,255,255,0.18)',
+                          color: 'var(--text-primary)',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Camera size={16} strokeWidth={1.8} />
+                      </button>
+                    )}
                   </>
                 }
               />
             </div>
           </section>
-        )}
+        ) : isOwner ? (
+          <section style={{ padding: isDesktop ? 0 : '12px 16px 0' }}>
+            <button
+              type="button"
+              onClick={() => setPhotoEditOpen(true)}
+              aria-label="Add photos"
+              style={{
+                width: '100%',
+                maxWidth: isDesktop ? 560 : undefined,
+                aspectRatio: '4 / 5',
+                borderRadius: 24,
+                background: 'var(--bg-inset)',
+                border: '2px dashed var(--border-default)',
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 10,
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <ImagePlus size={32} strokeWidth={1.5} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>+ Add photo</span>
+            </button>
+          </section>
+        ) : null}
         {/* RIGHT COLUMN starts here — wrapped on desktop for the side-by-side
             layout. Closing tag is right before the bottom CTA. */}
         <div style={isDesktop ? { minWidth: 0 } : { display: 'contents' }}>
@@ -788,6 +841,16 @@ export default function EventDetailScreen({
         </div>
         </div>
       </section>
+      {isOwner && (
+        <PhotoEditDialog
+          open={photoEditOpen}
+          onOpenChange={setPhotoEditOpen}
+          initialUrls={photos}
+          bucket="events"
+          allowVideo={false}
+          onSave={handleSaveEventPhotos}
+        />
+      )}
     </div>
   );
 }

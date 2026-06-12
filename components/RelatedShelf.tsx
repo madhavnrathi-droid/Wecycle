@@ -2,17 +2,21 @@
 
 /* Related-items shelf at the bottom of every product detail page.
  *
- * Five rails, fetched in parallel, rendered in priority order. Empty rails
- * skip themselves entirely — no mock content ever appears.
+ * Five rails, fetched in parallel, rendered in priority order. Each specific
+ * rail falls back to the generic pool when empty, so the shelf is never blank
+ * as long as any other listings exist in the community.
  *
- *   1. More from {sellerName}            — same user's other active listings
- *   2. Similar items                     — same category, different sellers
- *   3. Help return these  · Sponsored    — Lost & Found native ad slot
- *   4. Free in your community            — listing_type=free, cross-category
- *   5. You recently viewed               — localStorage history
+ *   1. More from {sellerName}  → fallback: "Discover other sellers"
+ *   2. Similar items           → fallback: "More on Wecycle"
+ *   3. Help return these       · Sponsored — Lost & Found native ad slot
+ *   4. Free in your community  — hide entirely if no free items (don't fake it)
+ *   5. You recently viewed     — hide if empty (user-history specific)
  *
- * Each fetcher returns [] in demo mode / without Supabase, so the shelf
- * gracefully collapses to nothing while the seller seeds content.
+ * Dedup: once an item appears in an earlier rail it is excluded from all
+ * subsequent rails via a Set<string> of already-rendered IDs.
+ *
+ * Shuffle key: per-day salt so the same visitor sees a slightly different
+ * mix each calendar day without jarring mid-session reshuffles.
  */
 
 import { useEffect, useState } from 'react';
@@ -23,6 +27,7 @@ import {
   fetchFreeListings,
   fetchRecentlyViewedListings,
   fetchLostFoundForAds,
+  fetchAnyOtherListings,
 } from '../lib/liveData';
 import type { MarketplaceItem, LostItem } from '../lib/mockData';
 
@@ -41,12 +46,33 @@ interface ShelfData {
   free: MarketplaceItem[];
   recent: MarketplaceItem[];
   lostFound: (LostItem & { photoUrls?: string[] })[];
+  /** Generic pool for fallbacks — already shuffled by day-key. */
+  pool: MarketplaceItem[];
 }
 
 const INITIAL: ShelfData = {
   loading: true,
-  fromSeller: [], similar: [], free: [], recent: [], lostFound: [],
+  fromSeller: [], similar: [], free: [], recent: [], lostFound: [], pool: [],
 };
+
+/* Deterministic per-id shuffle key — same item bucket stays stable across
+   re-mounts of the same page but varies across product pages because the
+   pool composition changes. (Date-of-day salt to refresh once a day.) */
+function shuffleKey(id: string): number {
+  const salt = Math.floor(Date.now() / 86_400_000);
+  let h = salt | 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return h;
+}
+
+/** Return `src` sorted by the day-keyed shuffle, then sliced to `limit`. */
+function shuffled(src: MarketplaceItem[], limit: number): MarketplaceItem[] {
+  return [...src]
+    .map(it => ({ it, k: shuffleKey(it.id) }))
+    .sort((a, b) => a.k - b.k)
+    .slice(0, limit)
+    .map(x => x.it);
+}
 
 export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller }: RelatedShelfProps) {
   const [data, setData] = useState<ShelfData>(INITIAL);
@@ -55,24 +81,20 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
     let cancelled = false;
     setData(INITIAL);
 
-    /* mapListingRow now threads `categoryId` (UUID) through MarketplaceItem
-       so the same-category query works against the DB. Without an id the
-       "Similar items" rail simply returns [] and skips. */
     const categoryKey = item.categoryId ?? null;
-
-    /* Resilience: each rail's fetch settles independently so a single
-       failure (e.g. an RLS edge case or a missing index) can't blank
-       the entire shelf. */
     const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
+
     Promise.all([
       safe(fetchSellerListings(item.user.id, item.id, 8)),
       safe(fetchSimilarListings(categoryKey, item.id, item.user.id, 10)),
       safe(fetchFreeListings(item.id, 10)),
       safe(fetchRecentlyViewedListings(item.id, 10)),
       safe(fetchLostFoundForAds(6)),
-    ]).then(([fromSeller, similar, free, recent, lostFound]) => {
+      /* Wider pool than needed — fallbacks draw from this. */
+      safe(fetchAnyOtherListings(item.id, undefined, 20)),
+    ]).then(([fromSeller, similar, free, recent, lostFound, pool]) => {
       if (cancelled) return;
-      setData({ loading: false, fromSeller, similar, free, recent, lostFound });
+      setData({ loading: false, fromSeller, similar, free, recent, lostFound, pool });
     });
 
     return () => { cancelled = true; };
@@ -84,24 +106,81 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
   const toLFCards = (items: (LostItem & { photoUrls?: string[] })[]): RailCard[] =>
     items.map(it => ({ kind: 'lostfound' as const, item: it, onClick: () => onOpenLF(it) }));
 
+  /* ── Build rails with fallbacks + dedup ── */
+
+  const rendered = new Set<string>();
+
+  /** Pull items from `src`, skip already-rendered ids, register newly shown ones. */
+  function consume(src: MarketplaceItem[], max = src.length): MarketplaceItem[] {
+    const out: MarketplaceItem[] = [];
+    for (const it of src) {
+      if (out.length >= max) break;
+      if (!rendered.has(it.id)) { out.push(it); rendered.add(it.id); }
+    }
+    return out;
+  }
+
+  /* Pool items not from the current seller (for "Discover other sellers"). */
+  const poolOtherSellers = data.pool.filter(it => it.user.id !== item.user.id);
+
+  /* Rail 1 — More from <Seller> or "Discover other sellers" */
+  let sellerRailItems: MarketplaceItem[];
+  let sellerTitle: string;
+  let sellerSubtitle: string | undefined;
+  let sellerCta: { label: string; onClick: () => void } | undefined;
+
   const sellerFirstName = item.user.name.split(' ')[0] || item.user.name;
+
+  if (data.fromSeller.length > 0) {
+    sellerRailItems = consume(data.fromSeller);
+    sellerTitle = `More from ${sellerFirstName}`;
+    sellerSubtitle = `${sellerRailItems.length} other active listing${sellerRailItems.length === 1 ? '' : 's'}`;
+    sellerCta = onOpenSeller ? { label: 'See storefront', onClick: onOpenSeller } : undefined;
+  } else {
+    /* Fallback: other sellers from the pool, day-shuffled */
+    sellerRailItems = consume(shuffled(poolOtherSellers, 8));
+    sellerTitle = 'Discover other sellers';
+    sellerSubtitle = undefined;
+    sellerCta = undefined;
+  }
+
+  /* Rail 2 — Similar items or "More on Wecycle" */
+  let similarRailItems: MarketplaceItem[];
+  let similarTitle: string;
+  let similarSubtitle: string | undefined;
+
+  if (data.similar.length > 0) {
+    similarRailItems = consume(data.similar);
+    similarTitle = item.isRequest ? 'Similar open requests' : 'Similar items';
+    similarSubtitle = item.category ? `In ${item.category}` : undefined;
+  } else {
+    /* Fallback: anything from pool not already rendered */
+    similarRailItems = consume(shuffled(data.pool, 10));
+    similarTitle = 'More on Wecycle';
+    similarSubtitle = undefined;
+  }
+
+  /* Rail 3 — Help return these (no fallback, L&F-specific) */
+  /* Rail 4 — Free in your community (hide if empty — don't fake generosity) */
+  const freeRailItems = consume(data.free);
+
+  /* Rail 5 — Recently viewed (hide if empty — user-history specific) */
+  const recentRailItems = consume(data.recent);
 
   return (
     <>
       <RelatedRail
-        title={`More from ${sellerFirstName}`}
-        subtitle={data.fromSeller.length
-          ? `${data.fromSeller.length} other active listing${data.fromSeller.length === 1 ? '' : 's'}`
-          : undefined}
-        cta={data.fromSeller.length && onOpenSeller ? { label: 'See storefront', onClick: onOpenSeller } : undefined}
-        cards={toListingCards(data.fromSeller)}
+        title={sellerTitle}
+        subtitle={sellerSubtitle}
+        cta={sellerCta}
+        cards={toListingCards(sellerRailItems)}
         loading={data.loading}
       />
 
       <RelatedRail
-        title={item.isRequest ? 'Similar open requests' : 'Similar items'}
-        subtitle={item.category ? `In ${item.category}` : undefined}
-        cards={toListingCards(data.similar)}
+        title={similarTitle}
+        subtitle={similarSubtitle}
+        cards={toListingCards(similarRailItems)}
         loading={data.loading}
       />
 
@@ -116,13 +195,13 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
       <RelatedRail
         title="Free in your community"
         subtitle="No money changes hands — just pick up"
-        cards={toListingCards(data.free)}
+        cards={toListingCards(freeRailItems)}
         loading={data.loading}
       />
 
       <RelatedRail
         title="You recently viewed"
-        cards={toListingCards(data.recent)}
+        cards={toListingCards(recentRailItems)}
         loading={data.loading}
       />
     </>

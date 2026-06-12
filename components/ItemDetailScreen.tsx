@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, MessageCircle, IndianRupee, Trash2, RotateCcw, Save, Loader2, Flag } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Save, Loader2, Flag, Camera, ImagePlus } from 'lucide-react';
 import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
@@ -17,7 +17,9 @@ import {
   incrementListingView, toggleListingSave,
   updateListingFields, repostListing,
   updateRequestFields, repostRequest,
+  updateListingMedia, updateRequestMedia,
 } from '../lib/liveData';
+import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
@@ -32,8 +34,6 @@ interface ItemDetailScreenProps {
   onRequireAuth: () => void;
   /** Optional: tap an avatar/owner name to open their storefront. */
   onOpenStorefront?: (user: User) => void;
-  /** Open an in-app message thread with the item owner. */
-  onMessage?: (otherUser: { id: string; name: string; initials: string; color: string }, listingId?: string, subject?: string) => void;
   /** Jump to another listing from the related-items shelf at the bottom. */
   onOpenItem?: (item: MarketplaceItem) => void;
   /** Jump to a Lost & Found item from the sponsored slot in the related shelf. */
@@ -61,7 +61,7 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onMessage, onOpenItem, onOpenLF, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
   const [reportOpen, setReportOpen] = useState(false);
@@ -72,6 +72,21 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
      see contact CTAs alongside their delete affordance. */
   const canManage = !!isOwner && !!onDelete;
   const photos = resolveItemMedia(item);
+
+  /* Photo editing — owner can open a picker dialog to add/remove/replace. */
+  const [photoEditOpen, setPhotoEditOpen] = useState(false);
+  /* Optimistic local override: once the owner saves new photos we swap them in
+     immediately rather than waiting for a full feed refetch. Stored as plain
+     URL strings so resolveItemMedia isn't needed again. */
+  const [localPhotoUrls, setLocalPhotoUrls] = useState<string[] | null>(null);
+  /* Derive the photo list the carousel actually shows. */
+  const displayPhotos = localPhotoUrls !== null
+    ? localPhotoUrls.map(u => u) // keep as strings; PhotoCarousel accepts string[]
+    : photos;
+  /* Current raw string URLs for seeding the picker (strip video records). */
+  const currentPhotoUrlsForPicker: string[] = photos
+    .map(p => (typeof p === 'string' ? p : p.src))
+    .filter(Boolean);
 
   /* ── Inline edit state ──────────────────────────────────
      Hydrated from the item; tracks dirty by comparison to the snapshot. */
@@ -192,6 +207,19 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setEUrgent(!!item.urgent);
   }, [item]);
 
+  const handleSavePhotos = useCallback(async (photoUrls: string[]) => {
+    if (isDemoMode()) {
+      setLocalPhotoUrls(photoUrls);
+      return;
+    }
+    if (isRequestPost) {
+      await updateRequestMedia(item.id, photoUrls, []);
+    } else {
+      await updateListingMedia(item.id, photoUrls, []);
+    }
+    setLocalPhotoUrls(photoUrls);
+  }, [item.id, isRequestPost]);
+
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
     setDeleting(true);
@@ -291,6 +319,23 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
      buttons ("Email Aditya" + "WhatsApp Aditya") side by side. */
   const hasBoth = contactLinks.length >= 2;
 
+  /* Sticky title bar — fires when the hero photo scrolls out of view.
+     IntersectionObserver is cheaper than a scroll listener: no per-frame
+     callbacks, no jank. The sentinel sits right after the hero section. */
+  const heroSentinelRef = useRef<HTMLDivElement>(null);
+  const [heroVisible, setHeroVisible] = useState(true);
+
+  useEffect(() => {
+    const sentinel = heroSentinelRef.current;
+    if (!sentinel) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setHeroVisible(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    obs.observe(sentinel);
+    return () => obs.disconnect();
+  }, []);
+
   /* Desktop (≥1024px) gets an Amazon-style 2-column layout:
      photos on the left, title + meta + actions on the right.
      Mobile keeps the original stacked flow with the fixed bottom action bar. */
@@ -298,7 +343,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     return (
       <DesktopLayout
         item={item}
-        photos={photos}
+        photos={displayPhotos}
         saved={saved}
         setSaved={setSaved}
         onToggleSave={handleToggleSave}
@@ -311,7 +356,6 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         onBack={onBack}
         onRequireAuth={onRequireAuth}
         onOpenStorefront={onOpenStorefront}
-        onMessage={onMessage}
         onOpenItem={onOpenItem}
         onOpenLF={onOpenLF}
         contactLinks={contactLinks}
@@ -322,6 +366,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         onDelete={onDelete}
         isAdmin={isAdmin}
         isOwner={isOwner}
+        heroSentinelRef={heroSentinelRef}
+        heroVisible={heroVisible}
         /* Inline-edit state, threaded down so the desktop layout's title /
            description / price etc. become editable in the same way. */
         editState={{
@@ -339,6 +385,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           handleSaveChanges,
           handleSaveAndRepost,
           handleDiscard,
+          photoEditOpen,
+          setPhotoEditOpen,
+          currentPhotoUrlsForPicker,
+          handleSavePhotos,
         }}
       />
     );
@@ -382,12 +432,96 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         </button>
       </header>
 
+      {/* ── STICKY TITLE BAR (mobile) ──
+         Slides down from the top once the hero photo scrolls away.
+         Layered on top of the regular header (z-index 31) so it covers
+         the category chip while keeping the back-button hit target
+         accessible (the back button is duplicated here). */}
+      <div
+        role="banner"
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0,
+          zIndex: 31,
+          background: 'var(--bg-overlay)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: '1px solid var(--border-subtle)',
+          padding: '8px 12px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          transform: heroVisible ? 'translateY(-100%)' : 'translateY(0)',
+          transition: 'transform 200ms ease',
+          /* Pointer events only when visible — prevents ghost tap targets */
+          pointerEvents: heroVisible ? 'none' : 'auto',
+        }}
+      >
+        <button
+          onClick={onBack}
+          aria-label="Back"
+          className="theme-toggle"
+          style={{ width: 36, height: 36, flexShrink: 0 }}
+        >
+          <ChevronLeft size={20} strokeWidth={1.8} />
+        </button>
+        <span
+          aria-current="page"
+          style={{
+            fontSize: 14, fontWeight: 600,
+            color: 'var(--text-primary)',
+            letterSpacing: '-0.01em',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            flex: 1, minWidth: 0,
+          }}
+        >
+          {item.title}
+        </span>
+        {/* Price / status pill */}
+        {item.isClosed ? (
+          <span style={{
+            flexShrink: 0,
+            fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: '#fff', background: 'var(--text-primary)',
+            padding: '4px 10px', borderRadius: 999,
+          }}>
+            {closedLabelFor(item)}
+          </span>
+        ) : (
+          <span style={{
+            flexShrink: 0,
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 12, fontWeight: 600,
+            color: isPriced ? 'var(--accent-amber)' : '#16A34A',
+            background: 'var(--bg-card)',
+            padding: '4px 10px', borderRadius: 999,
+            border: '1px solid var(--border-subtle)',
+          }}>
+            {isPriced && <IndianRupee size={11} strokeWidth={2.2} />}
+            <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
+          </span>
+        )}
+        {/* Mini contact CTA — hidden when item is closed or no contact channels */}
+        {!item.isClosed && contactLinks.length > 0 && (
+          <button
+            aria-label={contactLinks[0].ariaLabel}
+            onClick={() => handleContactClick(contactLinks[0])}
+            style={{
+              width: 36, height: 36, borderRadius: 999, border: 'none',
+              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <Mail size={15} strokeWidth={2} />
+          </button>
+        )}
+      </div>
+
       {/* ── PHOTO CAROUSEL ──
          Skip the entire hero frame when the post has no photos or videos.
          Otherwise we'd render a giant empty 4/5 box that's just visual
          dead space. The title + meta section below picks up the leftover
          padding naturally. */}
-      {photos.length > 0 && (
+      {displayPhotos.length > 0 ? (
         <section style={{ padding: '12px 16px 0' }}>
           <div style={{
             position: 'relative',
@@ -398,14 +532,59 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             background: 'var(--bg-inset)',
           }}>
             <PhotoCarousel
-              photos={photos}
+              photos={displayPhotos}
               aspectRatio="4 / 5"
               dotsPosition="bottom"
               radius={24}
             />
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setPhotoEditOpen(true)}
+                aria-label="Edit photos"
+                style={{
+                  position: 'absolute', top: 12, right: 12,
+                  zIndex: 10,
+                  width: 36, height: 36, borderRadius: 999,
+                  background: 'var(--bg-overlay)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: 'var(--text-primary)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Camera size={16} strokeWidth={1.8} />
+              </button>
+            )}
           </div>
         </section>
-      )}
+      ) : canManage ? (
+        <section style={{ padding: '12px 16px 0' }}>
+          <button
+            type="button"
+            onClick={() => setPhotoEditOpen(true)}
+            aria-label="Add photos"
+            style={{
+              width: '100%',
+              aspectRatio: '4 / 5',
+              borderRadius: 24,
+              background: 'var(--bg-inset)',
+              border: '2px dashed var(--border-default)',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 10,
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <ImagePlus size={32} strokeWidth={1.5} />
+            <span style={{ fontSize: 14, fontWeight: 600 }}>+ Add photo</span>
+          </button>
+        </section>
+      ) : null}
+      {/* Sentinel: when this leaves the viewport the sticky title bar appears */}
+      <div ref={heroSentinelRef} style={{ height: 0, margin: 0 }} aria-hidden="true" />
 
       {/* ── TITLE + META ──
          Owner-edit mode breaks the meta into one-field-per-row so each
@@ -817,52 +996,31 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               <Flag size={18} strokeWidth={1.8} />
             </button>
           )}
-          {/* ── Contact options — Message on Wecycle (primary) + WhatsApp/Email (always available) ── */}
-          {!item.isClosed && onMessage && (
-            <button
-              onClick={() => {
-                if (!user) { onRequireAuth(); return; }
-                onMessage(
-                  { id: item.user.id, name: item.user.name, initials: item.user.initials, color: item.user.color },
-                  item.id,
-                  item.title,
-                );
-              }}
-              aria-label={`Message ${item.user.name} about ${item.title}`}
-              style={{
-                flex: '1 1 100%', height: 52, borderRadius: 999,
-                background: 'var(--text-primary)', color: 'var(--bg-base)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              <MessageCircle size={15} strokeWidth={2} />
-              Message on Wecycle
-            </button>
-          )}
+          {/* ── Contact options — Email (primary, always present) + WhatsApp when owner opted in. */}
           {!item.isClosed && contactLinks.map(link => (
             <button
               key={link.channel}
-              onClick={() => handleContactClick(link)}
+              onClick={() => {
+                if (!user) { onRequireAuth(); return; }
+                handleContactClick(link);
+              }}
               aria-label={link.ariaLabel}
               style={{
-                flex: 1, height: 46, borderRadius: 999,
-                background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
-                color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-primary)',
-                border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-default)',
-                cursor: 'pointer',
-                fontSize: 13, fontWeight: 600,
+                flex: 1, height: 52, borderRadius: 999,
+                background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600,
                 letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
-              {link.channel === 'whatsapp' ? <WhatsAppGlyph size={14} /> : <Mail size={14} strokeWidth={2} />}
+              {link.channel === 'whatsapp' ? <WhatsAppGlyph size={15} /> : <Mail size={15} strokeWidth={2} />}
               {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
             </button>
           ))}
           {/* Fallback — closed item or no contact at all → profile */}
-          {(item.isClosed || (!onMessage && contactLinks.length === 0)) && (
+          {(item.isClosed || contactLinks.length === 0) && (
             <button
               onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
               aria-label={`View ${item.user.name}'s profile`}
@@ -889,6 +1047,16 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         targetUserId={item.user.id}
         targetLabel={`"${item.title}"`}
       />
+      {canManage && (
+        <PhotoEditDialog
+          open={photoEditOpen}
+          onOpenChange={setPhotoEditOpen}
+          initialUrls={currentPhotoUrlsForPicker}
+          bucket={isRequestPost ? 'listings' : 'listings'}
+          allowVideo={!isRequestPost}
+          onSave={handleSavePhotos}
+        />
+      )}
     </div>
   );
 }
@@ -913,6 +1081,11 @@ interface EditState {
   handleSaveChanges: () => Promise<void>;
   handleSaveAndRepost: () => Promise<void>;
   handleDiscard: () => void;
+  /* Photo editing */
+  photoEditOpen: boolean;
+  setPhotoEditOpen: (v: boolean) => void;
+  currentPhotoUrlsForPicker: string[];
+  handleSavePhotos: (urls: string[]) => Promise<void>;
 }
 
 interface DesktopLayoutProps {
@@ -931,7 +1104,6 @@ interface DesktopLayoutProps {
   onBack: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
-  onMessage?: (otherUser: { id: string; name: string; initials: string; color: string }, listingId?: string, subject?: string) => void;
   onOpenItem?: (item: MarketplaceItem) => void;
   onOpenLF?: (item: LostItem & { photoUrls?: string[] }) => void;
   contactLinks: ContactLink[];
@@ -942,30 +1114,35 @@ interface DesktopLayoutProps {
   onDelete?: () => void | Promise<void>;
   isAdmin?: boolean;
   isOwner?: boolean;
+  heroSentinelRef: React.RefObject<HTMLDivElement>;
+  heroVisible: boolean;
   editState: EditState;
 }
 
 function DesktopLayout({
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
-  shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront, onMessage,
+  shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   onOpenItem, onOpenLF,
   contactLinks, primaryActionLabel, handleContactClick, hasBoth,
-  canManage, onDelete, isAdmin, isOwner, editState,
+  canManage, onDelete, isAdmin, isOwner, heroSentinelRef, heroVisible, editState,
 }: DesktopLayoutProps) {
   void onRequireAuth;
   void isAdmin;
+  void primaryActionLabel;
+  void hasBoth;
   const [reportOpen, setReportOpen] = useState(false);
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType, eCategory, setECategory,
     eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError,
     handleSaveChanges, handleSaveAndRepost, handleDiscard,
+    photoEditOpen, setPhotoEditOpen, currentPhotoUrlsForPicker, handleSavePhotos,
   } = editState;
   void setSaved; /* save state is driven through onToggleSave now */
   return (
     <div className="screen-transition" style={{ background: 'var(--bg-base)', minHeight: '100%' }}>
-      {/* Slim top bar with back button */}
-      <header style={{
+      {/* Slim top bar: breadcrumb always visible + title/price/CTA fade in after hero */}
+      <header role="banner" style={{
         position: 'sticky', top: 0, zIndex: 30,
         background: 'var(--bg-overlay)',
         backdropFilter: 'blur(20px)',
@@ -977,22 +1154,83 @@ function DesktopLayout({
         <button onClick={onBack} aria-label="Back" className="theme-toggle">
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+        {/* Breadcrumb — always visible */}
+        <span style={{ fontSize: 13, color: 'var(--text-muted)', flexShrink: 0 }}>
           Marketplace
           <span style={{ margin: '0 6px', opacity: 0.5 }}>›</span>
           <span style={{ color: 'var(--text-secondary)' }}>{item.category}</span>
         </span>
+        {/* Title + price + mini-CTA — fade in once hero scrolls away */}
+        <span
+          aria-current="page"
+          style={{
+            flex: 1, minWidth: 0,
+            fontSize: 14, fontWeight: 600,
+            color: 'var(--text-primary)',
+            letterSpacing: '-0.01em',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            opacity: heroVisible ? 0 : 1,
+            transition: 'opacity 200ms ease',
+            pointerEvents: heroVisible ? 'none' : 'auto',
+          }}
+        >
+          {item.title}
+        </span>
+        {!heroVisible && (
+          <>
+            {item.isClosed ? (
+              <span style={{
+                flexShrink: 0,
+                fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: '#fff', background: 'var(--text-primary)',
+                padding: '4px 10px', borderRadius: 999,
+              }}>
+                {closedLabelFor(item)}
+              </span>
+            ) : (
+              <span style={{
+                flexShrink: 0,
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                fontSize: 12, fontWeight: 600,
+                color: isPriced ? 'var(--accent-amber)' : '#16A34A',
+                background: 'var(--bg-card)',
+                padding: '4px 10px', borderRadius: 999,
+                border: '1px solid var(--border-subtle)',
+              }}>
+                {isPriced && <IndianRupee size={11} strokeWidth={2.2} />}
+                <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
+              </span>
+            )}
+            {!item.isClosed && contactLinks.length > 0 && (
+              <button
+                aria-label={contactLinks[0].ariaLabel}
+                onClick={() => handleContactClick(contactLinks[0])}
+                style={{
+                  width: 36, height: 36, borderRadius: 999, border: 'none',
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <Mail size={15} strokeWidth={2} />
+              </button>
+            )}
+          </>
+        )}
       </header>
 
       {/* When there are no photos we collapse the 2-column grid into a
          single centered column so the right-hand info block isn't squeezed
-         into half-width with an empty void next to it. */}
+         into half-width with an empty void next to it.
+         Exception: when the owner can add photos we still show the 2-col
+         grid so the "+ Add photo" tile is visible in the left column. */}
       <div style={{
-        maxWidth: photos.length > 0 ? 1280 : 760,
+        maxWidth: (photos.length > 0 || canManage) ? 1280 : 760,
         margin: '0 auto',
         padding: '28px 32px 48px',
         display: 'grid',
-        gridTemplateColumns: photos.length > 0
+        gridTemplateColumns: (photos.length > 0 || canManage)
           ? 'minmax(0, 1.05fr) minmax(0, 1fr)'
           : 'minmax(0, 1fr)',
         gap: 48,
@@ -1000,8 +1238,9 @@ function DesktopLayout({
       }}>
         {/* ── LEFT: Photo carousel (sticky so it stays visible while reading).
              Rendered only when there's media; otherwise the right column
-             takes over the full width. */}
-        {photos.length > 0 && (
+             takes over the full width. The owner also sees a "+ Add photo"
+             tile here when no photos are present. */}
+        {photos.length > 0 ? (
         <div style={{
           position: 'sticky',
           top: 76,
@@ -1023,6 +1262,27 @@ function DesktopLayout({
               dotsPosition="bottom"
               radius={20}
             />
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setPhotoEditOpen(true)}
+                aria-label="Edit photos"
+                style={{
+                  position: 'absolute', top: 12, right: 12,
+                  zIndex: 10,
+                  width: 36, height: 36, borderRadius: 999,
+                  background: 'var(--bg-overlay)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: 'var(--text-primary)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Camera size={16} strokeWidth={1.8} />
+              </button>
+            )}
           </div>
 
           {/* Thumbnails strip below — quick jump for many photos */}
@@ -1060,6 +1320,38 @@ function DesktopLayout({
             </div>
           )}
         </div>
+        ) : canManage ? (
+          /* Owner, no photos yet — show a tappable "+ Add photo" tile. */
+          <div style={{ position: 'sticky', top: 76, alignSelf: 'start' }}>
+            <button
+              type="button"
+              onClick={() => setPhotoEditOpen(true)}
+              aria-label="Add photos"
+              style={{
+                width: '100%',
+                maxWidth: 560,
+                margin: '0 auto',
+                display: 'flex',
+                aspectRatio: '4 / 5',
+                borderRadius: 20,
+                background: 'var(--bg-inset)',
+                border: '2px dashed var(--border-default)',
+                flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 10,
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <ImagePlus size={36} strokeWidth={1.4} />
+              <span style={{ fontSize: 15, fontWeight: 600 }}>+ Add photo</span>
+            </button>
+          </div>
+        ) : null}
+        {/* Sentinel: when the bottom of the photo column leaves the viewport
+            the sticky header fades in the title+price+CTA strip. Placed in the
+            grid flow so it tracks the photo column's scroll position. */}
+        {photos.length > 0 && (
+          <div ref={heroSentinelRef} style={{ height: 0, gridColumn: '1', alignSelf: 'end' }} aria-hidden="true" />
         )}
 
         {/* ── RIGHT: Title, price, description, owner, actions ── */}
@@ -1349,37 +1641,16 @@ function DesktopLayout({
               </button>
             ) : (
               <>
-                {onMessage && (
-                  <button
-                    onClick={() => {
-                      onMessage(
-                        { id: item.user.id, name: item.user.name, initials: item.user.initials, color: item.user.color },
-                        item.id, item.title,
-                      );
-                    }}
-                    aria-label={`Message ${item.user.name} about ${item.title}`}
-                    style={{
-                      flex: '1 1 220px', minWidth: 0, height: 52, borderRadius: 14,
-                      background: 'var(--text-primary)', color: 'var(--bg-base)',
-                      border: 'none', cursor: 'pointer',
-                      fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    }}
-                  >
-                    <MessageCircle size={16} strokeWidth={2} /> Message on Wecycle
-                  </button>
-                )}
                 {contactLinks.map(link => (
                   <button
                     key={link.channel}
                     onClick={() => handleContactClick(link)}
                     aria-label={link.ariaLabel}
                     style={{
-                      flex: '1 1 200px', minWidth: 0, height: 52, borderRadius: 14,
-                      background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
-                      color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-primary)',
-                      border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-default)',
-                      cursor: 'pointer',
+                      flex: '1 1 220px', minWidth: 0, height: 52, borderRadius: 14,
+                      background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
+                      color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer',
                       fontSize: 15, fontWeight: 600,
                       letterSpacing: '-0.01em',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -1389,7 +1660,7 @@ function DesktopLayout({
                     {link.channel === 'whatsapp' ? `WhatsApp ${item.user.name.split(' ')[0]}` : `Email ${item.user.name.split(' ')[0]}`}
                   </button>
                 ))}
-                {!onMessage && contactLinks.length === 0 && (
+                {contactLinks.length === 0 && (
                   <button
                     onClick={() => onOpenStorefront?.(item.user)}
                     aria-label={`View ${item.user.name}'s profile`}
@@ -1492,6 +1763,16 @@ function DesktopLayout({
         targetUserId={item.user.id}
         targetLabel={`"${item.title}"`}
       />
+      {canManage && (
+        <PhotoEditDialog
+          open={photoEditOpen}
+          onOpenChange={setPhotoEditOpen}
+          initialUrls={currentPhotoUrlsForPicker}
+          bucket="listings"
+          allowVideo={!isRequestPost}
+          onSave={handleSavePhotos}
+        />
+      )}
     </div>
   );
 }

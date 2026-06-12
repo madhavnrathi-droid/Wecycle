@@ -26,7 +26,7 @@ interface SettingsScreenProps {
 export default function SettingsScreen({
   onBack, onOpenNotifications, onOpenFeedback, onOpenAccount,
 }: SettingsScreenProps) {
-  const { user, isDemo, signOut } = useAuth();
+  const { user, isDemo, signOut, profile } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(getSettings());
   const [pushOn, setPushOn] = useState(false);
@@ -296,35 +296,36 @@ export default function SettingsScreen({
       </Section>
 
       {/* ── CONTACT PREFERENCES ──
-         These drive which button(s) appear on YOUR posts. When both are on,
-         viewers see "Email you" + "WhatsApp you"; one is on → one CTA; none →
-         we fall back to email so the action is never dead. */}
+         Email is always on — every Wecycle account needs at least one
+         channel for contact, and email is the one guaranteed to exist.
+         WhatsApp is an optional add-on: only shown when the user has a
+         phone number on their profile, and only enabled when they
+         actively flip the toggle. */}
       <Section
         title="How others contact you"
-        hint="Choose the channels viewers use to message you about your posts."
+        hint="Email is always on. Add WhatsApp once your phone number is on your profile."
       >
         <Card>
           <Row
             label="Email"
-            hint="They open their mail app with your post pre-quoted."
+            hint="Always on — viewers open their mail app with your post pre-quoted. Required so people can reach you."
           >
-            <Toggle on={settings.contact.email} onChange={(v) => setContact({ email: v })} />
+            <Toggle on={true} onChange={() => {}} disabled />
           </Row>
           <Divider />
           <Row
-            label="WhatsApp"
-            hint="They open WhatsApp with a pre-filled message. Requires a phone on your account."
+            label={profile?.phone ? 'WhatsApp' : 'WhatsApp · Add a phone first'}
+            hint={profile?.phone
+              ? 'Viewers open WhatsApp with a pre-filled message about your post.'
+              : 'Add your phone number on the Account screen to enable WhatsApp contact.'}
           >
-            <Toggle on={settings.contact.whatsapp} onChange={(v) => setContact({ whatsapp: v })} />
+            <Toggle
+              on={!!profile?.phone && settings.contact.whatsapp}
+              onChange={(v) => setContact({ whatsapp: v })}
+              disabled={!profile?.phone}
+            />
           </Row>
         </Card>
-        {!settings.contact.email && !settings.contact.whatsapp && (
-          <p style={{
-            margin: '8px 4px 0', fontSize: 11, color: 'var(--accent-rose)', lineHeight: 1.4,
-          }}>
-            Both channels are off — Wecycle will still surface email as a fallback so people can reach you.
-          </p>
-        )}
       </Section>
 
       {/* ── MARKETPLACE ── */}
