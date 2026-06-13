@@ -47,8 +47,15 @@ export interface BannerSlide {
   /** Optional third line, shown only on the wide / desktop variant. */
   detail?: string;
   /** CSS gradient laid OVER the background (use rgba so the abstract blobs
-   *  underneath stay visible). */
+   *  underneath stay visible). Used as the fallback render when `image` is
+   *  absent or fails to load. */
   gradient: string;
+  /** Full-bleed banner artwork (e.g. /banners/share.png). When set and it
+   *  loads, the whole card is just this image — the gradient + doodles +
+   *  illustration + text overlay are skipped because the artwork already
+   *  contains all of that. If it 404s or errors, we fall back to the
+   *  gradient + text composition automatically (no broken-image state). */
+  image?: string;
   /** Fired when the slide is tapped / activated via keyboard. */
   onClick: () => void;
   ariaLabel?: string;
@@ -75,6 +82,12 @@ export default function MarketingBanner({
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* Slide ids whose `image` failed to load → fall back to the CSS render so
+     we never show a broken-image box (e.g. before the art is dropped in). */
+  const [imgErrored, setImgErrored] = useState<Set<string>>(new Set());
+  const markImgError = useCallback((id: string) => {
+    setImgErrored(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
 
   const goTo = useCallback((i: number, behavior: ScrollBehavior = 'smooth') => {
     const track = trackRef.current;
@@ -140,57 +153,77 @@ export default function MarketingBanner({
       onTouchEnd={() => resumeSoon()}
     >
       <div className="marketing-banner-track" ref={trackRef}>
-        {slides.map((slide, i) => (
+        {slides.map((slide, i) => {
+          const useImage = !!slide.image && !imgErrored.has(slide.id);
+          return (
           <button
             key={slide.id}
             type="button"
             onClick={slide.onClick}
             className="marketing-banner-slide"
             data-active={i === active || undefined}
+            data-art={useImage || undefined}
             aria-label={slide.ariaLabel ?? `${slide.title} — ${slide.subtitle}`}
             aria-roledescription="slide"
             aria-current={i === active ? 'true' : undefined}
           >
-            {/* Foreground accent gradient — provides legibility + color code. */}
-            <span
-              className="marketing-banner-gradient"
-              style={{ backgroundImage: slide.gradient }}
-              aria-hidden="true"
-            />
-
-            {/* Abstract hand-drawn-feel doodles behind the illustration. */}
-            <AbstractDoodles />
-
-            {/* Hand-drawn illustration via Iconify. Twemoji set looks loose
-                and abstract — feels hand-crafted vs the literal photo. */}
-            <span className="marketing-banner-illu-wrap" aria-hidden="true">
+            {useImage ? (
+              /* ── Full-bleed artwork — the graphic already bakes in the
+                 gradient, illustration, headline + arrow, so nothing else
+                 renders on top. Falls back to the CSS composition if it
+                 fails to load. ── */
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
-                src={iconifyUrl(slide.illustration)}
-                alt=""
-                className="marketing-banner-illu"
-                width={variant === 'wide' ? 110 : 56}
-                height={variant === 'wide' ? 110 : 56}
-                loading="lazy"
+                src={slide.image}
+                alt={slide.ariaLabel ?? `${slide.title} — ${slide.subtitle}`}
+                className="marketing-banner-art"
+                loading={i === 0 ? 'eager' : 'lazy'}
                 decoding="async"
                 draggable={false}
+                onError={() => markImgError(slide.id)}
               />
-            </span>
+            ) : (
+              <>
+                {/* Foreground accent gradient — legibility + colour code. */}
+                <span
+                  className="marketing-banner-gradient"
+                  style={{ backgroundImage: slide.gradient }}
+                  aria-hidden="true"
+                />
 
-            <span className="marketing-banner-text">
-              <span className="marketing-banner-title">{slide.title}</span>
-              <span className="marketing-banner-subtitle">{slide.subtitle}</span>
-              {variant === 'wide' && slide.detail && (
-                <span className="marketing-banner-detail">{slide.detail}</span>
-              )}
-            </span>
+                {/* Abstract hand-drawn-feel doodles behind the illustration. */}
+                <AbstractDoodles />
 
-            <span className="marketing-banner-arrow" aria-hidden="true">
-              {/* Size adapts via CSS for the wide variant; the SVG size here
-                 is the medium-of-both so it scales crisp on either device. */}
-              <ArrowUpRight size={variant === 'wide' ? 15 : 13} strokeWidth={2.4} />
-            </span>
+                {/* Hand-drawn illustration via Iconify. */}
+                <span className="marketing-banner-illu-wrap" aria-hidden="true">
+                  <img
+                    src={iconifyUrl(slide.illustration)}
+                    alt=""
+                    className="marketing-banner-illu"
+                    width={variant === 'wide' ? 110 : 56}
+                    height={variant === 'wide' ? 110 : 56}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                  />
+                </span>
+
+                <span className="marketing-banner-text">
+                  <span className="marketing-banner-title">{slide.title}</span>
+                  <span className="marketing-banner-subtitle">{slide.subtitle}</span>
+                  {variant === 'wide' && slide.detail && (
+                    <span className="marketing-banner-detail">{slide.detail}</span>
+                  )}
+                </span>
+
+                <span className="marketing-banner-arrow" aria-hidden="true">
+                  <ArrowUpRight size={variant === 'wide' ? 15 : 13} strokeWidth={2.4} />
+                </span>
+              </>
+            )}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {slides.length > 1 && (

@@ -39,7 +39,7 @@ interface FeedScreenProps {
   onOpenLF?: (lf: LostItem) => void;
   /** Banner CTA — fired when a marketing-banner slide is tapped.
    *  kind = which feature the user wants to jump to. */
-  onBannerAction?: (kind: 'share' | 'request' | 'events' | 'lost-found') => void;
+  onBannerAction?: (kind: 'share' | 'request' | 'events' | 'lost-found' | 'invite') => void;
   /** Fired when a user-search-result card is tapped. Routes to the
    *  matching storefront. */
   onOpenUser?: (userId: string) => void;
@@ -278,6 +278,7 @@ export default function FeedScreen({
   const bannerSlides: BannerSlide[] = [
     {
       id: 'share',
+      image: '/banners/share.png',
       illustration: 'twemoji:wrapped-gift',
       title: 'Share what you don’t use',
       subtitle: 'Give it a second life nearby',
@@ -288,6 +289,7 @@ export default function FeedScreen({
     },
     {
       id: 'request',
+      image: '/banners/request.png',
       illustration: 'twemoji:raising-hand',
       title: 'Ask for what you need',
       subtitle: 'Borrow before you buy',
@@ -298,6 +300,7 @@ export default function FeedScreen({
     },
     {
       id: 'events',
+      image: '/banners/events.png',
       illustration: 'twemoji:tear-off-calendar',
       title: 'Join local events',
       subtitle: 'Repair cafés, swaps, cleanups',
@@ -308,6 +311,7 @@ export default function FeedScreen({
     },
     {
       id: 'lost-found',
+      image: '/banners/lost-found.png',
       illustration: 'twemoji:magnifying-glass-tilted-left',
       title: 'Lost something?',
       subtitle: 'Or help return what you found',
@@ -315,6 +319,18 @@ export default function FeedScreen({
       gradient:
         'linear-gradient(135deg, rgba(234,179,8,0.92) 0%, rgba(217,119,6,0.88) 100%)',
       onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'lost-found' }); onBannerAction?.('lost-found'); },
+    },
+    {
+      id: 'mahe',
+      image: '/banners/mahe.png',
+      illustration: 'twemoji:graduation-cap',
+      title: 'For MAHE, by MAHE',
+      subtitle: 'Built for our campus',
+      detail: 'Invite a friend — the more of us here, the more there is to share.',
+      gradient:
+        'linear-gradient(135deg, rgba(37,99,235,0.92) 0%, rgba(168,85,247,0.9) 55%, rgba(34,197,94,0.9) 100%)',
+      ariaLabel: 'For MAHE, by MAHE — invite a friend to Wecycle',
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'mahe' }); onBannerAction?.('invite'); },
     },
   ];
 

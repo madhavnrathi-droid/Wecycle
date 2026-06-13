@@ -235,6 +235,27 @@ export default function WecycleApp() {
   const openShareItem   = () => requireAuth('share-item');
   const openPostRequest = () => requireAuth('post-request');
   const openSubmitEvent = () => requireAuth('submit-event');
+
+  /* Native share sheet → "invite a friend". Used by the drawer's Invite
+     item and the "For MAHE, by MAHE" marketing slide. Falls back to
+     clipboard when the Web Share API isn't available (desktop browsers). */
+  const inviteFriends = () => {
+    if (typeof window === 'undefined') return;
+    const shareUrl = window.location.origin || 'https://wecycle.page';
+    const nav = window.navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    if (typeof nav.share === 'function') {
+      nav.share({
+        title: 'Wecycle',
+        text: 'Join me on Wecycle — circulate resources in our community.',
+        url: shareUrl,
+      }).catch(() => {});
+    } else if (nav.clipboard?.writeText) {
+      nav.clipboard.writeText(shareUrl).then(
+        () => window.alert('Link copied — share it with a friend!'),
+        () => {},
+      );
+    }
+  };
   const openReportLF    = (status?: 'lost' | 'found') => {
     setLfDefaultStatus(status);
     requireAuth('report-lf');
@@ -279,23 +300,7 @@ export default function WecycleApp() {
       if (id === 'feedback')  { setSubStack(['feedback']);      return; }
       if (id === 'tour')      { track(EVT.tour_replayed); setActiveScreen('feed'); setShowTour(true); return; }
       if (id === 'invite') {
-        if (typeof window === 'undefined') return;
-        const shareUrl = window.location.origin || 'https://wecycle.page';
-        const nav = window.navigator as Navigator & {
-          share?: (d: ShareData) => Promise<void>;
-        };
-        if (typeof nav.share === 'function') {
-          nav.share({
-            title: 'Wecycle',
-            text: 'Join me on Wecycle — circulate resources in our community.',
-            url: shareUrl,
-          }).catch(() => {});
-        } else if (nav.clipboard?.writeText) {
-          nav.clipboard.writeText(shareUrl).then(
-            () => window.alert('Link copied — share it with a friend!'),
-            () => {},
-          );
-        }
+        inviteFriends();
         return;
       }
       if (id === 'mission') {
@@ -461,6 +466,7 @@ export default function WecycleApp() {
                 else if (kind === 'request') openPostRequest();
                 else if (kind === 'events')  setActiveScreen('events');
                 else if (kind === 'lost-found') setActiveScreen('lost_found');
+                else if (kind === 'invite')  inviteFriends();
               }}
               onOpenUser={async (userId) => {
                 /* Search-result tap → load the full profile shape the

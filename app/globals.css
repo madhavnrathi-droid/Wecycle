@@ -925,6 +925,19 @@ body {
 }
 .marketing-banner-slide:active { transform: scale(0.99); }
 
+/* Full-bleed artwork slide — the image IS the slide. Cover the whole card,
+   no padding, so the supplied graphic edge-to-edge. The slide drops its
+   flex padding when carrying art via [data-art]. */
+.marketing-banner-slide[data-art] { padding: 0 !important; align-items: stretch; }
+.marketing-banner-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  user-select: none;
+}
+
 /* Compact slide layout: vertical, text bottom-anchored. */
 .marketing-banner-compact .marketing-banner-slide {
   padding: 10px 12px 18px;
