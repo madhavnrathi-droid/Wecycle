@@ -20,6 +20,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { X, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { track, EVT } from '../lib/analytics';
+import { Logomark } from './Brand';
 
 export const ONBOARDING_KEY = 'wecycle.onboarding.v1.done';
 
@@ -347,6 +348,11 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
           </button>
         </div>
 
+        {!current.selector && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 10px' }}>
+            <Logomark size={60} alt="" />
+          </div>
+        )}
         <h3 style={{
           margin: '0 0 6px', fontSize: 17, fontWeight: 700,
           letterSpacing: '-0.02em',

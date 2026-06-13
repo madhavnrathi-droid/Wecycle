@@ -28,6 +28,7 @@ import { createDemoSession, initialsOf } from '../lib/demoAuth';
 import { setDemoMode } from '../lib/demoMode';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
+import { Logomark } from './Brand';
 
 type Step = 'email' | 'code';
 type AuthMode = 'signin' | 'signup';
@@ -279,6 +280,10 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
       <form id="auth-form" onSubmit={onFormSubmit} noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
       >
+        {/* ── Brand logomark — centered above the form ── */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: -4, marginBottom: 2 }}>
+          <Logomark size={56} alt="" />
+        </div>
         {step === 'email' ? (
           <>
             {/* ── Segmented control ── */}

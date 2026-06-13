@@ -14,7 +14,7 @@
 
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet, View, ActivityIndicator, Text, useColorScheme } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Image, useColorScheme } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
@@ -125,13 +125,16 @@ export default function App() {
               { backgroundColor: isDark ? '#0C0C0B' : '#FAFAF8' },
             ]}
           >
+            <Image
+              source={require('./assets/logomark.png')}
+              style={styles.loaderLogo}
+              resizeMode="contain"
+              accessibilityLabel="Wecycle"
+            />
             <ActivityIndicator
-              size="large"
+              size="small"
               color={isDark ? '#C4F649' : '#0C0C0B'}
             />
-            <Text style={[styles.loaderLabel, { color: isDark ? '#FAFAF8' : '#0C0C0B' }]}>
-              Wecycle
-            </Text>
           </View>
         )}
       </SafeAreaView>
@@ -149,10 +152,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
-  loaderLabel: {
-    marginTop: 14,
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1,
+  loaderLogo: {
+    width: 84,
+    height: 84,
   },
 });

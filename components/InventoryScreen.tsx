@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
+import { Wordmark } from './Brand';
 import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem } from '../lib/mockData';
 import { resolveItemMedia, getEventPhoto, getAvatar, getLostFoundPhoto } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
@@ -175,13 +176,8 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
           >
             <Menu size={20} strokeWidth={1.8} />
           </button>
-          <span style={{
-            flex: 1, textAlign: 'center',
-            fontWeight: 600, fontSize: 18,
-            letterSpacing: '-0.02em',
-            color: 'var(--text-primary)',
-          }}>
-            wecycle
+          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <Wordmark height={22} />
           </span>
           <button
             aria-label="Profile"

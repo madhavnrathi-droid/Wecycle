@@ -5,6 +5,7 @@ import {
   Menu, Eye, Bookmark, Share2, MessageCircle, Plus, Bell,
   Clock, IndianRupee, MapPin, MoreHorizontal, Users, CalendarDays,
 } from 'lucide-react';
+import { Wordmark } from './Brand';
 import {
   MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS,
   type MarketplaceItem, type CommunityEvent,
@@ -97,13 +98,8 @@ export default function ActivityScreen({
           >
             <Menu size={20} strokeWidth={1.8} />
           </button>
-          <span style={{
-            flex: 1, textAlign: 'center',
-            fontWeight: 600, fontSize: 18,
-            letterSpacing: '-0.02em',
-            color: 'var(--text-primary)',
-          }}>
-            wecycle
+          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <Wordmark height={22} />
           </span>
           <button
             aria-label="Your profile"

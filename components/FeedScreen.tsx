@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye } from 'lucide-react';
+import { Wordmark } from './Brand';
 import {
   MARKETPLACE_ITEMS, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
   type MarketplaceItem, type CommunityEvent, type LostItem,
@@ -337,13 +338,8 @@ export default function FeedScreen({
           >
             <Menu size={20} strokeWidth={1.8} />
           </button>
-          <span style={{
-            flex: 1, textAlign: 'center',
-            fontWeight: 600, fontSize: 18,
-            letterSpacing: '-0.02em',
-            color: 'var(--text-primary)',
-          }}>
-            wecycle
+          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <Wordmark height={22} />
           </span>
           <button
             aria-label="Your profile"

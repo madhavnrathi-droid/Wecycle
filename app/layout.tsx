@@ -26,11 +26,15 @@ const GTM_ID = "GTM-T59PDHDF";
 const GA4_MEASUREMENT_ID = "G-FR9104LN7N";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://wecycle-seven.vercel.app"),
   title: "Wecycle — Community Operating System",
   description:
     "Circulate resources within your community — share, swap, repair, and request what you need. Built for campuses, apartments, and neighborhoods.",
   manifest: "/manifest.json",
   applicationName: "Wecycle",
+  /* Favicon + apple-touch-icon come from app/icon.png and app/apple-icon.png
+     (Next App Router file conventions) — no manual <link> needed. PWA install
+     icons live in manifest.json. */
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -44,11 +48,13 @@ export const metadata: Metadata = {
     title: "Wecycle — Community Operating System",
     description: "Circulate resources within your community.",
     siteName: "Wecycle",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Wecycle" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Wecycle",
     description: "Circulate resources within your community.",
+    images: ["/og-image.png"],
   },
   /* Hint to the OS that this is an installable PWA */
   other: {
@@ -81,7 +87,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+        {/* apple-touch-icon + favicon are emitted from metadata.icons above */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

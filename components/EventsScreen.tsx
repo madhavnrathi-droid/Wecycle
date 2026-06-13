@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
+import { Wordmark } from './Brand';
 import { EVENTS, type CommunityEvent } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
@@ -151,13 +152,8 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
           >
             <Menu size={20} strokeWidth={1.8} />
           </button>
-          <span style={{
-            flex: 1, textAlign: 'center',
-            fontWeight: 600, fontSize: 18,
-            letterSpacing: '-0.02em',
-            color: 'var(--text-primary)',
-          }}>
-            wecycle
+          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <Wordmark height={22} />
           </span>
           <button
             aria-label="Your profile"
