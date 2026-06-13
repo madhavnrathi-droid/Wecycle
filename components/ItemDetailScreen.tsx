@@ -344,6 +344,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     price: isPriced ? item.price : undefined,
     badge: isPriced ? undefined : priceLabel,
     location: item.location,
+    byName: item.user.name,
+    byEmail: item.user.email,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
   };
 
   /* Convenience: when only one channel is on, the primary CTA carries the
@@ -1177,6 +1180,9 @@ function DesktopLayout({
     price: isPriced ? item.price : undefined,
     badge: isPriced ? undefined : priceLabel,
     location: item.location,
+    byName: item.user.name,
+    byEmail: item.user.email,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
   };
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,

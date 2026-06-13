@@ -241,6 +241,9 @@ export default function EventDetailScreen({
     imageUrls: displayPhotos.filter(u => !!u && /^https?:|^\//.test(u)),
     dateLine: [event.date, event.time].filter(Boolean).join(' · '),
     location: event.location,
+    byName: event.organizer?.name,
+    byEmail: event.organizer?.email,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${event.id}` : undefined,
   };
   const handleShareEvent = () => {
     track(EVT.share_clicked, { post_id: event.id, post_kind: 'event' });
@@ -281,13 +284,10 @@ export default function EventDetailScreen({
         }}>
           {TYPE_LABEL[event.eventType]}
         </span>
-        {/* Header right-side: share for guests, RSVP confirmation for going.
-           Owners just see a spacer (their editing happens in-place below,
-           with the Save CTA at the bottom). */}
-        {isOwner ? (
-          <span style={{ width: 36 }} aria-hidden="true" />
-        ) : (
-          <div style={{ display: 'flex', gap: 4 }}>
+        {/* Header right-side: everyone (incl. owners) can share; the calendar
+           add is guest-only since owners already know their own event. */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {!isOwner && (
             <button
               aria-label="Add to calendar"
               className="theme-toggle"
@@ -295,15 +295,15 @@ export default function EventDetailScreen({
             >
               <CalendarDays size={17} strokeWidth={1.8} />
             </button>
-            <button
-              aria-label="Share event"
-              className="theme-toggle"
-              onClick={handleShareEvent}
-            >
-              <Share2 size={17} strokeWidth={1.8} />
-            </button>
-          </div>
-        )}
+          )}
+          <button
+            aria-label="Share event"
+            className="theme-toggle"
+            onClick={handleShareEvent}
+          >
+            <Share2 size={17} strokeWidth={1.8} />
+          </button>
+        </div>
       </header>
 
       {/* ── DESKTOP 2-COLUMN WRAPPER ──

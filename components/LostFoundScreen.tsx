@@ -436,6 +436,9 @@ export function LostFoundDetailSheet({
     imageUrls: displayPhotoUrl && /^https?:|^\//.test(displayPhotoUrl) ? [displayPhotoUrl] : [],
     location: item.lastSeen,
     reward: item.reward,
+    byName: item.user.name,
+    byEmail: item.user.email,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
   };
   const handleShareLF = () => {
     track(EVT.share_clicked, { post_id: item.id, post_kind: 'lostfound' });

@@ -1,26 +1,27 @@
 'use client';
 
 /*
- * ShareCardModal — the "your card is ready" moment (Spotify-style).
+ * ShareCardModal — the "your card is ready" moment.
  *
- * Opens from any post's Share action. On open it renders the post into a
- * 4:5 PNG via lib/shareCard, previews it, and offers three actions:
- *   • Share  → native share sheet with the image file (Stories/WhatsApp/…)
- *   • Save   → download the PNG (and copy the link)
- *   • Copy link
- *
- * The preview is the exact generated image, so what the user sees is what
- * gets shared.
+ * Renders the post into a 4:5 PNG (lib/shareCard) and previews it with a
+ * snappy GSAP entrance + tasteful synthesised sound. Actions:
+ *   • Share  → shares a LINK to the product page (native sheet / clipboard),
+ *              NOT a screenshot. A success pop + chime confirms.
+ *   • Save   → downloads the card PNG.
+ *   • Copy   → copies the product link.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { X, Share2, Download, Link2, Loader2, Check } from 'lucide-react';
+import gsap from 'gsap';
 import {
-  renderShareCard, shareCardBlob, downloadCardBlob,
+  renderShareCard, downloadCardBlob,
   type ShareCardSpec,
 } from '../lib/shareCard';
+import { shareLink } from '../lib/share';
+import { sfxOpen, sfxShare, sfxTap } from '../lib/sfx';
 import { haptics } from '../lib/haptics';
 
 interface Props {
@@ -35,44 +36,87 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  /* Render whenever the modal opens with a spec. Keyed on the title so
-     re-opening for a different post regenerates. */
+  const cardRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const playedRef = useRef(false);
+
+  /* Render whenever the modal opens with a spec. */
   useEffect(() => {
     if (!open || !spec) return;
     let cancelled = false;
     setDataUrl(null);
     setBlob(null);
     setToast(null);
+    playedRef.current = false;
     (async () => {
       try {
         const r = await renderShareCard(spec);
         if (cancelled) return;
         setDataUrl(r.dataUrl);
         setBlob(r.blob);
-      } catch { /* leave preview empty; buttons will no-op gracefully */ }
+      } catch { /* leave empty */ }
     })();
     return () => { cancelled = true; };
-  }, [open, spec?.kind, spec?.title, spec?.imageUrls?.join('|'), spec?.price, spec?.badge, spec?.dateLine, spec?.location]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, spec?.kind, spec?.title, spec?.imageUrls?.join('|'), spec?.price, spec?.badge, spec?.dateLine, spec?.location, spec?.byName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Snappy entrance for the whole sheet when it mounts. */
+  useEffect(() => {
+    if (!open || !cardRef.current) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { gsap.set(cardRef.current, { clearProps: 'all' }); return; }
+    gsap.fromTo(
+      cardRef.current,
+      { scale: 0.9, y: 26, autoAlpha: 0 },
+      { scale: 1, y: 0, autoAlpha: 1, duration: 0.55, ease: 'back.out(1.6)' },
+    );
+  }, [open]);
+
+  /* When the card image lands, pop it in + play the bloom sound (once). */
+  useEffect(() => {
+    if (!dataUrl || !previewRef.current || playedRef.current) return;
+    playedRef.current = true;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    sfxOpen();
+    if (!reduce) {
+      gsap.fromTo(
+        previewRef.current,
+        { scale: 0.96, autoAlpha: 0.4 },
+        { scale: 1, autoAlpha: 1, duration: 0.5, ease: 'back.out(2)' },
+      );
+    }
+  }, [dataUrl]);
 
   const flashToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
   };
 
+  const successPop = () => {
+    if (!previewRef.current) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    gsap.fromTo(previewRef.current, { scale: 1 }, { scale: 1.045, duration: 0.13, ease: 'power2.out', yoyo: true, repeat: 1 });
+  };
+
   const onShare = async () => {
     if (!spec || busy) return;
     setBusy(true);
     haptics.medium();
-    const res = await shareCardBlob(blob, spec);
+    /* Share the LINK to the product page (not the screenshot). */
+    const res = await shareLink({
+      title: spec.title,
+      text: shareText(spec),
+      url: spec.url,
+    });
     setBusy(false);
-    if (res === 'shared') flashToast('Shared!');
-    else if (res === 'downloaded') flashToast('Saved to your device');
-    else flashToast("Couldn't share — try Save");
+    if (res === 'shared') { sfxShare(); successPop(); flashToast('Shared!'); }
+    else if (res === 'copied') { sfxShare(); successPop(); flashToast('Link copied'); }
+    else flashToast("Couldn't share");
   };
 
   const onSave = async () => {
     if (!spec || busy) return;
     setBusy(true);
+    sfxTap();
     const res = await downloadCardBlob(blob, spec);
     setBusy(false);
     flashToast(res === 'downloaded' ? 'Saved to your device' : "Couldn't save");
@@ -80,6 +124,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
 
   const onCopy = async () => {
     if (!spec) return;
+    sfxTap();
     const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : '');
     try {
       await navigator.clipboard?.writeText(url);
@@ -105,96 +150,109 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
             position: 'fixed', left: '50%', top: '50%',
             transform: 'translate(-50%, -50%)',
             width: 'min(420px, 94vw)',
+            zIndex: 301,
+          }}
+        >
+          <div ref={cardRef} style={{
             maxHeight: '94svh', overflowY: 'auto',
             background: 'var(--bg-card)',
             borderRadius: 24,
             padding: '18px 18px 22px',
-            zIndex: 301,
             boxShadow: '0 30px 80px rgba(0,0,0,0.4)',
             display: 'flex', flexDirection: 'column', gap: 16,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-              Share card
-            </span>
-            <Dialog.Close asChild>
-              <button aria-label="Close" className="theme-toggle" style={{ width: 34, height: 34 }}>
-                <X size={17} strokeWidth={2} />
-              </button>
-            </Dialog.Close>
-          </div>
-          <VisuallyHidden><Dialog.Title>Share this post as a card</Dialog.Title></VisuallyHidden>
-
-          {/* Preview — exact generated image, 4:5. */}
-          <div style={{
-            position: 'relative',
-            width: '100%', aspectRatio: '4 / 5',
-            borderRadius: 18, overflow: 'hidden',
-            background: 'var(--bg-inset)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {dataUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={dataUrl} alt="Shareable card preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            ) : (
-              <Loader2 size={28} strokeWidth={2} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--text-muted)' }} />
-            )}
-            {toast && (
-              <div role="status" style={{
-                position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(12,14,18,0.86)', color: '#fff',
-                padding: '8px 14px', borderRadius: 999,
-                fontSize: 12.5, fontWeight: 600,
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                whiteSpace: 'nowrap',
-              }}>
-                <Check size={13} strokeWidth={2.5} /> {toast}
-              </div>
-            )}
-          </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+                Share card
+              </span>
+              <Dialog.Close asChild>
+                <button aria-label="Close" className="theme-toggle" style={{ width: 34, height: 34 }}>
+                  <X size={17} strokeWidth={2} />
+                </button>
+              </Dialog.Close>
+            </div>
+            <VisuallyHidden><Dialog.Title>Share this post</Dialog.Title></VisuallyHidden>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              type="button"
-              onClick={onShare}
-              disabled={!dataUrl || busy}
-              style={{
-                flex: 1, height: 50, borderRadius: 14, border: 'none',
-                background: 'var(--accent-lime, #C4F649)', color: '#0C1B0C',
-                fontSize: 14.5, fontWeight: 700, cursor: dataUrl && !busy ? 'pointer' : 'not-allowed',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: !dataUrl || busy ? 0.6 : 1,
-              }}
-            >
-              {busy
-                ? <Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />
-                : <Share2 size={16} strokeWidth={2.2} />}
-              Share
-            </button>
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!dataUrl || busy}
-              aria-label="Save image"
-              className="theme-toggle"
-              style={{ width: 50, height: 50, borderRadius: 14 }}
-            >
-              <Download size={18} strokeWidth={1.9} />
-            </button>
-            <button
-              type="button"
-              onClick={onCopy}
-              aria-label="Copy link"
-              className="theme-toggle"
-              style={{ width: 50, height: 50, borderRadius: 14 }}
-            >
-              <Link2 size={18} strokeWidth={1.9} />
-            </button>
+            {/* Preview — exact generated image, 4:5. */}
+            <div ref={previewRef} style={{
+              position: 'relative',
+              width: '100%', aspectRatio: '4 / 5',
+              borderRadius: 18, overflow: 'hidden',
+              background: 'var(--bg-inset)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {dataUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={dataUrl} alt="Shareable card preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <Loader2 size={28} strokeWidth={2} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--text-muted)' }} />
+              )}
+              {toast && (
+                <div role="status" style={{
+                  position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
+                  background: 'rgba(12,14,18,0.86)', color: '#fff',
+                  padding: '8px 14px', borderRadius: 999,
+                  fontSize: 12.5, fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  whiteSpace: 'nowrap',
+                }}>
+                  <Check size={13} strokeWidth={2.5} /> {toast}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={onShare}
+                disabled={busy}
+                style={{
+                  flex: 1, height: 50, borderRadius: 14, border: 'none',
+                  background: 'var(--accent-lime, #C4F649)', color: '#0C1B0C',
+                  fontSize: 14.5, fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                {busy
+                  ? <Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />
+                  : <Share2 size={16} strokeWidth={2.2} />}
+                Share link
+              </button>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={!dataUrl || busy}
+                aria-label="Save image"
+                className="theme-toggle"
+                style={{ width: 50, height: 50, borderRadius: 14 }}
+              >
+                <Download size={18} strokeWidth={1.9} />
+              </button>
+              <button
+                type="button"
+                onClick={onCopy}
+                aria-label="Copy link"
+                className="theme-toggle"
+                style={{ width: 50, height: 50, borderRadius: 14 }}
+              >
+                <Link2 size={18} strokeWidth={1.9} />
+              </button>
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+function shareText(spec: ShareCardSpec): string {
+  switch (spec.kind) {
+    case 'request': return `Looking for "${spec.title}" on Wecycle`;
+    case 'event':   return `${spec.title}${spec.dateLine ? ` · ${spec.dateLine}` : ''} — on Wecycle`;
+    case 'lost':    return `Lost: "${spec.title}" — seen it? Help out on Wecycle`;
+    case 'found':   return `Found: "${spec.title}" — is it yours? On Wecycle`;
+    default:        return `"${spec.title}"${spec.price != null ? ` — ₹${spec.price}` : ''} on Wecycle`;
+  }
 }

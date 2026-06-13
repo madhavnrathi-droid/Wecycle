@@ -40,7 +40,11 @@ export interface ShareCardSpec {
   dateLine?: string;
   /** L&F reward note. */
   reward?: string;
-  /** Link to share alongside the image. Defaults to current URL. */
+  /** Uploader's display name — shown as the byline. */
+  byName?: string;
+  /** Uploader's email — shown under the byline. */
+  byEmail?: string;
+  /** Deep link to the post. Defaults to current URL. */
   url?: string;
 }
 
@@ -151,199 +155,181 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   ]);
   const photos = photoImgs.filter((p): p is HTMLImageElement => !!p);
 
+  const ix = 72; // left content margin
+
   const paint = (useImages: boolean) => {
     ctx.clearRect(0, 0, W, H);
 
-    // ── Charcoal surface ──
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#16171A');
-    bg.addColorStop(1, '#0B0B0D');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
-
-    const HEADER = 150;
-    const heroY = HEADER;
-    const heroH = 800;
-    const heroBottom = heroY + heroH; // 950
-
-    // ── Hero photo (full-bleed) ──
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, heroY, W, heroH);
-    ctx.clip();
+    // ── Full-bleed hero photo (the whole card) ──
     const hero = useImages ? photos[0] : null;
     if (hero) {
-      coverDraw(ctx, hero, 0, heroY, W, heroH);
+      coverDraw(ctx, hero, 0, 0, W, H);
     } else {
-      const pg = ctx.createLinearGradient(0, heroY, W, heroBottom);
-      pg.addColorStop(0, '#23252B');
-      pg.addColorStop(1, '#15161A');
+      const pg = ctx.createLinearGradient(0, 0, W, H);
+      pg.addColorStop(0, '#24262C');
+      pg.addColorStop(1, '#121317');
       ctx.fillStyle = pg;
-      ctx.fillRect(0, heroY, W, heroH);
-      ctx.font = `300px ${FONT}`;
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = `320px ${FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(kind.glyph, W / 2, heroY + heroH / 2);
+      ctx.fillText(kind.glyph, W / 2, H / 2);
     }
-    // Top scrim (for the price pill) + bottom scrim (for thumbs).
-    const topScrim = ctx.createLinearGradient(0, heroY, 0, heroY + 200);
-    topScrim.addColorStop(0, 'rgba(0,0,0,0.42)');
+
+    // Top + bottom scrims so the overlaid text always reads.
+    const topScrim = ctx.createLinearGradient(0, 0, 0, 440);
+    topScrim.addColorStop(0, 'rgba(0,0,0,0.62)');
     topScrim.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = topScrim;
-    ctx.fillRect(0, heroY, W, 200);
-    if (useImages && photos.length > 1) {
-      const botScrim = ctx.createLinearGradient(0, heroBottom - 240, 0, heroBottom);
-      botScrim.addColorStop(0, 'rgba(0,0,0,0)');
-      botScrim.addColorStop(1, 'rgba(0,0,0,0.55)');
-      ctx.fillStyle = botScrim;
-      ctx.fillRect(0, heroBottom - 240, W, 240);
-    }
-    ctx.restore();
+    ctx.fillRect(0, 0, W, 440);
+    const botScrim = ctx.createLinearGradient(0, H - 460, 0, H);
+    botScrim.addColorStop(0, 'rgba(0,0,0,0)');
+    botScrim.addColorStop(1, 'rgba(0,0,0,0.74)');
+    ctx.fillStyle = botScrim;
+    ctx.fillRect(0, H - 460, W, 460);
 
-    // ── Price / status pill, top-left of hero ──
+    // ── Top-right brand "dent": soft white circular bloom + logomark ──
+    const cx = W - 132, cy = 150;
+    const bloom = ctx.createRadialGradient(cx, cy, 10, cx, cy, 190);
+    bloom.addColorStop(0, 'rgba(255,255,255,0.9)');
+    bloom.addColorStop(0.55, 'rgba(255,255,255,0.55)');
+    bloom.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = bloom;
+    ctx.fillRect(cx - 200, cy - 200, 400, 400);
+    // Crisp white disc with a feathered rim for the "soft dent" look.
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = 26;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 82, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.restore();
+    if (logo) {
+      const ls = 86;
+      ctx.drawImage(logo, cx - ls / 2, cy - ls / 2, ls, ls);
+    }
+
+    // ── Top-left: title · subtitle · price/status pill ──
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    let y = 158;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `800 80px ${FONT}`;
+    const titleLines = wrapText(ctx, spec.title, W - ix - 240, 2);
+    for (const ln of titleLines) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 18;
+      ctx.fillText(ln, ix, y);
+      ctx.restore();
+      y += 92;
+    }
+
+    // Subtitle (kind tagline).
+    const tagline: Record<ShareCardKind, string> = {
+      item: 'Up for grabs nearby', request: 'Wanted on campus',
+      event: spec.dateLine || 'Happening on campus',
+      lost: 'Lost — help reunite it', found: 'Found — claim it',
+    };
+    ctx.font = `500 38px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 14;
+    ctx.fillText(wrapText(ctx, tagline[spec.kind], W - ix - 240, 1)[0], ix, y + 6);
+    ctx.restore();
+    y += 64;
+
+    // Price / status pill.
     const pillText =
       spec.price != null ? `₹ ${spec.price.toLocaleString('en-IN')}` :
       spec.badge ? spec.badge :
-      (spec.kind === 'lost' || spec.kind === 'found') ? kind.word :
-      spec.dateLine ? spec.dateLine : '';
+      (spec.kind === 'lost' || spec.kind === 'found') ? kind.word : '';
     if (pillText) {
-      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 38px ${FONT}`;
+      ctx.font = `700 40px ${FONT}`;
       const tw = ctx.measureText(pillText).width;
-      const ph = 64;
-      const pw = tw + 52;
-      const px = 40, py = heroY + 28;
+      const ph = 70, pw = tw + 56;
       ctx.save();
-      roundRect(ctx, px, py, pw, ph, ph / 2);
-      ctx.fillStyle = 'rgba(8,9,11,0.62)';
+      roundRect(ctx, ix, y, pw, ph, ph / 2);
+      ctx.fillStyle = 'rgba(8,9,11,0.66)';
       ctx.fill();
       ctx.restore();
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(pillText, px + 26, py + ph / 2 + 1);
+      ctx.fillText(pillText, ix + 28, y + ph / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
     }
 
-    // ── Thumbnail filmstrip (the OTHER photos), bottom of hero ──
+    // ── Bottom-right: thumbnail strip of the OTHER photos ──
     if (useImages && photos.length > 1) {
-      const extra = photos.slice(1, 6);
-      const t = 104, gap = 14, ty = heroBottom - 28 - t;
-      let tx = 40;
-      const maxShown = Math.min(extra.length, 4);
+      const extra = photos.slice(1, 5);
+      const t = 96, gap = 12;
+      const maxShown = Math.min(extra.length, 3);
+      const stripW = maxShown * t + (maxShown - 1) * gap;
+      let tx = W - 72 - stripW;
+      const ty = H - 250 - t;
       for (let i = 0; i < maxShown; i++) {
         ctx.save();
-        roundRect(ctx, tx, ty, t, t, 20);
+        roundRect(ctx, tx, ty, t, t, 18);
         ctx.clip();
         coverDraw(ctx, extra[i], tx, ty, t, t);
         ctx.restore();
         ctx.save();
-        roundRect(ctx, tx, ty, t, t, 20);
+        roundRect(ctx, tx, ty, t, t, 18);
         ctx.lineWidth = 3;
-        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
         ctx.stroke();
         ctx.restore();
-        // "+N" badge on the last tile when there are more.
         if (i === maxShown - 1 && photos.length - 1 > maxShown) {
           ctx.save();
-          roundRect(ctx, tx, ty, t, t, 20);
+          roundRect(ctx, tx, ty, t, t, 18);
           ctx.fillStyle = 'rgba(0,0,0,0.55)';
           ctx.fill();
           ctx.restore();
           ctx.fillStyle = '#fff';
-          ctx.font = `700 40px ${FONT}`;
+          ctx.font = `700 38px ${FONT}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(`+${photos.length - 1 - maxShown + 1}`, tx + t / 2, ty + t / 2 + 1);
           ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
         }
         tx += t + gap;
       }
     }
 
-    // ── White header band (drawn last so it sits cleanly above the hero) ──
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, HEADER);
-    // Brand lockup — logomark + cursive wordmark, no box.
-    const lx = 52;
-    if (logo) {
-      const ls = 60;
-      ctx.drawImage(logo, lx, (HEADER - ls) / 2, ls, ls);
-      if (wordmark) {
-        const wmH = 42;
-        const wmW = wmH * WORDMARK_AR;
-        ctx.drawImage(wordmark, lx + ls + 14, (HEADER - wmH) / 2, wmW, wmH);
-      }
-    } else if (wordmark) {
-      const wmH = 48;
-      ctx.drawImage(wordmark, lx, (HEADER - wmH) / 2, wmH * WORDMARK_AR, wmH);
+    // ── Bottom-left: uploader byline ──
+    if (spec.byName) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `700 42px ${FONT}`;
+      ctx.fillText(wrapText(ctx, spec.byName, W - ix * 2, 1)[0], ix, H - 188);
     }
-    // Type chip, right side of header.
-    ctx.textAlign = 'left';
+    if (spec.byEmail) {
+      ctx.fillStyle = 'rgba(255,255,255,0.74)';
+      ctx.font = `400 32px ${FONT}`;
+      ctx.fillText(wrapText(ctx, spec.byEmail, W - ix * 2, 1)[0], ix, H - 144);
+    }
+
+    // ── Bottom: brand signature (cursive wordmark) + url ──
+    let bx = ix;
+    if (wordmark) {
+      const wmH = 38;
+      const wmW = wmH * WORDMARK_AR;
+      // White wordmark reads on the dark scrim; the asset is colour-on-clear,
+      // so drop a soft shadow for contrast.
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 12;
+      ctx.drawImage(wordmark, bx, H - 86, wmW, wmH);
+      ctx.restore();
+      bx += wmW + 18;
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.font = `600 30px ${FONT}`;
     ctx.textBaseline = 'middle';
-    ctx.font = `700 26px ${FONT}`;
-    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '2px';
-    const chipTw = ctx.measureText(kind.word).width;
-    const dot = 14, dotGap = 12, chipPadX = 24;
-    const chipW = dot + dotGap + chipTw + chipPadX * 2;
-    const chipH = 56;
-    const chipX = W - 52 - chipW;
-    const chipY = (HEADER - chipH) / 2;
-    roundRect(ctx, chipX, chipY, chipW, chipH, chipH / 2);
-    ctx.fillStyle = 'rgba(15,17,20,0.06)';
-    ctx.fill();
-    ctx.fillStyle = kind.accent;
-    ctx.beginPath();
-    ctx.arc(chipX + chipPadX + dot / 2, HEADER / 2, dot / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#15171A';
-    ctx.fillText(kind.word, chipX + chipPadX + dot + dotGap, HEADER / 2 + 1);
-    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
-
-    // ── Info plate ──
-    ctx.textAlign = 'left';
+    ctx.fillText('· wecycle.page', bx, H - 86 + 19);
     ctx.textBaseline = 'alphabetic';
-    const ix = 56;
-    let y = heroBottom + 96;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `700 78px ${FONT}`;
-    const titleLines = wrapText(ctx, spec.title, W - ix * 2 - 120, 2);
-    for (const ln of titleLines) {
-      ctx.fillText(ln, ix, y);
-      y += 88;
-    }
-
-    // Subline: TYPE · place / date.
-    const subParts = [kind.word];
-    if (spec.location) subParts.push(spec.location);
-    else if (spec.dateLine && spec.price == null && !spec.badge) subParts.push(spec.dateLine);
-    ctx.font = `500 36px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.62)';
-    const sub = wrapText(ctx, subParts.join('   ·   '), W - ix * 2 - 120, 1)[0];
-    ctx.fillText(sub, ix, y + 20);
-
-    // wecycle.page, pinned bottom-left.
-    ctx.font = `600 32px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText('wecycle.page', ix, H - 60);
-
-    // Decorative ↗ link circle, bottom-right.
-    const cr = 46, cx = W - 56 - cr, cy = H - 60 - cr / 2 - 10;
-    ctx.beginPath();
-    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx - 13, cy + 13);
-    ctx.lineTo(cx + 13, cy - 13);
-    ctx.moveTo(cx - 6, cy - 13);
-    ctx.lineTo(cx + 13, cy - 13);
-    ctx.lineTo(cx + 13, cy + 6);
-    ctx.stroke();
-    ctx.lineCap = 'butt';
   };
 
   paint(true);

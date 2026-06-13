@@ -31,7 +31,7 @@ import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
-import { deletePostById, deleteEvent, purgeExpiredEvents, purgeExpiredRequests, updateLostFoundFields, repostLostFound } from '../lib/liveData';
+import { deletePostById, deleteEvent, purgeExpiredEvents, purgeExpiredRequests, updateLostFoundFields, repostLostFound, fetchPostById } from '../lib/liveData';
 import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
@@ -219,6 +219,24 @@ export default function WecycleApp() {
     };
     if (Object.values(utm).some(Boolean)) {
       track(EVT.app_open as never, { ...utm, kind: 'utm_detected' });
+    }
+
+    /* Deep link: `/?p=<id>` opens that post's detail directly (powers the
+       shareable product links). We fetch the single post by id and route it
+       to the right screen, then strip the param so refresh/back is clean. */
+    const postId = params.get('p');
+    if (postId) {
+      fetchPostById(postId).then(found => {
+        if (!found) return;
+        if (found.kind === 'item' || found.kind === 'request') setOpenItem(found.data);
+        else if (found.kind === 'event') setOpenEvent(found.data);
+        else if (found.kind === 'lostfound') setOpenLF(found.data);
+        try {
+          const u = new URL(window.location.href);
+          u.searchParams.delete('p');
+          window.history.replaceState({}, '', u.toString());
+        } catch { /* ignore */ }
+      }).catch(() => { /* ignore — invalid id */ });
     }
   }, []);
 

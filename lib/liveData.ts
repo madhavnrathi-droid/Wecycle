@@ -763,6 +763,34 @@ export async function fetchLostFoundByUser(userId: string): Promise<(LostItem & 
   return notRemoved((data as unknown as LostFoundRowLite[]).map(mapLostFoundRow));
 }
 
+/* ── Deep link: open a single post by id ──────────────
+   Powers shareable product links (`/?p=<id>`). Tries each post type in
+   turn and returns the first match, mapped to its app shape, so the host
+   can route it to the right detail screen. */
+export type DeepLinkPost =
+  | { kind: 'item'; data: MarketplaceItem }
+  | { kind: 'request'; data: MarketplaceItem }
+  | { kind: 'event'; data: CommunityEvent & { photoUrls?: string[] } }
+  | { kind: 'lostfound'; data: LostItem & { photoUrls?: string[] } };
+
+export async function fetchPostById(id: string): Promise<DeepLinkPost | null> {
+  if (!hasSupabaseEnv || !id) return null;
+
+  const listing = await supabase.from('listings').select(SELECT_WITH_JOINS).eq('id', id).maybeSingle();
+  if (listing.data) return { kind: 'item', data: mapListingRow(listing.data as unknown as ListingRow) };
+
+  const request = await supabase.from('requests').select(REQUEST_SELECT).eq('id', id).maybeSingle();
+  if (request.data) return { kind: 'request', data: mapRequestRow(request.data as unknown as RequestRowLite) };
+
+  const event = await supabase.from('events').select(EVENT_SELECT).eq('id', id).maybeSingle();
+  if (event.data) return { kind: 'event', data: mapEventRow(event.data as unknown as EventRowLite) };
+
+  const lf = await supabase.from('lost_found_reports').select(LF_SELECT).eq('id', id).maybeSingle();
+  if (lf.data) return { kind: 'lostfound', data: mapLostFoundRow(lf.data as unknown as LostFoundRowLite) };
+
+  return null;
+}
+
 /* ── Lost & Found: edit + repost ───────────────────── */
 
 export interface EditLostFoundPatch {
