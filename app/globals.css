@@ -832,8 +832,38 @@ body {
   .feed-greeting-search {
     display: block !important;
     flex: 1 1 auto;
-    max-width: none;
+    /* Cap so the search input doesn't sprawl across the whole row when the
+       counter widget moves out — the onboarding bbox stays accurate too. */
+    max-width: 520px;
     min-width: 280px;
+  }
+}
+
+/* ── DESKTOP HERO ROW ──
+   Banner (smaller) + LiveCounter side-by-side. Hidden on mobile via parent
+   .marketing-banner-mount-desktop visibility. */
+.feed-hero-row { display: contents; }
+@media (min-width: 1024px) {
+  .feed-hero-row {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .feed-hero-row .marketing-banner-wide {
+    /* Shrinks the banner to a cleaner desktop strip — ~2:1 aspect retained.
+       Counter takes the remaining horizontal real estate. */
+    flex: 1 1 0;
+    max-width: 480px;
+    margin-inline: 0;
+  }
+  .feed-hero-row .wc-widget {
+    flex: 1 1 0;
+    align-self: stretch;
+    /* Roomy but not absurd — caps so the counter doesn't get wider than the
+       banner on very large screens. */
+    max-width: 360px;
+    min-width: 220px;
   }
 }
 

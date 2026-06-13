@@ -25,55 +25,66 @@ const BASELINE = 176;
 const DEMO_CAP = BASELINE + 10;
 const DEMO_INTERVAL_MS = 25_000;
 
-export default function LiveCounter() {
-  const [display, setDisplay] = useState(BASELINE);
-  const tweenTarget = useRef({ n: BASELINE });
-  const currentRef = useRef(BASELINE);
+/* ── Module-singleton subscription ──────────────────────────────────────
+ * We render LiveCounter in multiple places (mobile greeting row + desktop
+ * hero row). Each mount used to open its own Supabase realtime channel
+ * with the same name, which the Supabase JS client rejects with
+ * "cannot add postgres_changes callbacks for realtime:wecycle-lobby
+ *  after subscribe()". Subscribe once at module scope; React mounts
+ * subscribe to a pub/sub that fans the count out to all listeners. */
+let sharedCount = BASELINE;
+const listeners = new Set<(n: number) => void>();
+let started = false;
+function emit(n: number) { sharedCount = n; listeners.forEach(l => l(n)); }
 
-  function animateTo(next: number) {
-    gsap.to(tweenTarget.current, {
-      n: next,
-      duration: 0.6,
-      ease: 'power2.out',
-      overwrite: true,
-      onUpdate() {
-        setDisplay(Math.floor(tweenTarget.current.n));
-      },
-      onComplete() {
-        setDisplay(next);
-      },
-    });
-    currentRef.current = next;
+function startSubscription() {
+  if (started || typeof window === 'undefined') return;
+  started = true;
+  if (hasSupabaseEnv) {
+    supabase
+      .channel('wecycle-lobby')
+      .on(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'profiles' },
+        () => {
+          const increment = Math.random() < 0.7 ? 1 : 2;
+          emit(sharedCount + increment);
+        },
+      )
+      .subscribe();
+  } else {
+    setInterval(() => {
+      if (sharedCount < DEMO_CAP) emit(sharedCount + 1);
+    }, DEMO_INTERVAL_MS);
   }
+}
+
+export default function LiveCounter() {
+  const [display, setDisplay] = useState(sharedCount);
+  const tweenTarget = useRef({ n: sharedCount });
 
   useEffect(() => {
-    if (hasSupabaseEnv) {
-      const channel = supabase
-        .channel('wecycle-lobby')
-        .on(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          'postgres_changes' as any,
-          { event: 'INSERT', schema: 'public', table: 'profiles' },
-          () => {
-            const increment = Math.random() < 0.7 ? 1 : 2;
-            animateTo(currentRef.current + increment);
-          },
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-
-    const timer = setInterval(() => {
-      if (currentRef.current < DEMO_CAP) {
-        animateTo(currentRef.current + 1);
-      }
-    }, DEMO_INTERVAL_MS);
-
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    startSubscription();
+    /* Tween from whatever we're currently showing to each new value the
+       singleton emits. Multiple LiveCounter mounts tween independently —
+       that's fine, GSAP handles the per-instance state. */
+    const listener = (next: number) => {
+      gsap.to(tweenTarget.current, {
+        n: next,
+        duration: 0.6,
+        ease: 'power2.out',
+        overwrite: true,
+        onUpdate() { setDisplay(Math.floor(tweenTarget.current.n)); },
+        onComplete() { setDisplay(next); },
+      });
+    };
+    listeners.add(listener);
+    /* Sync to the latest count immediately in case we mounted after an
+       emit (e.g. desktop counter mounts after a tab switch). */
+    setDisplay(sharedCount);
+    tweenTarget.current.n = sharedCount;
+    return () => { listeners.delete(listener); };
   }, []);
 
   return (

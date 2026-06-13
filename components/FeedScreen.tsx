@@ -421,8 +421,15 @@ export default function FeedScreen({
             </p>
           </div>
 
-          {/* Right: Live Activities widget — flex:1 fills remaining width */}
-          {mounted && <LiveCounter />}
+          {/* Right: Live Activities widget. On mobile, sits inline with the
+              greeting (current home-feed look). On desktop, this slot is
+              hidden — the counter is mounted alongside the marketing banner
+              below so the greeting row stays clean (greeting + search only). */}
+          {mounted && (
+            <div className="mobile-only" style={{ display: 'flex', alignSelf: 'stretch', flex: 1, minWidth: 0 }}>
+              <LiveCounter />
+            </div>
+          )}
         </div>
 
         {/* Search lives inline with the greeting on desktop */}
@@ -465,11 +472,16 @@ export default function FeedScreen({
         <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
 
-      {/* ── DESKTOP MARKETING BANNER ──
-         Wider, richer variant of the carousel. Sits below the search row so
-         the marketing strip gets its own real estate on big screens. */}
+      {/* ── DESKTOP MARKETING BANNER + LIVE COUNTER ──
+         Side-by-side row on desktop. Smaller banner (so it doesn't dominate
+         the feed) with the live counter widget filling the remaining width
+         to its right. Mobile uses the separate banner mount above + the
+         inline counter inside the greeting row. */}
       <section className="marketing-banner-mount-desktop" style={{ padding: '0 16px 20px' }}>
-        <MarketingBanner slides={bannerSlides} variant="wide" />
+        <div className="feed-hero-row">
+          <MarketingBanner slides={bannerSlides} variant="wide" />
+          {mounted && <LiveCounter />}
+        </div>
       </section>
 
       {/* ── MOBILE SEARCH (under banner) ── */}
