@@ -1,23 +1,23 @@
 'use client';
 
 /*
- * Spotify-style shareable cards.
+ * Shareable cards — editorial, brand-forward (Spotify/NFT-card energy).
  *
- * Generates a beautiful 4:5 (1080×1350) PNG for any Wecycle post — a
- * marketplace item, a request, an event, or a lost & found report — drawn
- * entirely on an offscreen <canvas> (no extra deps, no server round-trip).
+ * A 4:5 (1080×1350) PNG for any Wecycle post — item, request, event, or
+ * lost & found — drawn entirely on an offscreen <canvas> (no deps).
  *
- * Layout (top → bottom):
- *   • Rich type-coloured gradient background
- *   • Wecycle logomark badge, top-right corner
- *   • Large rounded cover photo (falls back to a glyph panel when there's
- *     no image, so we never paint a broken tile)
- *   • Type label · big title · price/badge pill · location/date line
- *   • "Wecycle · wecycle.page" footer
+ * Design:
+ *   • White header band carrying the Wecycle brand LOCKUP (logomark + cursive
+ *     wordmark, no box) on the left, and a quiet type chip on the right.
+ *   • Full-bleed hero photo dominating the card. When the post has multiple
+ *     photos, a thumbnail filmstrip of the rest sits on a scrim along the
+ *     bottom of the hero — so the card shows everything, not just the cover.
+ *   • A frosted price / status pill on the hero.
+ *   • Dark info plate: big title + "TYPE · place" subline + wecycle.page.
  *
- * The card is shared as an IMAGE through the Web Share API (the way Spotify
- * shares a track card to Stories/WhatsApp). Desktop or unsupported devices
- * fall back to downloading the PNG + copying the link.
+ * Neutral charcoal surface (no coloured gradient) so any photo pops and the
+ * brand reads cleanly. Shared as an IMAGE via the Web Share files API; falls
+ * back to a PNG download + link copy.
  */
 
 import { haptics } from './haptics';
@@ -27,9 +27,10 @@ export type ShareCardKind = 'item' | 'request' | 'event' | 'lost' | 'found';
 export interface ShareCardSpec {
   kind: ShareCardKind;
   title: string;
-  /** Cover photo URL (Supabase / Unsplash / local). Optional. */
-  imageUrl?: string;
-  /** Marketplace price in INR — renders an accent pill "₹ 8,000". */
+  /** All post photos (cover first). The card shows the cover full-bleed and
+   *  the remainder as a thumbnail strip. */
+  imageUrls?: string[];
+  /** Marketplace price in INR — renders the hero pill "₹ 8,000". */
   price?: number;
   /** Non-priced label when there's no price: "Free" · "Swap" · "Wanted". */
   badge?: string;
@@ -43,24 +44,22 @@ export interface ShareCardSpec {
   url?: string;
 }
 
-interface Theme {
-  label: string;
-  top: string;
-  bottom: string;
-  accent: string;       // pill fill
-  accentText: string;   // text on the pill
-  glyph: string;        // fallback emoji when no photo
+interface Kind {
+  word: string;       // type chip + subline
+  accent: string;     // small status dot
+  glyph: string;      // fallback when no photo
 }
 
-const THEME: Record<ShareCardKind, Theme> = {
-  item:    { label: 'SHARED ON WECYCLE', top: '#21A557', bottom: '#0B5230', accent: '#C4F649', accentText: '#0B2415', glyph: '📦' },
-  request: { label: 'WANTED ON WECYCLE', top: '#E6A417', bottom: '#8A5B00', accent: '#FFE066', accentText: '#3A2A00', glyph: '🙌' },
-  event:   { label: 'EVENT ON WECYCLE',  top: '#7C3AED', bottom: '#3F1D78', accent: '#E9D5FF', accentText: '#3B1567', glyph: '🎉' },
-  lost:    { label: 'LOST ON WECYCLE',   top: '#EA5A3D', bottom: '#8E2A14', accent: '#FFE0D6', accentText: '#7A2410', glyph: '🔎' },
-  found:   { label: 'FOUND ON WECYCLE',  top: '#21A557', bottom: '#0B5230', accent: '#C4F649', accentText: '#0B2415', glyph: '✅' },
+const KIND: Record<ShareCardKind, Kind> = {
+  item:    { word: 'SHARED',  accent: '#22C55E', glyph: '📦' },
+  request: { word: 'WANTED',  accent: '#F59E0B', glyph: '🙌' },
+  event:   { word: 'EVENT',   accent: '#8B5CF6', glyph: '🎉' },
+  lost:    { word: 'LOST',    accent: '#EF4444', glyph: '🔎' },
+  found:   { word: 'FOUND',   accent: '#22C55E', glyph: '✅' },
 };
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const WORDMARK_AR = 1719 / 607; // ≈ 2.832
 
 /* ── canvas helpers ─────────────────────────────── */
 
@@ -113,13 +112,10 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
   if (lines.length < maxLines) {
     lines.push(cur);
   } else {
-    // Append the rest onto the last allowed line and ellipsise.
     const restIdx = lines.join(' ').split(/\s+/).length;
     let last = [cur, ...words.slice(restIdx)].join(' ');
     if (ctx.measureText(last).width > maxWidth) {
-      while (last.length && ctx.measureText(`${last}…`).width > maxWidth) {
-        last = last.slice(0, -1);
-      }
+      while (last.length && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
       last = `${last.trimEnd()}…`;
     }
     lines[maxLines - 1] = last;
@@ -134,163 +130,222 @@ export interface RenderedCard {
   dataUrl: string;
 }
 
-/** Render the card to a PNG. Returns both a Blob (for the Web Share API) and
- *  a data URL (for an <img> preview). Never throws — on a tainted canvas it
- *  silently re-renders without the remote photo. */
+/** Render the card to a PNG. Returns a Blob (for the Web Share API) and a data
+ *  URL (for an <img> preview). Never throws — on a tainted canvas it silently
+ *  re-renders without the remote photos. */
 export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard> {
   const W = 1080;
   const H = 1350;
-  const theme = THEME[spec.kind];
+  const kind = KIND[spec.kind];
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // Preload assets (logomark same-origin; cover photo cross-origin).
-  const [logo, cover] = await Promise.all([
+  const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
+  const [logo, wordmark, ...photoImgs] = await Promise.all([
     loadImage('/brand/logomark.png', false),
-    spec.imageUrl ? loadImage(spec.imageUrl, true) : Promise.resolve(null),
+    loadImage('/brand/wordmark.png', false),
+    ...urls.slice(0, 6).map(u => loadImage(u, true)),
   ]);
+  const photos = photoImgs.filter((p): p is HTMLImageElement => !!p);
 
-  const paint = (useCover: boolean) => {
+  const paint = (useImages: boolean) => {
     ctx.clearRect(0, 0, W, H);
 
-    // Background gradient + soft top-left light.
-    const bg = ctx.createLinearGradient(0, 0, W * 0.6, H);
-    bg.addColorStop(0, theme.top);
-    bg.addColorStop(1, theme.bottom);
+    // ── Charcoal surface ──
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#16171A');
+    bg.addColorStop(1, '#0B0B0D');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
-    const glow = ctx.createRadialGradient(W * 0.22, H * 0.12, 40, W * 0.22, H * 0.12, W);
-    glow.addColorStop(0, 'rgba(255,255,255,0.20)');
-    glow.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, W, H);
 
-    const pad = 96;
-    const imgX = pad, imgY = 156, imgW = W - pad * 2, imgH = 540;
+    const HEADER = 150;
+    const heroY = HEADER;
+    const heroH = 800;
+    const heroBottom = heroY + heroH; // 950
 
-    // Cover photo (rounded, with drop shadow) — or a glyph panel.
+    // ── Hero photo (full-bleed) ──
     ctx.save();
-    roundRect(ctx, imgX, imgY, imgW, imgH, 44);
-    ctx.shadowColor = 'rgba(0,0,0,0.30)';
-    ctx.shadowBlur = 60;
-    ctx.shadowOffsetY = 26;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    roundRect(ctx, imgX, imgY, imgW, imgH, 44);
+    ctx.beginPath();
+    ctx.rect(0, heroY, W, heroH);
     ctx.clip();
-    if (useCover && cover) {
-      coverDraw(ctx, cover, imgX, imgY, imgW, imgH);
+    const hero = useImages ? photos[0] : null;
+    if (hero) {
+      coverDraw(ctx, hero, 0, heroY, W, heroH);
     } else {
-      const pg = ctx.createLinearGradient(imgX, imgY, imgX + imgW, imgY + imgH);
-      pg.addColorStop(0, 'rgba(255,255,255,0.24)');
-      pg.addColorStop(1, 'rgba(255,255,255,0.07)');
+      const pg = ctx.createLinearGradient(0, heroY, W, heroBottom);
+      pg.addColorStop(0, '#23252B');
+      pg.addColorStop(1, '#15161A');
       ctx.fillStyle = pg;
-      ctx.fillRect(imgX, imgY, imgW, imgH);
+      ctx.fillRect(0, heroY, W, heroH);
       ctx.font = `300px ${FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(theme.glyph, imgX + imgW / 2, imgY + imgH / 2 + 10);
+      ctx.fillText(kind.glyph, W / 2, heroY + heroH / 2);
+    }
+    // Top scrim (for the price pill) + bottom scrim (for thumbs).
+    const topScrim = ctx.createLinearGradient(0, heroY, 0, heroY + 200);
+    topScrim.addColorStop(0, 'rgba(0,0,0,0.42)');
+    topScrim.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = topScrim;
+    ctx.fillRect(0, heroY, W, 200);
+    if (useImages && photos.length > 1) {
+      const botScrim = ctx.createLinearGradient(0, heroBottom - 240, 0, heroBottom);
+      botScrim.addColorStop(0, 'rgba(0,0,0,0)');
+      botScrim.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = botScrim;
+      ctx.fillRect(0, heroBottom - 240, W, 240);
     }
     ctx.restore();
 
-    // Logomark badge — top-right (white rounded card + the mark, with shadow).
-    const badge = 140;
-    const bx = W - pad - badge;
-    const by = 40;
-    ctx.save();
-    roundRect(ctx, bx, by, badge, badge, 34);
-    ctx.shadowColor = 'rgba(0,0,0,0.24)';
-    ctx.shadowBlur = 28;
-    ctx.shadowOffsetY = 10;
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.restore();
-    if (logo) {
-      ctx.save();
-      roundRect(ctx, bx, by, badge, badge, 34);
-      ctx.clip();
-      ctx.drawImage(logo, bx, by, badge, badge);
-      ctx.restore();
-    }
-
-    // Text block.
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    let y = imgY + imgH + 78;
-
-    // Type label (letter-spaced uppercase).
-    ctx.font = `600 30px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    // letterSpacing is supported on modern Canvas2D; harmless if ignored.
-    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '3px';
-    ctx.fillText(theme.label, pad, y);
-    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
-    y += 58;
-
-    // Title (bold, up to 2 lines).
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `700 76px ${FONT}`;
-    const titleLines = wrapText(ctx, spec.title, W - pad * 2, 2);
-    for (const ln of titleLines) {
-      ctx.fillText(ln, pad, y + 8);
-      y += 86;
-    }
-    y += 16;
-
-    // Price / badge pill.
+    // ── Price / status pill, top-left of hero ──
     const pillText =
       spec.price != null ? `₹ ${spec.price.toLocaleString('en-IN')}` :
-      spec.badge ? spec.badge : '';
+      spec.badge ? spec.badge :
+      (spec.kind === 'lost' || spec.kind === 'found') ? kind.word :
+      spec.dateLine ? spec.dateLine : '';
     if (pillText) {
-      ctx.font = `700 40px ${FONT}`;
-      const tw = ctx.measureText(pillText).width;
-      const pillH = 68;
-      const pillW = tw + 60;
-      roundRect(ctx, pad, y, pillW, pillH, pillH / 2);
-      ctx.fillStyle = theme.accent;
-      ctx.fill();
-      ctx.fillStyle = theme.accentText;
+      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(pillText, pad + 30, y + pillH / 2 + 2);
-      ctx.textBaseline = 'alphabetic';
-      y += pillH + 28;
-    } else {
-      y += 6;
+      ctx.font = `700 38px ${FONT}`;
+      const tw = ctx.measureText(pillText).width;
+      const ph = 64;
+      const pw = tw + 52;
+      const px = 40, py = heroY + 28;
+      ctx.save();
+      roundRect(ctx, px, py, pw, ph, ph / 2);
+      ctx.fillStyle = 'rgba(8,9,11,0.62)';
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(pillText, px + 26, py + ph / 2 + 1);
     }
 
-    // Sub line(s): date (events) and/or location. Capped so they never reach
-    // the footer.
-    const subs: string[] = [];
-    if (spec.dateLine) subs.push(`🗓  ${spec.dateLine}`);
-    if (spec.location) subs.push(`📍  ${spec.location}`);
-    if (spec.reward) subs.push(`🎁  Reward: ${spec.reward}`);
-    ctx.font = `400 36px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    const footerTop = H - 116;
-    for (const s of subs.slice(0, 2)) {
-      if (y + 24 > footerTop - 10) break; // never collide with the footer
-      const line = wrapText(ctx, s, W - pad * 2, 1)[0];
-      ctx.fillText(line, pad, y + 24);
-      y += 52;
+    // ── Thumbnail filmstrip (the OTHER photos), bottom of hero ──
+    if (useImages && photos.length > 1) {
+      const extra = photos.slice(1, 6);
+      const t = 104, gap = 14, ty = heroBottom - 28 - t;
+      let tx = 40;
+      const maxShown = Math.min(extra.length, 4);
+      for (let i = 0; i < maxShown; i++) {
+        ctx.save();
+        roundRect(ctx, tx, ty, t, t, 20);
+        ctx.clip();
+        coverDraw(ctx, extra[i], tx, ty, t, t);
+        ctx.restore();
+        ctx.save();
+        roundRect(ctx, tx, ty, t, t, 20);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.stroke();
+        ctx.restore();
+        // "+N" badge on the last tile when there are more.
+        if (i === maxShown - 1 && photos.length - 1 > maxShown) {
+          ctx.save();
+          roundRect(ctx, tx, ty, t, t, 20);
+          ctx.fillStyle = 'rgba(0,0,0,0.55)';
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = '#fff';
+          ctx.font = `700 40px ${FONT}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`+${photos.length - 1 - maxShown + 1}`, tx + t / 2, ty + t / 2 + 1);
+          ctx.textAlign = 'left';
+        }
+        tx += t + gap;
+      }
     }
 
-    // Footer — pinned to the bottom, always clear of the content above.
-    ctx.font = `700 40px ${FONT}`;
+    // ── White header band (drawn last so it sits cleanly above the hero) ──
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('Wecycle', pad, H - 104);
-    ctx.font = `400 30px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.78)';
-    ctx.fillText('Your campus circular economy · wecycle.page', pad, H - 60);
+    ctx.fillRect(0, 0, W, HEADER);
+    // Brand lockup — logomark + cursive wordmark, no box.
+    const lx = 52;
+    if (logo) {
+      const ls = 60;
+      ctx.drawImage(logo, lx, (HEADER - ls) / 2, ls, ls);
+      if (wordmark) {
+        const wmH = 42;
+        const wmW = wmH * WORDMARK_AR;
+        ctx.drawImage(wordmark, lx + ls + 14, (HEADER - wmH) / 2, wmW, wmH);
+      }
+    } else if (wordmark) {
+      const wmH = 48;
+      ctx.drawImage(wordmark, lx, (HEADER - wmH) / 2, wmH * WORDMARK_AR, wmH);
+    }
+    // Type chip, right side of header.
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 26px ${FONT}`;
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '2px';
+    const chipTw = ctx.measureText(kind.word).width;
+    const dot = 14, dotGap = 12, chipPadX = 24;
+    const chipW = dot + dotGap + chipTw + chipPadX * 2;
+    const chipH = 56;
+    const chipX = W - 52 - chipW;
+    const chipY = (HEADER - chipH) / 2;
+    roundRect(ctx, chipX, chipY, chipW, chipH, chipH / 2);
+    ctx.fillStyle = 'rgba(15,17,20,0.06)';
+    ctx.fill();
+    ctx.fillStyle = kind.accent;
+    ctx.beginPath();
+    ctx.arc(chipX + chipPadX + dot / 2, HEADER / 2, dot / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#15171A';
+    ctx.fillText(kind.word, chipX + chipPadX + dot + dotGap, HEADER / 2 + 1);
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
+
+    // ── Info plate ──
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    const ix = 56;
+    let y = heroBottom + 96;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `700 78px ${FONT}`;
+    const titleLines = wrapText(ctx, spec.title, W - ix * 2 - 120, 2);
+    for (const ln of titleLines) {
+      ctx.fillText(ln, ix, y);
+      y += 88;
+    }
+
+    // Subline: TYPE · place / date.
+    const subParts = [kind.word];
+    if (spec.location) subParts.push(spec.location);
+    else if (spec.dateLine && spec.price == null && !spec.badge) subParts.push(spec.dateLine);
+    ctx.font = `500 36px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.62)';
+    const sub = wrapText(ctx, subParts.join('   ·   '), W - ix * 2 - 120, 1)[0];
+    ctx.fillText(sub, ix, y + 20);
+
+    // wecycle.page, pinned bottom-left.
+    ctx.font = `600 32px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText('wecycle.page', ix, H - 60);
+
+    // Decorative ↗ link circle, bottom-right.
+    const cr = 46, cx = W - 56 - cr, cy = H - 60 - cr / 2 - 10;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - 13, cy + 13);
+    ctx.lineTo(cx + 13, cy - 13);
+    ctx.moveTo(cx - 6, cy - 13);
+    ctx.lineTo(cx + 13, cy - 13);
+    ctx.lineTo(cx + 13, cy + 6);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
   };
 
-  // Try with the photo; if the canvas is tainted (cross-origin without CORS),
-  // re-render without it so export still succeeds.
   paint(true);
   let dataUrl: string;
   try {
@@ -321,8 +376,8 @@ function cardText(spec: ShareCardSpec): string {
 
 export type ShareCardResult = 'shared' | 'downloaded' | 'copied' | 'unavailable';
 
-/** Share the rendered card as an image file (Spotify-style). Falls back to a
- *  PNG download + link copy where the Web Share files API isn't available. */
+/** Share the rendered card as an image file. Falls back to a PNG download +
+ *  link copy where the Web Share files API isn't available. */
 export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Promise<ShareCardResult> {
   if (typeof navigator === 'undefined') return 'unavailable';
   const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : 'https://wecycle.page');
@@ -341,7 +396,6 @@ export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Pro
         return 'shared';
       } catch (e) {
         if ((e as Error).name === 'AbortError') return 'shared';
-        /* fall through to download */
       }
     }
   }
@@ -361,7 +415,6 @@ export async function downloadCardBlob(blob: Blob | null, spec: ShareCardSpec): 
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(href), 1500);
 
-  // Best-effort copy the link too.
   const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : '');
   try { await navigator.clipboard?.writeText(url); } catch { /* ignore */ }
   haptics.success();

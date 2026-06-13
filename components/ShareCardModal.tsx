@@ -52,7 +52,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
       } catch { /* leave preview empty; buttons will no-op gracefully */ }
     })();
     return () => { cancelled = true; };
-  }, [open, spec?.kind, spec?.title, spec?.imageUrl, spec?.price, spec?.badge, spec?.dateLine, spec?.location]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, spec?.kind, spec?.title, spec?.imageUrls?.join('|'), spec?.price, spec?.badge, spec?.dateLine, spec?.location]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const flashToast = (msg: string) => {
     setToast(msg);

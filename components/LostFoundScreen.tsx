@@ -433,7 +433,7 @@ export function LostFoundDetailSheet({
   const shareCardSpec: ShareCardSpec = {
     kind: item.status === 'found' ? 'found' : 'lost',
     title: item.title,
-    imageUrl: displayPhotoUrl && /^https?:|^\//.test(displayPhotoUrl) ? displayPhotoUrl : undefined,
+    imageUrls: displayPhotoUrl && /^https?:|^\//.test(displayPhotoUrl) ? [displayPhotoUrl] : [],
     location: item.lastSeen,
     reward: item.reward,
   };

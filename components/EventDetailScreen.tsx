@@ -238,7 +238,7 @@ export default function EventDetailScreen({
   const shareCardSpec: ShareCardSpec = {
     kind: 'event',
     title: event.title,
-    imageUrl: displayPhotos.find(u => !!u && /^https?:|^\//.test(u)),
+    imageUrls: displayPhotos.filter(u => !!u && /^https?:|^\//.test(u)),
     dateLine: [event.date, event.time].filter(Boolean).join(' · '),
     location: event.location,
   };

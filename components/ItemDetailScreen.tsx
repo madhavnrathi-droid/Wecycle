@@ -333,14 +333,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : 'item' });
     setShareCardOpen(true);
   };
-  /* The card's cover = first real photo (string URL or video poster). */
-  const shareCover = displayPhotos
+  /* The card shows every photo (cover full-bleed + the rest as a strip). */
+  const shareImages = displayPhotos
     .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
-    .find((u): u is string => !!u && /^https?:|^\//.test(u));
+    .filter((u): u is string => !!u && /^https?:|^\//.test(u));
   const shareCardSpec: ShareCardSpec = {
     kind: item.isRequest ? 'request' : 'item',
     title: item.title,
-    imageUrl: shareCover,
+    imageUrls: shareImages,
     price: isPriced ? item.price : undefined,
     badge: isPriced ? undefined : priceLabel,
     location: item.location,
@@ -1167,13 +1167,13 @@ function DesktopLayout({
   const [reportOpen, setReportOpen] = useState(false);
   /* Share card (Spotify-style) — preview + share/save modal. */
   const [shareCardOpen, setShareCardOpen] = useState(false);
-  const shareCover = photos
+  const shareImages = photos
     .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
-    .find((u): u is string => !!u && /^https?:|^\//.test(u));
+    .filter((u): u is string => !!u && /^https?:|^\//.test(u));
   const shareCardSpec: ShareCardSpec = {
     kind: item.isRequest ? 'request' : 'item',
     title: item.title,
-    imageUrl: shareCover,
+    imageUrls: shareImages,
     price: isPriced ? item.price : undefined,
     badge: isPriced ? undefined : priceLabel,
     location: item.location,
