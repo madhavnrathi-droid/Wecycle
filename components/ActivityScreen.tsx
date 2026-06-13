@@ -99,7 +99,7 @@ export default function ActivityScreen({
             <Menu size={20} strokeWidth={1.8} />
           </button>
           <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <Wordmark height={22} />
+            <Wordmark height={30} />
           </span>
           <button
             aria-label="Your profile"

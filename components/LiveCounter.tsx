@@ -95,10 +95,13 @@ export default function LiveCounter() {
           /* Takes the remaining horizontal space next to the greeting */
           flex: 1;
           min-width: 0;
-          /* Match greeting block height — greeting is ~64px on narrow screens */
+          /* Match the greeting block's height exactly — the greeting (h1 +
+             date) is the height-defining element, so the widget stretches to
+             it and never extends past the date line. No min-height floor that
+             would force the row taller. */
           align-self: stretch;
           position: relative;
-          border-radius: 22px;
+          border-radius: 20px;
           /* Yellow → lime at 135°; oversized so the position-shift is visible */
           background: linear-gradient(
             135deg,
@@ -110,14 +113,14 @@ export default function LiveCounter() {
           background-size: 300% 300%;
           animation: wc-widget-grad 10s ease infinite;
           /* Glassy inset border */
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-          padding: 14px 18px;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+          padding: 6px 16px;
           display: flex;
           flex-direction: column;
+          align-items: center;
           justify-content: center;
-          gap: 4px;
-          /* Never shrink narrower than its content */
-          min-height: 64px;
+          gap: 1px;
+          overflow: hidden;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -160,24 +163,29 @@ export default function LiveCounter() {
           }
         }
 
-        /* ── Count number ─────────────────────── */
+        /* ── Count number ─────────────────────────
+           Big, bold, tabular (odometer-like fixed-width digits) and centered
+           so it reads as a live counter spread across the widget. */
         .wc-widget-count {
-          font-size: 28px;
-          font-weight: 700;
+          font-size: 32px;
+          font-weight: 800;
           color: #0F1A00;
           line-height: 1;
-          letter-spacing: -0.03em;
-          /* Extra right space so the number never slides under the dot */
-          padding-right: 20px;
+          letter-spacing: -0.02em;
+          font-variant-numeric: tabular-nums;
+          font-feature-settings: 'tnum' 1;
+          text-align: center;
         }
 
         /* ── Sub-label ────────────────────────── */
         .wc-widget-label {
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.02em;
-          color: rgba(15, 26, 0, 0.7);
+          font-size: 10.5px;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          color: rgba(15, 26, 0, 0.66);
           line-height: 1;
+          text-align: center;
+          white-space: nowrap;
         }
       `}</style>
 

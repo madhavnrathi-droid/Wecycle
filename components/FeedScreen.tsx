@@ -339,7 +339,7 @@ export default function FeedScreen({
             <Menu size={20} strokeWidth={1.8} />
           </button>
           <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <Wordmark height={22} />
+            <Wordmark height={30} />
           </span>
           <button
             aria-label="Your profile"
@@ -383,8 +383,9 @@ export default function FeedScreen({
         }}
           className="feed-greeting-text"
         >
-          {/* Left: greeting text block */}
-          <div style={{ minWidth: 0, flexShrink: 1 }}>
+          {/* Left: greeting text block — centered vertically so it reads level
+              with the counter widget beside it. */}
+          <div style={{ minWidth: 0, flexShrink: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <h1 style={{
               margin: 0,
               fontSize: 26, fontWeight: 600,
