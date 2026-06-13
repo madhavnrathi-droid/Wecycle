@@ -25,7 +25,7 @@ export default function Terms() {
         </p>
 
         <h2 style={h2}>1. Eligibility</h2>
-        <p style={p}>You must be at least 13 years old and a member of the community Wecycle serves to use the app.</p>
+        <p style={p}>You must be at least <strong>16 years old</strong> and a member of the community Wecycle serves to use the app. If you are under 16, do not create an account.</p>
 
         <h2 style={h2}>2. Your account</h2>
         <p style={p}>
@@ -44,17 +44,22 @@ export default function Terms() {
 
         <h2 style={h2}>4. Content</h2>
         <p style={p}>
-          You keep ownership of what you post, and grant Wecycle a license to
-          display it within the app to operate the service. We may remove content
-          or suspend accounts that violate these terms or our community safety
-          rules.
+          You keep ownership of what you post, and grant Wecycle a non-exclusive,
+          royalty-free license to store, display, and distribute it within the app
+          to operate the service. You are solely responsible for the accuracy and
+          legality of your own posts. Wecycle is not responsible or liable for
+          content posted by other users. We may remove content or suspend accounts
+          that violate these terms or our community safety rules.
         </p>
 
         <h2 style={h2}>5. No warranty &amp; limitation of liability</h2>
         <p style={p}>
           Wecycle is provided &ldquo;as is,&rdquo; without warranties. To the
-          extent permitted by law, Wecycle is not liable for disputes, losses, or
-          damages arising from member interactions or use of the app.
+          extent permitted by law, Wecycle is not liable for (a) disputes, losses,
+          or damages arising from member interactions or user-to-user transactions,
+          (b) the accuracy, quality, or safety of items listed by other members,
+          or (c) any harm resulting from content posted by users. Meet safely, use
+          your judgment, and transact at your own risk.
         </p>
 
         <h2 style={h2}>6. Termination</h2>

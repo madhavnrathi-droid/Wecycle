@@ -345,7 +345,7 @@ body {
   background: var(--accent-lime);
   color: var(--text-on-accent);
   padding: 12px 20px;
-  box-shadow: var(--shadow-accent);
+  box-shadow: none;
 }
 .btn-primary:hover { background: var(--accent-lime-dim); }
 
@@ -3845,19 +3845,12 @@ textarea:focus-visible {
    MOTION DESIGN
    ═══════════════════════════════════════════════ */
 
-/* Primary CTA: dimensional gradient + glossy specular sweep on hover.
-   This is the "liquid" highlight rolling across the surface. */
-.btn-primary,
+/* Post FAB: glossy specular sweep on hover. */
 .bottom-nav-post {
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
-.btn-primary {
-  background: linear-gradient(180deg, var(--accent-lime), var(--accent-lime-dim));
-  box-shadow: var(--shadow-accent), inset 0 1px 0 rgba(255, 255, 255, 0.40);
-}
-.btn-primary::after,
 .bottom-nav-post::after {
   content: '';
   position: absolute;
@@ -3874,7 +3867,6 @@ textarea:focus-visible {
   pointer-events: none;
   z-index: 1;
 }
-.btn-primary:hover::after,
 .bottom-nav-post:hover::after { transform: translateX(130%); }
 
 /* Cards lift toward the pointer (desktop) for tactile depth */
@@ -3950,8 +3942,7 @@ textarea:focus-visible {
 /* Screen entrance: a touch slower + calmer */
 .motion-rise { animation: glass-rise 0.6s var(--ease-emphasized) both; }
 
-/* Specular sweeps: slower, glossier roll */
-.btn-primary::after,
+/* Specular sweep: slower, glossier roll */
 .bottom-nav-post::after { transition: transform 0.85s var(--ease-emphasized); }
 
 /* Card hover lift: gentler, longer */

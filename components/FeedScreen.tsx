@@ -373,8 +373,22 @@ export default function FeedScreen({
 
       {/* ── GREETING + MARKETING BANNER + DESKTOP-INLINE SEARCH ── */}
       <section className="feed-greeting-row" style={{ padding: '14px 20px 16px' }}>
-        <div className="feed-greeting-text" style={{ minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {/* Greeting text + live-counter widget sit side-by-side at equal
+            height. On very narrow screens (<380 px) they stack vertically via
+            flex-wrap — the widget takes a full row of its own. */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'stretch',
+          gap: 12,
+          flexWrap: 'wrap',
+          minWidth: 0,
+          flex: 1,
+        }}
+          className="feed-greeting-text"
+        >
+          {/* Left: greeting text block */}
+          <div style={{ minWidth: 0, flexShrink: 1 }}>
             <h1 style={{
               margin: 0,
               fontSize: 26, fontWeight: 600,
@@ -384,16 +398,18 @@ export default function FeedScreen({
             }} suppressHydrationWarning>
               Hi, {mounted ? greetingName : 'there'} <span aria-hidden="true">👋</span>
             </h1>
-            {mounted && <LiveCounter />}
+            <p style={{
+              margin: '4px 0 0',
+              fontSize: 13, color: 'var(--text-muted)',
+            }} suppressHydrationWarning>
+              {mounted && new Date().toLocaleDateString('en-US', {
+                weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
+              })}
+            </p>
           </div>
-          <p style={{
-            margin: '4px 0 0',
-            fontSize: 13, color: 'var(--text-muted)',
-          }} suppressHydrationWarning>
-            {mounted && new Date().toLocaleDateString('en-US', {
-              weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
-            })}
-          </p>
+
+          {/* Right: Live Activities widget — flex:1 fills remaining width */}
+          {mounted && <LiveCounter />}
         </div>
 
         {/* Search lives inline with the greeting on desktop */}

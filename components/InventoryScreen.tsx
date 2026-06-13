@@ -455,162 +455,181 @@ function InventoryCard({
      stock image, no fabricated thumbnail. Title + description shown directly. */
   if (!hasMedia) {
     return (
-      <article
-        className="feed-card inventory-card"
-        data-stroke={strokeKind}
-        style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}
-        aria-label={`Open ${item.title}`}
-      >
-        <button
-          onClick={onClick}
-          style={{
-            all: 'unset', cursor: 'pointer',
-            position: 'absolute', inset: 0,
-            padding: '14px 14px 56px',
-            display: 'flex', flexDirection: 'column', gap: 8,
-            background: 'var(--bg-surface)',
-            color: 'var(--text-primary)',
-            boxSizing: 'border-box',
-          }}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <article
+          className="feed-card inventory-card"
+          data-stroke={strokeKind}
+          style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}
+          aria-label={`Open ${item.title}`}
         >
-          {/* type chip top-left */}
-          <span style={{
-            alignSelf: 'flex-start',
-            background: 'var(--bg-inset)',
-            color: 'var(--text-secondary)',
-            padding: '3px 9px',
-            borderRadius: 999,
-            fontSize: 10, fontWeight: 600, letterSpacing: '-0.01em',
-          }}>
-            {item.isRequest ? '🙋 Request' : item.category}
-          </span>
-          <p style={{
-            margin: 0,
-            fontSize: 15, fontWeight: 600, lineHeight: 1.25,
-            letterSpacing: '-0.015em',
-            color: 'var(--text-primary)',
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}>{item.title}</p>
-          {item.description && (
+          <button
+            onClick={onClick}
+            style={{
+              all: 'unset', cursor: 'pointer',
+              position: 'absolute', inset: 0,
+              padding: '14px 14px 14px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+              background: 'var(--bg-surface)',
+              color: 'var(--text-primary)',
+              boxSizing: 'border-box',
+            }}
+          >
+            {/* type chip top-left */}
+            <span style={{
+              alignSelf: 'flex-start',
+              background: 'var(--bg-inset)',
+              color: 'var(--text-secondary)',
+              padding: '3px 9px',
+              borderRadius: 999,
+              fontSize: 10, fontWeight: 600, letterSpacing: '-0.01em',
+            }}>
+              {item.isRequest ? '🙋 Request' : item.category}
+            </span>
             <p style={{
               margin: 0,
-              fontSize: 12, color: 'var(--text-secondary)',
-              lineHeight: 1.45,
-              display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical',
+              fontSize: 15, fontWeight: 600, lineHeight: 1.25,
+              letterSpacing: '-0.015em',
+              color: 'var(--text-primary)',
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-            }}>{item.description}</p>
-          )}
-          <div style={{
-            marginTop: 'auto',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-            fontSize: 11, color: 'var(--text-muted)',
-          }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              {item.isRequest ? null : <><MapPin size={10} strokeWidth={2} />{item.location}</>}
-            </span>
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-              {item.isRequest
-                ? (item.urgent ? 'Urgent' : 'Wanted')
-                : isPriced ? `₹${item.price}`
-                : item.listingType === 'sell' ? 'Selling'
-                : item.listingType === 'free' ? 'Free'
-                : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
-            </span>
-          </div>
-        </button>
-        {completeLabel && onComplete && (
-          <CompleteButton label={completeLabel} onClick={onComplete} variant="text-card" />
+            }}>{item.title}</p>
+            {item.description && (
+              <p style={{
+                margin: 0,
+                fontSize: 12, color: 'var(--text-secondary)',
+                lineHeight: 1.45,
+                display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}>{item.description}</p>
+            )}
+            <div style={{
+              marginTop: 'auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+              fontSize: 11, color: 'var(--text-muted)',
+            }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                {item.isRequest ? null : <><MapPin size={10} strokeWidth={2} />{item.location}</>}
+              </span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                {item.isRequest
+                  ? (item.urgent ? 'Urgent' : 'Wanted')
+                  : isPriced ? `₹${item.price}`
+                  : item.listingType === 'sell' ? 'Selling'
+                  : item.listingType === 'free' ? 'Free'
+                  : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+              </span>
+            </div>
+          </button>
+        </article>
+        {completeLabel && (
+          <CompleteButton
+            label={completeLabel}
+            onClick={onComplete ?? (() => {})}
+            isClosed={!!item.isClosed}
+          />
         )}
-      </article>
+      </div>
     );
   }
 
   return (
-    <div
-      className="feed-card inventory-card"
-      data-stroke={strokeKind}
-      style={{ aspectRatio: ar, padding: 0, position: 'relative' }}
-      aria-label={`Open ${item.title}`}
-    >
-      <PhotoCarousel
-        photos={photos}
-        aspectRatio={ar}
-        showArrows={false}
-        dotsPosition="top"
-        onClick={onClick}
-        overlay={
-          <>
-            {showHeart && (
-              <span className="feed-card-save" data-saved aria-hidden="true" style={{ zIndex: 3 }}>
-                <Heart size={14} strokeWidth={2} fill="currentColor" />
-              </span>
-            )}
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div
+        className="feed-card inventory-card"
+        data-stroke={strokeKind}
+        style={{ aspectRatio: ar, padding: 0, position: 'relative' }}
+        aria-label={`Open ${item.title}`}
+      >
+        <PhotoCarousel
+          photos={photos}
+          aspectRatio={ar}
+          showArrows={false}
+          dotsPosition="top"
+          onClick={onClick}
+          overlay={
+            <>
+              {showHeart && (
+                <span className="feed-card-save" data-saved aria-hidden="true" style={{ zIndex: 3 }}>
+                  <Heart size={14} strokeWidth={2} fill="currentColor" />
+                </span>
+              )}
 
-            <div className="feed-card-overlay">
-              <p className="feed-card-title">{item.title}</p>
-              <div className="feed-card-meta">
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                  {item.isRequest
-                    ? <>🙋 {item.category}</>
-                    : <><MapPin size={10} strokeWidth={2} />{item.location}</>}
-                </span>
-                <span
-                  className="feed-card-price"
-                  style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
-                >
-                  {item.isRequest
-                    ? (item.urgent ? 'Urgent' : 'Wanted')
-                    : isPriced ? `₹${item.price}`
-                    : item.listingType === 'sell' ? 'Selling'
-                    : item.listingType === 'free' ? 'Free'
-                    : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
-                </span>
+              <div className="feed-card-overlay">
+                <p className="feed-card-title">{item.title}</p>
+                <div className="feed-card-meta">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    {item.isRequest
+                      ? <>🙋 {item.category}</>
+                      : <><MapPin size={10} strokeWidth={2} />{item.location}</>}
+                  </span>
+                  <span
+                    className="feed-card-price"
+                    style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
+                  >
+                    {item.isRequest
+                      ? (item.urgent ? 'Urgent' : 'Wanted')
+                      : isPriced ? `₹${item.price}`
+                      : item.listingType === 'sell' ? 'Selling'
+                      : item.listingType === 'free' ? 'Free'
+                      : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+                  </span>
+                </div>
               </div>
-            </div>
-          </>
-        }
-      />
-      {completeLabel && onComplete && (
-        <CompleteButton label={completeLabel} onClick={onComplete} variant="photo-card" />
+            </>
+          }
+        />
+      </div>
+      {completeLabel && (
+        <CompleteButton
+          label={completeLabel}
+          onClick={onComplete ?? (() => {})}
+          isClosed={!!item.isClosed}
+        />
       )}
     </div>
   );
 }
 
-/* Per-card "Sold / Completed / Found" pill in the bottom-right corner.
-   On a photo card it floats above the image; on a text-only card it sits
-   slightly inside the bottom edge over the surface bg. Owner-only. */
+/* Per-card action pill rendered BELOW the photo/card area. Owner-only.
+   Default (available): white bg, black text, 1px border.
+   Active/closed (already sold/completed): black bg, white text, no border.
+   Hover: slight elevation on the available state. */
 function CompleteButton({
-  label, onClick, variant,
-}: { label: string; onClick: () => void | Promise<void>; variant: 'photo-card' | 'text-card' }) {
+  label, onClick, isClosed,
+}: { label: string; onClick: () => void | Promise<void>; isClosed: boolean }) {
   const [busy, setBusy] = useState(false);
   return (
     <button
       onClick={async (e) => {
         e.stopPropagation();
-        if (busy) return;
+        if (busy || isClosed) return;
         setBusy(true);
         try { await onClick(); } finally { setBusy(false); }
       }}
       aria-label={label}
       style={{
-        position: 'absolute', right: 10, bottom: 10, zIndex: 4,
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '5px 10px',
-        background: variant === 'photo-card'
-          ? 'rgba(34, 197, 94, 0.95)'
-          : 'var(--accent-mint, #22C55E)',
-        color: '#0E0E08',
-        border: 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+        width: '100%',
+        padding: '7px 10px',
+        marginTop: 6,
+        background: isClosed ? '#0E0E0E' : 'var(--bg-surface, #fff)',
+        color: isClosed ? '#fff' : 'var(--text-primary)',
+        border: isClosed ? 'none' : '1px solid var(--border-default)',
         borderRadius: 999,
-        fontSize: 11, fontWeight: 700, letterSpacing: '-0.01em',
-        cursor: busy ? 'wait' : 'pointer',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+        fontSize: 11, fontWeight: 600, letterSpacing: '-0.01em',
+        cursor: isClosed ? 'default' : busy ? 'wait' : 'pointer',
         opacity: busy ? 0.65 : 1,
+        transition: 'box-shadow 150ms ease',
+        boxSizing: 'border-box',
+      }}
+      onMouseEnter={e => {
+        if (!isClosed) (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
       }}
     >
-      <Check size={11} strokeWidth={2.5} />
+      <Check size={11} strokeWidth={2} />
       {busy ? '…' : label}
     </button>
   );
@@ -634,82 +653,86 @@ function InventoryEventCard({
   if (!photo && !hasUploaded && !isMockEvent) {
     /* Text-only event card. */
     return (
-      <article className="feed-card inventory-card" data-stroke="event" style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}>
-        <button onClick={onClick} style={{
-          all: 'unset', cursor: 'pointer', position: 'absolute', inset: 0,
-          padding: '14px 14px 56px', display: 'flex', flexDirection: 'column', gap: 8,
-          background: 'var(--bg-surface)', color: 'var(--text-primary)', boxSizing: 'border-box',
-        }}>
-          <span style={{
-            alignSelf: 'flex-start', background: 'var(--bg-inset)',
-            color: 'var(--text-secondary)', padding: '3px 9px',
-            borderRadius: 999, fontSize: 10, fontWeight: 600,
-            display: 'inline-flex', alignItems: 'center', gap: 4,
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <article className="feed-card inventory-card" data-stroke="event" style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}>
+          <button onClick={onClick} style={{
+            all: 'unset', cursor: 'pointer', position: 'absolute', inset: 0,
+            padding: '14px', display: 'flex', flexDirection: 'column', gap: 8,
+            background: 'var(--bg-surface)', color: 'var(--text-primary)', boxSizing: 'border-box',
           }}>
-            <CalendarDays size={10} strokeWidth={2} /> Event
-          </span>
-          <p style={{
-            margin: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.25,
-            color: 'var(--text-primary)', display: '-webkit-box',
-            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-          }}>{event.title}</p>
-          {event.description && (
-            <p style={{
-              margin: 0, fontSize: 12, color: 'var(--text-secondary)',
-              lineHeight: 1.45, display: '-webkit-box',
-              WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-            }}>{event.description}</p>
-          )}
-          <div style={{
-            marginTop: 'auto', display: 'flex', justifyContent: 'space-between',
-            fontSize: 11, color: 'var(--text-muted)',
-          }}>
-            <span>{event.date.split(' ').slice(0, 3).join(' ')}</span>
-            <span style={{ display: 'inline-flex', gap: 8 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Eye size={10} strokeWidth={2} />{metrics.views}</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Users size={10} strokeWidth={2} />{metrics.rsvps}</span>
+            <span style={{
+              alignSelf: 'flex-start', background: 'var(--bg-inset)',
+              color: 'var(--text-secondary)', padding: '3px 9px',
+              borderRadius: 999, fontSize: 10, fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>
+              <CalendarDays size={10} strokeWidth={2} /> Event
             </span>
-          </div>
-        </button>
-        {onDelete && <CompleteButton label="Delete" onClick={onDelete} variant="text-card" />}
-      </article>
+            <p style={{
+              margin: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.25,
+              color: 'var(--text-primary)', display: '-webkit-box',
+              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            }}>{event.title}</p>
+            {event.description && (
+              <p style={{
+                margin: 0, fontSize: 12, color: 'var(--text-secondary)',
+                lineHeight: 1.45, display: '-webkit-box',
+                WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+              }}>{event.description}</p>
+            )}
+            <div style={{
+              marginTop: 'auto', display: 'flex', justifyContent: 'space-between',
+              fontSize: 11, color: 'var(--text-muted)',
+            }}>
+              <span>{event.date.split(' ').slice(0, 3).join(' ')}</span>
+              <span style={{ display: 'inline-flex', gap: 8 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Eye size={10} strokeWidth={2} />{metrics.views}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Users size={10} strokeWidth={2} />{metrics.rsvps}</span>
+              </span>
+            </div>
+          </button>
+        </article>
+        {onDelete && <CompleteButton label="Delete" onClick={onDelete} isClosed={false} />}
+      </div>
     );
   }
 
   return (
-    <div className="feed-card inventory-card" data-stroke="event" style={{ aspectRatio: ar, padding: 0, position: 'relative' }}>
-      <button
-        onClick={onClick}
-        className="feed-card"
-        style={{ aspectRatio: ar, padding: 0, border: 'none', background: 'transparent', width: '100%', height: '100%' }}
-        aria-label={`Open event ${event.title}`}
-      >
-        <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="feed-card inventory-card" data-stroke="event" style={{ aspectRatio: ar, padding: 0, position: 'relative' }}>
+        <button
+          onClick={onClick}
+          className="feed-card"
+          style={{ aspectRatio: ar, padding: 0, border: 'none', background: 'transparent', width: '100%', height: '100%' }}
+          aria-label={`Open event ${event.title}`}
+        >
+          <img src={photo} alt="" className="feed-card-img" loading="lazy" />
 
-        <span style={{
-          position: 'absolute', top: 10, left: 10,
-          background: 'rgba(0,0,0,0.55)', color: '#fff',
-          backdropFilter: 'blur(8px)', borderRadius: 999,
-          padding: '4px 9px', fontSize: 10, fontWeight: 500,
-          display: 'inline-flex', alignItems: 'center', gap: 4, zIndex: 3,
-        }}>
-          <CalendarDays size={10} strokeWidth={2} />Event
-        </span>
+          <span style={{
+            position: 'absolute', top: 10, left: 10,
+            background: 'rgba(0,0,0,0.55)', color: '#fff',
+            backdropFilter: 'blur(8px)', borderRadius: 999,
+            padding: '4px 9px', fontSize: 10, fontWeight: 500,
+            display: 'inline-flex', alignItems: 'center', gap: 4, zIndex: 3,
+          }}>
+            <CalendarDays size={10} strokeWidth={2} />Event
+          </span>
 
-        <div className="feed-card-overlay">
-          <p className="feed-card-title">{event.title}</p>
-          <div className="feed-card-meta" style={{ gap: 10 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <Eye size={10} strokeWidth={2} />{metrics.views}
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <Users size={10} strokeWidth={2} />{metrics.rsvps}
-            </span>
-            <span className="feed-card-price">{event.date.split(' ').slice(0, 3).join(' ')}</span>
+          <div className="feed-card-overlay">
+            <p className="feed-card-title">{event.title}</p>
+            <div className="feed-card-meta" style={{ gap: 10 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <Eye size={10} strokeWidth={2} />{metrics.views}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <Users size={10} strokeWidth={2} />{metrics.rsvps}
+              </span>
+              <span className="feed-card-price">{event.date.split(' ').slice(0, 3).join(' ')}</span>
+            </div>
           </div>
-        </div>
-      </button>
-      {onDelete && <CompleteButton label="Delete" onClick={onDelete} variant="photo-card" />}
+        </button>
+      </div>
+      {onDelete && <CompleteButton label="Delete" onClick={onDelete} isClosed={false} />}
     </div>
   );
 }
@@ -728,44 +751,46 @@ function InventoryLostFoundCard({
   const isLost = lf.status === 'lost';
   const ar = tall ? '0.72' : '0.92';
   return (
-    <div
-      className="feed-card inventory-card"
-      data-stroke="lostfound"
-      style={{ aspectRatio: ar, padding: 0, position: 'relative' }}
-    >
-      <button
-        onClick={onClick}
-        className="feed-card"
-        style={{ aspectRatio: ar, padding: 0, border: 'none', background: 'transparent', width: '100%', height: '100%' }}
-        aria-label={`Open ${lf.title}`}
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div
+        className="feed-card inventory-card"
+        data-stroke="lostfound"
+        style={{ aspectRatio: ar, padding: 0, position: 'relative' }}
       >
-        <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+        <button
+          onClick={onClick}
+          className="feed-card"
+          style={{ aspectRatio: ar, padding: 0, border: 'none', background: 'transparent', width: '100%', height: '100%' }}
+          aria-label={`Open ${lf.title}`}
+        >
+          <img src={photo} alt="" className="feed-card-img" loading="lazy" />
 
-        <span style={{
-          position: 'absolute', top: 10, left: 10,
-          background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
-          color: '#fff',
-          backdropFilter: 'blur(8px)', borderRadius: 999,
-          padding: '4px 10px',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-          zIndex: 3,
-        }}>
-          {lf.status}
-        </span>
+          <span style={{
+            position: 'absolute', top: 10, left: 10,
+            background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
+            color: '#fff',
+            backdropFilter: 'blur(8px)', borderRadius: 999,
+            padding: '4px 10px',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+            zIndex: 3,
+          }}>
+            {lf.status}
+          </span>
 
-        <div className="feed-card-overlay">
-          <p className="feed-card-title">{lf.title}</p>
-          <div className="feed-card-meta" style={{ gap: 10 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <MapPin size={10} strokeWidth={2} />
-              {lf.lastSeen}
-            </span>
-            <span className="feed-card-price">{lf.timeAgo}</span>
+          <div className="feed-card-overlay">
+            <p className="feed-card-title">{lf.title}</p>
+            <div className="feed-card-meta" style={{ gap: 10 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <MapPin size={10} strokeWidth={2} />
+                {lf.lastSeen}
+              </span>
+              <span className="feed-card-price">{lf.timeAgo}</span>
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+      </div>
       {completeLabel && onComplete && (
-        <CompleteButton label={completeLabel} onClick={onComplete} variant="photo-card" />
+        <CompleteButton label={completeLabel} onClick={onComplete} isClosed={false} />
       )}
     </div>
   );

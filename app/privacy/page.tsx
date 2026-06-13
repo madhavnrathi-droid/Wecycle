@@ -44,7 +44,7 @@ export default function PrivacyPolicy() {
           <li style={li}><strong>Session recordings &amp; heatmaps:</strong> Microsoft Clarity may record anonymized interaction sessions (with text inputs masked) to help us improve usability.</li>
           <li style={li}><strong>Local storage:</strong> we store your sign-in session, app settings, and a first-run flag on your device.</li>
         </ul>
-        <p style={p}>We do <strong>not</strong> collect financial or payment information — Wecycle takes no payments. We do not knowingly collect data from children under 13.</p>
+        <p style={p}>We do <strong>not</strong> collect financial or payment information — Wecycle takes no payments. We do not knowingly collect data from children under 16.</p>
 
         <h2 style={h2}>2. How we use your information</h2>
         <ul style={ul}>
@@ -107,9 +107,9 @@ export default function PrivacyPolicy() {
 
         <h2 style={h2}>8. Children</h2>
         <p style={p}>
-          Wecycle is intended for college students and is not directed to children
-          under 13. If you believe a child has provided us data, contact us and we
-          will delete it.
+          Wecycle is intended for users aged 16 and over and is not directed to
+          children under 16. If you believe a minor under 16 has provided us data,
+          contact us and we will delete it.
         </p>
 
         <h2 style={h2}>9. Changes to this policy</h2>
