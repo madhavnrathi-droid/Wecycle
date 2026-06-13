@@ -436,8 +436,10 @@ export function LostFoundDetailSheet({
     imageUrls: displayPhotoUrl && /^https?:|^\//.test(displayPhotoUrl) ? [displayPhotoUrl] : [],
     location: item.lastSeen,
     reward: item.reward,
+    description: item.description,
     byName: item.user.name,
     byEmail: item.user.email,
+    byPhone: item.user.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
   };
   const handleShareLF = () => {

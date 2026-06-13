@@ -241,8 +241,10 @@ export default function EventDetailScreen({
     imageUrls: displayPhotos.filter(u => !!u && /^https?:|^\//.test(u)),
     dateLine: [event.date, event.time].filter(Boolean).join(' · '),
     location: event.location,
+    description: event.description,
     byName: event.organizer?.name,
     byEmail: event.organizer?.email,
+    byPhone: event.organizer?.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${event.id}` : undefined,
   };
   const handleShareEvent = () => {

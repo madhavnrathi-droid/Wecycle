@@ -40,10 +40,14 @@ export interface ShareCardSpec {
   dateLine?: string;
   /** L&F reward note. */
   reward?: string;
-  /** Uploader's display name — shown as the byline. */
+  /** Short description, shown in the footer if present. */
+  description?: string;
+  /** Uploader's display name — the seller byline. */
   byName?: string;
-  /** Uploader's email — shown under the byline. */
+  /** Uploader's email — shown in the footer contact line. */
   byEmail?: string;
+  /** Uploader's phone — shown in the footer contact line. */
+  byPhone?: string;
   /** Deep link to the post. Defaults to current URL. */
   url?: string;
 }
@@ -155,181 +159,142 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   ]);
   const photos = photoImgs.filter((p): p is HTMLImageElement => !!p);
 
-  const ix = 72; // left content margin
+  const ix = 64; // footer left/right margin
 
   const paint = (useImages: boolean) => {
     ctx.clearRect(0, 0, W, H);
 
-    // ── Full-bleed hero photo (the whole card) ──
+    // ── White card surface ──
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Product image (top), inset + rounded like the references ──
+    const imX = 36, imY = 36, imW = W - 72, imH = 720;
+    const imR = 32;
+    ctx.save();
+    roundRect(ctx, imX, imY, imW, imH, imR);
+    ctx.clip();
     const hero = useImages ? photos[0] : null;
     if (hero) {
-      coverDraw(ctx, hero, 0, 0, W, H);
+      coverDraw(ctx, hero, imX, imY, imW, imH);
     } else {
-      const pg = ctx.createLinearGradient(0, 0, W, H);
-      pg.addColorStop(0, '#24262C');
-      pg.addColorStop(1, '#121317');
+      const pg = ctx.createLinearGradient(imX, imY, imX + imW, imY + imH);
+      pg.addColorStop(0, '#EEF0F3');
+      pg.addColorStop(1, '#DDE1E6');
       ctx.fillStyle = pg;
-      ctx.fillRect(0, 0, W, H);
-      ctx.font = `320px ${FONT}`;
+      ctx.fillRect(imX, imY, imW, imH);
+      ctx.font = `300px ${FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(kind.glyph, W / 2, H / 2);
+      ctx.fillText(kind.glyph, imX + imW / 2, imY + imH / 2);
     }
-
-    // Top + bottom scrims so the overlaid text always reads.
-    const topScrim = ctx.createLinearGradient(0, 0, 0, 440);
-    topScrim.addColorStop(0, 'rgba(0,0,0,0.62)');
+    // Faint top scrim so the pill + logo always read on bright photos.
+    const topScrim = ctx.createLinearGradient(imX, imY, imX, imY + 220);
+    topScrim.addColorStop(0, 'rgba(0,0,0,0.32)');
     topScrim.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = topScrim;
-    ctx.fillRect(0, 0, W, 440);
-    const botScrim = ctx.createLinearGradient(0, H - 460, 0, H);
-    botScrim.addColorStop(0, 'rgba(0,0,0,0)');
-    botScrim.addColorStop(1, 'rgba(0,0,0,0.74)');
-    ctx.fillStyle = botScrim;
-    ctx.fillRect(0, H - 460, W, 460);
+    ctx.fillRect(imX, imY, imW, 220);
+    ctx.restore();
 
-    // ── Top-right brand "dent": soft white circular bloom + logomark ──
-    const cx = W - 132, cy = 150;
-    const bloom = ctx.createRadialGradient(cx, cy, 10, cx, cy, 190);
-    bloom.addColorStop(0, 'rgba(255,255,255,0.9)');
-    bloom.addColorStop(0.55, 'rgba(255,255,255,0.55)');
-    bloom.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = bloom;
-    ctx.fillRect(cx - 200, cy - 200, 400, 400);
-    // Crisp white disc with a feathered rim for the "soft dent" look.
+    // Kind pill, top-left of image (like "Best Seller").
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 28px ${FONT}`;
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '1.5px';
+    const kw = ctx.measureText(kind.word).width;
+    const kpH = 56, kpW = kw + 48, kpX = imX + 28, kpY = imY + 28;
+    roundRect(ctx, kpX, kpY, kpW, kpH, kpH / 2);
+    ctx.fillStyle = 'rgba(10,12,16,0.55)';
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(kind.word, kpX + 24, kpY + kpH / 2 + 1);
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
+
+    // Logomark in a clean white circle, top-right — bigger, no bloom.
+    const cr = 64, cx = imX + imW - 28 - cr, cy = imY + 28 + cr;
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.18)';
-    ctx.shadowBlur = 26;
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    ctx.shadowBlur = 22;
+    ctx.shadowOffsetY = 6;
     ctx.beginPath();
-    ctx.arc(cx, cy, 82, 0, Math.PI * 2);
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.restore();
     if (logo) {
-      const ls = 86;
+      const ls = 88;
       ctx.drawImage(logo, cx - ls / 2, cy - ls / 2, ls, ls);
     }
 
-    // ── Top-left: title · subtitle · price/status pill ──
+    // ── Footer (white, no photo) ──
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    let y = 158;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `800 80px ${FONT}`;
-    const titleLines = wrapText(ctx, spec.title, W - ix - 240, 2);
+    let y = imY + imH + 78;
+
+    // Product title.
+    ctx.fillStyle = '#14161A';
+    ctx.font = `800 62px ${FONT}`;
+    const titleLines = wrapText(ctx, spec.title, W - ix * 2, 2);
     for (const ln of titleLines) {
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.35)';
-      ctx.shadowBlur = 18;
       ctx.fillText(ln, ix, y);
-      ctx.restore();
-      y += 92;
+      y += 70;
     }
+    y += 8;
 
-    // Subtitle (kind tagline).
-    const tagline: Record<ShareCardKind, string> = {
-      item: 'Up for grabs nearby', request: 'Wanted on campus',
-      event: spec.dateLine || 'Happening on campus',
-      lost: 'Lost — help reunite it', found: 'Found — claim it',
-    };
-    ctx.font = `500 38px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.3)';
-    ctx.shadowBlur = 14;
-    ctx.fillText(wrapText(ctx, tagline[spec.kind], W - ix - 240, 1)[0], ix, y + 6);
-    ctx.restore();
-    y += 64;
-
-    // Price / status pill.
-    const pillText =
-      spec.price != null ? `₹ ${spec.price.toLocaleString('en-IN')}` :
-      spec.badge ? spec.badge :
-      (spec.kind === 'lost' || spec.kind === 'found') ? kind.word : '';
-    if (pillText) {
+    // Seller name (left) + price / status (right).
+    const rowMid = y + 20;
+    if (spec.byName) {
+      ctx.fillStyle = '#6A6F77';
+      ctx.font = `500 38px ${FONT}`;
       ctx.textBaseline = 'middle';
-      ctx.font = `700 40px ${FONT}`;
-      const tw = ctx.measureText(pillText).width;
-      const ph = 70, pw = tw + 56;
-      ctx.save();
-      roundRect(ctx, ix, y, pw, ph, ph / 2);
-      ctx.fillStyle = 'rgba(8,9,11,0.66)';
-      ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(pillText, ix + 28, y + ph / 2 + 1);
+      ctx.fillText(wrapText(ctx, spec.byName, W - ix * 2 - 320, 1)[0], ix, rowMid);
       ctx.textBaseline = 'alphabetic';
     }
-
-    // ── Bottom-right: thumbnail strip of the OTHER photos ──
-    if (useImages && photos.length > 1) {
-      const extra = photos.slice(1, 5);
-      const t = 96, gap = 12;
-      const maxShown = Math.min(extra.length, 3);
-      const stripW = maxShown * t + (maxShown - 1) * gap;
-      let tx = W - 72 - stripW;
-      const ty = H - 250 - t;
-      for (let i = 0; i < maxShown; i++) {
-        ctx.save();
-        roundRect(ctx, tx, ty, t, t, 18);
-        ctx.clip();
-        coverDraw(ctx, extra[i], tx, ty, t, t);
-        ctx.restore();
-        ctx.save();
-        roundRect(ctx, tx, ty, t, t, 18);
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-        ctx.stroke();
-        ctx.restore();
-        if (i === maxShown - 1 && photos.length - 1 > maxShown) {
-          ctx.save();
-          roundRect(ctx, tx, ty, t, t, 18);
-          ctx.fillStyle = 'rgba(0,0,0,0.55)';
-          ctx.fill();
-          ctx.restore();
-          ctx.fillStyle = '#fff';
-          ctx.font = `700 38px ${FONT}`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(`+${photos.length - 1 - maxShown + 1}`, tx + t / 2, ty + t / 2 + 1);
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'alphabetic';
-        }
-        tx += t + gap;
-      }
-    }
-
-    // ── Bottom-left: uploader byline ──
-    if (spec.byName) {
+    const priceText =
+      spec.price != null ? `₹${spec.price.toLocaleString('en-IN')}` :
+      spec.badge ? spec.badge :
+      (spec.kind === 'lost' || spec.kind === 'found') ? kind.word : '';
+    if (priceText) {
+      ctx.font = `800 46px ${FONT}`;
+      const pw = ctx.measureText(priceText).width;
+      const ph = 70, pillW = pw + 52;
+      const px = W - ix - pillW;
+      roundRect(ctx, px, rowMid - ph / 2, pillW, ph, ph / 2);
+      ctx.fillStyle = '#14161A';
+      ctx.fill();
       ctx.fillStyle = '#ffffff';
-      ctx.font = `700 42px ${FONT}`;
-      ctx.fillText(wrapText(ctx, spec.byName, W - ix * 2, 1)[0], ix, H - 188);
+      ctx.textBaseline = 'middle';
+      ctx.font = `800 42px ${FONT}`;
+      ctx.fillText(priceText, px + 26, rowMid + 1);
+      ctx.textBaseline = 'alphabetic';
     }
-    if (spec.byEmail) {
-      ctx.fillStyle = 'rgba(255,255,255,0.74)';
-      ctx.font = `400 32px ${FONT}`;
-      ctx.fillText(wrapText(ctx, spec.byEmail, W - ix * 2, 1)[0], ix, H - 144);
+    y = rowMid + 54;
+
+    // Description (if any).
+    if (spec.description?.trim()) {
+      ctx.fillStyle = '#6A6F77';
+      ctx.font = `400 36px ${FONT}`;
+      for (const ln of wrapText(ctx, spec.description.trim(), W - ix * 2, 2)) {
+        y += 46;
+        ctx.fillText(ln, ix, y);
+      }
+      y += 12;
     }
 
-    // ── Bottom: brand signature (cursive wordmark) + url ──
-    let bx = ix;
-    if (wordmark) {
-      const wmH = 38;
-      const wmW = wmH * WORDMARK_AR;
-      // White wordmark reads on the dark scrim; the asset is colour-on-clear,
-      // so drop a soft shadow for contrast.
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.35)';
-      ctx.shadowBlur = 12;
-      ctx.drawImage(wordmark, bx, H - 86, wmW, wmH);
-      ctx.restore();
-      bx += wmW + 18;
+    // Email + phone contact line.
+    const contact = [spec.byEmail, spec.byPhone].filter(Boolean).join('   ·   ');
+    if (contact) {
+      y += 50;
+      ctx.fillStyle = '#9AA0A8';
+      ctx.font = `500 32px ${FONT}`;
+      ctx.fillText(wrapText(ctx, contact, W - ix * 2, 1)[0], ix, y);
     }
-    ctx.fillStyle = 'rgba(255,255,255,0.72)';
-    ctx.font = `600 30px ${FONT}`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText('· wecycle.page', bx, H - 86 + 19);
-    ctx.textBaseline = 'alphabetic';
+
+    // ── Wecycle wordmark — bigger, pinned bottom-left (no url) ──
+    if (wordmark) {
+      const wmH = 58;
+      ctx.drawImage(wordmark, ix, H - 64 - wmH, wmH * WORDMARK_AR, wmH);
+    }
   };
 
   paint(true);

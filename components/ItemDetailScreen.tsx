@@ -344,8 +344,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     price: isPriced ? item.price : undefined,
     badge: isPriced ? undefined : priceLabel,
     location: item.location,
+    description: item.description,
     byName: item.user.name,
     byEmail: item.user.email,
+    byPhone: item.user.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
   };
 
@@ -1180,8 +1182,10 @@ function DesktopLayout({
     price: isPriced ? item.price : undefined,
     badge: isPriced ? undefined : priceLabel,
     location: item.location,
+    description: item.description,
     byName: item.user.name,
     byEmail: item.user.email,
+    byPhone: item.user.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
   };
   const {
