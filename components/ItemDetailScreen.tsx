@@ -1354,8 +1354,16 @@ function DesktopLayout({
           <div ref={heroSentinelRef} style={{ height: 0, gridColumn: '1', alignSelf: 'end' }} aria-hidden="true" />
         )}
 
-        {/* ── RIGHT: Title, price, description, owner, actions ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+        {/* ── RIGHT: Title, price, description, owner, actions ──
+             Explicitly pinned to column 2 / row 1 in the 2-col layout. The
+             zero-height scroll sentinel above carries `gridColumn: 1`, which
+             was disrupting grid auto-placement and pushing this info block
+             down into a second row (forcing the user to scroll past the tall
+             photo to reach the details). */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0,
+          ...((photos.length > 0 || canManage) ? { gridColumn: 2, gridRow: 1 } : {}),
+        }}>
 
           {canManage ? (
             <select
