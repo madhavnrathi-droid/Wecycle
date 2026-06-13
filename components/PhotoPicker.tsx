@@ -68,6 +68,11 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
      We show this many spinner placeholder tiles in the grid. */
   const [processingCount, setProcessingCount] = useState(0);
 
+  /* Index of the tile currently being cut-out via the per-tile scissors button.
+     Used to overlay a spinner on JUST that tile (works for existing remote
+     photos too — the "remove bg" toggle only applied to newly added files). */
+  const [cuttingIdx, setCuttingIdx] = useState<number | null>(null);
+
   /* Background-removal toggle — default OFF */
   const [removeBg, setRemoveBg] = useState(false);
 
@@ -141,6 +146,75 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
       setError(`Couldn't remove background — keeping the original.`);
       console.warn('[PhotoPicker] stripBackground failed', err);
       return file;
+    }
+  };
+
+  /** Cut the background out of a single tile in-place. Works on:
+   *   - blob: URLs (new uploads still in mediaRef) — uses the cached File
+   *   - https:// URLs (existing photos from the server) — fetches the bytes
+   *     first, then runs the same proxy flow.
+   *
+   *  On success, swaps the tile's URL for a new blob URL backed by the
+   *  cutout PNG, so saving the post re-uploads it as a transparent image.
+   *  On failure, leaves the tile untouched and shows a soft toast. */
+  const cutTileBg = async (idx: number) => {
+    if (cuttingIdx !== null) return;
+    const url = photos[idx];
+    if (!url) return;
+    const existing = mediaRef.current.get(url);
+    if (existing?.kind === 'video') {
+      setError("Can't remove background from a video.");
+      return;
+    }
+    setCuttingIdx(idx);
+    try {
+      /* Get the source bytes — either the cached blob (new upload) or a
+         freshly-fetched copy of the remote image (existing post). */
+      let sourceFile: File;
+      if (existing?.blob) {
+        const ext = existing.blob.type.split('/')[1]?.split(';')[0] || 'jpg';
+        sourceFile = new File([existing.blob], `tile-${idx}.${ext}`, {
+          type: existing.blob.type || 'image/jpeg',
+        });
+      } else {
+        const resp = await fetch(url, { mode: 'cors' });
+        if (!resp.ok) throw new Error(`fetch ${resp.status}`);
+        const blob = await resp.blob();
+        const ext = blob.type.split('/')[1]?.split(';')[0] || 'jpg';
+        sourceFile = new File([blob], `tile-${idx}.${ext}`, {
+          type: blob.type || 'image/jpeg',
+        });
+      }
+
+      const cutout = await stripBackground(sourceFile);
+      /* stripBackground returns the original file on failure — bail without
+         mutating the tile in that case (the toast was already shown). */
+      if (cutout === sourceFile) return;
+
+      const [settled] = await compressMediaBatch([cutout]);
+      if (settled.status !== 'fulfilled') {
+        setError("Couldn't finish the cutout — keeping the original.");
+        return;
+      }
+      const newMedia = settled.value;
+      mediaRef.current.set(newMedia.url, newMedia);
+
+      const next = [...photos];
+      next[idx] = newMedia.url;
+      onChange(next);
+
+      /* If the tile we replaced was a blob we had cached, free it now that
+         it's no longer referenced. (Remote URLs need no cleanup.) */
+      if (existing) {
+        if (existing.posterUrl) URL.revokeObjectURL(existing.posterUrl);
+        mediaRef.current.delete(url);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      setError("Couldn't remove background — keeping the original.");
+      console.warn('[PhotoPicker] cutTileBg failed', err);
+    } finally {
+      setCuttingIdx(null);
     }
   };
 
@@ -359,6 +433,18 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
                 </span>
               )}
               {i === 0 && <span className="photo-picker-cover">Cover</span>}
+              {!isVideo && (
+                <button
+                  type="button"
+                  className="photo-picker-cut"
+                  aria-label={`Remove background from photo ${i + 1}`}
+                  title="Remove background"
+                  onClick={() => cutTileBg(i)}
+                  disabled={cuttingIdx !== null}
+                >
+                  <Scissors size={12} strokeWidth={2.5} />
+                </button>
+              )}
               <button
                 type="button"
                 className="photo-picker-remove"
@@ -367,6 +453,24 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
               >
                 <X size={12} strokeWidth={2.5} />
               </button>
+              {cuttingIdx === i && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute', inset: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(0,0,0,0.45)',
+                    backdropFilter: 'blur(2px)',
+                    borderRadius: 'inherit',
+                  }}
+                >
+                  <Loader2
+                    size={22}
+                    strokeWidth={2}
+                    style={{ animation: 'spin-loader 0.9s linear infinite', color: '#fff' }}
+                  />
+                </span>
+              )}
             </div>
           );
         })}
