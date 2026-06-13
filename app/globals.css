@@ -2716,6 +2716,134 @@ section.mobile-only { display: block; }
    PHOTO PICKER (forms — multi-photo upload preview)
    ═══════════════════════════════════════════════ */
 
+/* ── Photo picker: big preview + thumbnail carousel ── */
+.photo-preview {
+  position: relative;
+  width: 100%;
+  height: clamp(220px, 42vh, 320px);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.photo-preview > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* show the WHOLE image, never cropped */
+  display: block;
+}
+.photo-preview-play {
+  position: absolute; inset: 0; margin: auto;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px); pointer-events: none;
+}
+.photo-preview-cover,
+.photo-preview-makecover {
+  position: absolute; top: 12px; left: 12px;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.01em;
+  padding: 6px 12px; border-radius: 999px;
+  backdrop-filter: blur(8px);
+}
+.photo-preview-cover {
+  background: rgba(10, 12, 16, 0.6); color: #fff; pointer-events: none;
+}
+.photo-preview-makecover {
+  background: rgba(255, 255, 255, 0.92); color: #14161A;
+  border: none; cursor: pointer;
+}
+.photo-preview-makecover:hover { background: #fff; }
+.photo-preview-remove {
+  position: absolute; top: 12px; right: 12px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(10, 12, 16, 0.6); color: #fff; border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; backdrop-filter: blur(8px);
+}
+.photo-preview-busy {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(2px);
+}
+
+.photo-empty {
+  width: 100%;
+  height: clamp(200px, 38vh, 300px);
+  border-radius: 16px;
+  border: 1.5px dashed var(--border-default);
+  background: var(--bg-inset);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; cursor: pointer; color: var(--text-secondary);
+  font-family: inherit; transition: border-color 0.15s var(--ease-smooth), color 0.15s;
+}
+.photo-empty:hover { border-color: var(--text-primary); color: var(--text-primary); }
+.photo-empty-title { font-size: 15px; font-weight: 600; }
+.photo-empty-hint { font-size: 12px; color: var(--text-muted); }
+
+.photo-actions {
+  display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+}
+.photo-actions button {
+  flex: 1 1 auto; min-width: 150px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 42px; padding: 0 14px; border-radius: 12px;
+  border: 1px solid var(--border-default); background: var(--bg-surface);
+  color: var(--text-primary); font-family: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.photo-actions button:hover:not(:disabled) { border-color: #22C55E; color: #16A34A; }
+.photo-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.photo-carousel {
+  display: flex; gap: 8px; margin-top: 10px;
+  overflow-x: auto; padding: 2px 2px 6px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+.photo-carousel::-webkit-scrollbar { height: 4px; }
+.photo-carousel::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 999px; }
+.photo-thumb {
+  position: relative; flex: 0 0 auto;
+  width: 72px; height: 72px; border-radius: 12px;
+  overflow: hidden; background: var(--bg-inset);
+  border: 2px solid var(--border-subtle);
+  cursor: pointer; padding: 0;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.photo-thumb.is-active {
+  border-color: #22C55E;
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px rgba(34, 197, 94, 0.4);
+}
+.photo-thumb > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-thumb-play {
+  position: absolute; inset: 0; margin: auto;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; pointer-events: none;
+}
+.photo-thumb-cover {
+  position: absolute; bottom: 4px; left: 4px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(10, 12, 16, 0.65); color: #FFE066;
+  display: inline-flex; align-items: center; justify-content: center; pointer-events: none;
+}
+.photo-thumb-remove {
+  position: absolute; top: 3px; right: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(10, 12, 16, 0.62); color: #fff; border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; backdrop-filter: blur(4px);
+}
+.photo-thumb-add {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px dashed var(--border-default); color: var(--text-secondary);
+}
+.photo-thumb-add:hover { border-color: var(--text-primary); color: var(--text-primary); }
+
 .photo-picker {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -3348,15 +3476,23 @@ section.mobile-only { display: block; }
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 38px 12px 12px;
-  /* Stronger, smoother scrim so white title/location text stays legible over
-     busy photos (the earlier 0→0.55 ramp washed out on light images). */
+  padding: 46px 12px 12px;
+  /* Frosted-glass bottom panel. A background-removed (transparent) product —
+     e.g. a cut-out chair — would otherwise float right over the title/price
+     with nothing behind it; this gives the text a soft frosted strip to sit
+     on. The mask fades the whole panel (gradient + blur) in toward the
+     bottom, so only the text strip is frosted and the product's body above
+     stays crisp and undisturbed. */
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.28) 45%,
-    rgba(0, 0, 0, 0.72) 100%
+    rgba(10, 12, 16, 0) 0%,
+    rgba(10, 12, 16, 0.34) 55%,
+    rgba(10, 12, 16, 0.62) 100%
   );
+  -webkit-backdrop-filter: blur(7px) saturate(1.05);
+  backdrop-filter: blur(7px) saturate(1.05);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 42%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 42%);
   color: #fff;
   pointer-events: none;
 }

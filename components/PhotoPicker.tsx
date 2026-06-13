@@ -1,36 +1,36 @@
 'use client';
 
 /* Shared photo picker used by Share / Request / Lost-Found / Submit-Event /
- * Edit-Item modals. Handles the full lifecycle:
+ * Edit-Photos modals.
  *
- *   - Tap "Add" → bottom sheet offering camera or gallery
+ * UX: one LARGE preview of the active photo (whole image, never cropped) with
+ * a horizontal CAROUSEL of thumbnails beneath it. Tap a thumbnail to make it
+ * active. Background removal works per-image ("Remove background") or across
+ * every photo at once ("Remove bg · all"), and the first photo is the cover
+ * (any photo can be promoted with "Make cover").
+ *
+ *   - Tap "Add" → bottom sheet offering camera or gallery.
  *   - Files are auto-compressed (longest edge 1600px, JPEG q=0.82) before
- *     being added to state, so uploads to Supabase stay small.
- *   - Drag-to-reorder on desktop; long-press-drag works on mobile via
- *     pointer events with HTML5 drag-and-drop fallback.
- *   - First photo is always the "Cover" (first in array).
- *   - Object URLs are tracked so we can revoke them on unmount.
- *   - Optional "Remove background" toggle — powered by @imgly/background-removal
- *     (ONNX U2-Net via WebAssembly, Apache 2.0, model loaded from CDN on first
- *     use, NOT bundled). Videos always pass through unchanged.
+ *     being added, so uploads to Supabase stay small.
+ *   - Background removal proxies to /api/remove-background (remove.bg) and
+ *     works on both new uploads (cached blob) and existing remote photos
+ *     (fetched on demand) — the result is a transparent PNG.
  *
- * Consumers receive the current array of object URLs via `onChange`; they
- * stay in charge of where to send the blobs (Supabase storage etc.).
- * For now we just hold blobs in a ref keyed by URL so the caller can pull
- * them via the optional `getBlobs()` ref.
+ * Consumers receive the current array of object/remote URLs via `onChange`
+ * and pull the matching compressed bytes via the `getBlobs()/getMedia()` ref.
  */
 
 import {
   useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef,
 } from 'react';
-import { Plus, X, Camera, ImagePlus, Play, Scissors, Loader2 } from 'lucide-react';
+import { Plus, X, Camera, ImagePlus, Play, Scissors, Loader2, Star } from 'lucide-react';
 import {
   compressMediaBatch, MAX_VIDEO_BYTES, MediaTooLargeError,
   type CompressedMedia,
 } from '../lib/mediaCompression';
 
 interface PhotoPickerProps {
-  /** Object URLs currently held (photos and videos share this list). */
+  /** Object/remote URLs currently held (photos and videos share this list). */
   photos: string[];
   onChange: (next: string[]) => void;
   max?: number;                                  /* hard cap, default 3 */
@@ -43,13 +43,8 @@ interface PhotoPickerProps {
 }
 
 export interface PhotoPickerHandle {
-  /** Pull compressed blobs in current display order. */
   getBlobs: () => Blob[];
-  /** Pull rich media records (kind + poster + dimensions) in display order.
-   *  Mainly useful for the feed card which needs to know which entries are
-   *  videos so it can render `<video>` instead of `<img>`. */
   getMedia: () => CompressedMedia[];
-  /** Drop the internal blob cache (call after upload). */
   clear: () => void;
 }
 
@@ -57,48 +52,42 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   { photos, onChange, max = 3, label = 'first is cover', defaultSource, allowVideo = true },
   ref,
 ) {
-  /* Map of objectURL → CompressedMedia, so the parent can hand us back any
-     order and we still ship the matching compressed bytes + know which
-     entries are videos. */
+  /* Map of objectURL → CompressedMedia. */
   const mediaRef = useRef<Map<string, CompressedMedia>>(new Map());
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [busy, setBusy] = useState(0); /* number of files currently compressing */
+  const [busy, setBusy] = useState(0);            /* files compressing */
+  const [processingCount, setProcessingCount] = useState(0); /* bg-removals left */
+  const [cuttingIdx, setCuttingIdx] = useState<number | null>(null); /* single cut */
+  const [bulkBusy, setBulkBusy] = useState(false);
+  /* Which photo fills the big preview. */
+  const [activeIdx, setActiveIdx] = useState(0);
 
-  /* Per-tile processing state: count of files currently being background-removed.
-     We show this many spinner placeholder tiles in the grid. */
-  const [processingCount, setProcessingCount] = useState(0);
-
-  /* Index of the tile currently being cut-out via the per-tile scissors button.
-     Used to overlay a spinner on JUST that tile (works for existing remote
-     photos too — the "remove bg" toggle only applied to newly added files). */
-  const [cuttingIdx, setCuttingIdx] = useState<number | null>(null);
-
-  /* Background-removal toggle — default OFF */
-  const [removeBg, setRemoveBg] = useState(false);
-
-  /* Two inputs — one per source. Both accept image + video; the OS picker
-     then surfaces the right capture/library UI. */
   const libraryRef = useRef<HTMLInputElement>(null);
-  const cameraRef  = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const [error, setError] = useState<string | null>(null);
-  /* Clear the error after a few seconds — it's a soft toast, not a permanent state. */
   useEffect(() => {
     if (!error) return;
     const t = setTimeout(() => setError(null), 4500);
     return () => clearTimeout(t);
   }, [error]);
 
-  /* Revoke any object URLs that left the photos array (removed / reordered out) */
+  /* Revoke object URLs on unmount. */
   useEffect(() => {
+    const map = mediaRef.current;
     return () => {
-      mediaRef.current.forEach((m, url) => {
+      map.forEach((m, url) => {
         URL.revokeObjectURL(url);
         if (m.posterUrl) URL.revokeObjectURL(m.posterUrl);
       });
-      mediaRef.current.clear();
+      map.clear();
     };
   }, []);
+
+  /* Keep the active index inside bounds as photos are added/removed. */
+  useEffect(() => {
+    setActiveIdx(a => (photos.length === 0 ? 0 : Math.min(a, photos.length - 1)));
+  }, [photos.length]);
 
   useImperativeHandle(ref, () => ({
     getBlobs: () => photos.map(url => mediaRef.current.get(url)?.blob).filter((b): b is Blob => !!b),
@@ -114,12 +103,8 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
 
   /* ── background removal ────────────────────── */
 
-  /** Strip the background from a single image File via /api/remove-background.
-   *
-   *  The route proxies to remove.bg with a server-only API key, returns a
-   *  transparent PNG. Failures (server not configured, network error,
-   *  remove.bg quota exhausted) fall back to the original file silently with
-   *  a calm toast — never block the upload. */
+  /** Strip the background from a single File via /api/remove-background.
+   *  Returns the original file unchanged on any failure (with a soft toast). */
   const stripBackground = async (file: File): Promise<File> => {
     try {
       const form = new FormData();
@@ -130,18 +115,13 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         try {
           const json = (await res.json()) as { error?: string };
           if (json?.error) msg = json.error;
-        } catch { /* not json — keep default */ }
+        } catch { /* not json */ }
         setError(`${msg} — keeping the original.`);
         return file;
       }
       const blob = await res.blob();
-      /* Wrap the PNG bytes as a File so the downstream compressor can
-         inspect .type and preserve the alpha channel. */
       const cutoutName = file.name.replace(/\.[^.]+$/, '') + '-cutout.png';
-      return new File([blob], cutoutName, {
-        type: 'image/png',
-        lastModified: Date.now(),
-      });
+      return new File([blob], cutoutName, { type: 'image/png', lastModified: Date.now() });
     } catch (err) {
       setError(`Couldn't remove background — keeping the original.`);
       console.warn('[PhotoPicker] stripBackground failed', err);
@@ -149,62 +129,44 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
     }
   };
 
-  /** Cut the background out of a single tile in-place. Works on:
-   *   - blob: URLs (new uploads still in mediaRef) — uses the cached File
-   *   - https:// URLs (existing photos from the server) — fetches the bytes
-   *     first, then runs the same proxy flow.
-   *
-   *  On success, swaps the tile's URL for a new blob URL backed by the
-   *  cutout PNG, so saving the post re-uploads it as a transparent image.
-   *  On failure, leaves the tile untouched and shows a soft toast. */
+  /** Resolve the source bytes for photo `url` — cached blob (new upload) or a
+   *  freshly fetched copy (existing remote photo). */
+  const sourceFileFor = async (url: string, idx: number): Promise<File | null> => {
+    const existing = mediaRef.current.get(url);
+    if (existing?.kind === 'video') return null;
+    if (existing?.blob) {
+      const ext = existing.blob.type.split('/')[1]?.split(';')[0] || 'jpg';
+      return new File([existing.blob], `tile-${idx}.${ext}`, { type: existing.blob.type || 'image/jpeg' });
+    }
+    const resp = await fetch(url, { mode: 'cors' });
+    if (!resp.ok) throw new Error(`fetch ${resp.status}`);
+    const blob = await resp.blob();
+    const ext = blob.type.split('/')[1]?.split(';')[0] || 'jpg';
+    return new File([blob], `tile-${idx}.${ext}`, { type: blob.type || 'image/jpeg' });
+  };
+
+  /** Remove the background from ONE photo (the active one) in place. */
   const cutTileBg = async (idx: number) => {
-    if (cuttingIdx !== null) return;
+    if (cuttingIdx !== null || bulkBusy) return;
     const url = photos[idx];
     if (!url) return;
     const existing = mediaRef.current.get(url);
-    if (existing?.kind === 'video') {
-      setError("Can't remove background from a video.");
-      return;
-    }
+    if (existing?.kind === 'video') { setError("Can't remove background from a video."); return; }
     setCuttingIdx(idx);
     try {
-      /* Get the source bytes — either the cached blob (new upload) or a
-         freshly-fetched copy of the remote image (existing post). */
-      let sourceFile: File;
-      if (existing?.blob) {
-        const ext = existing.blob.type.split('/')[1]?.split(';')[0] || 'jpg';
-        sourceFile = new File([existing.blob], `tile-${idx}.${ext}`, {
-          type: existing.blob.type || 'image/jpeg',
-        });
-      } else {
-        const resp = await fetch(url, { mode: 'cors' });
-        if (!resp.ok) throw new Error(`fetch ${resp.status}`);
-        const blob = await resp.blob();
-        const ext = blob.type.split('/')[1]?.split(';')[0] || 'jpg';
-        sourceFile = new File([blob], `tile-${idx}.${ext}`, {
-          type: blob.type || 'image/jpeg',
-        });
-      }
-
+      const sourceFile = await sourceFileFor(url, idx);
+      if (!sourceFile) return;
       const cutout = await stripBackground(sourceFile);
-      /* stripBackground returns the original file on failure — bail without
-         mutating the tile in that case (the toast was already shown). */
-      if (cutout === sourceFile) return;
-
+      if (cutout === sourceFile) return; // failure → toast already shown
       const [settled] = await compressMediaBatch([cutout]);
       if (settled.status !== 'fulfilled') {
         setError("Couldn't finish the cutout — keeping the original.");
         return;
       }
-      const newMedia = settled.value;
-      mediaRef.current.set(newMedia.url, newMedia);
-
+      mediaRef.current.set(settled.value.url, settled.value);
       const next = [...photos];
-      next[idx] = newMedia.url;
+      next[idx] = settled.value.url;
       onChange(next);
-
-      /* If the tile we replaced was a blob we had cached, free it now that
-         it's no longer referenced. (Remote URLs need no cleanup.) */
       if (existing) {
         if (existing.posterUrl) URL.revokeObjectURL(existing.posterUrl);
         mediaRef.current.delete(url);
@@ -218,6 +180,51 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
     }
   };
 
+  /** Remove the background from EVERY photo. Builds the final array once at the
+   *  end so per-image replacements never clobber each other. */
+  const bulkRemoveBg = async () => {
+    if (cuttingIdx !== null || bulkBusy) return;
+    const targets = photos
+      .map((u, i) => ({ u, i }))
+      .filter(({ u }) => mediaRef.current.get(u)?.kind !== 'video');
+    if (targets.length === 0) return;
+    setBulkBusy(true);
+    setProcessingCount(targets.length);
+    const replacements = new Map<number, string>();
+    const freed: { url: string; poster?: string }[] = [];
+    try {
+      for (const { u, i } of targets) {
+        try {
+          const sourceFile = await sourceFileFor(u, i);
+          if (!sourceFile) { setProcessingCount(c => Math.max(0, c - 1)); continue; }
+          const cutout = await stripBackground(sourceFile);
+          if (cutout === sourceFile) { setProcessingCount(c => Math.max(0, c - 1)); continue; }
+          const [settled] = await compressMediaBatch([cutout]);
+          if (settled.status === 'fulfilled') {
+            mediaRef.current.set(settled.value.url, settled.value);
+            replacements.set(i, settled.value.url);
+            const existing = mediaRef.current.get(u);
+            if (existing?.blob) freed.push({ url: u, poster: existing.posterUrl });
+          }
+        } catch (err) {
+          console.warn('[PhotoPicker] bulkRemoveBg item failed', err);
+        }
+        setProcessingCount(c => Math.max(0, c - 1));
+      }
+      if (replacements.size) {
+        onChange(photos.map((u, i) => replacements.get(i) ?? u));
+        freed.forEach(f => {
+          if (f.poster) URL.revokeObjectURL(f.poster);
+          mediaRef.current.delete(f.url);
+          URL.revokeObjectURL(f.url);
+        });
+      }
+    } finally {
+      setBulkBusy(false);
+      setProcessingCount(0);
+    }
+  };
+
   /* ── adding ────────────────────────────────── */
 
   const remaining = Math.max(0, max - photos.length);
@@ -226,163 +233,94 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
     if (!files || files.length === 0) return;
     const toProcess = Array.from(files).slice(0, remaining);
     if (toProcess.length === 0) return;
-
-    const photoFiles = toProcess.filter(f => !f.type.startsWith('video/'));
-    const bgCount = removeBg ? photoFiles.length : 0;
-
-    if (bgCount > 0) setProcessingCount(c => c + bgCount);
+    const startLen = photos.length;
     setBusy(prev => prev + toProcess.length);
-
     try {
-      let processedFiles: File[] = toProcess;
-
-      if (removeBg && photoFiles.length > 0) {
-        /* Run removals sequentially to avoid saturating WASM threads. */
-        const processedPhotos: File[] = [];
-        for (const f of photoFiles) {
-          const result = await stripBackground(f);
-          processedPhotos.push(result);
-          setProcessingCount(c => Math.max(0, c - 1));
-        }
-        /* Reconstruct array in original order. */
-        let pi = 0;
-        processedFiles = toProcess.map(f =>
-          f.type.startsWith('video/') ? f : processedPhotos[pi++],
-        );
-      }
-
-      const settled = await compressMediaBatch(processedFiles);
+      const settled = await compressMediaBatch(toProcess);
       const accepted: CompressedMedia[] = [];
       const errs: string[] = [];
       settled.forEach((res, idx) => {
         if (res.status === 'fulfilled') {
           accepted.push(res.value);
           mediaRef.current.set(res.value.url, res.value);
+        } else if (res.reason instanceof MediaTooLargeError) {
+          errs.push(`${toProcess[idx].name} is over ${(MAX_VIDEO_BYTES / (1024 * 1024)).toFixed(0)} MB`);
         } else {
-          const reason = res.reason;
-          if (reason instanceof MediaTooLargeError) {
-            errs.push(`${toProcess[idx].name} is over ${(MAX_VIDEO_BYTES / (1024 * 1024)).toFixed(0)} MB`);
-          } else {
-            errs.push(`Couldn't read ${toProcess[idx].name}`);
-          }
+          errs.push(`Couldn't read ${toProcess[idx].name}`);
         }
       });
-      if (accepted.length) onChange([...photos, ...accepted.map(m => m.url)]);
+      if (accepted.length) {
+        onChange([...photos, ...accepted.map(m => m.url)]);
+        setActiveIdx(startLen); /* jump preview to the first newly added photo */
+      }
       if (errs.length) setError(errs.join(' · '));
     } finally {
       setBusy(prev => Math.max(0, prev - toProcess.length));
-      if (bgCount > 0) setProcessingCount(0); /* safety reset */
     }
   };
 
-  /* ── removing ──────────────────────────────── */
+  /* ── removing / cover ──────────────────────── */
 
   const removeAt = (idx: number) => {
     const url = photos[idx];
     if (url) {
       const m = mediaRef.current.get(url);
-      if (m) {
-        if (m.posterUrl) URL.revokeObjectURL(m.posterUrl);
-        mediaRef.current.delete(url);
-      }
+      if (m?.posterUrl) URL.revokeObjectURL(m.posterUrl);
+      if (m) mediaRef.current.delete(url);
       URL.revokeObjectURL(url);
     }
     onChange(photos.filter((_, i) => i !== idx));
+    setActiveIdx(a => Math.max(0, a >= idx ? a - 1 : a));
   };
 
-  /* ── reordering via HTML5 drag ─────────────── */
-
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [dropTarget, setDropTarget] = useState<number | null>(null);
-
-  const onDragStart = (idx: number) => (e: React.DragEvent) => {
-    setDragIdx(idx);
-    e.dataTransfer.setData('text/plain', String(idx));
-    e.dataTransfer.effectAllowed = 'move';
-  };
-  const onDragOver = (idx: number) => (e: React.DragEvent) => {
-    if (dragIdx === null || dragIdx === idx) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDropTarget(idx);
-  };
-  const onDrop = (idx: number) => (e: React.DragEvent) => {
-    e.preventDefault();
-    if (dragIdx === null || dragIdx === idx) {
-      setDragIdx(null);
-      setDropTarget(null);
-      return;
-    }
+  /** Promote a photo to the cover slot (index 0). */
+  const makeCover = (idx: number) => {
+    if (idx <= 0) return;
     const next = [...photos];
-    const [moved] = next.splice(dragIdx, 1);
-    next.splice(idx, 0, moved);
+    const [m] = next.splice(idx, 1);
+    next.unshift(m);
     onChange(next);
-    setDragIdx(null);
-    setDropTarget(null);
+    setActiveIdx(0);
   };
-  const onDragEnd = () => { setDragIdx(null); setDropTarget(null); };
 
   /* ── source choice ────────────────────────── */
 
-  const openCamera  = () => { setSheetOpen(false); cameraRef.current?.click(); };
+  const openCamera = () => { setSheetOpen(false); cameraRef.current?.click(); };
   const openLibrary = () => { setSheetOpen(false); libraryRef.current?.click(); };
-
   const onAddClick = () => {
-    if (defaultSource === 'camera')  { openCamera();  return; }
+    if (defaultSource === 'camera') { openCamera(); return; }
     if (defaultSource === 'library') { openLibrary(); return; }
-    const hasCamera = typeof navigator !== 'undefined' &&
-      'mediaDevices' in navigator &&
-      !!navigator.mediaDevices?.getUserMedia;
+    const hasCamera = typeof navigator !== 'undefined' && 'mediaDevices' in navigator && !!navigator.mediaDevices?.getUserMedia;
     if (hasCamera) setSheetOpen(true);
     else openLibrary();
   };
 
-  /* ── render ───────────────────────────────── */
+  /* ── derived ──────────────────────────────── */
 
-  const isProcessing = processingCount > 0 || busy > 0;
+  const busyAny = cuttingIdx !== null || bulkBusy || busy > 0;
+  const isProcessing = processingCount > 0 || busy > 0 || bulkBusy;
+  const safeActive = photos.length ? Math.min(activeIdx, photos.length - 1) : -1;
+  const activeUrl = safeActive >= 0 ? photos[safeActive] : undefined;
+  const activeMedia = activeUrl ? mediaRef.current.get(activeUrl) : undefined;
+  const activeIsVideo = activeMedia?.kind === 'video';
+  const photoCount = photos.filter(u => mediaRef.current.get(u)?.kind !== 'video').length;
 
   const status = useMemo(() => {
-    if (processingCount > 0) return `Removing background on ${processingCount} photo${processingCount === 1 ? '' : 's'}…`;
+    if (bulkBusy || processingCount > 0) return `Removing background… ${processingCount} left`;
     if (busy > 0) return `Compressing ${busy} item${busy === 1 ? '' : 's'}…`;
     if (photos.length === 0) return null;
     const types = photos.map(u => mediaRef.current.get(u)?.kind ?? 'photo');
-    const videoCount = types.filter(k => k === 'video').length;
-    const photoCount = types.length - videoCount;
-    const summary =
-      videoCount > 0 && photoCount > 0
-        ? `${photoCount} photo${photoCount === 1 ? '' : 's'} + ${videoCount} video${videoCount === 1 ? '' : 's'}`
-        : videoCount > 0
-          ? `${videoCount} video${videoCount === 1 ? '' : 's'}`
-          : `${photoCount} photo${photoCount === 1 ? '' : 's'}`;
+    const v = types.filter(k => k === 'video').length;
+    const p = types.length - v;
+    const summary = v > 0 && p > 0 ? `${p} photo${p === 1 ? '' : 's'} + ${v} video${v === 1 ? '' : 's'}`
+      : v > 0 ? `${v} video${v === 1 ? '' : 's'}` : `${p} photo${p === 1 ? '' : 's'}`;
     return `${summary} of ${max} · ${label}`;
-  }, [processingCount, busy, photos, max, label]);
+  }, [bulkBusy, processingCount, busy, photos, max, label]);
 
-  /* Shared toggle pill — rendered both inline and inside the source sheet */
-  const BgTogglePill = (
-    <button
-      type="button"
-      className={`photo-bg-toggle${removeBg ? ' photo-bg-toggle--on' : ''}`}
-      onClick={() => setRemoveBg(v => !v)}
-      aria-pressed={removeBg}
-    >
-      <Scissors size={13} strokeWidth={2} />
-      <span>Remove background</span>
-      {removeBg && <span className="photo-bg-toggle-beta">Beta</span>}
-    </button>
-  );
+  /* ── render ───────────────────────────────── */
 
   return (
     <>
-      {/* Remove-background toggle pill — visible even before photos are added */}
-      <div className="photo-bg-toggle-row">
-        {BgTogglePill}
-        {removeBg && (
-          <span className="photo-bg-toggle-hint">
-            Best on clean subjects. Adds 2–5 sec per photo.
-          </span>
-        )}
-      </div>
-
       {status && (
         <div className="photo-picker-status">
           {isProcessing && <span className="dot" aria-hidden="true" />}
@@ -390,119 +328,102 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         </div>
       )}
 
-      <div className="photo-picker">
-        {photos.map((src, i) => {
-          const m = mediaRef.current.get(src);
-          const isVideo = m?.kind === 'video';
-          return (
-            <div
-              key={src + i}
-              className={
-                'photo-picker-tile photo-picker-tile--filled' +
-                (dragIdx === i ? ' is-dragging' : '') +
-                (dropTarget === i ? ' is-drop-target' : '')
-              }
-              draggable
-              onDragStart={onDragStart(i)}
-              onDragOver={onDragOver(i)}
-              onDrop={onDrop(i)}
-              onDragEnd={onDragEnd}
-              aria-grabbed={dragIdx === i || undefined}
-              aria-label={`${isVideo ? 'Video' : 'Photo'} ${i + 1}${i === 0 ? ' (cover)' : ''} — drag to reorder`}
-            >
-              {isVideo
-                ? <img src={m?.posterUrl ?? src} alt="" draggable={false} />
-                : <img src={src} alt="" draggable={false} />}
-              {isVideo && (
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute', inset: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <span style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: 'rgba(0,0,0,0.55)', color: '#fff',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    backdropFilter: 'blur(6px)',
-                  }}>
-                    <Play size={14} strokeWidth={2} fill="currentColor" />
-                  </span>
-                </span>
-              )}
-              {i === 0 && <span className="photo-picker-cover">Cover</span>}
-              {!isVideo && (
-                <button
-                  type="button"
-                  className="photo-picker-cut"
-                  aria-label={`Remove background from photo ${i + 1}`}
-                  title="Remove background"
-                  onClick={() => cutTileBg(i)}
-                  disabled={cuttingIdx !== null}
-                >
-                  <Scissors size={12} strokeWidth={2.5} />
-                </button>
-              )}
-              <button
-                type="button"
-                className="photo-picker-remove"
-                aria-label={`Remove ${isVideo ? 'video' : 'photo'} ${i + 1}`}
-                onClick={() => removeAt(i)}
-              >
-                <X size={12} strokeWidth={2.5} />
-              </button>
-              {cuttingIdx === i && (
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute', inset: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(0,0,0,0.45)',
-                    backdropFilter: 'blur(2px)',
-                    borderRadius: 'inherit',
-                  }}
-                >
-                  <Loader2
-                    size={22}
-                    strokeWidth={2}
-                    style={{ animation: 'spin-loader 0.9s linear infinite', color: '#fff' }}
-                  />
-                </span>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Spinner placeholder tiles while background removal is running */}
-        {Array.from({ length: processingCount }).map((_, i) => (
-          <div key={`processing-${i}`} className="photo-picker-tile photo-picker-tile--processing">
-            <Loader2
-              size={22}
-              strokeWidth={2}
-              style={{ animation: 'spin-loader 0.9s linear infinite', color: 'var(--text-secondary)' }}
-            />
-          </div>
-        ))}
-
-        {photos.length + processingCount < max && processingCount === 0 && (
+      {/* Big preview of the active photo (whole image, not cropped). */}
+      {photos.length > 0 ? (
+        <div className="photo-preview">
+          <img src={activeIsVideo ? (activeMedia?.posterUrl ?? activeUrl) : activeUrl} alt="" />
+          {activeIsVideo && (
+            <span className="photo-preview-play" aria-hidden="true">
+              <Play size={18} strokeWidth={2} fill="currentColor" />
+            </span>
+          )}
+          {safeActive === 0 ? (
+            <span className="photo-preview-cover"><Star size={11} strokeWidth={2.4} fill="currentColor" /> Cover</span>
+          ) : (
+            <button type="button" className="photo-preview-makecover" onClick={() => makeCover(safeActive)}>
+              <Star size={12} strokeWidth={2.2} /> Make cover
+            </button>
+          )}
           <button
             type="button"
-            className="photo-picker-tile"
-            onClick={onAddClick}
-            aria-label="Add photo"
-            disabled={busy > 0 && remaining === 0}
+            className="photo-preview-remove"
+            aria-label="Remove this photo"
+            onClick={() => removeAt(safeActive)}
           >
-            <Plus size={20} strokeWidth={1.8} />
-            <span style={{ fontSize: 11, fontWeight: 500 }}>
-              {photos.length === 0 ? 'Add' : 'More'}
-            </span>
+            <X size={16} strokeWidth={2.4} />
           </button>
-        )}
-      </div>
+          {cuttingIdx === safeActive && (
+            <span className="photo-preview-busy" aria-hidden="true">
+              <Loader2 size={28} strokeWidth={2} style={{ animation: 'spin-loader 0.9s linear infinite', color: '#fff' }} />
+            </span>
+          )}
+        </div>
+      ) : (
+        <button type="button" className="photo-empty" onClick={onAddClick} disabled={busy > 0}>
+          <ImagePlus size={32} strokeWidth={1.5} />
+          <span className="photo-empty-title">Add photos</span>
+          <span className="photo-empty-hint">Up to {max} · the first one is your cover</span>
+        </button>
+      )}
 
-      {/* Two hidden inputs — library and camera. */}
+      {/* Background-removal actions for the active / all photos. */}
+      {photos.length > 0 && (
+        <div className="photo-actions">
+          <button
+            type="button"
+            onClick={() => cutTileBg(safeActive)}
+            disabled={busyAny || activeIsVideo}
+          >
+            <Scissors size={15} strokeWidth={2} /> Remove background
+          </button>
+          {photoCount > 1 && (
+            <button type="button" onClick={bulkRemoveBg} disabled={busyAny}>
+              <Scissors size={15} strokeWidth={2} /> Remove bg · all
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Thumbnail carousel. */}
+      {photos.length > 0 && (
+        <div className="photo-carousel" role="listbox" aria-label="Photos">
+          {photos.map((src, i) => {
+            const m = mediaRef.current.get(src);
+            const isVideo = m?.kind === 'video';
+            return (
+              <div
+                key={src + i}
+                role="option"
+                aria-selected={i === safeActive}
+                tabIndex={0}
+                className={`photo-thumb${i === safeActive ? ' is-active' : ''}`}
+                onClick={() => setActiveIdx(i)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveIdx(i); } }}
+                aria-label={`${isVideo ? 'Video' : 'Photo'} ${i + 1}${i === 0 ? ' (cover)' : ''}`}
+              >
+                <img src={isVideo ? (m?.posterUrl ?? src) : src} alt="" draggable={false} />
+                {isVideo && <span className="photo-thumb-play" aria-hidden="true"><Play size={11} strokeWidth={2} fill="currentColor" /></span>}
+                {i === 0 && <span className="photo-thumb-cover" aria-hidden="true"><Star size={9} strokeWidth={2.6} fill="currentColor" /></span>}
+                <button
+                  type="button"
+                  className="photo-thumb-remove"
+                  aria-label={`Remove ${isVideo ? 'video' : 'photo'} ${i + 1}`}
+                  onClick={e => { e.stopPropagation(); removeAt(i); }}
+                >
+                  <X size={11} strokeWidth={2.6} />
+                </button>
+              </div>
+            );
+          })}
+          {photos.length < max && (
+            <button type="button" className="photo-thumb photo-thumb-add" onClick={onAddClick} aria-label="Add photo" disabled={busy > 0}>
+              <Plus size={20} strokeWidth={1.8} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Hidden inputs. */}
       <input
         ref={libraryRef}
         type="file"
@@ -520,13 +441,10 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
       />
 
-      {/* Soft error toast */}
       {error && (
         <div role="alert" style={{
-          marginTop: 8, padding: '8px 12px',
-          borderRadius: 10,
-          background: 'rgba(237,46,80,0.10)',
-          color: 'var(--accent-rose)',
+          marginTop: 8, padding: '8px 12px', borderRadius: 10,
+          background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose)',
           fontSize: 12, fontWeight: 500,
         }}>
           {error}
@@ -536,60 +454,29 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
       {/* Source choice bottom sheet */}
       {sheetOpen && (
         <>
-          <div
-            className="photo-source-sheet-backdrop"
-            onClick={() => setSheetOpen(false)}
-            aria-hidden="true"
-          />
+          <div className="photo-source-sheet-backdrop" onClick={() => setSheetOpen(false)} aria-hidden="true" />
           <div className="photo-source-sheet" role="dialog" aria-label="Add media">
             <div className="grabber" aria-hidden="true" />
             <button type="button" className="photo-source-option" onClick={openCamera}>
               <Camera size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div>Camera</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  Take a photo or record a video right now
-                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Take a photo or record a video right now</div>
               </div>
             </button>
             <button type="button" className="photo-source-option" onClick={openLibrary}>
               <ImagePlus size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div>Upload from library</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  Pick {allowVideo ? 'photos or a video' : 'photos'} you've already saved
-                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pick {allowVideo ? 'photos or a video' : 'photos'} you've already saved</div>
               </div>
             </button>
-
-            {/* Remove-background toggle inside the sheet too */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 8px 0', flexWrap: 'wrap',
-            }}>
-              {BgTogglePill}
-              {removeBg && (
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, flex: 1 }}>
-                  Best on clean subjects. Adds 2–5 sec per photo.
-                </span>
-              )}
-            </div>
-
-            <p style={{
-              margin: '6px 12px 0',
-              fontSize: 11,
-              color: 'var(--text-muted)',
-              textAlign: 'center',
-              lineHeight: 1.5,
-            }}>
+            <p style={{ margin: '6px 12px 0', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
               {allowVideo
                 ? 'Photo or video must be under 5 MB. We compress on upload to save your data.'
                 : 'Photos must be under 5 MB each. We compress on upload to save your data.'}
             </p>
-
-            <button type="button" className="photo-source-cancel" onClick={() => setSheetOpen(false)}>
-              Cancel
-            </button>
+            <button type="button" className="photo-source-cancel" onClick={() => setSheetOpen(false)}>Cancel</button>
           </div>
         </>
       )}

@@ -950,21 +950,38 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 </button>
               </>
             ) : (
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                style={{
-                  flex: 1, height: 52, padding: '0 16px', borderRadius: 999,
-                  background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
-                  color: confirmDelete ? '#fff' : 'var(--accent-rose)',
-                  border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
-                  cursor: 'pointer', fontSize: 14, fontWeight: 600,
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-              >
-                <Trash2 size={16} strokeWidth={2} />
-                {deleting ? 'Deleting…' : confirmDelete ? 'Tap again to confirm' : 'Delete'}
-              </button>
+              /* Owner, not editing: Delete + Share (owners can share their
+                 own listing too). */
+              <>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  style={{
+                    flex: 1, height: 52, padding: '0 16px', borderRadius: 999,
+                    background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
+                    color: confirmDelete ? '#fff' : 'var(--accent-rose)',
+                    border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
+                    cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <Trash2 size={16} strokeWidth={2} />
+                  {deleting ? 'Deleting…' : confirmDelete ? 'Tap again to confirm' : 'Delete'}
+                </button>
+                <button
+                  aria-label="Share"
+                  onClick={handleShare}
+                  style={{
+                    width: 52, height: 52, borderRadius: 999,
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <Share2 size={18} strokeWidth={1.8} />
+                </button>
+              </>
             )
           ) : (
           <>
