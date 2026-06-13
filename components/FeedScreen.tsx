@@ -278,7 +278,7 @@ export default function FeedScreen({
   const bannerSlides: BannerSlide[] = [
     {
       id: 'share',
-      image: '/banners/share.png',
+      image: '/banners/share.jpg',
       illustration: 'twemoji:wrapped-gift',
       title: 'Share what you don’t use',
       subtitle: 'Give it a second life nearby',
@@ -289,7 +289,7 @@ export default function FeedScreen({
     },
     {
       id: 'request',
-      image: '/banners/request.png',
+      image: '/banners/request.jpg',
       illustration: 'twemoji:raising-hand',
       title: 'Ask for what you need',
       subtitle: 'Borrow before you buy',
@@ -300,7 +300,7 @@ export default function FeedScreen({
     },
     {
       id: 'events',
-      image: '/banners/events.png',
+      image: '/banners/events.jpg',
       illustration: 'twemoji:tear-off-calendar',
       title: 'Join local events',
       subtitle: 'Repair cafés, swaps, cleanups',
@@ -311,7 +311,7 @@ export default function FeedScreen({
     },
     {
       id: 'lost-found',
-      image: '/banners/lost-found.png',
+      image: '/banners/lost-found.jpg',
       illustration: 'twemoji:magnifying-glass-tilted-left',
       title: 'Lost something?',
       subtitle: 'Or help return what you found',
@@ -322,7 +322,7 @@ export default function FeedScreen({
     },
     {
       id: 'mahe',
-      image: '/banners/mahe.png',
+      image: '/banners/mahe.jpg',
       illustration: 'twemoji:graduation-cap',
       title: 'For MAHE, by MAHE',
       subtitle: 'Built for our campus',
