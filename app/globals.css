@@ -598,10 +598,16 @@ body {
    marketing banner below). Narrow preview panes (<1024px) still get the
    mobile flow with the centered phone mockup. */
 .mobile-only       { display: initial; }
+/* Sections were getting `display: inline` (the initial value of display)
+   which collapsed their box-model padding — mobile search bar was
+   overflowing its 16px margin. Force block on sections specifically;
+   other tags (span/div/etc) keep their previous behaviour. */
+section.mobile-only { display: block; }
 .desktop-only      { display: none; }
 @media (min-width: 1024px) {
   .mobile-only     { display: none !important; }
   .desktop-only    { display: initial !important; }
+  section.desktop-only { display: block !important; }
 }
 
 /* ═══════════════════════════════════════════════

@@ -340,9 +340,8 @@ export default function FeedScreen({
       {/* ── TOP BAR ── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 30,
-        background: 'var(--bg-overlay)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        /* Solid card background — no liquid-glass blur. */
+        background: 'var(--bg-card)',
         padding: '14px 16px 10px',
       }} className="mobile-only-nav">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
