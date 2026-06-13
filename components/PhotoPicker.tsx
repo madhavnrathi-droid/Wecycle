@@ -109,20 +109,39 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
 
   /* ── background removal ────────────────────── */
 
-  /** Strip the background from a single image File.
+  /** Strip the background from a single image File via /api/remove-background.
    *
-   *  Temporarily disabled — the @imgly/background-removal dependency
-   *  pulls onnxruntime-web, whose ESM bundle (`import.meta.url`) fails
-   *  webpack/Terser parsing on Vercel even with serverExternalPackages
-   *  + IgnorePlugin + a postinstall .mjs→.js patch. Re-enable once the
-   *  bundling story is sorted (likely by loading the model from a CDN
-   *  at runtime instead of pulling it via npm).
-   *
-   *  Until then: keep the toggle UI but silently pass the original
-   *  image through. Users who try it see a calm "Coming soon" toast. */
+   *  The route proxies to remove.bg with a server-only API key, returns a
+   *  transparent PNG. Failures (server not configured, network error,
+   *  remove.bg quota exhausted) fall back to the original file silently with
+   *  a calm toast — never block the upload. */
   const stripBackground = async (file: File): Promise<File> => {
-    setError('Background removal is coming soon — keeping the original for now.');
-    return file;
+    try {
+      const form = new FormData();
+      form.append('image', file, file.name);
+      const res = await fetch('/api/remove-background', { method: 'POST', body: form });
+      if (!res.ok) {
+        let msg = `Couldn't remove background (${res.status})`;
+        try {
+          const json = (await res.json()) as { error?: string };
+          if (json?.error) msg = json.error;
+        } catch { /* not json — keep default */ }
+        setError(`${msg} — keeping the original.`);
+        return file;
+      }
+      const blob = await res.blob();
+      /* Wrap the PNG bytes as a File so the downstream compressor can
+         inspect .type and preserve the alpha channel. */
+      const cutoutName = file.name.replace(/\.[^.]+$/, '') + '-cutout.png';
+      return new File([blob], cutoutName, {
+        type: 'image/png',
+        lastModified: Date.now(),
+      });
+    } catch (err) {
+      setError(`Couldn't remove background — keeping the original.`);
+      console.warn('[PhotoPicker] stripBackground failed', err);
+      return file;
+    }
   };
 
   /* ── adding ────────────────────────────────── */
