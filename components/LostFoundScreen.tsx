@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Menu, Search, Plus, MapPin, AlertCircle, CheckCircle,
-  Mail, X, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus,
+  Mail, X, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, Share2,
 } from 'lucide-react';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
@@ -22,6 +22,9 @@ import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchLostFound, onPostsChanged, updateLostFoundMedia } from '../lib/liveData';
 import PhotoEditDialog from './PhotoEditDialog';
 import EmptyState from './EmptyState';
+import ShareCardModal from './ShareCardModal';
+import type { ShareCardSpec } from '../lib/shareCard';
+import { Logomark } from './Brand';
 import { useAuth } from '../lib/AuthContext';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
@@ -414,6 +417,9 @@ export function LostFoundDetailSheet({
 
   /* Photo editing — only relevant when isOwner. */
   const [photoEditOpen, setPhotoEditOpen] = useState(false);
+
+  /* Share card (Spotify-style). Spec is built lower, after displayPhotoUrl. */
+  const [shareCardOpen, setShareCardOpen] = useState(false);
   const [localPhotoUrls, setLocalPhotoUrls] = useState<string[] | null>(null);
   const currentPhotoUrls: string[] = (item as { photoUrls?: string[] }).photoUrls ?? [];
   const displayPhotoUrl: string | undefined =
@@ -422,6 +428,18 @@ export function LostFoundDetailSheet({
   const handleSaveLFPhotos = async (photoUrls: string[]) => {
     await updateLostFoundMedia(item.id, photoUrls);
     setLocalPhotoUrls(photoUrls);
+  };
+
+  const shareCardSpec: ShareCardSpec = {
+    kind: item.status === 'found' ? 'found' : 'lost',
+    title: item.title,
+    imageUrl: displayPhotoUrl && /^https?:|^\//.test(displayPhotoUrl) ? displayPhotoUrl : undefined,
+    location: item.lastSeen,
+    reward: item.reward,
+  };
+  const handleShareLF = () => {
+    track(EVT.share_clicked, { post_id: item.id, post_kind: 'lostfound' });
+    setShareCardOpen(true);
   };
 
   /* Inline-edit state — only meaningful when isOwner. */
@@ -582,6 +600,18 @@ export function LostFoundDetailSheet({
                 <span style={{ fontSize: 13, fontWeight: 600 }}>+ Add photo</span>
               </button>
             ) : null}
+            {displayPhotoUrl && (
+              <span aria-hidden="true" style={{
+                position: 'absolute', top: 14, right: 14, zIndex: 6,
+                width: 40, height: 40, borderRadius: 999,
+                background: 'rgba(255,255,255,0.9)',
+                backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Logomark size={28} alt="" />
+              </span>
+            )}
             {isOwner && displayPhotoUrl && (
               <button
                 type="button"
@@ -636,6 +666,9 @@ export function LostFoundDetailSheet({
             }}>{item.title}</h2>
           )}
           {isOwner && <span style={{ flex: 1 }} />}
+          <button onClick={handleShareLF} aria-label="Share" className="theme-toggle">
+            <Share2 size={17} strokeWidth={1.8} />
+          </button>
           <button onClick={onClose} aria-label="Close" className="theme-toggle">
             <X size={18} strokeWidth={1.8} />
           </button>
@@ -673,6 +706,18 @@ export function LostFoundDetailSheet({
                 <span style={{ fontSize: 12, fontWeight: 600 }}>+ Add photo</span>
               </button>
             ) : null}
+            {displayPhotoUrl && (
+              <span aria-hidden="true" style={{
+                position: 'absolute', top: 10, right: 10, zIndex: 6,
+                width: 36, height: 36, borderRadius: 999,
+                background: 'rgba(255,255,255,0.9)',
+                backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Logomark size={25} alt="" />
+              </span>
+            )}
             {isOwner && displayPhotoUrl && (
               <button
                 type="button"
@@ -964,6 +1009,7 @@ export function LostFoundDetailSheet({
           onSave={handleSaveLFPhotos}
         />
       )}
+      <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
     </>
   );
 }

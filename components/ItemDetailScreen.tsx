@@ -23,9 +23,33 @@ import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
-import { shareLink } from '../lib/share';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES, closedLabelFor } from '../lib/mockData';
+import ShareCardModal from './ShareCardModal';
+import type { ShareCardSpec } from '../lib/shareCard';
+import { Logomark } from './Brand';
+
+/* Wecycle brand stamp pinned to the top-right corner of a detail hero photo.
+   A small frosted-white circle so the logomark reads on any image. `offset`
+   shifts it left when an owner edit button shares the corner. */
+function PhotoLogoStamp({ offset = 12 }: { offset?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: 'absolute', top: 12, right: offset, zIndex: 11,
+        width: 38, height: 38, borderRadius: 999,
+        background: 'rgba(255,255,255,0.9)',
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
+      }}
+    >
+      <Logomark size={26} alt="" />
+    </span>
+  );
+}
 
 interface ItemDetailScreenProps {
   item: MarketplaceItem;
@@ -303,15 +327,23 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     }
   };
 
-  /* Native OS share sheet for the listing. Falls back to clipboard. */
+  /* Share → generate a Spotify-style card and open the preview/share modal. */
+  const [shareCardOpen, setShareCardOpen] = useState(false);
   const handleShare = () => {
     track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : 'item' });
-    void shareLink({
-      title: item.title,
-      text: item.isRequest
-        ? `${item.user.name} is looking for "${item.title}" on Wecycle`
-        : `"${item.title}" on Wecycle${typeof item.price === 'number' ? ` — ₹${item.price}` : ''}`,
-    });
+    setShareCardOpen(true);
+  };
+  /* The card's cover = first real photo (string URL or video poster). */
+  const shareCover = displayPhotos
+    .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
+    .find((u): u is string => !!u && /^https?:|^\//.test(u));
+  const shareCardSpec: ShareCardSpec = {
+    kind: item.isRequest ? 'request' : 'item',
+    title: item.title,
+    imageUrl: shareCover,
+    price: isPriced ? item.price : undefined,
+    badge: isPriced ? undefined : priceLabel,
+    location: item.location,
   };
 
   /* Convenience: when only one channel is on, the primary CTA carries the
@@ -537,13 +569,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               dotsPosition="bottom"
               radius={24}
             />
+            <PhotoLogoStamp />
             {canManage && (
               <button
                 type="button"
                 onClick={() => setPhotoEditOpen(true)}
                 aria-label="Edit photos"
                 style={{
-                  position: 'absolute', top: 12, right: 12,
+                  position: 'absolute', top: 12, right: 58,
                   zIndex: 10,
                   width: 36, height: 36, borderRadius: 999,
                   background: 'var(--bg-overlay)',
@@ -1057,6 +1090,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           onSave={handleSavePhotos}
         />
       )}
+      <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
     </div>
   );
 }
@@ -1131,6 +1165,19 @@ function DesktopLayout({
   void primaryActionLabel;
   void hasBoth;
   const [reportOpen, setReportOpen] = useState(false);
+  /* Share card (Spotify-style) — preview + share/save modal. */
+  const [shareCardOpen, setShareCardOpen] = useState(false);
+  const shareCover = photos
+    .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
+    .find((u): u is string => !!u && /^https?:|^\//.test(u));
+  const shareCardSpec: ShareCardSpec = {
+    kind: item.isRequest ? 'request' : 'item',
+    title: item.title,
+    imageUrl: shareCover,
+    price: isPriced ? item.price : undefined,
+    badge: isPriced ? undefined : priceLabel,
+    location: item.location,
+  };
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType, eCategory, setECategory,
@@ -1262,13 +1309,14 @@ function DesktopLayout({
               dotsPosition="bottom"
               radius={20}
             />
+            <PhotoLogoStamp />
             {canManage && (
               <button
                 type="button"
                 onClick={() => setPhotoEditOpen(true)}
                 aria-label="Edit photos"
                 style={{
-                  position: 'absolute', top: 12, right: 12,
+                  position: 'absolute', top: 12, right: 58,
                   zIndex: 10,
                   width: 36, height: 36, borderRadius: 999,
                   background: 'var(--bg-overlay)',
@@ -1705,12 +1753,7 @@ function DesktopLayout({
               aria-label="Share"
               onClick={() => {
                 track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : 'item' });
-                void shareLink({
-                  title: item.title,
-                  text: item.isRequest
-                    ? `${item.user.name} is looking for "${item.title}" on Wecycle`
-                    : `"${item.title}" on Wecycle${typeof item.price === 'number' ? ` — ₹${item.price}` : ''}`,
-                });
+                setShareCardOpen(true);
               }}
               style={{
                 width: 52, height: 52, borderRadius: 14,
@@ -1781,6 +1824,7 @@ function DesktopLayout({
           onSave={handleSavePhotos}
         />
       )}
+      <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
     </div>
   );
 }

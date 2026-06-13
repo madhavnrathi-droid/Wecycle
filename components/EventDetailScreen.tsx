@@ -19,6 +19,9 @@ import { shareLink, addEventToCalendar } from '../lib/share';
 import { updateEvent, updateEventMedia } from '../lib/liveData';
 import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
+import ShareCardModal from './ShareCardModal';
+import type { ShareCardSpec } from '../lib/shareCard';
+import { Logomark } from './Brand';
 
 interface EventDetailScreenProps {
   event: CommunityEvent;
@@ -230,12 +233,18 @@ export default function EventDetailScreen({
     });
   };
 
+  /* Share → Spotify-style card preview/share modal. */
+  const [shareCardOpen, setShareCardOpen] = useState(false);
+  const shareCardSpec: ShareCardSpec = {
+    kind: 'event',
+    title: event.title,
+    imageUrl: displayPhotos.find(u => !!u && /^https?:|^\//.test(u)),
+    dateLine: [event.date, event.time].filter(Boolean).join(' · '),
+    location: event.location,
+  };
   const handleShareEvent = () => {
     track(EVT.share_clicked, { post_id: event.id, post_kind: 'event' });
-    void shareLink({
-      title: event.title,
-      text: `${event.title} · ${event.date} at ${event.location} — on Wecycle`,
-    });
+    setShareCardOpen(true);
   };
 
   /* When both channels are accepted we render two named buttons inline with
@@ -341,9 +350,20 @@ export default function EventDetailScreen({
                     }}>
                       {TYPE_LABEL[event.eventType]}
                     </div>
+                    {/* Wecycle brand stamp — top-right corner. */}
+                    <span aria-hidden="true" style={{
+                      position: 'absolute', top: 12, right: 12, zIndex: 6,
+                      width: 38, height: 38, borderRadius: 999,
+                      background: 'rgba(255,255,255,0.9)',
+                      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Logomark size={26} alt="" />
+                    </span>
                     {isRsvpd && (
                       <div style={{
-                        position: 'absolute', top: 14, right: 14,
+                        position: 'absolute', top: 60, right: 14,
                         background: '#22C55E', color: '#fff',
                         borderRadius: 999, padding: '5px 11px',
                         fontSize: 11, fontWeight: 600,
@@ -851,6 +871,7 @@ export default function EventDetailScreen({
           onSave={handleSaveEventPhotos}
         />
       )}
+      <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
     </div>
   );
 }
