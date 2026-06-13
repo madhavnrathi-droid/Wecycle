@@ -4,13 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/patch-ort-exports.js",
     "build": "next build",
-    "start": "next start",
-    "postinstall": "node scripts/patch-ort-exports.js"
+    "start": "next start"
   },
   "dependencies": {
-    "@imgly/background-removal": "^1.7.0",
     "@radix-ui/react-alert-dialog": "^1.1.16",
     "@radix-ui/react-dialog": "^1.1.16",
     "@radix-ui/react-popover": "^1.1.16",
@@ -27,7 +24,6 @@
     "lottie-web": "^5.12.2",
     "lucide-react": "^1.14.0",
     "next": "^13.5.0",
-    "onnxruntime-web": "^1.21.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^3.6.0",

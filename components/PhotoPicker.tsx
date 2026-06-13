@@ -110,24 +110,19 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   /* ── background removal ────────────────────── */
 
   /** Strip the background from a single image File.
-   *  Returns a transparent-PNG File on success, or the original File on failure.
-   *  The library is lazy-imported only when the user actually enables the toggle,
-   *  so users who never use this feature pay zero first-paint cost. */
+   *
+   *  Temporarily disabled — the @imgly/background-removal dependency
+   *  pulls onnxruntime-web, whose ESM bundle (`import.meta.url`) fails
+   *  webpack/Terser parsing on Vercel even with serverExternalPackages
+   *  + IgnorePlugin + a postinstall .mjs→.js patch. Re-enable once the
+   *  bundling story is sorted (likely by loading the model from a CDN
+   *  at runtime instead of pulling it via npm).
+   *
+   *  Until then: keep the toggle UI but silently pass the original
+   *  image through. Users who try it see a calm "Coming soon" toast. */
   const stripBackground = async (file: File): Promise<File> => {
-    try {
-      const { removeBackground } = await import('@imgly/background-removal');
-      const resultBlob = await removeBackground(file);
-      /* removeBackground returns a Blob — wrap as File so mediaCompression
-         can inspect .type and detect the alpha channel. */
-      return new File([resultBlob], file.name.replace(/\.[^.]+$/, '.png'), {
-        type: 'image/png',
-        lastModified: Date.now(),
-      });
-    } catch (err) {
-      console.warn('[PhotoPicker] background removal failed, using original', err);
-      setError("Couldn't remove background — keeping the original.");
-      return file;
-    }
+    setError('Background removal is coming soon — keeping the original for now.');
+    return file;
   };
 
   /* ── adding ────────────────────────────────── */
