@@ -832,9 +832,8 @@ body {
   .feed-greeting-search {
     display: block !important;
     flex: 1 1 auto;
-    /* Cap so the search input doesn't sprawl across the whole row when the
-       counter widget moves out — the onboarding bbox stays accurate too. */
-    max-width: 520px;
+    /* Fill all remaining horizontal space — search pill now stretches from
+       the greeting's right edge all the way to the row's end. */
     min-width: 280px;
   }
 }
@@ -851,19 +850,17 @@ body {
     align-items: stretch;
   }
   .feed-hero-row .marketing-banner-wide {
-    /* Shrinks the banner to a cleaner desktop strip — ~2:1 aspect retained.
-       Counter takes the remaining horizontal real estate. */
+    /* Equal-width column with the counter — 50/50 split of the row. The
+       2:1 aspect of the artwork is preserved by the card's own
+       aspect-ratio rule; height follows naturally. */
     flex: 1 1 0;
-    max-width: 480px;
+    min-width: 0;
     margin-inline: 0;
   }
   .feed-hero-row .wc-widget {
     flex: 1 1 0;
+    min-width: 0;
     align-self: stretch;
-    /* Roomy but not absurd — caps so the counter doesn't get wider than the
-       banner on very large screens. */
-    max-width: 360px;
-    min-width: 220px;
   }
 }
 

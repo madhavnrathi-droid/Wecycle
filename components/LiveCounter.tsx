@@ -95,6 +95,12 @@ export default function LiveCounter() {
           50%  { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        /* Second, slower layer — moves a soft radial highlight diagonally
+           across the card so the surface always feels alive. */
+        @keyframes wc-widget-grad-2 {
+          0%   { background-position: 0% 0%; }
+          100% { background-position: 100% 100%; }
+        }
 
         @keyframes wc-pulse-ring {
           0%   { transform: scale(1);   opacity: 0.7; }
@@ -113,16 +119,18 @@ export default function LiveCounter() {
           align-self: stretch;
           position: relative;
           border-radius: 20px;
-          /* Yellow → lime at 135°; oversized so the position-shift is visible */
+          /* Yellow → lime at 135°; oversized so the position-shift is visible.
+             Adds a green stop for extra range. */
           background: linear-gradient(
             135deg,
             #FFE066 0%,
-            #D8F54B 45%,
-            #C4F649 60%,
+            #E8F95E 30%,
+            #C4F649 50%,
+            #9BE85A 70%,
             #FFE066 100%
           );
-          background-size: 300% 300%;
-          animation: wc-widget-grad 10s ease infinite;
+          background-size: 320% 320%;
+          animation: wc-widget-grad 8s ease infinite;
           /* Glassy inset border */
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
           padding: 6px 16px;
@@ -133,9 +141,25 @@ export default function LiveCounter() {
           gap: 1px;
           overflow: hidden;
         }
+        /* Second gradient layer — a soft white radial highlight that drifts
+           diagonally across the card on its own clock. Reads like real
+           light catching the surface. */
+        .wc-widget::before {
+          content: '';
+          position: absolute;
+          inset: -20%;
+          background:
+            radial-gradient(ellipse 60% 60% at 30% 30%, rgba(255,255,255,0.55), transparent 60%),
+            radial-gradient(ellipse 50% 50% at 80% 80%, rgba(196,246,73,0.45), transparent 65%);
+          background-size: 200% 200%;
+          animation: wc-widget-grad-2 14s linear infinite;
+          pointer-events: none;
+          mix-blend-mode: screen;
+        }
 
         @media (prefers-reduced-motion: reduce) {
-          .wc-widget {
+          .wc-widget,
+          .wc-widget::before {
             animation-play-state: paused;
           }
         }
@@ -176,16 +200,22 @@ export default function LiveCounter() {
 
         /* ── Count number ─────────────────────────
            Big, bold, tabular (odometer-like fixed-width digits) and centered
-           so it reads as a live counter spread across the widget. */
+           so it reads as a live counter spread across the widget. Scales up
+           on desktop where the widget gets its own column. */
         .wc-widget-count {
-          font-size: 32px;
+          font-size: 36px;
           font-weight: 800;
           color: #0F1A00;
           line-height: 1;
-          letter-spacing: -0.02em;
+          letter-spacing: -0.03em;
           font-variant-numeric: tabular-nums;
           font-feature-settings: 'tnum' 1;
           text-align: center;
+          position: relative;
+          z-index: 1;
+        }
+        @media (min-width: 1024px) {
+          .wc-widget-count { font-size: 72px; }
         }
 
         /* ── Sub-label ────────────────────────── */
@@ -197,6 +227,11 @@ export default function LiveCounter() {
           line-height: 1;
           text-align: center;
           white-space: nowrap;
+          position: relative;
+          z-index: 1;
+        }
+        @media (min-width: 1024px) {
+          .wc-widget-label { font-size: 13px; margin-top: 4px; }
         }
       `}</style>
 
