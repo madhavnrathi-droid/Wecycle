@@ -278,7 +278,7 @@ export default function FeedScreen({
   const bannerSlides: BannerSlide[] = [
     {
       id: 'share',
-      image: '/banners/share.jpg',
+      image: '/banners/share.png',
       illustration: 'twemoji:wrapped-gift',
       title: 'Share what you don’t use',
       subtitle: 'Give it a second life nearby',

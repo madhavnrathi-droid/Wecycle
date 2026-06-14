@@ -3,22 +3,23 @@
 /*
  * Shareable cards — editorial, brand-forward (Spotify / NFT-card energy).
  *
- * A tall card rendered on a transparent canvas with a soft drop shadow, for any
+ * A card rendered on a transparent canvas with a soft drop shadow, for any
  * Wecycle post — item, request, event, lost & found. Drawn entirely on an
- * offscreen <canvas>, no deps. The card HEIGHT adapts to the footer content so
- * there's never an empty gap nor a collision, whatever the post length.
+ * offscreen <canvas>, no deps. The card is BUILT AROUND THE PHOTO: the image
+ * area takes the photo's exact aspect ratio (no crop, no letterbox fill) and
+ * the card grows/shrinks to fit, so a post always reads the way it was shot.
  *
- * Design (copied from the in-house mockups):
- *   • The WHOLE card is a per-kind shader gradient — green→blue (marketplace),
+ * Design (from the in-house mockups):
+ *   • Whole card is a soft per-kind gradient — green→blue (marketplace),
  *     amber→auburn (request), pink→purple (event), orange→red (lost & found).
- *   • All copy is white. A white pill (top-left) carries the kind nudge and the
- *     logomark sits in a white circle (top-right).
- *   • The PRODUCT PHOTO is inset on a WHITE base and shown WHOLE (contain over a
- *     blurred copy of itself), so any aspect ratio fills the frame, nothing is
- *     cropped, and a background-removed cut-out always sits on white.
+ *     All copy is white.
+ *   • A white kind pill (top-left) + the logomark in a white circle (top-right).
+ *   • Photo inset on a WHITE base (a bg-removed cut-out always sits on white,
+ *     never the dark UI behind it).
  *   • Footer: title + price, location, description, a translucent reward pill /
- *     event stat-chips, a person row (avatar · name · verified, chat/phone),
- *     the cursive wecycle wordmark and the mockup action buttons.
+ *     event stat-chips, a clean person row (avatar · name · verified) and the
+ *     cursive wecycle wordmark centred as the signature. No fake buttons — the
+ *     card is shared as an image alongside the real product link.
  *
  * Shared as an IMAGE via the Web Share files API; falls back to PNG download +
  * link copy. Never throws — a tainted canvas re-renders without remote photos.
@@ -56,25 +57,28 @@ interface Theme {
   g1: string;      // gradient top-left
   g2: string;      // gradient bottom-right
   glyph: string;   // fallback when no photo
-  cta: string;     // primary action button label
-  caIcon: IconName;
   person: string;  // person sub-label
 }
 
-type IconName =
-  | 'chat' | 'calendar' | 'heart' | 'share' | 'bookmark' | 'mail' | 'clock'
-  | 'users' | 'pin' | 'eye' | 'phone' | 'gift' | 'flag';
+type IconName = 'mail' | 'clock' | 'users' | 'pin' | 'gift' | 'calendar';
 
 const THEME: Record<ShareCardKind, Theme> = {
-  item:    { message: 'Selling on Wecycle',   dot: '#16A34A', g1: '#1FA257', g2: '#0E80C4', glyph: '📦', cta: 'Chat with Seller', caIcon: 'chat',     person: 'Verified user' },
-  request: { message: 'Wanted on Wecycle',    dot: '#E0960C', g1: '#E0960C', g2: '#8A3A12', glyph: '🙌', cta: 'Message',          caIcon: 'chat',     person: 'Verified user' },
-  event:   { message: 'Event on Wecycle',     dot: '#B14FD8', g1: '#D957A6', g2: '#6E28D9', glyph: '🎉', cta: "I'm Interested",   caIcon: 'calendar', person: 'Organizer' },
-  lost:    { message: 'Lost',                  dot: '#F0470F', g1: '#F97316', g2: '#E11D48', glyph: '🔎', cta: 'Share',            caIcon: 'share',    person: 'Verified user' },
-  found:   { message: 'Found',                 dot: '#EA6A0C', g1: '#FB8F3A', g2: '#E0344E', glyph: '✅', cta: 'Share',            caIcon: 'share',    person: 'Verified user' },
+  item:    { message: 'Selling on Wecycle',   dot: '#16A34A', g1: '#3BAC6E', g2: '#2E96CC', glyph: '📦', person: 'Verified user' },
+  request: { message: 'Wanted on Wecycle',    dot: '#D97706', g1: '#E0A638', g2: '#9C5024', glyph: '🙌', person: 'Verified user' },
+  event:   { message: 'Event on Wecycle',     dot: '#7C3AED', g1: '#CC74B4', g2: '#7B4ECB', glyph: '🎉', person: 'Organizer' },
+  lost:    { message: 'Lost',                  dot: '#F0470F', g1: '#FB8B43', g2: '#E14C5C', glyph: '🔎', person: 'Verified user' },
+  found:   { message: 'Found',                 dot: '#EA6A0C', g1: '#FB9E52', g2: '#E15264', glyph: '✅', person: 'Verified user' },
 };
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 const WORDMARK_AR = 1719 / 607; // ≈ 2.832
+
+const WHITE = '#ffffff';
+const WHITE_2 = 'rgba(255,255,255,0.88)';
+const WHITE_3 = 'rgba(255,255,255,0.76)';
+const GLASS = 'rgba(255,255,255,0.15)';
+const GLASS_STRONG = 'rgba(255,255,255,0.95)';
+const HAIR = 'rgba(255,255,255,0.24)';
 
 /* ── geometry helpers ───────────────────────────── */
 
@@ -108,6 +112,7 @@ function coverDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
+/** object-fit: contain (whole image, never cropped). */
 function containDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const ir = img.width / img.height;
   const rr = w / h;
@@ -164,39 +169,11 @@ function icon(ctx: CanvasRenderingContext2D, name: IconName, cx: number, cy: num
       ctx.beginPath(); ctx.moveTo(x + lw, y + h * 0.18); ctx.lineTo(cx, y + h * 0.6); ctx.lineTo(x + w - lw, y + h * 0.18); ctx.stroke();
       break;
     }
-    case 'chat': {
-      const w = s, h = s * 0.84, x = cx - w / 2, y = cy - h / 2;
-      roundRect(ctx, x, y, w, h * 0.82, h * 0.26); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x + w * 0.26, y + h * 0.82); ctx.lineTo(x + w * 0.16, y + h); ctx.lineTo(x + w * 0.46, y + h * 0.82); ctx.stroke();
-      break;
-    }
     case 'calendar': {
       const w = s, h = s, x = cx - w / 2, y = cy - h / 2 + s * 0.04;
       roundRect(ctx, x, y + h * 0.12, w, h * 0.84, h * 0.16); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x + w * 0.26, y); ctx.lineTo(x + w * 0.26, y + h * 0.22);
       ctx.moveTo(x + w * 0.74, y); ctx.lineTo(x + w * 0.74, y + h * 0.22); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy + s * 0.02); ctx.lineTo(cx, cy + s * 0.3);
-      ctx.moveTo(cx - s * 0.14, cy + s * 0.16); ctx.lineTo(cx + s * 0.14, cy + s * 0.16); ctx.stroke();
-      break;
-    }
-    case 'heart': {
-      const u = s * 0.5;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + u * 0.72);
-      ctx.bezierCurveTo(cx - u * 1.3, cy - u * 0.3, cx - u * 0.5, cy - u * 1.0, cx, cy - u * 0.28);
-      ctx.bezierCurveTo(cx + u * 0.5, cy - u * 1.0, cx + u * 1.3, cy - u * 0.3, cx, cy + u * 0.72);
-      ctx.closePath(); ctx.stroke();
-      break;
-    }
-    case 'share': {
-      ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.85); ctx.lineTo(cx, cy + r * 0.25);
-      ctx.moveTo(cx - r * 0.42, cy - r * 0.45); ctx.lineTo(cx, cy - r * 0.9); ctx.lineTo(cx + r * 0.42, cy - r * 0.45); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx - r * 0.7, cy - r * 0.1); ctx.lineTo(cx - r * 0.7, cy + r * 0.85); ctx.lineTo(cx + r * 0.7, cy + r * 0.85); ctx.lineTo(cx + r * 0.7, cy - r * 0.1); ctx.stroke();
-      break;
-    }
-    case 'bookmark': {
-      const w = s * 0.66, h = s * 0.92, x = cx - w / 2, y = cy - h / 2;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(cx, y + h * 0.7); ctx.lineTo(x, y + h); ctx.closePath(); ctx.stroke();
       break;
     }
     case 'clock': {
@@ -218,22 +195,6 @@ function icon(ctx: CanvasRenderingContext2D, name: IconName, cx: number, cy: num
       ctx.beginPath(); ctx.arc(cx, cy - r * 0.18, r * 0.24, 0, Math.PI * 2); ctx.stroke();
       break;
     }
-    case 'eye': {
-      ctx.beginPath();
-      ctx.moveTo(cx - r * 0.95, cy);
-      ctx.quadraticCurveTo(cx, cy - r * 0.85, cx + r * 0.95, cy);
-      ctx.quadraticCurveTo(cx, cy + r * 0.85, cx - r * 0.95, cy);
-      ctx.closePath(); ctx.stroke();
-      ctx.beginPath(); ctx.arc(cx, cy, r * 0.3, 0, Math.PI * 2); ctx.stroke();
-      break;
-    }
-    case 'phone': {
-      const w = s * 0.6, h = s * 0.92, x = cx - w / 2, y = cy - h / 2;
-      roundRect(ctx, x, y, w, h, w * 0.24); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx - w * 0.16, y + h * 0.12); ctx.lineTo(cx + w * 0.16, y + h * 0.12); ctx.stroke();
-      ctx.beginPath(); ctx.arc(cx, y + h - h * 0.13, lw * 0.7, 0, Math.PI * 2); ctx.fill();
-      break;
-    }
     case 'gift': {
       const w = s * 0.92, h = s * 0.8, x = cx - w / 2, y = cy - h / 2;
       roundRect(ctx, x, y + h * 0.3, w, h * 0.7, 4); ctx.stroke();
@@ -241,16 +202,6 @@ function icon(ctx: CanvasRenderingContext2D, name: IconName, cx: number, cy: num
       ctx.beginPath(); ctx.moveTo(cx, y + h * 0.3); ctx.lineTo(cx, y + h); ctx.stroke();
       ctx.beginPath(); ctx.ellipse(cx - w * 0.18, y + h * 0.18, w * 0.16, h * 0.16, 0, 0, Math.PI * 2);
       ctx.ellipse(cx + w * 0.18, y + h * 0.18, w * 0.16, h * 0.16, 0, 0, Math.PI * 2); ctx.stroke();
-      break;
-    }
-    case 'flag': {
-      ctx.beginPath(); ctx.moveTo(cx - r * 0.5, cy - r * 0.85); ctx.lineTo(cx - r * 0.5, cy + r * 0.85); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx - r * 0.5, cy - r * 0.7);
-      ctx.lineTo(cx + r * 0.62, cy - r * 0.52);
-      ctx.lineTo(cx + r * 0.2, cy - r * 0.18);
-      ctx.lineTo(cx + r * 0.62, cy + r * 0.16);
-      ctx.lineTo(cx - r * 0.5, cy); ctx.closePath(); ctx.stroke();
       break;
     }
   }
@@ -272,7 +223,7 @@ function drawAvatar(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: nu
     coverDraw(ctx, img, cx - r, cy - r, r * 2, r * 2);
   } else {
     ctx.fillStyle = color || '#ffffff';
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.92;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#14161A';
@@ -282,7 +233,6 @@ function drawAvatar(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: nu
     ctx.textAlign = 'left';
   }
   ctx.restore();
-  // hairline ring
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.stroke();
@@ -313,14 +263,6 @@ interface FooterCtx {
   avatar: HTMLImageElement | null; wordmark: HTMLImageElement | null;
 }
 
-/** Translucent white text colours for the gradient surface. */
-const WHITE = '#ffffff';
-const WHITE_2 = 'rgba(255,255,255,0.86)';
-const WHITE_3 = 'rgba(255,255,255,0.74)';
-const GLASS = 'rgba(255,255,255,0.16)';
-const GLASS_STRONG = 'rgba(255,255,255,0.94)';
-const HAIR = 'rgba(255,255,255,0.22)';
-
 export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard> {
   const PAD = 44;
   const W = 1080;
@@ -343,14 +285,17 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const fx = 56;
   const imX = 40, imW = W - 80, imR = 28;
   const imY = 120;                       // below the header band (pill + logo)
-  const imH = isEvent ? 560 : 716;
+  // The card is built around the photo: the image area takes the photo's exact
+  // aspect ratio (clamped to a sane range so extreme panoramas stay usable).
+  const heroAR = hero ? hero.width / hero.height : (isEvent ? 16 / 9 : 4 / 3);
+  const imH = Math.round(Math.min(1520, Math.max(380, imW / heroAR)));
   const imBottom = imY + imH;
   const f: FooterCtx = { W, fx, imBottom, avatar, wordmark };
   const layout = isEvent ? layoutEventFooter : layoutItemFooter;
 
   // Measure → adaptive card height.
   const footerBottom = layout(ctx, spec, t, f, false);
-  const H = Math.round(footerBottom + 50);
+  const H = Math.round(footerBottom + 46);
   canvas.height = H + PAD * 2;
 
   const paint = (useHero: boolean) => {
@@ -360,7 +305,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
 
     // Drop shadow under the rounded card.
     ctx.save();
-    ctx.shadowColor = 'rgba(17,24,39,0.32)';
+    ctx.shadowColor = 'rgba(17,24,39,0.30)';
     ctx.shadowBlur = 66;
     ctx.shadowOffsetY = 30;
     roundRect(ctx, 0, 0, W, H, R);
@@ -372,15 +317,14 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     roundRect(ctx, 0, 0, W, H, R);
     ctx.clip();
 
-    // Full-card gradient (diagonal, top-left g1 → bottom-right g2).
-    const g = ctx.createLinearGradient(0, 0, W * 0.65, H);
+    // Soft full-card gradient (diagonal, top-left g1 → bottom-right g2).
+    const g = ctx.createLinearGradient(0, 0, W * 0.7, H);
     g.addColorStop(0, t.g1);
     g.addColorStop(1, t.g2);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-    // gentle radial lift, top-left
-    const rg = ctx.createRadialGradient(W * 0.2, 80, 60, W * 0.2, 80, W * 0.9);
-    rg.addColorStop(0, 'rgba(255,255,255,0.16)');
+    const rg = ctx.createRadialGradient(W * 0.22, 70, 40, W * 0.22, 70, W);
+    rg.addColorStop(0, 'rgba(255,255,255,0.12)');
     rg.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = rg;
     ctx.fillRect(0, 0, W, H);
@@ -405,7 +349,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     ctx.fillStyle = '#ffffff'; ctx.fill();
     if (logo) { const ls = cr * 1.55; ctx.drawImage(logo, ccx - ls / 2, ccy - ls / 2, ls, ls); }
 
-    // Image — white base (cut-outs always sit on white), then whole photo.
+    // Photo — white base (cut-outs always on white), whole image at its own AR.
     ctx.save();
     roundRect(ctx, imX, imY, imW, imH, imR);
     ctx.clip();
@@ -413,15 +357,10 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     ctx.fillRect(imX, imY, imW, imH);
     const photo = useHero ? hero : null;
     if (photo) {
-      ctx.save();
-      ctx.filter = 'blur(46px) brightness(0.98)';
-      coverDraw(ctx, photo, imX - 64, imY - 64, imW + 128, imH + 128);
-      ctx.restore();
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      ctx.fillRect(imX, imY, imW, imH);
-      containDraw(ctx, photo, imX + 14, imY + 14, imW - 28, imH - 28);
+      containDraw(ctx, photo, imX, imY, imW, imH);
     } else {
       ctx.font = `260px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#9AA0A8';
       ctx.fillText(t.glyph, imX + imW / 2, imY + imH / 2); ctx.textAlign = 'left';
     }
     ctx.restore();
@@ -463,35 +402,11 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
 
 /* ── footers (single source of truth: measure when draw=false) ──── */
 
-/** A frosted action pill (icon + label) right-anchored. Returns its left x. */
-function rightPill(ctx: CanvasRenderingContext2D, rightX: number, midY: number, label: string, ic: IconName): number {
-  const h = 80;
-  ctx.font = `700 31px ${FONT}`;
-  const lw = ctx.measureText(label).width;
-  const w = 42 + 34 + 14 + lw + 32;
-  const x = rightX - w;
-  roundRect(ctx, x, midY - h / 2, w, h, h / 2);
-  ctx.fillStyle = GLASS_STRONG; ctx.fill();
-  icon(ctx, ic, x + 44, midY, 34, '#1B1D22');
-  ctx.fillStyle = '#14161A'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText(label, x + 44 + 34, midY + 1); ctx.textBaseline = 'alphabetic';
-  return x;
-}
-
-/** A frosted icon circle right-anchored. Returns its left x. */
-function rightCircle(ctx: CanvasRenderingContext2D, rightX: number, midY: number, ic: IconName): number {
-  const d = 80, x = rightX - d;
-  roundRect(ctx, x, midY - d / 2, d, d, d / 2);
-  ctx.fillStyle = GLASS; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = HAIR; ctx.stroke();
-  icon(ctx, ic, x + d / 2, midY, 36, WHITE);
-  return x;
-}
-
-function wordmarkWhite(ctx: CanvasRenderingContext2D, wm: HTMLImageElement | null, x: number, midY: number, h = 52) {
-  if (!wm) return;
-  const w = h * WORDMARK_AR;
-  ctx.drawImage(tintImage(wm, w, h, '#ffffff'), x, midY - h / 2, w, h);
+/** Centred cursive wecycle wordmark — the signature that anchors the card. */
+function wordmarkSignature(ctx: CanvasRenderingContext2D, f: FooterCtx, y: number, draw: boolean): number {
+  const wmH = 56, wmW = wmH * WORDMARK_AR;
+  if (draw && f.wordmark) ctx.drawImage(tintImage(f.wordmark, wmW, wmH, '#ffffff'), (f.W - wmW) / 2, y, wmW, wmH);
+  return y + wmH;
 }
 
 /** Marketplace / request / lost / found footer. Returns content bottom Y. */
@@ -517,9 +432,8 @@ function layoutItemFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t:
   }
   y += (titleLines.length - 1) * 68 + 16;
 
-  // Location · time.
   if (spec.location) {
-    y += 34;
+    y += 36;
     if (draw) {
       icon(ctx, 'pin', fx + 14, y - 11, 30, WHITE_2);
       ctx.font = `500 32px ${FONT}`; ctx.fillStyle = WHITE_2;
@@ -527,7 +441,6 @@ function layoutItemFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t:
     }
   }
 
-  // Description.
   if (spec.description?.trim()) {
     ctx.font = `400 35px ${FONT}`;
     const lines = wrapText(ctx, spec.description.trim(), W - fx * 2, 3);
@@ -538,7 +451,7 @@ function layoutItemFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t:
 
   // Reward pill (request / lost / found).
   if (spec.reward?.trim()) {
-    y += 36;
+    y += 38;
     const ph = 84, label = kind === 'request' ? 'Offering Reward' : 'Reward';
     if (draw) {
       roundRect(ctx, fx, y, W - fx * 2, ph, 22); ctx.fillStyle = GLASS; ctx.fill();
@@ -554,76 +467,37 @@ function layoutItemFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t:
   }
 
   // Divider.
-  y += 36;
-  if (draw) { ctx.strokeStyle = HAIR; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx, y); ctx.lineTo(W - fx, y); ctx.stroke(); }
-  y += 6;
-
-  // Person row: avatar + name + sub-label (left) · chat/phone circles (right).
   y += 40;
-  const ar = 32;
-  if (draw && spec.byName) {
-    drawAvatar(ctx, fx + ar, y, ar, avatar, spec.byInitials, spec.byColor);
-    const nameX = fx + ar * 2 + 22;
-    ctx.font = `700 37px ${FONT}`; ctx.fillStyle = WHITE; ctx.textBaseline = 'middle';
-    const nm = wrapText(ctx, spec.byName, W - nameX - fx - 200, 1)[0];
-    ctx.fillText(nm, nameX, y - 14);
-    if (spec.verified) checkBadge(ctx, nameX + ctx.measureText(nm).width + 26, y - 14, 16, '#ffffff', t.g2);
-    ctx.font = `500 28px ${FONT}`; ctx.fillStyle = WHITE_3;
-    ctx.fillText(t.person, nameX, y + 24);
-    ctx.textBaseline = 'alphabetic';
-    // contact circles
-    let rx = W - fx;
-    if (spec.byPhone) rx = rightCircle(ctx, rx, y, 'phone') - 14;
-    rightCircle(ctx, rx, y, 'chat');
-  }
-  y += ar + 24;
+  if (draw) { ctx.strokeStyle = HAIR; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx, y); ctx.lineTo(W - fx, y); ctx.stroke(); }
 
-  // Wordmark + actions.
-  if (kind === 'lost' || kind === 'found') {
-    // wecycle wordmark on its own line, then a row of three frosted pills.
-    y += 46;
-    if (draw) wordmarkWhite(ctx, f.wordmark, fx, y, 50);
-    y += 58;
-    const rowY = y + 42, gap = 14, n = 3;
+  // Person row (avatar + name + verified · sub-label). No fake icons.
+  if (spec.byName) {
+    y += 44;
+    const ar = 32;
     if (draw) {
-      const pw = (W - fx * 2 - gap * (n - 1)) / n;
-      const defs: [string, IconName][] = [['Share', 'share'], ['Save', 'heart'], ['Report', 'flag']];
-      defs.forEach(([lbl, ic], i) => {
-        const x = fx + (pw + gap) * i, h = 84;
-        roundRect(ctx, x, rowY - h / 2, pw, h, h / 2); ctx.fillStyle = GLASS; ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = HAIR; ctx.stroke();
-        ctx.font = `700 30px ${FONT}`;
-        const lw = ctx.measureText(lbl).width, gw = 32 + 12 + lw, sx = x + (pw - gw) / 2;
-        icon(ctx, ic, sx + 16, rowY, 32, WHITE);
-        ctx.fillStyle = WHITE; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-        ctx.fillText(lbl, sx + 32 + 12, rowY + 1); ctx.textBaseline = 'alphabetic';
-      });
+      drawAvatar(ctx, fx + ar, y, ar, avatar, spec.byInitials, spec.byColor);
+      const nameX = fx + ar * 2 + 22;
+      ctx.font = `700 37px ${FONT}`; ctx.fillStyle = WHITE; ctx.textBaseline = 'middle';
+      const nm = wrapText(ctx, spec.byName, W - nameX - fx - 50, 1)[0];
+      ctx.fillText(nm, nameX, y - 14);
+      if (spec.verified) checkBadge(ctx, nameX + ctx.measureText(nm).width + 26, y - 14, 16, '#ffffff', t.g2);
+      ctx.font = `500 28px ${FONT}`; ctx.fillStyle = WHITE_3;
+      ctx.fillText(t.person, nameX, y + 24);
+      ctx.textBaseline = 'alphabetic';
     }
-    return rowY + 42;
+    y += ar + 24;
   }
-  y += 36;
-  const midY = y + 42;
-  if (draw) {
-    wordmarkWhite(ctx, f.wordmark, fx, midY);
-    let rx = W - fx;
-    if (kind === 'item') {
-      rx = rightCircle(ctx, rx, midY, 'share') - 14;
-      rx = rightCircle(ctx, rx, midY, 'heart') - 14;
-      rightPill(ctx, rx, midY, t.cta, t.caIcon);
-    } else {
-      rx = rightCircle(ctx, rx, midY, 'share') - 14;
-      const lbl = `${t.cta}${spec.byName ? ` ${spec.byName.split(/\s+/)[0]}` : ''}`;
-      rightPill(ctx, rx, midY, lbl, t.caIcon);
-    }
-  }
-  return midY + 42;
+
+  // Centred wordmark signature.
+  y += 48;
+  return wordmarkSignature(ctx, f, y, draw);
 }
 
 /** Event footer (date badge handled separately). Returns content bottom Y. */
 function layoutEventFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t: Theme, f: FooterCtx, draw: boolean): number {
   const { W, fx, avatar } = f;
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  let y = f.imBottom + 74;
+  let y = f.imBottom + 76;
 
   ctx.font = `800 58px ${FONT}`;
   const titleLines = wrapText(ctx, spec.title, W - fx * 2, 2);
@@ -648,7 +522,7 @@ function layoutEventFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t
 
   const chips = (spec.eventChips ?? []).filter(Boolean).slice(0, 3);
   if (chips.length) {
-    y += 36;
+    y += 38;
     const boxH = 96;
     if (draw) {
       roundRect(ctx, fx, y, W - fx * 2, boxH, 22); ctx.fillStyle = GLASS; ctx.fill();
@@ -666,38 +540,29 @@ function layoutEventFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t
     y += boxH;
   }
 
-  // Organizer row.
+  // Divider.
+  y += 40;
+  if (draw) { ctx.strokeStyle = HAIR; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx, y); ctx.lineTo(W - fx, y); ctx.stroke(); }
+
+  // Organizer row (no fake icons).
   if (spec.byName) {
-    y += 38;
+    y += 44;
     const ar = 32;
     if (draw) {
       drawAvatar(ctx, fx + ar, y, ar, avatar, spec.byInitials, spec.byColor);
       const nameX = fx + ar * 2 + 22;
       ctx.font = `700 36px ${FONT}`; ctx.fillStyle = WHITE; ctx.textBaseline = 'middle';
-      const nm = wrapText(ctx, spec.byName, W - nameX - fx - 130, 1)[0];
+      const nm = wrapText(ctx, spec.byName, W - nameX - fx - 50, 1)[0];
       ctx.fillText(nm, nameX, y - 14);
       if (spec.verified) checkBadge(ctx, nameX + ctx.measureText(nm).width + 24, y - 14, 15, '#ffffff', t.g2);
       ctx.font = `500 27px ${FONT}`; ctx.fillStyle = WHITE_3;
       ctx.fillText(t.person, nameX, y + 22); ctx.textBaseline = 'alphabetic';
-      rightCircle(ctx, W - fx, y, 'chat');
     }
-    y += ar + 14;
+    y += ar + 22;
   }
 
-  // Divider + actions.
-  y += 32;
-  if (draw) { ctx.strokeStyle = HAIR; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx, y); ctx.lineTo(W - fx, y); ctx.stroke(); }
-  y += 6;
-  y += 36;
-  const midY = y + 42;
-  if (draw) {
-    wordmarkWhite(ctx, f.wordmark, fx, midY);
-    let rx = W - fx;
-    rx = rightCircle(ctx, rx, midY, 'bookmark') - 14;
-    rx = rightCircle(ctx, rx, midY, 'share') - 14;
-    rightPill(ctx, rx, midY, t.cta, t.caIcon);
-  }
-  return midY + 42;
+  y += 46;
+  return wordmarkSignature(ctx, f, y, draw);
 }
 
 /* ── share / download / copy ────────────────────── */
@@ -714,6 +579,8 @@ function cardText(spec: ShareCardSpec): string {
 
 export type ShareCardResult = 'shared' | 'downloaded' | 'copied' | 'unavailable';
 
+/** Share the rendered card AS AN IMAGE, with the product link in the caption.
+ *  Falls back to a PNG download + link copy where files can't be shared. */
 export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Promise<ShareCardResult> {
   if (typeof navigator === 'undefined') return 'unavailable';
   const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : 'https://wecycle.page');
@@ -724,7 +591,7 @@ export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Pro
       canShare?: (d: ShareData) => boolean;
       share?: (d: ShareData) => Promise<void>;
     };
-    const data: ShareData = { files: [file], title: spec.title, text: cardText(spec), url } as ShareData;
+    const data: ShareData = { files: [file], title: spec.title, text: `${cardText(spec)}\n${url}`, url } as ShareData;
     if (typeof nav.share === 'function' && nav.canShare?.(data)) {
       try {
         await nav.share(data);
