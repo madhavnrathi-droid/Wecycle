@@ -102,31 +102,40 @@ function coverDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
+/** Draw `img` with object-fit: contain (whole image, never cropped). */
+function containDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+  const ir = img.width / img.height;
+  const rr = w / h;
+  let dw: number, dh: number;
+  if (ir > rr) { dw = w; dh = w / ir; } else { dh = h; dw = h * ir; }
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
 /** Wrap to at most `maxLines`, ellipsising the final line if it overflows. */
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
-  const words = text.trim().split(/\s+/);
+  const words = text.trim().split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let cur = '';
   for (let i = 0; i < words.length; i++) {
     const test = cur ? `${cur} ${words[i]}` : words[i];
     if (ctx.measureText(test).width <= maxWidth || !cur) {
       cur = test;
+    } else if (lines.length === maxLines - 1) {
+      // On the last allowed line — keep ALL remaining words here (the trailing
+      // ellipsis pass below trims it to fit), so no words are silently dropped.
+      cur = `${cur} ${words.slice(i).join(' ')}`;
+      break;
     } else {
       lines.push(cur);
       cur = words[i];
-      if (lines.length === maxLines - 1) break;
     }
   }
-  if (lines.length < maxLines) {
-    lines.push(cur);
-  } else {
-    const restIdx = lines.join(' ').split(/\s+/).length;
-    let last = [cur, ...words.slice(restIdx)].join(' ');
-    if (ctx.measureText(last).width > maxWidth) {
-      while (last.length && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
-      last = `${last.trimEnd()}…`;
-    }
-    lines[maxLines - 1] = last;
+  if (cur) lines.push(cur);
+  const li = lines.length - 1;
+  if (li >= 0 && ctx.measureText(lines[li]).width > maxWidth) {
+    let last = lines[li];
+    while (last.length && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+    lines[li] = `${last.trimEnd()}…`;
   }
   return lines;
 }
@@ -176,7 +185,15 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     ctx.clip();
     const hero = useImages ? photos[0] : null;
     if (hero) {
-      coverDraw(ctx, hero, imX, imY, imW, imH);
+      // Blurred cover backdrop fills the panel (no empty bars)…
+      ctx.save();
+      ctx.filter = 'blur(36px) brightness(0.94)';
+      coverDraw(ctx, hero, imX - 48, imY - 48, imW + 96, imH + 96);
+      ctx.restore();
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      ctx.fillRect(imX, imY, imW, imH);
+      // …and the WHOLE product sits sharp on top — never cropped.
+      containDraw(ctx, hero, imX + 18, imY + 18, imW - 36, imH - 36);
     } else {
       const pg = ctx.createLinearGradient(imX, imY, imX + imW, imY + imH);
       pg.addColorStop(0, '#EEF0F3');
@@ -188,12 +205,12 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
       ctx.textBaseline = 'middle';
       ctx.fillText(kind.glyph, imX + imW / 2, imY + imH / 2);
     }
-    // Faint top scrim so the pill + logo always read on bright photos.
-    const topScrim = ctx.createLinearGradient(imX, imY, imX, imY + 220);
-    topScrim.addColorStop(0, 'rgba(0,0,0,0.32)');
+    // Faint top scrim so the kind pill always reads on bright photos.
+    const topScrim = ctx.createLinearGradient(imX, imY, imX, imY + 200);
+    topScrim.addColorStop(0, 'rgba(0,0,0,0.30)');
     topScrim.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = topScrim;
-    ctx.fillRect(imX, imY, imW, 220);
+    ctx.fillRect(imX, imY, imW, 200);
     ctx.restore();
 
     // Kind pill, top-left of image (like "Best Seller").
@@ -211,41 +228,39 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
 
     // Logomark in a clean white circle straddling the image's TOP-RIGHT
-    // corner — half over the photo, half in the white margin. No bloom.
+    // corner — half over the photo, half in the white margin. Flat: no drop
+    // shadow, just a hairline ring so the margin-half keeps a crisp edge.
     const cr = 66, cx = imX + imW, cy = imY;
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.24)';
-    ctx.shadowBlur = 26;
-    ctx.shadowOffsetY = 6;
     ctx.beginPath();
     ctx.arc(cx, cy, cr, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
-    ctx.restore();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(17,19,24,0.08)';
+    ctx.stroke();
     if (logo) {
-      const ls = 102;
+      const ls = 104;
       ctx.drawImage(logo, cx - ls / 2, cy - ls / 2, ls, ls);
     }
 
     // ── Footer (white, no photo). Flat text, bigger proportions. ──
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    let y = imY + imH + 84;
 
-    const wmH = 66;
-    const wordmarkY = H - 54 - wmH; // top of the bottom-pinned wordmark
+    const wmH = 84;
+    const wordmarkY = H - 56 - wmH; // top of the bottom-pinned wordmark
+    const fy = imY + imH + 84;      // first title baseline
 
-    // Product title.
+    // Product title (1–2 lines). Advance tracks the real last baseline so the
+    // seller row sits snug under it (no dead gap).
     ctx.fillStyle = '#14161A';
     ctx.font = `800 72px ${FONT}`;
-    for (const ln of wrapText(ctx, spec.title, W - ix * 2, 2)) {
-      ctx.fillText(ln, ix, y);
-      y += 80;
-    }
-    y += 10;
+    const titleLines = wrapText(ctx, spec.title, W - ix * 2, 2);
+    titleLines.forEach((ln, i) => ctx.fillText(ln, ix, fy + i * 80));
+    let y = fy + (titleLines.length - 1) * 80 + 56;
 
     // Seller name (left) + price / status pill (right).
-    const rowMid = y + 24;
+    const rowMid = y + 22;
     if (spec.byName) {
       ctx.fillStyle = '#6A6F77';
       ctx.font = `500 40px ${FONT}`;
@@ -270,24 +285,27 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
       ctx.fillText(priceText, px + 29, rowMid + 1);
       ctx.textBaseline = 'alphabetic';
     }
-    y = rowMid + 66;
+    y = rowMid + 54;
 
-    // Description (capped so it never collides with the contact + wordmark).
-    if (spec.description?.trim()) {
+    // Description fills the space between the row and the contact line, with
+    // only as many lines as fit — wrapText ellipsises the last one cleanly.
+    const contact = [spec.byEmail, spec.byPhone].filter(Boolean).join('   ·   ');
+    const descLineH = 50;
+    const lastDescBaseline = wordmarkY - (contact ? 46 : 0) - 16;
+    const maxDescLines = Math.max(0, Math.min(2, Math.floor((lastDescBaseline - y) / descLineH)));
+    if (spec.description?.trim() && maxDescLines > 0) {
       ctx.fillStyle = '#6A6F77';
       ctx.font = `400 38px ${FONT}`;
-      for (const ln of wrapText(ctx, spec.description.trim(), W - ix * 2, 2)) {
-        if (y + 52 > wordmarkY - 96) break;
-        y += 52;
+      for (const ln of wrapText(ctx, spec.description.trim(), W - ix * 2, maxDescLines)) {
+        y += descLineH;
         ctx.fillText(ln, ix, y);
       }
-      y += 14;
+      y += 12;
     }
 
-    // Email + phone contact line.
-    const contact = [spec.byEmail, spec.byPhone].filter(Boolean).join('   ·   ');
-    if (contact && y + 46 < wordmarkY - 12) {
-      y += 46;
+    // Email + phone contact line (flows under the description, above wordmark).
+    if (contact && y + 44 <= wordmarkY - 6) {
+      y += 44;
       ctx.fillStyle = '#9AA0A8';
       ctx.font = `500 34px ${FONT}`;
       ctx.fillText(wrapText(ctx, contact, W - ix * 2, 1)[0], ix, y);
