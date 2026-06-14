@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import Modal from '../Modal';
-import PhotoCarousel from '../PhotoCarousel';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createEvent } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
@@ -119,7 +118,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           <button
             type="submit" form="event-form"
             disabled={submitting}
-            className="btn btn-primary"
+            className="btn btn-gradient"
             style={{ flex: 2 }}
           >
             {submitting ? 'Submitting…' : 'Submit for review'}
@@ -255,20 +254,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
             <span className="field-hint">Optional — first is cover</span>
           </div>
 
-          {form.photos.length > 0 && (
-            <div style={{
-              borderRadius: 16, overflow: 'hidden',
-              background: 'var(--bg-inset)', marginBottom: 8,
-            }}>
-              <PhotoCarousel
-                photos={form.photos}
-                aspectRatio="4 / 5"
-                dotsPosition="bottom"
-                radius={16}
-              />
-            </div>
-          )}
-
+          {/* PhotoPicker shows its own large preview now. */}
           <PhotoPicker
             ref={pickerRef}
             photos={form.photos}

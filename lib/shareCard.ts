@@ -169,8 +169,8 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     ctx.fillRect(0, 0, W, H);
 
     // ── Product image (top), inset + rounded like the references ──
-    const imX = 36, imY = 36, imW = W - 72, imH = 720;
-    const imR = 32;
+    const imX = 64, imY = 84, imW = W - 128, imH = 600;
+    const imR = 34;
     ctx.save();
     roundRect(ctx, imX, imY, imW, imH, imR);
     ctx.clip();
@@ -210,11 +210,12 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     ctx.fillText(kind.word, kpX + 24, kpY + kpH / 2 + 1);
     (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
 
-    // Logomark in a clean white circle, top-right — bigger, no bloom.
-    const cr = 64, cx = imX + imW - 28 - cr, cy = imY + 28 + cr;
+    // Logomark in a clean white circle straddling the image's TOP-RIGHT
+    // corner — half over the photo, half in the white margin. No bloom.
+    const cr = 66, cx = imX + imW, cy = imY;
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.22)';
-    ctx.shadowBlur = 22;
+    ctx.shadowColor = 'rgba(0,0,0,0.24)';
+    ctx.shadowBlur = 26;
     ctx.shadowOffsetY = 6;
     ctx.beginPath();
     ctx.arc(cx, cy, cr, 0, Math.PI * 2);
@@ -222,32 +223,34 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     ctx.fill();
     ctx.restore();
     if (logo) {
-      const ls = 88;
+      const ls = 102;
       ctx.drawImage(logo, cx - ls / 2, cy - ls / 2, ls, ls);
     }
 
-    // ── Footer (white, no photo) ──
+    // ── Footer (white, no photo). Flat text, bigger proportions. ──
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    let y = imY + imH + 78;
+    let y = imY + imH + 84;
+
+    const wmH = 66;
+    const wordmarkY = H - 54 - wmH; // top of the bottom-pinned wordmark
 
     // Product title.
     ctx.fillStyle = '#14161A';
-    ctx.font = `800 62px ${FONT}`;
-    const titleLines = wrapText(ctx, spec.title, W - ix * 2, 2);
-    for (const ln of titleLines) {
+    ctx.font = `800 72px ${FONT}`;
+    for (const ln of wrapText(ctx, spec.title, W - ix * 2, 2)) {
       ctx.fillText(ln, ix, y);
-      y += 70;
+      y += 80;
     }
-    y += 8;
+    y += 10;
 
-    // Seller name (left) + price / status (right).
-    const rowMid = y + 20;
+    // Seller name (left) + price / status pill (right).
+    const rowMid = y + 24;
     if (spec.byName) {
       ctx.fillStyle = '#6A6F77';
-      ctx.font = `500 38px ${FONT}`;
+      ctx.font = `500 40px ${FONT}`;
       ctx.textBaseline = 'middle';
-      ctx.fillText(wrapText(ctx, spec.byName, W - ix * 2 - 320, 1)[0], ix, rowMid);
+      ctx.fillText(wrapText(ctx, spec.byName, W - ix * 2 - 360, 1)[0], ix, rowMid);
       ctx.textBaseline = 'alphabetic';
     }
     const priceText =
@@ -255,45 +258,44 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
       spec.badge ? spec.badge :
       (spec.kind === 'lost' || spec.kind === 'found') ? kind.word : '';
     if (priceText) {
-      ctx.font = `800 46px ${FONT}`;
+      ctx.font = `800 50px ${FONT}`;
       const pw = ctx.measureText(priceText).width;
-      const ph = 70, pillW = pw + 52;
+      const ph = 82, pillW = pw + 58;
       const px = W - ix - pillW;
       roundRect(ctx, px, rowMid - ph / 2, pillW, ph, ph / 2);
       ctx.fillStyle = '#14161A';
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.textBaseline = 'middle';
-      ctx.font = `800 42px ${FONT}`;
-      ctx.fillText(priceText, px + 26, rowMid + 1);
+      ctx.fillText(priceText, px + 29, rowMid + 1);
       ctx.textBaseline = 'alphabetic';
     }
-    y = rowMid + 54;
+    y = rowMid + 66;
 
-    // Description (if any).
+    // Description (capped so it never collides with the contact + wordmark).
     if (spec.description?.trim()) {
       ctx.fillStyle = '#6A6F77';
-      ctx.font = `400 36px ${FONT}`;
+      ctx.font = `400 38px ${FONT}`;
       for (const ln of wrapText(ctx, spec.description.trim(), W - ix * 2, 2)) {
-        y += 46;
+        if (y + 52 > wordmarkY - 96) break;
+        y += 52;
         ctx.fillText(ln, ix, y);
       }
-      y += 12;
+      y += 14;
     }
 
     // Email + phone contact line.
     const contact = [spec.byEmail, spec.byPhone].filter(Boolean).join('   ·   ');
-    if (contact) {
-      y += 50;
+    if (contact && y + 46 < wordmarkY - 12) {
+      y += 46;
       ctx.fillStyle = '#9AA0A8';
-      ctx.font = `500 32px ${FONT}`;
+      ctx.font = `500 34px ${FONT}`;
       ctx.fillText(wrapText(ctx, contact, W - ix * 2, 1)[0], ix, y);
     }
 
     // ── Wecycle wordmark — bigger, pinned bottom-left (no url) ──
     if (wordmark) {
-      const wmH = 58;
-      ctx.drawImage(wordmark, ix, H - 64 - wmH, wmH * WORDMARK_AR, wmH);
+      ctx.drawImage(wordmark, ix, wordmarkY, wmH * WORDMARK_AR, wmH);
     }
   };
 

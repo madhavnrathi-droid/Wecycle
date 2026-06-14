@@ -129,7 +129,7 @@ export default function ReportLostFoundModal({
           <button
             type="submit" form="report-lf-form"
             disabled={submitting}
-            className="btn btn-primary"
+            className="btn btn-gradient"
             style={{ flex: 2 }}
           >
             {submitting ? 'Submitting…' : 'Submit report'}

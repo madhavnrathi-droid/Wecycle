@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react';
 import { Gift, Tag, MapPin, Bell } from 'lucide-react';
 import Modal from '../Modal';
-import PhotoCarousel from '../PhotoCarousel';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
@@ -144,7 +143,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           <button
             type="submit" form="share-item-form"
             disabled={submitting}
-            className="btn btn-primary"
+            className="btn btn-gradient"
             style={{ flex: 2 }}
           >
             {submitting ? 'Sharing…' : 'Share with community'}
@@ -165,20 +164,8 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
             )}
           </div>
 
-          {form.photos.length > 0 && (
-            <div style={{
-              borderRadius: 16, overflow: 'hidden',
-              background: 'var(--bg-inset)', marginBottom: 8,
-            }}>
-              <PhotoCarousel
-                photos={form.photos}
-                aspectRatio="4 / 5"
-                dotsPosition="bottom"
-                radius={16}
-              />
-            </div>
-          )}
-
+          {/* PhotoPicker now shows its own large preview, so no separate
+              carousel preview here (it was duplicating the image). */}
           <PhotoPicker
             ref={pickerRef}
             photos={form.photos}

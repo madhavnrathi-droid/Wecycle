@@ -349,6 +349,18 @@ body {
 }
 .btn-primary:hover { background: var(--accent-lime-dim); }
 
+/* Brand-gradient CTA — the green→blue of the Wecycle logomark, white text.
+   Used for the primary create / upload actions (Share with community, Post
+   request, Submit event, Report). Auth's "Send code" stays flat lime. */
+.btn-gradient {
+  background: linear-gradient(135deg, #2FAE4E 0%, #18A6E0 100%);
+  color: #ffffff;
+  padding: 12px 20px;
+  box-shadow: 0 8px 20px -10px rgba(24, 166, 224, 0.7);
+}
+.btn-gradient:hover { filter: brightness(1.06); }
+.btn-gradient:disabled { opacity: 0.6; }
+
 .btn-secondary {
   background: var(--bg-card);
   color: var(--text-primary);
@@ -3507,7 +3519,7 @@ section.mobile-only { display: block; }
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  /* Flat text — legibility comes from the frosted scrim, not a shadow. */
 }
 .feed-card-meta {
   display: flex;
@@ -3527,7 +3539,6 @@ section.mobile-only { display: block; }
   gap: 3px;
   min-width: 0;
   flex: 1 1 auto;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
 }
 .feed-card-loc > svg { flex: 0 0 auto; }
 .feed-card-loc-text {
@@ -3536,15 +3547,16 @@ section.mobile-only { display: block; }
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* Price — unboxed, bold and prominent (e-commerce convention: the price is
+   the loudest thing on the card). Legibility comes from the frosted scrim. */
 .feed-card-price {
   flex: 0 0 auto;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.96);
-  color: #0E0E08;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-weight: 700;
-  font-size: 10px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
 /* ═══════════════════════════════════════════════
