@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import BottomNav, { type Screen } from '../components/BottomNav';
 import FeedScreen from '../components/FeedScreen';
 import MarketplaceScreen from '../components/MarketplaceScreen';
@@ -36,9 +36,13 @@ import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
 import {
-  getSettings, onSettingsChange, applyTheme, watchSystemTheme,
-  applyLargerText, saveSettings, type ThemeMode,
+  getSettings, onSettingsChange, applyTheme,
+  applyLargerText,
 } from '../lib/settings';
+
+/* useLayoutEffect warns during SSR; fall back to useEffect on the server so
+ * the scroll-restore logic below runs flush-before-paint on the client only. */
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 type ModalKind =
   | null
@@ -128,48 +132,33 @@ export default function WecycleApp() {
   const popSub  = () => setSubStack(prev => prev.slice(0, -1));
   const clearSubStack = () => setSubStack([]);
 
-  /* Theme state derived from settings — supports light/dark/system. */
-  const [themeMode, setThemeMode] = useState<ThemeMode>('system');
-  const [isDark, setIsDark] = useState(false);
+  /* Appearance — Wecycle is light-only now (dark mode retired). We still pin
+   * the browser/PWA chrome to the light surface and apply the "larger text"
+   * preference, reacting to changes made in Settings. */
   useEffect(() => {
-    const syncDarkFromDOM = () => {
-      if (typeof document !== 'undefined') {
-        setIsDark(document.documentElement.classList.contains('dark'));
-      }
-    };
-    /* Hydrate from localStorage and apply immediately */
     const s = getSettings();
-    setThemeMode(s.appearance.theme);
-    applyTheme(s.appearance.theme);
+    applyTheme('light');
     applyLargerText(s.appearance.largerText);
-    syncDarkFromDOM();
-    /* Listen for in-app changes (Settings toggle) */
     const off = onSettingsChange(next => {
-      setThemeMode(next.appearance.theme);
-      applyTheme(next.appearance.theme);
+      applyTheme('light');
       applyLargerText(next.appearance.largerText);
-      syncDarkFromDOM();
     });
     return off;
   }, []);
-  useEffect(() => {
-    /* Re-resolve when OS preference flips while in 'system' mode */
-    return watchSystemTheme(themeMode, () => {
-      applyTheme(themeMode);
-      if (typeof document !== 'undefined') {
-        setIsDark(document.documentElement.classList.contains('dark'));
-      }
-    });
-  }, [themeMode]);
 
-  /* Drawer's sun/moon button cycles light → dark → system. */
-  const toggleTheme = () => {
-    const next: ThemeMode =
-      themeMode === 'light'  ? 'dark'   :
-      themeMode === 'dark'   ? 'system' :
-                                'light';
-    saveSettings({ appearance: { ...getSettings().appearance, theme: next } });
-  };
+  /* Detail / storefront / settings sub-screens share the same <main id="main">
+   * scroll container as the feed. React keeps that DOM node's scrollTop across
+   * the swap, so tapping a product while scrolled down used to open the detail
+   * halfway down the page. Force every full-screen takeover to open at the very
+   * top — the product photo + name first — flush before paint so there's no
+   * visible jump. */
+  useIsoLayoutEffect(() => {
+    if (isDesktop) return; /* desktop overlays are modals; the feed stays put */
+    const overlay = !!(openItem || openEvent || openStorefront || subScreen);
+    if (!overlay) return;
+    const main = document.getElementById('main');
+    if (main) main.scrollTop = 0;
+  }, [isDesktop, openItem, openEvent, openStorefront, subScreen]);
 
   /* Service worker */
   useEffect(() => {
@@ -597,8 +586,6 @@ export default function WecycleApp() {
         <Drawer
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
-          isDark={isDark}
-          onToggleTheme={toggleTheme}
           onSignIn={() => { setDrawerOpen(false); setTimeout(() => setModal('auth'), 80); }}
           onNavigate={handleDrawerNavigate}
         />

@@ -60,10 +60,10 @@ export const metadata: Metadata = {
   other: {
     "msapplication-tap-highlight": "no",
   },
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FAFAF6" },
-    { media: "(prefers-color-scheme: dark)",  color: "#0C0C0B" },
-  ],
+  /* Wecycle is light-only — pin the browser/PWA chrome to the cream surface so
+     a phone in OS dark mode never tints the status bar dark over a light app.
+     (Single non-media value; no dark variant.) */
+  themeColor: "#FAFAF6",
   viewport: {
     width: "device-width",
     initialScale: 1,

@@ -3500,16 +3500,26 @@ section.mobile-only { display: block; }
   color: #fff;
   pointer-events: none;
 }
-/* Only background-removed (transparent .png) products get the frosted-glass
-   bottom panel — the cut-out would otherwise float over the text with nothing
-   behind it. The mask fades the panel in toward the bottom so the product's
-   body above stays crisp. Ordinary photos skip the blur entirely. */
+/* Background-removed (transparent .png) products float on a white base, so the
+   dark photo-scrim looks muddy and the product's lower edge tangles with the
+   white title/price — the bug where "the words are behind the image". Give
+   these cards a clean, opaque-WHITE footer with DARK text instead: the caption
+   always sits on a defined surface, the way a product-catalogue card reads, and
+   the product fades gently into it rather than colliding. */
 .feed-card-overlay[data-cut] {
-  -webkit-backdrop-filter: blur(7px) saturate(1.05);
-  backdrop-filter: blur(7px) saturate(1.05);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 42%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 42%);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.85) 44%,
+    #ffffff 80%
+  );
+  color: var(--text-primary);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
+.feed-card-overlay[data-cut] .feed-card-title { color: var(--text-primary); }
+.feed-card-overlay[data-cut] .feed-card-meta  { color: var(--text-muted); }
+.feed-card-overlay[data-cut] .feed-card-price { color: var(--text-primary); }
 .feed-card-title {
   margin: 0;
   font-size: 13px;

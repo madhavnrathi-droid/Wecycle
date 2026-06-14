@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import {
   X, User, Settings, MessageSquare, Send, Bell,
-  Heart, LogOut, Moon, Sun, ChevronRight, Sparkles,
+  Heart, LogOut, ChevronRight, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getAvatar } from '../lib/photos';
@@ -12,8 +12,6 @@ import { track, EVT } from '../lib/analytics';
 interface DrawerProps {
   open: boolean;
   onClose: () => void;
-  isDark: boolean;
-  onToggleTheme: () => void;
   onSignIn: () => void;
   onNavigate?: (id: string) => void;
 }
@@ -42,7 +40,7 @@ const SECTIONS: { items: { id: string; label: string; icon: IconCmp; desc?: stri
 ];
 
 export default function Drawer({
-  open, onClose, isDark, onToggleTheme, onSignIn, onNavigate,
+  open, onClose, onSignIn, onNavigate,
 }: DrawerProps) {
   const { user, profile, signOut } = useAuth();
   const ref = useRef<HTMLDivElement>(null);
@@ -180,27 +178,20 @@ export default function Drawer({
           ))}
         </nav>
 
-        {/* Footer */}
-        <div style={{
-          padding: '12px 14px calc(14px + env(safe-area-inset-bottom, 0px))',
-          borderTop: '1px solid var(--border-subtle)',
-          display: 'flex', gap: 8,
-        }}>
-          <button
-            onClick={onToggleTheme}
-            className="drawer-footer-btn"
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDark ? <Sun size={16} strokeWidth={1.8} /> : <Moon size={16} strokeWidth={1.8} />}
-            <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
-          </button>
-          {user && (
+        {/* Footer — only when signed in (Sign out is its sole action now that
+            the theme toggle has been retired). */}
+        {user && (
+          <div style={{
+            padding: '12px 14px calc(14px + env(safe-area-inset-bottom, 0px))',
+            borderTop: '1px solid var(--border-subtle)',
+            display: 'flex', gap: 8,
+          }}>
             <button onClick={handleSignOut} className="drawer-footer-btn">
               <LogOut size={16} strokeWidth={1.8} />
               <span>Sign out</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </aside>
     </>
   );

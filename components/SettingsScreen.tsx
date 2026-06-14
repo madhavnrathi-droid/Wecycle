@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, Sun, Moon, Monitor,
+  ChevronLeft, ChevronRight,
   Bell, BellRing, Shield, Tag, Info,
   MessageSquare, Globe, EyeOff, Trash2, Loader2, UserX,
 } from 'lucide-react';
@@ -10,7 +10,7 @@ import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/pu
 import { getBlockedUsers, unblockUser, onBlocksChange, type BlockedUser } from '../lib/moderation';
 import {
   getSettings, saveSettings, onSettingsChange, applyLargerText,
-  type ThemeMode, type UserSettings,
+  type UserSettings,
 } from '../lib/settings';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -176,10 +176,6 @@ export default function SettingsScreen({
       {/* ── APPEARANCE ── */}
       <Section title="Appearance" hint="How Wecycle looks on this device.">
         <Card>
-          <Row label="Theme" hint="System matches your phone's appearance.">
-            <ThemeSwitcher value={settings.appearance.theme} onChange={(v) => setAppearance({ theme: v })} />
-          </Row>
-          <Divider />
           <Row label="Larger text" hint="Bump readable body copy across the app.">
             <Toggle on={settings.appearance.largerText} onChange={(v) => setAppearance({ largerText: v })} />
           </Row>
@@ -540,43 +536,6 @@ function LinkCard({ icon, title, subtitle, onClick }: {
 /* ──────────────────────────────────────────────── */
 /*  Controls                                         */
 /* ──────────────────────────────────────────────── */
-
-function ThemeSwitcher({ value, onChange }: { value: ThemeMode; onChange: (v: ThemeMode) => void }) {
-  const options: Array<{ v: ThemeMode; label: string; icon: React.ReactNode }> = [
-    { v: 'light',  label: 'Light',  icon: <Sun     size={13} strokeWidth={1.8} /> },
-    { v: 'dark',   label: 'Dark',   icon: <Moon    size={13} strokeWidth={1.8} /> },
-    { v: 'system', label: 'System', icon: <Monitor size={13} strokeWidth={1.8} /> },
-  ];
-  return (
-    <div role="radiogroup" aria-label="Theme" style={{
-      display: 'inline-flex', gap: 2, padding: 2,
-      background: 'var(--bg-inset)', borderRadius: 999,
-      border: '1px solid var(--border-default)',
-    }}>
-      {options.map(o => (
-        <button
-          key={o.v}
-          role="radio"
-          aria-checked={value === o.v}
-          onClick={() => onChange(o.v)}
-          style={{
-            all: 'unset', cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '5px 10px', fontSize: 12, fontWeight: 500,
-            borderRadius: 999,
-            background: value === o.v ? 'var(--bg-card)' : 'transparent',
-            color: value === o.v ? 'var(--text-primary)' : 'var(--text-muted)',
-            boxShadow: value === o.v ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
-            transition: 'all 0.15s',
-          }}
-        >
-          {o.icon}
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (

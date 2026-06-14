@@ -193,11 +193,10 @@ export function onSettingsChange(cb: (s: UserSettings) => void): () => void {
 
 /* ── Theme application ─────────────────────────── */
 
-/** Resolve "system" against the current OS preference. */
-export function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
-  if (mode !== 'system') return mode;
-  if (!isBrowser()) return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+/** Dark mode has been retired — Wecycle is light-only. We keep the signature so
+ *  callers/persisted settings stay valid, but it always resolves to light. */
+export function resolveTheme(_mode: ThemeMode): 'light' | 'dark' {
+  return 'light';
 }
 
 /* The two surface colors the browser/OS chrome should tint to. Must match
