@@ -264,7 +264,7 @@ export default function EventDetailScreen({
     verified: true,
     byEmail: event.organizer?.email,
     byPhone: event.organizer?.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${event.id}` : undefined,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${event.id}` : undefined,
   };
   const handleShareEvent = () => {
     track(EVT.share_clicked, { post_id: event.id, post_kind: 'event' });

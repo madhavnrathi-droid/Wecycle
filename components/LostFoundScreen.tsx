@@ -443,7 +443,7 @@ export function LostFoundDetailSheet({
     verified: item.verified,
     byEmail: item.user.email,
     byPhone: item.user.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
   };
   const handleShareLF = () => {
     track(EVT.share_clicked, { post_id: item.id, post_kind: 'lostfound' });

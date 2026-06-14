@@ -328,26 +328,36 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     rg.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = rg;
     ctx.fillRect(0, 0, W, H);
+    // Fade the gradient out to white at the very top, so the brand mark + pill
+    // sit cleanly on white — the logomark needs no circle around it.
+    const topFade = ctx.createLinearGradient(0, 0, 0, 300);
+    topFade.addColorStop(0, 'rgba(255,255,255,1)');
+    topFade.addColorStop(0.55, 'rgba(255,255,255,0.85)');
+    topFade.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = topFade;
+    ctx.fillRect(0, 0, W, 300);
 
-    // Header band — kind pill (left) + logomark circle (right).
+    // Header — kind pill (left) + logomark (right), both on the white top.
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.font = `700 30px ${FONT}`;
     const mw = ctx.measureText(t.message).width;
     const phH = 60, dotR = 8, padL = 28, gapD = 15;
     const phW = padL + dotR * 2 + gapD + mw + 30;
     const headMid = 44 + phH / 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(17,24,39,0.12)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
     roundRect(ctx, fx, 44, phW, phH, phH / 2);
     ctx.fillStyle = GLASS_STRONG; ctx.fill();
+    ctx.restore();
+    roundRect(ctx, fx, 44, phW, phH, phH / 2);
+    ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(17,19,24,0.07)'; ctx.stroke();
     ctx.beginPath(); ctx.arc(fx + padL + dotR, headMid, dotR, 0, Math.PI * 2);
     ctx.fillStyle = t.dot; ctx.fill();
     ctx.fillStyle = '#14161A';
     ctx.fillText(t.message, fx + padL + dotR * 2 + gapD, headMid + 1);
 
-    const cr = 50;
-    const ccx = W - fx - cr, ccy = 44 + cr;
-    ctx.beginPath(); ctx.arc(ccx, ccy, cr, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff'; ctx.fill();
-    if (logo) { const ls = cr * 1.55; ctx.drawImage(logo, ccx - ls / 2, ccy - ls / 2, ls, ls); }
+    // Logomark — no circle, sits directly on the faded-white top-right corner.
+    if (logo) { const ls = 96; ctx.drawImage(logo, W - fx - ls, headMid - ls / 2, ls, ls); }
 
     // Photo — white base (cut-outs always on white), whole image at its own AR.
     ctx.save();

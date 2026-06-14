@@ -351,7 +351,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     verified: true,
     byEmail: item.user.email,
     byPhone: item.user.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
   };
 
   /* Convenience: when only one channel is on, the primary CTA carries the
@@ -1209,7 +1209,7 @@ function DesktopLayout({
     verified: true,
     byEmail: item.user.email,
     byPhone: item.user.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
+    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
   };
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,

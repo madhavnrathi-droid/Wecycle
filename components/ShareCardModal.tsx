@@ -17,9 +17,10 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { X, Share2, Download, Link2, Loader2, Check } from 'lucide-react';
 import gsap from 'gsap';
 import {
-  renderShareCard, downloadCardBlob, shareCardBlob,
+  renderShareCard, downloadCardBlob,
   type ShareCardSpec,
 } from '../lib/shareCard';
+import { shareLink } from '../lib/share';
 import { sfxOpen, sfxShare, sfxTap } from '../lib/sfx';
 import { haptics } from '../lib/haptics';
 
@@ -112,11 +113,13 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
     if (!spec || busy) return;
     setBusy(true);
     haptics.medium();
-    /* Share the CARD IMAGE with the product link in the caption. */
-    const res = await shareCardBlob(blob, spec);
+    /* Share the LINK — it unfurls into a rich preview (photo · title · price)
+       from the per-post OG tags on /s/<id>, the way any e-commerce share works.
+       The card itself is saved/previewed; the link carries the picture. */
+    const res = await shareLink({ title: spec.title, text: shareText(spec), url: spec.url });
     setBusy(false);
     if (res === 'shared') { sfxShare(); successPop(); flashToast('Shared!'); }
-    else if (res === 'downloaded') { sfxShare(); successPop(); flashToast('Saved · link copied'); }
+    else if (res === 'copied') { sfxShare(); successPop(); flashToast('Link copied'); }
     else flashToast("Couldn't share");
   };
 
@@ -258,4 +261,14 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+function shareText(spec: ShareCardSpec): string {
+  switch (spec.kind) {
+    case 'request': return `Looking for "${spec.title}" on Wecycle`;
+    case 'event':   return `${spec.title}${spec.dateLine ? ` · ${spec.dateLine}` : ''} — on Wecycle`;
+    case 'lost':    return `Lost: "${spec.title}" — seen it? Help out on Wecycle`;
+    case 'found':   return `Found: "${spec.title}" — is it yours? On Wecycle`;
+    default:        return `"${spec.title}"${spec.price != null ? ` — ₹${spec.price}` : ''} on Wecycle`;
+  }
 }
