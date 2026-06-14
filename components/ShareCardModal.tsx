@@ -173,17 +173,16 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
             </div>
             <VisuallyHidden><Dialog.Title>Share this post</Dialog.Title></VisuallyHidden>
 
-            {/* Preview — exact generated image, 4:5. */}
+            {/* Preview — exact generated image (whole card, its own rounded
+                corners + baked drop shadow shown via the transparent margin). */}
             <div ref={previewRef} style={{
               position: 'relative',
-              width: '100%', aspectRatio: '4 / 5',
-              borderRadius: 18, overflow: 'hidden',
-              background: 'var(--bg-inset)',
+              width: '100%', minHeight: 320,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               {dataUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={dataUrl} alt="Shareable card preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <img src={dataUrl} alt="Shareable card preview" style={{ maxWidth: '100%', maxHeight: '62vh', display: 'block' }} />
               ) : (
                 <Loader2 size={28} strokeWidth={2} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--text-muted)' }} />
               )}

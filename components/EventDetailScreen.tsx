@@ -235,14 +235,33 @@ export default function EventDetailScreen({
 
   /* Share → Spotify-style card preview/share modal. */
   const [shareCardOpen, setShareCardOpen] = useState(false);
+  const shareDateBadge = (() => {
+    const d = new Date(event.date);
+    if (isNaN(d.getTime())) return undefined;
+    return {
+      mon: d.toLocaleString('en-US', { month: 'short' }),
+      day: String(d.getDate()),
+      dow: d.toLocaleString('en-US', { weekday: 'short' }),
+    };
+  })();
+  const shareChips = [
+    event.time,
+    typeof event.attendees === 'number' ? `${event.attendees} going` : undefined,
+    event.maxAttendees ? `Cap ${event.maxAttendees}` : undefined,
+  ].filter(Boolean) as string[];
   const shareCardSpec: ShareCardSpec = {
     kind: 'event',
     title: event.title,
     imageUrls: displayPhotos.filter(u => !!u && /^https?:|^\//.test(u)),
     dateLine: [event.date, event.time].filter(Boolean).join(' · '),
+    dateBadge: shareDateBadge,
+    eventChips: shareChips,
     location: event.location,
     description: event.description,
     byName: event.organizer?.name,
+    byInitials: event.organizer?.initials,
+    byColor: event.organizer?.color,
+    verified: true,
     byEmail: event.organizer?.email,
     byPhone: event.organizer?.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${event.id}` : undefined,

@@ -881,7 +881,7 @@ function FeedCard({
               <Heart size={14} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
             </span>
 
-            <div className="feed-card-overlay">
+            <div className="feed-card-overlay" data-cut={isCutoutUrl(coverUrl(photos[0])) || undefined}>
               <p className="feed-card-title">{item.title}</p>
               <div className="feed-card-meta">
                 <span className="feed-card-loc">
@@ -902,6 +902,13 @@ function FeedCard({
     </div>
   );
 }
+
+/** A bg-removed photo is stored as a transparent .png — only those cards get
+ *  the frosted bottom blur behind the title (ordinary photos just get a soft
+ *  gradient scrim). */
+const isCutoutUrl = (u: unknown): boolean => typeof u === 'string' && /\.png(\?|$)/i.test(u);
+const coverUrl = (p: unknown): string | undefined =>
+  typeof p === 'string' ? p : ((p as { poster?: string; src?: string } | null)?.poster ?? (p as { src?: string } | null)?.src);
 
 /* ── Event tile (All-tab variant) ──────────────────
    Mirrors the inventory event card shape but uses the public organizer
@@ -925,7 +932,7 @@ function EventFeedCard({
       style={{ aspectRatio: ar, padding: 0 }}
       aria-label={`Open event ${event.title}`}
     >
-      <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+      <img src={photo} alt="" className="feed-card-img" loading="lazy" style={{ background: isCutoutUrl(photo) ? '#fff' : undefined }} />
       <span style={{
         position: 'absolute', top: 10, left: 10,
         background: 'rgba(168,85,247,0.92)', color: '#fff',
@@ -937,7 +944,7 @@ function EventFeedCard({
       }}>
         <CalendarDays size={10} strokeWidth={2} /> Event
       </span>
-      <div className="feed-card-overlay">
+      <div className="feed-card-overlay" data-cut={isCutoutUrl(photo) || undefined}>
         <p className="feed-card-title">{event.title}</p>
         <div className="feed-card-meta" style={{ gap: 10 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
@@ -971,7 +978,7 @@ function LostFoundFeedCard({
       style={{ aspectRatio: ar, padding: 0 }}
       aria-label={`Open ${lf.title}`}
     >
-      <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+      <img src={photo} alt="" className="feed-card-img" loading="lazy" style={{ background: isCutoutUrl(photo) ? '#fff' : undefined }} />
       <span style={{
         position: 'absolute', top: 10, left: 10,
         background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
@@ -982,7 +989,7 @@ function LostFoundFeedCard({
       }}>
         {lf.status}
       </span>
-      <div className="feed-card-overlay">
+      <div className="feed-card-overlay" data-cut={isCutoutUrl(photo) || undefined}>
         <p className="feed-card-title">{lf.title}</p>
         <div className="feed-card-meta">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>

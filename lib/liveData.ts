@@ -194,7 +194,9 @@ async function uploadOne(
   media: CompressedMedia,
   index: number,
 ): Promise<string> {
-  const ext = media.kind === 'video' ? 'mp4' : 'jpg';
+  // Keep the .png extension for transparent cutouts (bg-removed photos) so the
+  // feed can tell them apart from ordinary opaque photos by their URL.
+  const ext = media.kind === 'video' ? 'mp4' : (media.blob.type === 'image/png' ? 'png' : 'jpg');
   const path = `${uid}/${Date.now()}-${index}.${ext}`;
   const { error } = await supabase.storage.from(bucket).upload(path, media.blob, {
     cacheControl: '3600',

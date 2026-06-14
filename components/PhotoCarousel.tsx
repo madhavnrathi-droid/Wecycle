@@ -239,6 +239,9 @@ export default function PhotoCarousel({
                     display: 'block',
                     userSelect: 'none',
                     pointerEvents: 'none',
+                    /* A bg-removed cut-out (transparent .png) must sit on white,
+                       never let the dark UI show through it. */
+                    background: typeof slide === 'string' && /\.png(\?|$)/i.test(slide) ? '#fff' : undefined,
                   }}
                 />
               )}

@@ -438,6 +438,9 @@ export function LostFoundDetailSheet({
     reward: item.reward,
     description: item.description,
     byName: item.user.name,
+    byInitials: item.user.initials,
+    byColor: item.user.color,
+    verified: item.verified,
     byEmail: item.user.email,
     byPhone: item.user.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/?p=${item.id}` : undefined,
@@ -586,7 +589,7 @@ export function LostFoundDetailSheet({
               <img
                 src={displayPhotoUrl}
                 alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', background: /\.png(\?|$)/i.test(displayPhotoUrl) ? '#fff' : undefined }}
               />
             ) : isOwner ? (
               <button
@@ -691,7 +694,7 @@ export function LostFoundDetailSheet({
               <img
                 src={displayPhotoUrl}
                 alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', background: /\.png(\?|$)/i.test(displayPhotoUrl) ? '#fff' : undefined }}
               />
             ) : isOwner ? (
               <button
