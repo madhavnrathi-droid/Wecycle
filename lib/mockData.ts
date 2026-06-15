@@ -178,6 +178,10 @@ export interface LostItem {
   id: string;
   title: string;
   description: string;
+  /* Lowercased category id (e.g. 'electronics', 'sports', 'other') so the
+   * home-feed category filter can place a lost/found post correctly. Optional
+   * because legacy reports + some demo rows may not carry one. */
+  category?: string;
   status: 'lost' | 'found' | 'claimed';
   lastSeen: string;
   photoColor: string;
@@ -664,6 +668,7 @@ export const MY_EVENT_IDS = ['e3', 'e6'];
 export const LOST_FOUND_ITEMS: LostItem[] = [
   {
     id: 'lf1',
+    category: 'electronics',
     title: 'MacBook Air M2 Charger (USB-C, 30W)',
     description: 'White Apple charger, has a small scratch on the cable. Last seen in F-101 during afternoon lecture.',
     status: 'lost',
@@ -677,6 +682,7 @@ export const LOST_FOUND_ITEMS: LostItem[] = [
   },
   {
     id: 'lf2',
+    category: 'other',
     title: 'Found: Blue Casio Watch',
     description: 'Found near the SAC exit. Has initials "P.S." on the back. Come claim it.',
     status: 'found',
@@ -689,6 +695,7 @@ export const LOST_FOUND_ITEMS: LostItem[] = [
   },
   {
     id: 'lf3',
+    category: 'electronics',
     title: 'Lost: Noise Buds (White TWS Earphones)',
     description: 'Lost at the gym. Left earbud has a tiny sticker. Reward: will swap for my bluetooth speaker.',
     status: 'lost',
@@ -702,6 +709,7 @@ export const LOST_FOUND_ITEMS: LostItem[] = [
   },
   {
     id: 'lf4',
+    category: 'other',
     title: 'Found: Black Wallet (No cash inside)',
     description: 'Has student ID of Anil Sharma (3rd yr EEE). IDs and cards intact. Reach me ASAP.',
     status: 'found',
@@ -714,6 +722,7 @@ export const LOST_FOUND_ITEMS: LostItem[] = [
   },
   {
     id: 'lf5',
+    category: 'lab',
     title: 'Lost: Engineering Drawing Kit',
     description: 'Staedtler box with all instruments. Blue case. Had my name written on it but faded.',
     status: 'lost',
@@ -726,6 +735,7 @@ export const LOST_FOUND_ITEMS: LostItem[] = [
   },
   {
     id: 'lf6',
+    category: 'electronics',
     title: 'Found: Canon Lens Cap (52mm)',
     description: 'Found on the SAC stairs. If yours, tell me the lens it belongs to.',
     status: 'found',

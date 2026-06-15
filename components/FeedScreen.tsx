@@ -253,16 +253,17 @@ export default function FeedScreen({
 
     return merged
       .filter(e => {
-        /* Items + requests carry categories — respect the active filter.
-         * Events and L&F don't have a category field, so they're always
-         * visible regardless of the chip the user picked. This avoids
-         * the "lost football vanishes under the Sports filter" trap
-         * the user flagged: an L&F post without a category shouldn't
-         * disappear just because there's no category to match against. */
+        /* Every kind now respects the active category chip. Items, requests
+         * and Lost & Found posts carry a category, so they appear only under
+         * their own chip (and under "All"). Events have no category, so they
+         * surface only under "All" — never mislabeled inside a goods chip.
+         * A category-less L&F post likewise shows only under "All" instead of
+         * leaking into every chip (the bug where a lost football and a speaker
+         * showed up under "Books"). */
         if (e.kind === 'item')    return matchesCategory(e.item.category) && matchesQuery(e.item.title);
         if (e.kind === 'request') return matchesCategory(e.item.category) && matchesQuery(e.item.title);
-        if (e.kind === 'event')   return matchesQuery(e.event.title);
-        return                              matchesQuery(e.lf.title);
+        if (e.kind === 'event')   return matchesCategory(undefined)       && matchesQuery(e.event.title);
+        return                           matchesCategory(e.lf.category)   && matchesQuery(e.lf.title);
       })
       .sort((a, b) => a.sortKey - b.sortKey);
   }, [items, requests, events, lostFound, activeCategory, query]);

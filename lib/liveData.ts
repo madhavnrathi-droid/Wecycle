@@ -704,6 +704,7 @@ interface LostFoundRowLite {
   user_id: string;
   title: string;
   description: string | null;
+  category_id: string | null;
   status: 'lost' | 'found' | 'claimed' | 'returned';
   last_seen: string | null;
   photo_color: string | null;
@@ -729,6 +730,7 @@ export function mapLostFoundRow(row: LostFoundRowLite): LostItem & { photoUrls?:
     id: row.id,
     title: row.title,
     description: row.description ?? '',
+    category: row.category_id ?? undefined,
     status: (row.status === 'returned' ? 'claimed' : row.status) as LostItem['status'],
     lastSeen: row.last_seen ?? '',
     photoColor: row.photo_color ?? '#1C1C1A',
