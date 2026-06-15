@@ -90,6 +90,13 @@ export default function PhotoCarousel({
     () => photos.some(p => typeof p !== 'string' && p.kind === 'video'),
     [photos],
   );
+  /* A bg-removed cut-out (transparent .png) must sit on WHITE — never the cream
+     surface that shows through its transparent areas. When any slide is a
+     cutout, paint the whole frame white. */
+  const hasCutout = useMemo(
+    () => photos.some(p => typeof p === 'string' && /\.png(\?|$)/i.test(p)),
+    [photos],
+  );
   const activeIsVideo = useMemo(() => {
     const p = photos[active];
     return typeof p !== 'string' && p?.kind === 'video';
@@ -180,6 +187,8 @@ export default function PhotoCarousel({
         position: 'relative',
         overflow: 'hidden',
         cursor: onClick ? 'pointer' : undefined,
+        /* Cut-outs always render on white (overrides the cream frame default). */
+        background: hasCutout ? '#fff' : undefined,
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

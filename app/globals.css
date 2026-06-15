@@ -2668,6 +2668,17 @@ section.mobile-only { display: block; }
   scroll-snap-stop: always;
 }
 
+/* ── Background-removed cut-outs always sit on WHITE ──
+   Cut-outs are transparent PNGs in the `listings` storage bucket. Wherever one
+   renders — feed cards, detail carousel, inventory, storefront, related rails,
+   thumbnails — its transparent pixels must reveal pure white, never the cream
+   surface. This one rule backs every such image with white; opaque .jpg photos
+   never match, and DiceBear avatars (api.dicebear.com/…png) + brand assets
+   (/brand/…png) aren't in this storage path, so they're untouched. */
+img[src*="/object/public/listings/"][src*=".png"] {
+  background: #fff;
+}
+
 .carousel-dots {
   position: absolute;
   left: 0; right: 0;
@@ -2735,7 +2746,10 @@ section.mobile-only { display: block; }
   height: clamp(220px, 42vh, 320px);
   border-radius: 16px;
   overflow: hidden;
-  background: var(--bg-inset);
+  /* WHITE, not the cream surface: a bg-removed cut-out (transparent PNG) is
+     previewed here with object-fit:contain, so any transparent area / letterbox
+     must read as pure white — never another colour. */
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
