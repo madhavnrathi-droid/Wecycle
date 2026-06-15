@@ -85,6 +85,52 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
+/* ── Engagement actions (save · share · report · admin-delete) ──
+ * These live on the SAME ROW as the product name now, NOT in the sticky bar —
+ * the bottom bar is reserved for contacting the seller (email / WhatsApp). */
+function EngagementActions({
+  saved, onToggleSave, onShare, showReport, onReport, showAdminDelete, onAdminDelete, size = 40,
+}: {
+  saved: boolean;
+  onToggleSave: () => void;
+  onShare: () => void;
+  showReport: boolean;
+  onReport: () => void;
+  showAdminDelete: boolean;
+  onAdminDelete: () => void;
+  size?: number;
+}) {
+  const base: React.CSSProperties = {
+    width: size, height: size, borderRadius: 999,
+    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', flexShrink: 0,
+  };
+  const icon = Math.round(size * 0.44);
+  return (
+    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+      <button onClick={onToggleSave} aria-label={saved ? 'Saved' : 'Save'} aria-pressed={saved}
+        style={{ ...base, color: saved ? '#ED2E50' : 'var(--text-secondary)' }}>
+        <Heart size={icon} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
+      </button>
+      <button onClick={onShare} aria-label="Share" style={{ ...base, color: 'var(--text-secondary)' }}>
+        <Share2 size={icon} strokeWidth={1.8} />
+      </button>
+      {showReport && (
+        <button onClick={onReport} aria-label="Report this post" style={{ ...base, color: 'var(--text-muted)' }}>
+          <Flag size={icon} strokeWidth={1.8} />
+        </button>
+      )}
+      {showAdminDelete && (
+        <button onClick={onAdminDelete} aria-label="Admin delete"
+          style={{ ...base, color: '#ED2E50', borderColor: 'rgba(237,46,80,0.4)' }}>
+          <Trash2 size={icon} strokeWidth={1.8} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(item.saved);
@@ -249,6 +295,13 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setDeleting(true);
     try { await onDelete?.(); onBack(); }
     finally { setDeleting(false); }
+  };
+
+  /* Admin moderation delete (admin viewing someone else's post). Window confirm
+     since it's a destructive cross-user action; lives in the title-row actions. */
+  const handleAdminDelete = async () => {
+    if (typeof window !== 'undefined' && !window.confirm('Admin: delete this post permanently?')) return;
+    try { await onDelete?.(); } finally { onBack(); }
   };
 
   /* Count a view once per open for real listings. Fire-and-forget; the next
@@ -462,14 +515,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         }}>
           {item.category}
         </span>
-        <button
-          onClick={handleToggleSave}
-          aria-label={saved ? 'Unsave' : 'Save'}
-          aria-pressed={saved}
-          className="theme-toggle"
-        >
-          <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} color={saved ? '#ED2E50' : undefined} />
-        </button>
+        {/* Save lives in the title row now (with share/report), so the header
+            just needs a spacer to keep the category centred. */}
+        <span style={{ width: 36, flexShrink: 0 }} aria-hidden="true" />
       </header>
 
       {/* ── STICKY TITLE BAR (mobile) ──
@@ -528,14 +576,11 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         ) : (
           <span style={{
             flexShrink: 0,
-            display: 'inline-flex', alignItems: 'center', gap: 3,
-            fontSize: 12, fontWeight: 600,
-            color: isPriced ? 'var(--accent-amber)' : '#16A34A',
-            background: 'var(--bg-card)',
-            padding: '4px 10px', borderRadius: 999,
-            border: '1px solid var(--border-subtle)',
+            display: 'inline-flex', alignItems: 'center', gap: 1,
+            fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em',
+            color: 'var(--text-primary)',
           }}>
-            {isPriced && <IndianRupee size={11} strokeWidth={2.2} />}
+            {isPriced && <IndianRupee size={12} strokeWidth={2.3} />}
             <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
           </span>
         )}
@@ -694,15 +739,31 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         </section>
       ) : (
         <section style={{ padding: '20px 20px 0' }}>
-          <h1 style={{
-            margin: 0,
-            fontSize: 22, fontWeight: 600,
-            letterSpacing: '-0.025em',
-            color: 'var(--text-primary)',
-            lineHeight: 1.2,
-          }}>
-            {item.title}
-          </h1>
+          {/* Title + engagement actions (save · share · report · admin-delete)
+              share the same row. The sticky bottom bar is reserved for
+              contacting the seller (email / WhatsApp). */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <h1 style={{
+              margin: 0,
+              fontSize: 22, fontWeight: 600,
+              letterSpacing: '-0.025em',
+              color: 'var(--text-primary)',
+              lineHeight: 1.2,
+              flex: 1, minWidth: 0,
+            }}>
+              {item.title}
+            </h1>
+            <EngagementActions
+              saved={saved}
+              onToggleSave={handleToggleSave}
+              onShare={handleShare}
+              showReport={!isOwner}
+              onReport={() => setReportOpen(true)}
+              showAdminDelete={!!isAdmin && !isOwner}
+              onAdminDelete={handleAdminDelete}
+              size={40}
+            />
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13, minWidth: 0, flex: 1 }}>
@@ -720,15 +781,13 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 {closedLabelFor(item)}
               </div>
             ) : (
+              /* Price — bold black, no bounding box (reads like a real price). */
               <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 14, fontWeight: 600,
-                color: isPriced ? 'var(--accent-amber)' : '#16A34A',
-                background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
-                padding: '5px 12px',
-                borderRadius: 999,
+                display: 'inline-flex', alignItems: 'center', gap: 1,
+                fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em',
+                color: 'var(--text-primary)',
               }}>
-                {isPriced && <IndianRupee size={12} strokeWidth={2.2} />}
+                {isPriced && <IndianRupee size={16} strokeWidth={2.4} />}
                 <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
               </div>
             )}
@@ -988,73 +1047,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             )
           ) : (
           <>
-          <button
-            onClick={handleToggleSave}
-            aria-label={saved ? 'Saved' : 'Save'}
-            aria-pressed={saved}
-            style={{
-              width: 52, height: 52, borderRadius: 999,
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: saved ? '#ED2E50' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
-          </button>
-          {isAdmin && (
-            <button
-              onClick={async () => {
-                if (typeof window !== 'undefined' && !window.confirm('Admin: delete this post permanently?')) return;
-                try { await onDelete?.(); } finally { onBack(); }
-              }}
-              aria-label="Admin delete"
-              style={{
-                width: 52, height: 52, borderRadius: 999,
-                background: '#ED2E50', color: '#fff',
-                border: 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', flexShrink: 0,
-              }}
-            >
-              <Trash2 size={18} strokeWidth={2} />
-            </button>
-          )}
-          <button
-            aria-label="Share"
-            onClick={handleShare}
-            style={{
-              width: 52, height: 52, borderRadius: 999,
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <Share2 size={18} strokeWidth={1.8} />
-          </button>
-          {!isOwner && (
-            <button
-              aria-label="Report this post"
-              onClick={() => setReportOpen(true)}
-              style={{
-                width: 52, height: 52, borderRadius: 999,
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              <Flag size={18} strokeWidth={1.8} />
-            </button>
-          )}
-          {/* ── Contact options — Email (primary, always present) + WhatsApp when owner opted in. */}
+          {/* ── Contact the seller — the ONLY thing in the sticky bar now.
+              Email is ALWAYS present (every member has an email on file); when
+              the seller also opts into WhatsApp the two CTAs split the row.
+              Save / share / report / admin-delete moved up to the title row. */}
           {!item.isClosed && contactLinks.map(link => (
             <button
               key={link.channel}
@@ -1271,14 +1267,11 @@ function DesktopLayout({
             ) : (
               <span style={{
                 flexShrink: 0,
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-                fontSize: 12, fontWeight: 600,
-                color: isPriced ? 'var(--accent-amber)' : '#16A34A',
-                background: 'var(--bg-card)',
-                padding: '4px 10px', borderRadius: 999,
-                border: '1px solid var(--border-subtle)',
+                display: 'inline-flex', alignItems: 'center', gap: 1,
+                fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em',
+                color: 'var(--text-primary)',
               }}>
-                {isPriced && <IndianRupee size={11} strokeWidth={2.2} />}
+                {isPriced && <IndianRupee size={13} strokeWidth={2.3} />}
                 <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
               </span>
             )}
@@ -1515,17 +1508,14 @@ function DesktopLayout({
                 onPriceStr={setEPriceStr}
               />
             ) : (
+              /* Price — bold black, no bounding box. */
               <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 18, fontWeight: 700,
-                color: isPriced ? 'var(--accent-amber)' : '#16A34A',
-                background: isPriced ? 'rgba(245,132,0,0.10)' : 'rgba(34,197,94,0.10)',
-                padding: '6px 14px',
-                borderRadius: 999,
-                letterSpacing: '-0.01em',
+                display: 'inline-flex', alignItems: 'center', gap: 2,
+                fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em',
+                color: 'var(--text-primary)',
               }}>
-                {isPriced && <IndianRupee size={14} strokeWidth={2.2} />}
-                <span>{isPriced ? item.price : priceLabel}</span>
+                {isPriced && <IndianRupee size={18} strokeWidth={2.4} />}
+                <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
               </div>
             )}
             {canManage && isRequestPost && (
