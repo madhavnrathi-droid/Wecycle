@@ -2669,13 +2669,16 @@ section.mobile-only { display: block; }
 }
 
 /* ── Background-removed cut-outs always sit on WHITE ──
-   Cut-outs are transparent PNGs in the `listings` storage bucket. Wherever one
-   renders — feed cards, detail carousel, inventory, storefront, related rails,
-   thumbnails — its transparent pixels must reveal pure white, never the cream
-   surface. This one rule backs every such image with white; opaque .jpg photos
-   never match, and DiceBear avatars (api.dicebear.com/…png) + brand assets
-   (/brand/…png) aren't in this storage path, so they're untouched. */
-img[src*="/object/public/listings/"][src*=".png"] {
+   A cut-out is a transparent image whose see-through pixels reveal whatever is
+   behind it. The extension is NOT a reliable signal — some cut-outs were stored
+   with a .jpg name yet are genuinely transparent PNG bytes — so we key off the
+   STORAGE PATH instead: every user-uploaded photo (listings, lost-&-found,
+   events) gets a white backing. Opaque photos are unaffected (the image hides
+   the white); transparent cut-outs reveal white instead of the cream card or a
+   dark thumbnail/rail container. DiceBear avatars (api.dicebear.com/…png) and
+   brand assets (/brand/…png) aren't under this storage path, so they're left
+   alone. */
+img[src*="/storage/v1/object/public/"] {
   background: #fff;
 }
 
