@@ -4139,7 +4139,7 @@ textarea:focus-visible {
   from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(6px); }
   to   { opacity: 1; transform: none; filter: blur(0); }
 }
-.motion-rise { animation: glass-rise 0.5s var(--ease-glass) both; }
+.motion-rise { animation: glass-rise 0.5s var(--ease-glass) backwards; }
 
 /* ═══════════════════════════════════════════════
    MOTION REFINEMENT  (slower · smoother · Apple HIG)
@@ -4192,7 +4192,7 @@ textarea:focus-visible {
 .modal-body > *:nth-child(n+6) { animation-delay: 0.30s; }
 
 /* Screen entrance: a touch slower + calmer */
-.motion-rise { animation: glass-rise 0.6s var(--ease-emphasized) both; }
+.motion-rise { animation: glass-rise 0.6s var(--ease-emphasized) backwards; }
 
 /* Specular sweep: slower, glossier roll */
 .bottom-nav-post::after { transition: transform 0.85s var(--ease-emphasized); }
