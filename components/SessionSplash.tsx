@@ -24,8 +24,8 @@ import { useLayoutEffect, useEffect, useState } from 'react';
 
 const LAST_ACTIVE_KEY = 'wecycle.lastActive';
 const SESSION_GAP_MS = 30 * 60 * 1000; /* 30 min away ⇒ new session */
-const HOLD_MS = 1300;                  /* fully-visible dwell */
-const FADE_MS = 560;                   /* fade-out duration */
+const HOLD_MS = 1400;                  /* fully-visible dwell */
+const FADE_MS = 640;                   /* fade-out duration */
 const HEARTBEAT_MS = 60 * 1000;        /* keep an active session "fresh" */
 
 /* useLayoutEffect warns during SSR; fall back to useEffect on the server so the
@@ -138,13 +138,24 @@ export default function SessionSplash() {
           background-size: 220% 220%;
           animation: wc-splash-shift 10s ease-in-out infinite;
           opacity: 1;
-          transition: opacity ${FADE_MS}ms ease;
-          will-change: opacity;
+          transform: scale(1);
+          /* Glossy dismiss — eases away while scaling up a touch, like an
+             app-launch splash handing off to the UI. */
+          transition: opacity ${FADE_MS}ms cubic-bezier(0.33, 0, 0.2, 1),
+                      transform ${FADE_MS}ms cubic-bezier(0.33, 0, 0.2, 1);
+          will-change: opacity, transform;
           /* iOS safe areas — gradient bleeds edge to edge regardless */
           padding: env(safe-area-inset-top) env(safe-area-inset-right)
                    env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
-        .wc-splash[data-hide] { opacity: 0; pointer-events: none; }
+        .wc-splash[data-hide] {
+          opacity: 0;
+          transform: scale(1.08);
+          pointer-events: none;
+        }
+        /* Freeze the logo's breathing the moment we start dismissing, so the
+           fade is a single clean motion (no competing scale). */
+        .wc-splash[data-hide] .wc-splash-mark { animation-play-state: paused; }
 
         /* Drifting aurora blobs (blue / teal / mint / green) layered over the
            base on their own slow clock — the "shader" movement. */
@@ -172,16 +183,34 @@ export default function SessionSplash() {
           pointer-events: none;
         }
 
-        .wc-splash-mark {
+        /* Wrapper carries the MOTION only (scale-in + breathe). Keeping the
+           animation off the painted mark means the colour pipeline never
+           re-rasterises mid-frame — which is what made the old filtered <img>
+           flicker black↔white. */
+        /* Static container — carries ONLY the soft shadow, never a transform or
+           a colour filter, so nothing re-rasterises the mark mid-animation. */
+        .wc-splash-logo {
           position: relative;
           z-index: 1;
+          display: block;
+          line-height: 0;
+          filter: drop-shadow(0 6px 26px rgba(0, 0, 0, 0.28));
+        }
+        /* Pure-white logomark via an ALPHA MASK of the source PNG — the white is
+           a static background colour (no brightness/invert filter chain), so it
+           is rock-stable while it scales. Explicit square size avoids the
+           %-of-flex-item collapse. */
+        .wc-splash-mark {
+          display: block;
           width: clamp(96px, 26vw, 132px);
-          height: auto;
-          /* Knock the blue-green logomark out to pure white. */
-          filter: brightness(0) invert(1) drop-shadow(0 6px 26px rgba(0, 0, 0, 0.28));
+          height: clamp(96px, 26vw, 132px);
+          background-color: #fff;
+          -webkit-mask: url(/brand/logomark.png) center / contain no-repeat;
+                  mask: url(/brand/logomark.png) center / contain no-repeat;
           animation:
             wc-splash-mark-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both,
             wc-splash-breathe 3.4s ease-in-out 0.6s infinite;
+          will-change: transform, opacity;
           user-select: none;
         }
 
@@ -192,8 +221,9 @@ export default function SessionSplash() {
         }
       `}</style>
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="wc-splash-mark" src="/brand/logomark.png" alt="" draggable={false} />
+      <div className="wc-splash-logo">
+        <span className="wc-splash-mark" aria-hidden="true" />
+      </div>
     </div>
   );
 }
