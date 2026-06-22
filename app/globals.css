@@ -22,7 +22,9 @@
   /* Text — high contrast hierarchy */
   --text-primary: #0E0E08;
   --text-secondary: #5A5950;
-  --text-muted: #989688;
+  /* Darkened from #989688 (~2.85:1 on cream — failed WCAG AA) to clear AA for
+     small text. Stays lighter than --text-secondary so the hierarchy holds. */
+  --text-muted: #6E6C62;
   --text-on-accent: #0C0C0B;
 
   /* Accents — calibrated for light surfaces */

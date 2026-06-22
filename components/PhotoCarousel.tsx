@@ -121,6 +121,13 @@ export default function PhotoCarousel({
     };
   }, [photos.length]);
 
+  /* Clamp the active index when the photos array shrinks (photo removed or a
+     shorter re-fetch) so photos[active] never points past the end → no blank
+     active slide / missing dot. */
+  useEffect(() => {
+    setActive(a => Math.min(a, Math.max(0, photos.length - 1)));
+  }, [photos.length]);
+
   /* Track whether the frame is on-screen so we don't autoplay a video that
      scrolled out of view (would burn the user's battery on long feeds). */
   useEffect(() => {

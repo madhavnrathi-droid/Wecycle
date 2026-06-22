@@ -5,11 +5,11 @@
   "launcherName": "Wecycle",
   "display": "standalone",
   "themeColor": "#FAFAF6",
-  "themeColorDark": "#0C0C0B",
+  "themeColorDark": "#FAFAF6",
   "navigationColor": "#FAFAF6",
-  "navigationColorDark": "#0C0C0B",
+  "navigationColorDark": "#FAFAF6",
   "navigationDividerColor": "#FAFAF6",
-  "navigationDividerColorDark": "#0C0C0B",
+  "navigationDividerColorDark": "#FAFAF6",
   "backgroundColor": "#FAFAF6",
   "enableNotifications": false,
   "startUrl": "/",
@@ -19,8 +19,8 @@
     "path": "./android.keystore",
     "alias": "wecycle"
   },
-  "appVersionName": "yes",
-  "appVersionCode": 2,
+  "appVersionName": "1.0.0",
+  "appVersionCode": 3,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://wecycle-seven.vercel.app/manifest.json",
@@ -39,6 +39,6 @@
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "displayOverride": [],
-  "appVersion": "yes",
+  "appVersion": "1.0.0",
   "splashScreenFadeOutDuration": 300
 }

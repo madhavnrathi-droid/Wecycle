@@ -37,6 +37,19 @@ export async function POST(req: Request) {
     );
   }
 
+  /* Same-origin guard. This endpoint spends paid remove.bg credits, so we
+     refuse callers that aren't our own app — other sites hotlinking it, or
+     drive-by scripts with no Origin/Referer. The in-app photo picker always
+     runs same-origin, so legitimate use is unaffected. (Auth + per-user rate
+     limiting is the stronger follow-up; this is the zero-regression guard.) */
+  const host = req.headers.get('host');
+  const srcRef = req.headers.get('origin') || req.headers.get('referer');
+  let srcHost: string | null = null;
+  if (srcRef) { try { srcHost = new URL(srcRef).host; } catch { /* malformed */ } }
+  if (!host || srcHost !== host) {
+    return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
+  }
+
   let form: FormData;
   try {
     form = await req.formData();

@@ -149,7 +149,7 @@ export default function AlertFormModal({
             type="submit"
             form="alert-form"
             disabled={!!submitting}
-            className="btn btn-primary"
+            className="btn btn-gradient"
             style={{ flex: 2, gap: 6 }}
           >
             <Bell size={14} strokeWidth={2} />

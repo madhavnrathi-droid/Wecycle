@@ -1396,10 +1396,13 @@ export async function searchUsers(q: string, limit = 8): Promise<UserSearchHit[]
   const safe = trimmed.replace(/[%,()]/g, ' ');
   const pat = `%${safe}%`;
 
+  /* Search by NAME only, and never select email / college_id here — a public
+     user search must not let anyone enumerate students' emails or roll numbers
+     (PII). Contact details are fetched only when a signed-in user opens a post. */
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, initials, avatar_color, email, college_id, role, department, is_online, hide_listings_from_search')
-    .or(`full_name.ilike.${pat},email.ilike.${pat},college_id.ilike.${pat}`)
+    .select('id, full_name, initials, avatar_color, role, department, is_online, hide_listings_from_search')
+    .ilike('full_name', pat)
     .limit(limit);
   if (error || !data) return [];
 
@@ -1408,8 +1411,6 @@ export async function searchUsers(q: string, limit = 8): Promise<UserSearchHit[]
     full_name: string | null;
     initials: string | null;
     avatar_color: string | null;
-    email: string | null;
-    college_id: string | null;
     role: string | null;
     department: string | null;
     is_online: boolean | null;
@@ -1419,11 +1420,9 @@ export async function searchUsers(q: string, limit = 8): Promise<UserSearchHit[]
     .filter(r => !r.hide_listings_from_search)
     .map(r => ({
       id: r.id,
-      name: r.full_name || r.email?.split('@')[0] || 'Wecycle member',
+      name: r.full_name || 'Wecycle member',
       initials: r.initials || (r.full_name?.[0] ?? 'W').toUpperCase(),
       avatarColor: r.avatar_color || '#6C63FF',
-      email: r.email ?? undefined,
-      collegeId: r.college_id ?? undefined,
       role: r.role ?? undefined,
       department: r.department ?? undefined,
       isOnline: r.is_online ?? false,

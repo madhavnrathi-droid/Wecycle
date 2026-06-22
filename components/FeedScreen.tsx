@@ -266,7 +266,7 @@ export default function FeedScreen({
         return                           matchesCategory(e.lf.category)   && matchesQuery(e.lf.title);
       })
       .sort((a, b) => a.sortKey - b.sortKey);
-  }, [items, requests, events, lostFound, activeCategory, query]);
+  }, [items, requests, events, lostFound, activeCategory, query, blocked]);
 
   const greetingName = (profile?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0];
 

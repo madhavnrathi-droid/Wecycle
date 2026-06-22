@@ -466,6 +466,14 @@ export function LostFoundDetailSheet({
     setEReward(item.reward ?? '');
   }, [item.id, item.title, item.description, item.status, item.lastSeen, item.reward]);
 
+  /* Escape closes the detail sheet — matches the shared Modal so keyboard users
+     aren't trapped (the sheet has a Close button but no key handler otherwise). */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const isDirty =
     eTitle !== item.title ||
     eDescription !== (item.description ?? '') ||

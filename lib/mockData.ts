@@ -221,7 +221,7 @@ export interface ImpactMetric {
 export const COMMUNITIES: Community[] = [
   {
     id: 'bits-goa',
-    name: 'BITS Pilani Goa',
+    name: 'Manipal Academy of Higher Education',
     type: 'campus',
     location: 'Goa, India',
     memberCount: 1847,
@@ -256,7 +256,7 @@ export const COMMUNITIES: Community[] = [
 export const USERS: User[] = [
   {
     id: 'u1', name: 'Ananya Sharma', initials: 'AS', color: '#6C63FF',
-    role: 'Design Student', community: 'BITS Goa', joinedDaysAgo: 142,
+    role: 'Design Student', community: 'MAHE', joinedDaysAgo: 142,
     itemsShared: 23, itemsReceived: 18, impactScore: 847,
     badges: ['Pioneer', 'Top Sharer', 'Green Star'], isOnline: true,
     email: 'ananya.sharma@learner.manipal.edu', phone: '+919812340001',
@@ -264,7 +264,7 @@ export const USERS: User[] = [
   },
   {
     id: 'u2', name: 'Rahul Mehta', initials: 'RM', color: '#FF6B80',
-    role: 'CS Senior', community: 'BITS Goa', joinedDaysAgo: 89,
+    role: 'CS Senior', community: 'MAHE', joinedDaysAgo: 89,
     itemsShared: 14, itemsReceived: 11, impactScore: 521,
     badges: ['Repair Hero', 'Connector'], isOnline: true,
     email: 'rahul.mehta@learner.manipal.edu', phone: '+919812340002',
@@ -272,7 +272,7 @@ export const USERS: User[] = [
   },
   {
     id: 'u3', name: 'Priya Nair', initials: 'PN', color: '#3DD6F5',
-    role: 'EEE Junior', community: 'BITS Goa', joinedDaysAgo: 203,
+    role: 'EEE Junior', community: 'MAHE', joinedDaysAgo: 203,
     itemsShared: 31, itemsReceived: 27, impactScore: 1124,
     badges: ['Pioneer', 'Impact Leader', 'Community Hero', 'Top Sharer'], isOnline: false,
     email: 'priya.nair@learner.manipal.edu',
@@ -281,7 +281,7 @@ export const USERS: User[] = [
   },
   {
     id: 'u4', name: 'Karan Singh', initials: 'KS', color: '#C8FF4D',
-    role: 'Mech Engineer', community: 'BITS Goa', joinedDaysAgo: 67,
+    role: 'Mech Engineer', community: 'MAHE', joinedDaysAgo: 67,
     itemsShared: 8, itemsReceived: 12, impactScore: 342,
     badges: ['Fixer'], isOnline: true,
     email: 'karan.singh@learner.manipal.edu', phone: '+919812340004',
@@ -289,7 +289,7 @@ export const USERS: User[] = [
   },
   {
     id: 'u5', name: 'Meera Iyer', initials: 'MI', color: '#FF9A40',
-    role: 'BioTech Research', community: 'BITS Goa', joinedDaysAgo: 178,
+    role: 'BioTech Research', community: 'MAHE', joinedDaysAgo: 178,
     itemsShared: 19, itemsReceived: 15, impactScore: 712,
     badges: ['Lab Connector', 'Green Star'], isOnline: false,
     email: 'meera.iyer@learner.manipal.edu', phone: '+919812340005',
@@ -298,7 +298,7 @@ export const USERS: User[] = [
   },
   {
     id: 'u6', name: 'Aditya Kumar', initials: 'AK', color: '#A855F7',
-    role: 'Physics PhD', community: 'BITS Goa', joinedDaysAgo: 310,
+    role: 'Physics PhD', community: 'MAHE', joinedDaysAgo: 310,
     itemsShared: 42, itemsReceived: 38, impactScore: 1876,
     badges: ['Pioneer', 'Top Sharer', 'Community Hero', 'Impact Leader', 'Fixer'], isOnline: true,
     email: 'aditya.kumar@learner.manipal.edu', phone: '+919812340006',
@@ -306,7 +306,7 @@ export const USERS: User[] = [
   },
   {
     id: 'u7', name: 'Sneha Patel', initials: 'SP', color: '#22C55E',
-    role: 'Management Student', community: 'BITS Goa', joinedDaysAgo: 55,
+    role: 'Management Student', community: 'MAHE', joinedDaysAgo: 55,
     itemsShared: 6, itemsReceived: 9, impactScore: 218,
     badges: ['Newcomer'], isOnline: false,
     email: 'sneha.patel@learner.manipal.edu', phone: '+919812340007',
@@ -314,7 +314,7 @@ export const USERS: User[] = [
   },
   {
     id: 'u8', name: 'Dev Malhotra', initials: 'DM', color: '#F472B6',
-    role: 'Architecture', community: 'BITS Goa', joinedDaysAgo: 125,
+    role: 'Architecture', community: 'MAHE', joinedDaysAgo: 125,
     itemsShared: 17, itemsReceived: 14, impactScore: 589,
     badges: ['Space Maker', 'Green Star'], isOnline: true,
     email: 'dev.malhotra@learner.manipal.edu', phone: '+919812340008',
@@ -337,7 +337,7 @@ export const FEED_ITEMS: FeedItem[] = [
       title: '3,000 Items Circulated!',
       metric: 'Community Milestone',
       value: '3,240',
-      description: 'BITS Goa has circulated 3,240 items this semester — preventing 8.4 tonnes of waste.',
+      description: 'MAHE has circulated 3,240 items this semester — preventing 8.4 tonnes of waste.',
     },
   },
   {
@@ -577,7 +577,7 @@ export const EVENTS: CommunityEvent[] = [
     eventType: 'swap',
     date: 'Sat, 17 May 2025',
     time: '10:00 AM – 4:00 PM',
-    location: 'SAC Lawn, BITS Goa',
+    location: 'SAC Lawn, MIT Manipal',
     attendees: 87,
     maxAttendees: 200,
     colorAccent: '#C8FF4D',

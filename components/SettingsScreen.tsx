@@ -74,9 +74,27 @@ export default function SettingsScreen({
        finger — they don't have to wait for the next paint or close the tab. */
     if (patch.largerText !== undefined) applyLargerText(patch.largerText);
   };
+  /* Privacy + contact prefs are local-first (instant UI) but ALSO mirrored to
+     the user's profile row so they actually take effect server-side — the
+     storefront, the post contact buttons, and RLS all read these columns.
+     Fire-and-forget; a failed sync never blocks the toggle. Skipped in demo. */
+  const persistProfile = (cols: Record<string, unknown>) => {
+    if (isDemo || !user) return;
+    supabase.from('profiles').update(cols as never).eq('id', user.id)
+      .then(({ error }) => { if (error) console.warn('[settings] profile sync failed:', error.message); });
+  };
+  const PRIVACY_COLS: Record<string, string> = {
+    showOnlineStatus: 'show_online_status',
+    allowDMs: 'allow_dms',
+    showPhone: 'show_phone_on_profile',
+    hideListingsFromSearch: 'hide_listings_from_search',
+  };
   const setPrivacy = (patch: Partial<UserSettings['privacy']>) => {
     fireSettings('privacy', patch as Record<string, unknown>);
     saveSettings({ privacy: { ...settings.privacy, ...patch } });
+    const cols: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) if (PRIVACY_COLS[k]) cols[PRIVACY_COLS[k]] = v;
+    if (Object.keys(cols).length) persistProfile(cols);
   };
   const setMarketplace = (patch: Partial<UserSettings['marketplace']>) => {
     fireSettings('marketplace', patch as Record<string, unknown>);
@@ -85,6 +103,10 @@ export default function SettingsScreen({
   const setContact = (patch: Partial<UserSettings['contact']>) => {
     fireSettings('contact', patch as Record<string, unknown>);
     saveSettings({ contact: { ...settings.contact, ...patch } });
+    const cols: Record<string, unknown> = {};
+    if (patch.email !== undefined) cols.contact_email_enabled = patch.email;
+    if (patch.whatsapp !== undefined) cols.contact_whatsapp_enabled = patch.whatsapp;
+    if (Object.keys(cols).length) persistProfile(cols);
   };
 
   const clearCache = () => {

@@ -113,7 +113,7 @@ const STEPS: TourStep[] = [
     selector: '[data-tour="topnav-account"]',
     title: 'Your profile & settings',
     body:
-      'Tap your avatar for your storefront, settings, theme, and contact preferences.',
+      'Tap your avatar for your storefront, settings, and contact preferences.',
     screen: 'feed',
     placement: 'bottom',
   },
@@ -169,8 +169,14 @@ export default function OnboardingTour({ onJumpTo, onClose }: Props) {
     const timers: ReturnType<typeof setTimeout>[] = [];
     const update = () => {
       const el = document.querySelector<HTMLElement>(current.selector!);
-      if (el) {
-        const r = el.getBoundingClientRect();
+      const r = el ? el.getBoundingClientRect() : null;
+      /* A node can exist yet be unmeasurable: steps that target the
+       * `.mobile-only-nav` resolve a real element on desktop, but it's
+       * `display:none` there, so getBoundingClientRect() is a 0×0 box. Drawing
+       * a halo around that collapses the ring into a broken dot/line. Treat a
+       * zero-size rect exactly like a missing target — fall back to the
+       * centered, no-spotlight card (the `rect === null` render path). */
+      if (el && r && (r.width !== 0 || r.height !== 0)) {
         setRect(r);
         /* Match the target's real corner shape. The active nav button is a
          * full pill (border-radius:999px) — a fixed 14px halo around it looks

@@ -347,7 +347,7 @@ function CommunityImpactTab() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: '0 0 1px', fontSize: 16, fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
-            BITS Pilani Goa
+            Manipal Academy of Higher Education
           </p>
           <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
             1,847 members · since 2023
