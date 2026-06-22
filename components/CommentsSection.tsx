@@ -16,10 +16,11 @@
  * Persistence is the in-memory store in lib/comments.ts. Replace with Supabase
  * later — the Comment shape already matches what the table will look like. */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Send, CornerDownRight, Trash2, Flag } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { addComment, deleteComment, getComments, timeAgo, type Comment } from '../lib/comments';
+import { fetchComments, createComment, removeComment, timeAgo, type Comment } from '../lib/comments';
+import type { FeedEntityType } from '../lib/api/feed';
 import { track, EVT } from '../lib/analytics';
 import { USERS, type User } from '../lib/mockData';
 import { getAvatar } from '../lib/photos';
@@ -27,26 +28,36 @@ import ReportSheet from './ReportSheet';
 
 interface CommentsSectionProps {
   postId: string;
+  /** Which feed entity the postId refers to — keys the comments table row. */
+  entityType: FeedEntityType;
   onRequireAuth: () => void;
   /** When provided, tapping a commenter's name/avatar opens their storefront. */
   onOpenStorefront?: (user: User) => void;
 }
 
-export default function CommentsSection({ postId, onRequireAuth, onOpenStorefront }: CommentsSectionProps) {
-  const { user, profile, isAdmin } = useAuth();
+export default function CommentsSection({ postId, entityType, onRequireAuth, onOpenStorefront }: CommentsSectionProps) {
+  const { user, profile, isAdmin, isDemo } = useAuth();
   const [reportTarget, setReportTarget] = useState<{ commentId: string; commentAuthorId: string; preview: string } | null>(null);
-  const handleDelete = (c: Comment) => {
-    if (typeof window !== 'undefined' && !window.confirm('Admin: delete this comment?')) return;
-    deleteComment(postId, c.id);
-    setComments(getComments(postId));
-  };
-  const [comments, setComments] = useState<Comment[]>(() => getComments(postId));
+  const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  /* Re-fetch when the post changes (component is re-used between detail pages). */
-  useEffect(() => { setComments(getComments(postId)); }, [postId]);
+  /* Load + reload comments for this post. Demo reads the in-memory store; live
+     mode reads the `comments` table (author resolved via the profiles join).
+     Re-runs when the post / entity / mode changes. */
+  const reload = useCallback(() => {
+    let alive = true;
+    fetchComments(postId, entityType, isDemo).then(rows => { if (alive) setComments(rows); });
+    return () => { alive = false; };
+  }, [postId, entityType, isDemo]);
+  useEffect(() => reload(), [reload]);
+
+  const handleDelete = async (c: Comment) => {
+    if (typeof window !== 'undefined' && !window.confirm('Admin: delete this comment?')) return;
+    await removeComment(postId, c.id, entityType, isDemo);
+    reload();
+  };
 
   /* Group: top-level → replies map. We don't expect deep recursion, so a single
      pass is enough. */
@@ -106,30 +117,36 @@ export default function CommentsSection({ postId, onRequireAuth, onOpenStorefron
     setDraft('');
   };
 
-  const submit = () => {
+  const submit = async () => {
     const body = draft.trim();
     if (!body) return;
     if (!user || !me) { onRequireAuth(); return; }
-    const mentions = replyTo
-      ? [{ userId: replyTo.author.id, name: replyTo.author.name }]
+    const wasReplyingTo = replyTo;
+    const mentions = wasReplyingTo
+      ? [{ userId: wasReplyingTo.author.id, name: wasReplyingTo.author.name }]
       : undefined;
-    addComment({
-      postId,
-      author: me,
-      body,
-      parentId: replyTo?.id,
-      mentions,
-    });
+    /* Clear the composer optimistically — the reload repaints with the
+       persisted row (real id + createdAt, live author from the DB join). */
+    setDraft('');
+    setReplyTo(null);
+    const created = await createComment(
+      { postId, entityType, author: me, body, parentId: wasReplyingTo?.id, mentions },
+      isDemo,
+    );
+    if (!created) {
+      /* Write failed (network / not signed in) — restore the draft + reply
+         target so the user doesn't lose what they typed. */
+      setDraft(body);
+      setReplyTo(wasReplyingTo);
+      return;
+    }
     track(EVT.comment_posted, {
       post_id: postId,
-      is_reply: !!replyTo,
+      is_reply: !!wasReplyingTo,
       body_length: body.length,
       has_mention: !!mentions?.length,
     });
-    /* Refresh from the store so we pick up the auto-generated id + createdAt */
-    setComments(getComments(postId));
-    setDraft('');
-    setReplyTo(null);
+    reload();
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

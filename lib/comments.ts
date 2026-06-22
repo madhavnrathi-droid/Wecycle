@@ -12,6 +12,8 @@
  */
 
 import { USERS, type User } from './mockData';
+import { supabase } from './supabase';
+import type { FeedEntityType } from './api/feed';
 
 export interface Comment {
   id: string;
@@ -113,4 +115,112 @@ export function timeAgo(iso: string, now: Date = new Date()): string {
   const d = Math.floor(h / 24);
   if (d < 7)  return `${d}d ago`;
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/* ── Live (Supabase-backed) comments ─────────────────────────────────────
+   Demo mode keeps using the in-memory store above. Live mode reads/writes the
+   `comments` table; both return the same `Comment` shape so the UI never
+   branches on mode itself — it just passes `isDemo` through. */
+
+const COMMENT_SELECT =
+  'id, entity_id, parent_comment_id, body, created_at, ' +
+  'author:profiles!comments_user_id_fkey(id, full_name, initials, avatar_color, role)';
+
+interface CommentRow {
+  id: string;
+  entity_id: string;
+  parent_comment_id: string | null;
+  body: string;
+  created_at: string;
+  author: {
+    id: string;
+    full_name: string | null;
+    initials: string | null;
+    avatar_color: string | null;
+    role: string | null;
+  } | null;
+}
+
+function rowToComment(r: CommentRow): Comment {
+  const a = r.author;
+  return {
+    id: r.id,
+    postId: r.entity_id,
+    body: r.body,
+    createdAt: r.created_at,
+    parentId: r.parent_comment_id ?? undefined,
+    author: {
+      id: a?.id ?? 'unknown',
+      name: a?.full_name || 'Wecycle member',
+      initials: a?.initials || (a?.full_name?.[0] ?? 'W').toUpperCase(),
+      color: a?.avatar_color || '#6C63FF',
+      role: a?.role || 'Member',
+      community: '',
+      joinedDaysAgo: 0,
+      itemsShared: 0,
+      itemsReceived: 0,
+      impactScore: 0,
+      badges: [],
+      isOnline: false,
+    },
+  };
+}
+
+/** Load every comment (top-level + replies) for a post. Demo → in-memory. */
+export async function fetchComments(
+  postId: string, entityType: FeedEntityType, isDemo: boolean,
+): Promise<Comment[]> {
+  if (isDemo) return getComments(postId);
+  const { data, error } = await supabase
+    .from('comments')
+    .select(COMMENT_SELECT)
+    .eq('entity_type', entityType)
+    .eq('entity_id', postId)
+    .order('created_at', { ascending: true });
+  if (error || !data) return [];
+  return (data as unknown as CommentRow[]).map(rowToComment);
+}
+
+/** Post a comment. Demo → in-memory; live → insert (author = the auth user;
+    RLS enforces user_id = auth.uid()). Returns the persisted comment, or null
+    if the write failed (network / not signed in). */
+export async function createComment(
+  input: {
+    postId: string; entityType: FeedEntityType; author: User;
+    body: string; parentId?: string; mentions?: { userId: string; name: string }[];
+  },
+  isDemo: boolean,
+): Promise<Comment | null> {
+  if (isDemo) {
+    return addComment({
+      postId: input.postId, author: input.author, body: input.body,
+      parentId: input.parentId, mentions: input.mentions,
+    });
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({
+      user_id: user.id,
+      entity_type: input.entityType,
+      entity_id: input.postId,
+      body: input.body,
+      parent_comment_id: input.parentId ?? null,
+    })
+    .select(COMMENT_SELECT)
+    .single();
+  if (error || !data) return null;
+  return rowToComment(data as unknown as CommentRow);
+}
+
+/** Delete a comment (+ its replies). Demo → in-memory; live → DB delete. RLS
+    permits own-comment or admin; replies are removed by the self-FK ON DELETE
+    CASCADE. */
+export async function removeComment(
+  postId: string, commentId: string, _entityType: FeedEntityType, isDemo: boolean,
+): Promise<boolean> {
+  if (isDemo) return deleteComment(postId, commentId);
+  const { error } = await supabase.from('comments').delete().eq('id', commentId);
+  return !error;
 }

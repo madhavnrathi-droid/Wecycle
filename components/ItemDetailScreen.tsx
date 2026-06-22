@@ -913,7 +913,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
 
       {/* ── COMMENTS (mobile) ── */}
       <section style={{ padding: '20px 20px 0' }}>
-        <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
+        <CommentsSection postId={item.id} entityType={item.isRequest ? 'request' : 'listing'} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
       </section>
 
       {/* ── RELATED SHELF (Amazon-style rails) ── */}
@@ -1811,7 +1811,7 @@ function DesktopLayout({
 
           {/* Comments thread — full width below the right column on desktop */}
           <div style={{ marginTop: 8 }}>
-            <CommentsSection postId={item.id} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
+            <CommentsSection postId={item.id} entityType={item.isRequest ? 'request' : 'listing'} onRequireAuth={onRequireAuth} onOpenStorefront={onOpenStorefront} />
           </div>
         </div>
       </div>

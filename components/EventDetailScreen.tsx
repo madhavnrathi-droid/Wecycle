@@ -716,6 +716,7 @@ export default function EventDetailScreen({
       <section style={{ padding: '24px 20px 0' }}>
         <CommentsSection
           postId={event.id}
+          entityType="event"
           onRequireAuth={onRequireAuth}
           onOpenStorefront={onOpenStorefront}
         />
