@@ -13,6 +13,7 @@ import type { LostItem } from '../lib/mockData';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, itemAction, actionLabel, type ContactLink } from '../lib/contactUser';
+import { useOwnerContact } from '../lib/useOwnerContact';
 import {
   incrementListingView, toggleListingSave,
   updateListingFields, repostListing,
@@ -341,20 +342,25 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
      otherwise derived from the listing type. */
   const action = isRequest ? 'request' as const : itemAction(item);
 
+  /* Owner contact (email/phone) resolved on demand — the raw columns are locked
+     down at the DB so the feed no longer carries them. Demo uses the mock
+     user's values; live fetches the one owner via the get_contact RPC. */
+  const ownerContact = useOwnerContact(item.user.id, { email: item.user.email, phone: item.user.phone });
+
   /* Resolve contact channels the owner has accepted. We compute these
      unconditionally so logged-out viewers see the right *number* of buttons
      (just blurred behind an auth prompt); only the actual link is gated. */
   const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
     owner: {
       name:    item.user.name,
-      email:   item.user.email,
-      phone:   item.user.phone,
+      email:   ownerContact.email,
+      phone:   ownerContact.phone,
       contact: item.user.contact,
     },
     action,
     item,
     viewerName: profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined,
-  }), [item, profile, user, action]);
+  }), [item, profile, user, action, ownerContact.email, ownerContact.phone]);
 
   const primaryActionLabel = actionLabel(action);
 
@@ -402,8 +408,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     byInitials: item.user.initials,
     byColor: item.user.color,
     verified: true,
-    byEmail: item.user.email,
-    byPhone: item.user.phone,
+    byEmail: ownerContact.email,
+    byPhone: ownerContact.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
   };
 
@@ -1186,6 +1192,9 @@ function DesktopLayout({
   void primaryActionLabel;
   void hasBoth;
   const [reportOpen, setReportOpen] = useState(false);
+  /* Owner contact for the share card — same on-demand resolve as the main
+     component (raw email/phone columns are locked down). */
+  const ownerContact = useOwnerContact(item.user.id, { email: item.user.email, phone: item.user.phone });
   /* Share card (Spotify-style) — preview + share/save modal. */
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const shareImages = photos
@@ -1203,8 +1212,8 @@ function DesktopLayout({
     byInitials: item.user.initials,
     byColor: item.user.color,
     verified: true,
-    byEmail: item.user.email,
-    byPhone: item.user.phone,
+    byEmail: ownerContact.email,
+    byPhone: ownerContact.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
   };
   const {

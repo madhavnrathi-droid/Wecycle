@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { fetchContact } from './liveData';
 import type { Profile } from './api/types';
 import { getDemoSession, clearDemoSession, onDemoSessionChange, type DemoSession, initialsOf } from './demoAuth';
 import { identify as analyticsIdentify, resetIdentity as analyticsReset, track, EVT } from './analytics';
@@ -103,8 +104,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isDemo, setIsDemo] = useState(false);
 
   const loadRealProfile = async (uid: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (data) setProfile(data);
+    /* email/phone are column-locked at the DB; select every other column
+       explicitly (a bare `*` would hit the revoked columns and 400), then
+       hydrate the OWN row's contact via the get_contact RPC so the rest of the
+       app keeps reading profile.email / profile.phone unchanged. */
+    const cols =
+      'id, username, full_name, avatar_url, avatar_color, initials, bio, role, ' +
+      'community_id, badges, impact_score, items_shared_count, items_received_count, ' +
+      'repairs_helped_count, co2_saved_kg, money_saved, is_online, last_active_at, ' +
+      'joined_at, updated_at, college_id, graduating_year, course, department, residence, ' +
+      'contact_email_enabled, contact_whatsapp_enabled, show_online_status, allow_dms, ' +
+      'show_phone_on_profile, hide_listings_from_search, notification_prefs, theme, ' +
+      'larger_text, hide_prices_on_feed';
+    const { data } = await supabase.from('profiles').select(cols).eq('id', uid).single();
+    if (!data) return;
+    const { email, phone } = await fetchContact(uid);
+    setProfile({
+      ...(data as unknown as Record<string, unknown>),
+      email: email ?? null,
+      phone: phone ?? null,
+    } as unknown as Profile);
   };
 
   const refreshProfile = async () => {

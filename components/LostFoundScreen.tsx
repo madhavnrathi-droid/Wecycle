@@ -30,6 +30,7 @@ import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
+import { useOwnerContact } from '../lib/useOwnerContact';
 import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 
@@ -413,6 +414,8 @@ export function LostFoundDetailSheet({
   const { user } = useAuth();
   const { isDesktop } = useBreakpoint();
   const isLost = item.status === 'lost';
+  /* Owner (reporter) contact resolved on demand — raw columns are locked down. */
+  const ownerContact = useOwnerContact(item.user.id, { email: item.user.email, phone: item.user.phone });
   const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
 
   /* Photo editing — only relevant when isOwner. */
@@ -441,8 +444,8 @@ export function LostFoundDetailSheet({
     byInitials: item.user.initials,
     byColor: item.user.color,
     verified: item.verified,
-    byEmail: item.user.email,
-    byPhone: item.user.phone,
+    byEmail: ownerContact.email,
+    byPhone: ownerContact.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
   };
   const handleShareLF = () => {
@@ -512,15 +515,15 @@ export function LostFoundDetailSheet({
   const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
     owner: {
       name: item.user.name,
-      email: item.user.email,
-      phone: item.user.phone,
+      email: ownerContact.email,
+      phone: ownerContact.phone,
       contact: item.user.contact,
     },
     action: isLost ? 'general' : 'general',
     /* We re-use the item-shaped quote for the body since LostItem has a title */
     item: { title: item.title, category: 'Lost & Found', listingType: 'free' },
     viewerName,
-  }), [item, viewerName, isLost]);
+  }), [item, viewerName, isLost, ownerContact.email, ownerContact.phone]);
 
   /* No standalone "claim" button anymore — viewers route their claim through
      email or WhatsApp so the reporter can verify identity off-platform. */

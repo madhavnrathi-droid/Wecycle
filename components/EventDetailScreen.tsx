@@ -12,6 +12,7 @@ import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, type ContactLink } from '../lib/contactUser';
+import { useOwnerContact } from '../lib/useOwnerContact';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
@@ -181,18 +182,21 @@ export default function EventDetailScreen({
     setEMaxAttendeesStr(event.maxAttendees ? String(event.maxAttendees) : '');
   }, [event, initial]);
 
+  /* Owner contact resolved on demand — raw email/phone columns are locked down. */
+  const ownerContact = useOwnerContact(event.organizer?.id, { email: event.organizer?.email, phone: event.organizer?.phone });
+
   /* Contact links for messaging the organizer — same flow as item details. */
   const contactLinks: ContactLink[] = useMemo(() => buildContactLinks({
     owner: {
       name:    event.organizer.name,
-      email:   event.organizer.email,
-      phone:   event.organizer.phone,
+      email:   ownerContact.email,
+      phone:   ownerContact.phone,
       contact: event.organizer.contact,
     },
     action: 'event',
     event,
     viewerName: profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined,
-  }), [event, profile, user]);
+  }), [event, profile, user, ownerContact.email, ownerContact.phone]);
 
   const handleContact = (link: ContactLink) => {
     if (!user) { onRequireAuth(); return; }
@@ -262,8 +266,8 @@ export default function EventDetailScreen({
     byInitials: event.organizer?.initials,
     byColor: event.organizer?.color,
     verified: true,
-    byEmail: event.organizer?.email,
-    byPhone: event.organizer?.phone,
+    byEmail: ownerContact.email,
+    byPhone: ownerContact.phone,
     url: typeof window !== 'undefined' ? `${window.location.origin}/s/${event.id}` : undefined,
   };
   const handleShareEvent = () => {

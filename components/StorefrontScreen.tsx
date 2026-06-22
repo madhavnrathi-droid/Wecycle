@@ -35,7 +35,7 @@ import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv, supabase } from '../lib/supabase';
 import {
   fetchListingsByUser, fetchEventsByUser, fetchLostFoundByUser,
-  fetchMyRequests, fetchProfileStats, onPostsChanged, type ProfileStats,
+  fetchMyRequests, fetchProfileStats, fetchContact, onPostsChanged, type ProfileStats,
 } from '../lib/liveData';
 
 interface StorefrontScreenProps {
@@ -134,16 +134,12 @@ export default function StorefrontScreen({
          object joined onto listing rows doesn't carry the academic info. */
       supabase
         .from('profiles')
-        .select('email, phone, college_id, graduating_year, course, department, residence, show_phone_on_profile')
+        .select('college_id, graduating_year, course, department, residence, show_phone_on_profile')
         .eq('id', user.id)
         .single()
-        .then(({ data }) => {
+        .then(async ({ data }) => {
           if (cancelled || !data) return;
-          /* Cast through unknown — generated Database types pre-date the
-             email-column migration. Live DB has the column. */
           const d = data as unknown as {
-            email: string | null;
-            phone: string | null;
             college_id: string | null;
             graduating_year: number | null;
             course: string | null;
@@ -151,9 +147,14 @@ export default function StorefrontScreen({
             residence: 'day_scholar' | 'hosteler' | null;
             show_phone_on_profile: boolean | null;
           };
+          /* email/phone are column-locked — resolve via the get_contact RPC.
+             `user` here is the storefront's subject: own row returns full
+             contact; others' are filtered by their share prefs. */
+          const contact = await fetchContact(user.id);
+          if (cancelled) return;
           setPublicProfile({
-            email: d.email ?? undefined,
-            phone: d.phone ?? undefined,
+            email: contact.email,
+            phone: contact.phone,
             collegeId: d.college_id ?? undefined,
             graduatingYear: d.graduating_year ?? undefined,
             course: d.course ?? undefined,

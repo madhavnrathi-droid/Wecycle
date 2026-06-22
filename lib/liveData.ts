@@ -80,13 +80,33 @@ function profileToUser(p: JoinedProfile | null | undefined, fallbackId: string):
     impactScore: 0,
     badges: [],
     isOnline: p?.is_online ?? false,
-    email: p?.email ?? undefined,
-    phone: p?.phone ?? undefined,
+    /* email/phone are intentionally NOT carried on feed rows anymore — the raw
+       columns are locked down at the DB so the feed can't leak them in bulk.
+       Detail screens fetch a single owner's contact on demand via fetchContact
+       (get_contact RPC). The booleans below still drive whether to even show a
+       contact channel. */
     contact: {
       email: p?.contact_email_enabled ?? true,
       whatsapp: p?.contact_whatsapp_enabled ?? false,
     },
   };
+}
+
+/* ── On-demand contact lookup ──────────────────────────
+   email/phone columns are REVOKEd from anon/authenticated so the feed can't be
+   used to harvest them in bulk. When a signed-in user actually opens a post, we
+   resolve that one owner's contact through the get_contact SECURITY DEFINER RPC,
+   which returns the OWN row in full and others' filtered by their share prefs. */
+export async function fetchContact(userId: string): Promise<{ email?: string; phone?: string }> {
+  if (!hasSupabaseEnv || !userId) return {};
+  /* get_contact was added out-of-band and isn't in the generated Database
+     types — call it through a narrow cast rather than `any`. */
+  const rpc = supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: Array<{ email: string | null; phone: string | null }> | null; error: unknown }>;
+  const { data, error } = await rpc('get_contact', { target: userId });
+  if (error || !data || data.length === 0) return {};
+  return { email: data[0].email ?? undefined, phone: data[0].phone ?? undefined };
 }
 
 export function mapListingRow(row: ListingRow): MarketplaceItem {
@@ -119,7 +139,7 @@ const SELECT_WITH_JOINS = `
   *,
   user:profiles!listings_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
+    is_online, contact_email_enabled, contact_whatsapp_enabled
   ),
   category:categories(id, label, icon)
 `;
@@ -500,7 +520,7 @@ const REQUEST_SELECT = `
   *,
   user:profiles!requests_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
+    is_online, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
 
@@ -554,7 +574,7 @@ const EVENT_SELECT = `
   *,
   organizer:profiles!events_organizer_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
+    is_online, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
 
@@ -695,7 +715,7 @@ const LF_SELECT = `
   *,
   user:profiles!lost_found_reports_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
+    is_online, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
 
@@ -1270,7 +1290,7 @@ export async function fetchMySaves(userId: string): Promise<MarketplaceItem[]> {
         *,
         user:profiles!listings_user_id_fkey(
           id, username, full_name, initials, avatar_url, avatar_color, role,
-          is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled
+          is_online, contact_email_enabled, contact_whatsapp_enabled
         ),
         category:categories(id, label, icon)
       )
