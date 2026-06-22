@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Superseded standalone prototype — kept locally but NOT part of the Next app
+# build, and it carried a stray service-role key for an old Supabase project.
+# Untracked so it stops shipping in the repo. (Rotate that old key separately.)
+Wecycle Circular Economy Platform/
+Wecycle Circular Economy Platform.zip
