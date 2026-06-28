@@ -116,13 +116,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       'contact_email_enabled, contact_whatsapp_enabled, show_online_status, allow_dms, ' +
       'show_phone_on_profile, hide_listings_from_search, notification_prefs, theme, ' +
       'larger_text, hide_prices_on_feed';
-    const { data } = await supabase.from('profiles').select(cols).eq('id', uid).single();
+    /* Run the profile select and the contact RPC in parallel — they're
+       independent, so there's no reason to await one before the other. */
+    const [{ data }, contact] = await Promise.all([
+      supabase.from('profiles').select(cols).eq('id', uid).single(),
+      fetchContact(uid),
+    ]);
     if (!data) return;
-    const { email, phone } = await fetchContact(uid);
     setProfile({
       ...(data as unknown as Record<string, unknown>),
-      email: email ?? null,
-      phone: phone ?? null,
+      email: contact.email ?? null,
+      phone: contact.phone ?? null,
     } as unknown as Profile);
   };
 

@@ -114,20 +114,23 @@ export default function FeedScreen({
 
     const load = () => {
       setLoading(true);
-      Promise.all([
-        fetchMarketplaceItems({ limit: 60 }),
-        fetchRequests({ limit: 60 }),
-        fetchEvents(),
-        fetchLostFound(),
-      ])
-        .then(([listingRows, requestRows, eventRows, lfRows]) => {
-          if (cancelled) return;
-          setItems(listingRows);
-          setRequests(requestRows);
-          setEvents(eventRows);
-          setLostFound(lfRows);
-        })
-        .finally(() => { if (!cancelled) setLoading(false); });
+      /* Progressive load: paint each slice the moment its own query returns
+         instead of blocking the whole feed on the slowest of the four. The
+         masonry grows as data lands, so the feed feels instant. Listings are
+         the primary content, so we clear the loading state as soon as they
+         arrive rather than waiting for events / lost-found. */
+      const pItems  = fetchMarketplaceItems({ limit: 60 });
+      const pReq    = fetchRequests({ limit: 60 });
+      const pEvents = fetchEvents();
+      const pLF     = fetchLostFound();
+      pItems.then(rows  => { if (!cancelled) { setItems(rows); setLoading(false); } });
+      pReq.then(rows    => { if (!cancelled) setRequests(rows); });
+      pEvents.then(rows => { if (!cancelled) setEvents(rows); });
+      pLF.then(rows     => { if (!cancelled) setLostFound(rows); });
+      /* Safety net: clear the spinner once everything settles, even if the
+         listings query returned empty / errored. */
+      Promise.allSettled([pItems, pReq, pEvents, pLF])
+        .then(() => { if (!cancelled) setLoading(false); });
     };
     load();
     /* Refetch the instant someone posts (same tab) */

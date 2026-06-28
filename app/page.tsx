@@ -174,8 +174,13 @@ export default function WecycleApp() {
      in the fetch helpers. */
   useEffect(() => {
     if (isDemoMode()) return;
-    purgeExpiredEvents();
-    purgeExpiredRequests();
+    /* Defer the janitors a few seconds so their DELETEs don't compete with the
+       feed's read queries during the critical first-paint window. */
+    const t = setTimeout(() => {
+      purgeExpiredEvents().catch(() => {});
+      purgeExpiredRequests().catch(() => {});
+    }, 3000);
+    return () => clearTimeout(t);
   }, []);
 
   /* ─ App-open analytics ────────────────────────────────────────
