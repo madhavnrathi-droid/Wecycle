@@ -19,6 +19,10 @@
   --border-subtle: #EFEDE5;
   --border-strong: #CDCAC0;
 
+  /* Approx iPhone screen corner radius — the mobile bottom dock matches this on
+     its bottom corners so it nests into the device's bottom corners. */
+  --ios-corner: 44px;
+
   /* Text — high contrast hierarchy */
   --text-primary: #0E0E08;
   --text-secondary: #5A5950;
@@ -3597,23 +3601,12 @@ img[src*="/storage/v1/object/public/"] {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   width: 100%;
-  max-width: 430px;
   z-index: 40;
-  /* Sit the pill right at the bottom — only clear the home indicator,
-     no extra floating gap. env() reports ~34px on iPhones with a home
-     bar (perfect lift); otherwise 6px keeps a hairline gap. */
-  padding-bottom: env(safe-area-inset-bottom, 6px);
-  /* Short, opaque fade so scrolling content tucks cleanly under the pill —
-     no milky/frosted veil over the cards (that read as "glass"). */
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    var(--bg-base) 38%,
-    var(--bg-base) 100%
-  );
+  /* Mobile: full-bleed dock anchored to the very bottom (see .bottom-nav-inner).
+     Tablet/desktop overrides below re-center it as a compact floating pill. */
   pointer-events: none;
 }
 .bottom-nav-inner {
@@ -3621,24 +3614,22 @@ img[src*="/storage/v1/object/public/"] {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 10px 12px;
-  /* No bottom margin — the .bottom-nav parent already adds the
-     home-indicator inset via env(safe-area-inset-bottom). The pill sits
-     hugged against the screen's bottom curve. */
-  margin: 0 10px 6px;
-  /* SOLID surface — explicitly opaque, NO backdrop-filter / glass. The
-     frosted material washed out over feed imagery; a clean white (light) /
-     near-black (dark) pill reads far better and is what shipped earlier. */
+  gap: 2px;
+  /* Mobile: edge-to-edge dock flush to the bottom. The surface fills down past
+     the home indicator (content padded up by the safe-area inset), and the
+     BOTTOM corners use the iPhone screen radius so the dock nests into the
+     device's bottom corners; the TOP corners round like a rising panel. */
+  margin: 0;
+  padding: 11px 18px calc(env(safe-area-inset-bottom, 8px) + 10px);
+  /* SOLID surface — explicitly opaque, NO backdrop-filter / glass. */
   background: var(--bg-surface);
   background-color: var(--bg-surface);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  border: 1px solid var(--border-default);
-  border-radius: 32px;
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.14),
-    0 2px 8px rgba(0, 0, 0, 0.08);
-  gap: 2px;
+  border: none;
+  border-top: 1px solid var(--border-default);
+  border-radius: 26px 26px var(--ios-corner) var(--ios-corner);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.10);
 }
 /* Pill-expanding nav button — borrowed from the Karya app.
  * The button stays icon-only until it becomes active, at which point it
@@ -3725,12 +3716,22 @@ img[src*="/storage/v1/object/public/"] {
 
 /* Tablet: slightly tighter pill, similar mobile feel */
 @media (min-width: 768px) {
-  .bottom-nav { max-width: 380px; }
+  /* Tablet/desktop: re-center as a compact floating pill (not edge-to-edge). */
+  .bottom-nav {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    max-width: 380px;
+  }
   .bottom-nav-inner {
     padding: 8px 14px;
     gap: 4px;
-    border-radius: 999px;
     margin: 0 0 20px;
+    border: 1px solid var(--border-default);
+    border-radius: 999px;
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.14),
+      0 2px 8px rgba(0, 0, 0, 0.08);
   }
   /* `min-width` (not width) so the inactive icons sit at 40px but the
      active button can still expand into a pill. */
