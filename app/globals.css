@@ -585,6 +585,15 @@ body {
   position: relative;
   background: var(--bg-base);
 }
+/* The scroll container fills the viewport (height:100svh, set inline). Pad its
+   top by the safe-area inset so the sticky screen headers — and the Wecycle
+   logo in them — clear the Dynamic Island / notch instead of hiding under it.
+   border-box keeps the total height at 100svh so nothing overflows. Applies to
+   every screen at once (they all render inside .scroll-shell). */
+.scroll-shell {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+}
 @media (min-width: 720px) {
   .app-container { max-width: min(92vw, 1480px); }
 }
@@ -3624,7 +3633,7 @@ img[src*="/storage/v1/object/public/"] {
      bottom is CLAMPED so a device that over-reports safe-area-inset-bottom
      can't inflate the dock into a tall white slab — it stays compact while
      still clearing a real home indicator. */
-  padding: 10px 12px clamp(10px, env(safe-area-inset-bottom, 10px), 16px);
+  padding: 10px 12px clamp(12px, env(safe-area-inset-bottom, 12px), 20px);
   /* SOLID surface — explicitly opaque, NO backdrop-filter / glass. */
   background: var(--bg-surface);
   background-color: var(--bg-surface);
@@ -3632,7 +3641,11 @@ img[src*="/storage/v1/object/public/"] {
   backdrop-filter: none;
   border: none;
   border-top: 1px solid var(--border-default);
-  border-radius: 26px 26px var(--ios-corner) var(--ios-corner);
+  /* Rounded top (rising-panel look). SQUARE bottom corners on purpose: the dock
+     fills to the very bottom edge and the OS screen-corner mask clips it to the
+     device's EXACT corner radius, so it nests perfectly on any iPhone — no cream
+     gap, no hardcoded radius that mismatches the device. */
+  border-radius: 24px 24px 0 0;
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.10);
 }
 /* Pill-expanding nav button — borrowed from the Karya app.
