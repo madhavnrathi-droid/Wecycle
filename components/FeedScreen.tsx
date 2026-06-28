@@ -16,6 +16,7 @@ import {
   fetchMarketplaceItems, fetchRequests, fetchEvents, fetchLostFound,
   fetchSavedListingIds, toggleListingSave,
   onPostsChanged, searchUsers, type UserSearchHit,
+  readFeedCache, writeFeedCache,
 } from '../lib/liveData';
 import { getEventMetrics } from '../lib/metrics';
 import { getSettings, onSettingsChange } from '../lib/settings';
@@ -112,13 +113,22 @@ export default function FeedScreen({
       return;
     }
 
-    const load = () => {
-      setLoading(true);
+    const load = (isFirst: boolean) => {
+      /* Stale-while-revalidate: on first open, paint the last cached feed
+         instantly and skip the loading state; then refresh in the background.
+         We only show "Loading the feed…" when there's nothing cached yet. */
+      if (isFirst) {
+        const cached = readFeedCache();
+        if (cached) {
+          setItems(cached.items);
+          setRequests(cached.requests);
+          setEvents(cached.events);
+          setLostFound(cached.lostFound);
+        }
+        setLoading(!cached);
+      }
       /* Progressive load: paint each slice the moment its own query returns
-         instead of blocking the whole feed on the slowest of the four. The
-         masonry grows as data lands, so the feed feels instant. Listings are
-         the primary content, so we clear the loading state as soon as they
-         arrive rather than waiting for events / lost-found. */
+         instead of blocking the whole feed on the slowest of the four. */
       const pItems  = fetchMarketplaceItems({ limit: 60 });
       const pReq    = fetchRequests({ limit: 60 });
       const pEvents = fetchEvents();
@@ -127,14 +137,16 @@ export default function FeedScreen({
       pReq.then(rows    => { if (!cancelled) setRequests(rows); });
       pEvents.then(rows => { if (!cancelled) setEvents(rows); });
       pLF.then(rows     => { if (!cancelled) setLostFound(rows); });
-      /* Safety net: clear the spinner once everything settles, even if the
-         listings query returned empty / errored. */
-      Promise.allSettled([pItems, pReq, pEvents, pLF])
-        .then(() => { if (!cancelled) setLoading(false); });
+      /* Cache the fresh result + clear the spinner once everything settles. */
+      Promise.all([pItems, pReq, pEvents, pLF]).then(([i, r, e, l]) => {
+        if (cancelled) return;
+        setLoading(false);
+        writeFeedCache({ items: i, requests: r, events: e, lostFound: l });
+      });
     };
-    load();
-    /* Refetch the instant someone posts (same tab) */
-    const off = onPostsChanged(load);
+    load(true);
+    /* Refetch the instant someone posts (same tab) — no cache reseed/flicker. */
+    const off = onPostsChanged(() => load(false));
     return () => { cancelled = true; off(); };
   }, [mounted]);
 

@@ -109,6 +109,44 @@ export async function fetchContact(userId: string): Promise<{ email?: string; ph
   return { email: data[0].email ?? undefined, phone: data[0].phone ?? undefined };
 }
 
+/* ── Feed cache (stale-while-revalidate) ───────────────
+   The home feed is the same community feed for every viewer, so we persist the
+   last successful fetch and rehydrate it INSTANTLY on the next open — the screen
+   paints from cache immediately, then refreshes in the background. This removes
+   the "feed sits on a loading state after it opens" pause on repeat visits. */
+export interface FeedCache {
+  items: MarketplaceItem[];
+  requests: MarketplaceItem[];
+  events: CommunityEvent[];
+  lostFound: LostItem[];
+}
+
+const FEED_CACHE_KEY = 'wecycle.feedCache.v1';
+const FEED_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; /* ignore caches older than a week */
+
+export function readFeedCache(): FeedCache | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(FEED_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at?: number; data?: FeedCache };
+    if (!parsed?.data || typeof parsed.at !== 'number') return null;
+    if (Date.now() - parsed.at > FEED_CACHE_TTL) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+export function writeFeedCache(data: FeedCache): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ at: Date.now(), data }));
+  } catch {
+    /* quota exceeded / private mode — caching is best-effort, ignore */
+  }
+}
+
 export function mapListingRow(row: ListingRow): MarketplaceItem {
   return {
     id: row.id,
