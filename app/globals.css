@@ -3620,7 +3620,11 @@ img[src*="/storage/v1/object/public/"] {
      BOTTOM corners use the iPhone screen radius so the dock nests into the
      device's bottom corners; the TOP corners round like a rising panel. */
   margin: 0;
-  padding: 11px 18px calc(env(safe-area-inset-bottom, 8px) + 10px);
+  /* Tight, even padding around the icon row (same as the original pill). The
+     bottom is CLAMPED so a device that over-reports safe-area-inset-bottom
+     can't inflate the dock into a tall white slab — it stays compact while
+     still clearing a real home indicator. */
+  padding: 10px 12px clamp(10px, env(safe-area-inset-bottom, 10px), 16px);
   /* SOLID surface — explicitly opaque, NO backdrop-filter / glass. */
   background: var(--bg-surface);
   background-color: var(--bg-surface);
