@@ -3646,7 +3646,12 @@ img[src*="/storage/v1/object/public/"] {
      device's EXACT corner radius, so it nests perfectly on any iPhone — no cream
      gap, no hardcoded radius that mismatches the device. */
   border-radius: 24px 24px 0 0;
-  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.10);
+  /* Slight drop shadow so the dock reads as an elevated surface the feed tucks
+     under — a tight near-edge layer for definition + a soft diffuse layer for
+     depth. Works the same on iOS and Android (cast upward onto the content). */
+  box-shadow:
+    0 -1px 4px rgba(0, 0, 0, 0.06),
+    0 -6px 22px rgba(0, 0, 0, 0.12);
 }
 /* Pill-expanding nav button — borrowed from the Karya app.
  * The button stays icon-only until it becomes active, at which point it
