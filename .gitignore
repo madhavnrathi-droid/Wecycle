@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+# capacitor: temp route-stash during the static export build
+/.cap-excluded/
 
 # production
 /build

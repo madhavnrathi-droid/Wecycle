@@ -28,6 +28,7 @@ import {
   compressMediaBatch, MAX_VIDEO_BYTES, MediaTooLargeError,
   type CompressedMedia,
 } from '../lib/mediaCompression';
+import { apiBase } from '../lib/platform';
 
 interface PhotoPickerProps {
   /** Object/remote URLs currently held (photos and videos share this list). */
@@ -109,7 +110,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
     try {
       const form = new FormData();
       form.append('image', file, file.name);
-      const res = await fetch('/api/remove-background', { method: 'POST', body: form });
+      const res = await fetch(`${apiBase()}/api/remove-background`, { method: 'POST', body: form });
       if (!res.ok) {
         let msg = `Couldn't remove background (${res.status})`;
         try {

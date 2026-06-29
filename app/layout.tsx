@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
 import { AuthProvider } from "../lib/AuthContext";
 import SessionSplash from "../components/SessionSplash";
+import NativeInit from "../components/NativeInit";
 import "./globals.css";
 
 /* Microsoft Clarity project ID. Hard-coded because Clarity's snippet is
@@ -166,6 +167,9 @@ export default function RootLayout({
         {/* Full-screen brand splash on a new session — overlays everything,
             decides + paints before the app shows, then fades out. */}
         <SessionSplash />
+        {/* Native (Capacitor) runtime setup — status bar, keyboard, splash.
+            No-op on the web. */}
+        <NativeInit />
       </body>
     </html>
   );
