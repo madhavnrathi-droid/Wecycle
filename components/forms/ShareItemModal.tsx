@@ -31,6 +31,10 @@ interface ShareItemModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit?: (data: ShareItemForm) => void;
+  /* 'item' (default) = share a physical thing. 'service' = offer a service,
+     which posts as an opportunity: no condition, pricing reads as a rate, and
+     the category defaults to Services. Reuses this whole form + backend path. */
+  mode?: 'item' | 'service';
 }
 
 export interface ShareItemForm {
@@ -46,9 +50,10 @@ export interface ShareItemForm {
 
 const MAX_PHOTOS = 3;
 
-export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemModalProps) {
+export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' }: ShareItemModalProps) {
+  const isService = mode === 'service';
   const [form, setForm] = useState<ShareItemForm>({
-    title: '', category: '', condition: '', description: '',
+    title: '', category: isService ? 'Services' : '', condition: '', description: '',
     location: '', pricing: 'free', photos: [],
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ShareItemForm, string>>>({});
@@ -67,7 +72,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     if (!form.title.trim()) e.title = 'Required';
     if (!form.category) e.category = 'Pick a category';
     /* Condition is now OPTIONAL — defaults to 'good' on submit if not chosen. */
-    if (!form.location.trim()) e.location = 'Where can people pick this up?';
+    if (!form.location.trim()) e.location = isService ? 'Where can people reach you? (or “Online”)' : 'Where can people pick this up?';
     /* Price is now OPTIONAL even when listing as Sell — empty → "Selling" label. */
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -75,7 +80,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
 
   const reset = () => {
     setForm({
-      title: '', category: '', condition: '', description: '', location: '', pricing: 'free', photos: [],
+      title: '', category: isService ? 'Services' : '', condition: '', description: '', location: '', pricing: 'free', photos: [],
     });
     setNotifyOnEngagement(true);
   };
@@ -99,6 +104,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           price: form.price,
           media: pickerRef.current?.getMedia() ?? [],
           notifyOnEngagement,
+          kind: isService ? 'opportunity' : 'item',
         });
       } else {
         /* Demo path — no backend; just simulate latency. */
@@ -106,7 +112,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
       }
       haptics.success();
       track(EVT.post_form_submitted, {
-        post_kind: 'share',
+        post_kind: isService ? 'service' : 'share',
         listing_type: form.pricing === 'sell' ? 'sell' : 'free',
         has_photos: form.photos.length > 0,
         photo_count: form.photos.length,
@@ -121,7 +127,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     } catch (err) {
       haptics.error();
       track(EVT.post_form_failed, {
-        post_kind: 'share',
+        post_kind: isService ? 'service' : 'share',
         reason: (err as Error).message?.slice(0, 80),
       });
       setSubmitError((err as Error).message || 'Could not post — please try again.');
@@ -134,7 +140,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
     <Modal
       open={open}
       onClose={onClose}
-      title="Share an item"
+      title={isService ? 'Offer a service' : 'Share an item'}
       footer={
         <>
           <button type="button" onClick={onClose} className="btn btn-secondary" style={{ flex: 1 }}>
@@ -146,7 +152,9 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
             className="btn btn-gradient"
             style={{ flex: 2 }}
           >
-            {submitting ? 'Sharing…' : 'Share with community'}
+            {submitting
+              ? (isService ? 'Posting…' : 'Sharing…')
+              : (isService ? 'Post opportunity' : 'Share with community')}
           </button>
         </>
       }
@@ -181,7 +189,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           <input
             id="si-title"
             className="form-input"
-            placeholder="e.g. Physics Textbook 12th Edition"
+            placeholder={isService ? 'e.g. Physics Tutoring, Bicycle Repair' : 'e.g. Physics Textbook 12th Edition'}
             value={form.title}
             onChange={e => update('title', e.target.value)}
             aria-required="true"
@@ -209,24 +217,27 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
           {errors.category && <span className="field-error">{errors.category}</span>}
         </div>
 
-        {/* Colored condition slider — optional. */}
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <span>Condition</span>
-            <span className="field-hint" style={{ fontWeight: 400 }}>Optional</span>
-          </label>
-          <ConditionSlider
-            value={form.condition}
-            onChange={v => update('condition', v)}
-          />
-        </div>
+        {/* Colored condition slider — optional. Hidden for services, where an
+            item's physical condition is meaningless. */}
+        {!isService && (
+          <div className="field" style={{ marginBottom: 14 }}>
+            <label className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span>Condition</span>
+              <span className="field-hint" style={{ fontWeight: 400 }}>Optional</span>
+            </label>
+            <ConditionSlider
+              value={form.condition}
+              onChange={v => update('condition', v)}
+            />
+          </div>
+        )}
 
         <div className="field" style={{ marginBottom: 14 }}>
           <label htmlFor="si-desc" className="field-label">Description</label>
           <textarea
             id="si-desc"
             className="form-textarea"
-            placeholder="Condition notes, accessories, anything to mention…"
+            placeholder={isService ? 'What you offer, experience, availability…' : 'Condition notes, accessories, anything to mention…'}
             value={form.description}
             onChange={e => update('description', e.target.value)}
             maxLength={500}
@@ -237,12 +248,12 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
         <div className="field" style={{ marginBottom: 14 }}>
           <label htmlFor="si-loc" className="field-label">
             <MapPin size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-            Pickup location <span className="required" aria-hidden="true">*</span>
+            {isService ? 'Location' : 'Pickup location'} <span className="required" aria-hidden="true">*</span>
           </label>
           <input
             id="si-loc"
             className="form-input"
-            placeholder="e.g. Meera Bhawan, Block 15"
+            placeholder={isService ? 'e.g. Online, or Meera Bhawan' : 'e.g. Meera Bhawan, Block 15'}
             value={form.location}
             onChange={e => update('location', e.target.value)}
             aria-required="true"
@@ -252,7 +263,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
         </div>
 
         <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
-          <legend className="field-label" style={{ marginBottom: 8 }}>Pricing</legend>
+          <legend className="field-label" style={{ marginBottom: 8 }}>{isService ? 'Rate' : 'Pricing'}</legend>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <button
               type="button"
@@ -262,7 +273,7 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
             >
               <Gift size={20} strokeWidth={1.8} />
               <span style={{ fontWeight: 600, fontSize: 13 }}>Free</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Give it away</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{isService ? 'Happy to help' : 'Give it away'}</span>
             </button>
             <button
               type="button"
@@ -271,21 +282,23 @@ export default function ShareItemModal({ open, onClose, onSubmit }: ShareItemMod
               onClick={() => update('pricing', 'sell')}
             >
               <Tag size={20} strokeWidth={1.8} />
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Sell</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Set a price</span>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>{isService ? 'Paid' : 'Sell'}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{isService ? 'Set a rate' : 'Set a price'}</span>
             </button>
           </div>
           {form.pricing === 'sell' && (
             <div className="field" style={{ marginTop: 10 }}>
               <label htmlFor="si-price" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span>Price (₹)</span>
-                <span className="field-hint" style={{ fontWeight: 400 }}>Optional — leave blank for "Selling"</span>
+                <span>{isService ? 'Rate (₹)' : 'Price (₹)'}</span>
+                <span className="field-hint" style={{ fontWeight: 400 }}>
+                  {isService ? 'Optional — leave blank for "Rate on ask"' : 'Optional — leave blank for "Selling"'}
+                </span>
               </label>
               <input
                 id="si-price"
                 type="number" inputMode="numeric" min="1"
                 className="form-input"
-                placeholder="e.g. 500 (or leave blank)"
+                placeholder={isService ? 'e.g. 300 / hr (or leave blank)' : 'e.g. 500 (or leave blank)'}
                 value={form.price ?? ''}
                 onChange={e => update('price', Number(e.target.value) || undefined)}
               />

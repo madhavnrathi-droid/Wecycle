@@ -43,6 +43,9 @@ interface ListingRow {
   title: string;
   description: string | null;
   category_id: string | null;
+  /* 'item' (default) or 'opportunity' (a service offer). Column added by the
+     add_kind_to_listings migration; existing rows default to 'item'. */
+  kind: string | null;
   listing_type: MarketplaceItem['listingType'];
   condition: MarketplaceItem['condition'];
   price: number | null;
@@ -119,6 +122,9 @@ export interface FeedCache {
   requests: MarketplaceItem[];
   events: CommunityEvent[];
   lostFound: LostItem[];
+  /* Optional for back-compat: caches written before opportunities shipped
+     won't carry this key — readers fall back to []. */
+  opportunities?: MarketplaceItem[];
 }
 
 const FEED_CACHE_KEY = 'wecycle.feedCache.v1';
@@ -154,6 +160,7 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     description: row.description ?? '',
     category: row.category?.label ?? row.category_id ?? 'Other',
     categoryId: row.category_id ?? undefined,
+    kind: row.kind === 'opportunity' ? 'opportunity' : 'item',
     listingType: row.listing_type,
     price: row.price ?? undefined,
     condition: row.condition,
@@ -207,6 +214,29 @@ export async function fetchMarketplaceItems(filter: FeedFilter = {}): Promise<Ma
     /* Keep completed (sold/given) listings in the feed — they render dimmed
        with a status ribbon rather than vanishing. */
     .in('status', ['active', 'completed'])
+    /* Only physical-item listings here — service opportunities live on their
+       own Services tab, fetched by fetchOpportunities. */
+    .eq('kind', 'item')
+    .order('posted_at', { ascending: false })
+    .limit(filter.limit ?? 60);
+
+  if (filter.category && filter.category !== 'all') q = q.eq('category_id', filter.category);
+  if (filter.search?.trim()) q = q.ilike('title', `%${filter.search.trim()}%`);
+
+  const { data, error } = await q;
+  if (error || !data) return [];
+  return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
+}
+
+/* Service opportunities — the same listings table filtered to kind='opportunity'.
+   Mirrors fetchMarketplaceItems so the Services tab behaves like Shared. */
+export async function fetchOpportunities(filter: FeedFilter = {}): Promise<MarketplaceItem[]> {
+  if (!hasSupabaseEnv) return [];
+  let q = supabase
+    .from('listings')
+    .select(SELECT_WITH_JOINS)
+    .in('status', ['active', 'completed'])
+    .eq('kind', 'opportunity')
     .order('posted_at', { ascending: false })
     .limit(filter.limit ?? 60);
 
@@ -298,6 +328,8 @@ export interface NewListingInput {
   price?: number;
   media: CompressedMedia[];
   notifyOnEngagement?: boolean;
+  /* 'item' (default) for a physical listing, 'opportunity' for a service. */
+  kind?: 'item' | 'opportunity';
 }
 
 export async function createListingWithMedia(input: NewListingInput): Promise<MarketplaceItem> {
@@ -331,6 +363,7 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       title: input.title.trim(),
       description: input.description?.trim() || null,
       category_id: categoryId,
+      kind: input.kind ?? 'item',
       listing_type: input.listingType,
       condition: input.condition,
       price: input.listingType === 'sell' ? (input.price ?? null) : null,

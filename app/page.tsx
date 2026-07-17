@@ -48,6 +48,7 @@ type ModalKind =
   | null
   | 'post-picker'
   | 'share-item'
+  | 'offer-service'
   | 'post-request'
   | 'report-lf'
   | 'submit-event'
@@ -244,9 +245,10 @@ export default function WecycleApp() {
     setModal(next);
   };
 
-  const openShareItem   = () => requireAuth('share-item');
-  const openPostRequest = () => requireAuth('post-request');
-  const openSubmitEvent = () => requireAuth('submit-event');
+  const openShareItem    = () => requireAuth('share-item');
+  const openOfferService = () => requireAuth('offer-service');
+  const openPostRequest  = () => requireAuth('post-request');
+  const openSubmitEvent  = () => requireAuth('submit-event');
 
   /* Native share sheet → "invite a friend". Used by the drawer's Invite
      item and the "For MAHE, by MAHE" marketing slide. Falls back to
@@ -292,10 +294,11 @@ export default function WecycleApp() {
     setActiveScreen('account');
   };
 
-  const handlePostPickerSelect = (kind: 'share' | 'request' | 'event' | 'report-lf') => {
+  const handlePostPickerSelect = (kind: 'share' | 'service' | 'request' | 'event' | 'report-lf') => {
     setModal(null);
     setTimeout(() => {
       if (kind === 'share')     openShareItem();
+      if (kind === 'service')   openOfferService();
       if (kind === 'request')   openPostRequest();
       if (kind === 'event')     openSubmitEvent();
       if (kind === 'report-lf') openReportLF();
@@ -602,6 +605,7 @@ export default function WecycleApp() {
 
         {/* ── FORM MODALS ── */}
         <ShareItemModal open={modal === 'share-item'} onClose={closeModal} />
+        <ShareItemModal open={modal === 'offer-service'} onClose={closeModal} mode="service" />
         <PostRequestModal open={modal === 'post-request'} onClose={closeModal} />
         <ReportLostFoundModal open={modal === 'report-lf'} onClose={closeModal} defaultStatus={lfDefaultStatus} />
         <SubmitEventModal open={modal === 'submit-event'} onClose={closeModal} />

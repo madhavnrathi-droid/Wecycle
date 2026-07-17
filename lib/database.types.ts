@@ -754,6 +754,7 @@ export type Database = {
           description: string | null
           id: string
           is_featured: boolean
+          kind: string
           listing_type: Database["public"]["Enums"]["listing_type"]
           location: string | null
           photo_color: string | null
@@ -778,6 +779,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_featured?: boolean
+          kind?: string
           listing_type: Database["public"]["Enums"]["listing_type"]
           location?: string | null
           photo_color?: string | null
@@ -802,6 +804,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_featured?: boolean
+          kind?: string
           listing_type?: Database["public"]["Enums"]["listing_type"]
           location?: string | null
           photo_color?: string | null

@@ -323,14 +323,17 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   /* Requests are "wanted" posts — never priced, and the action is to offer help
      rather than to take/buy. */
   const isRequest = !!item.isRequest;
+  /* A service offer rather than a physical item — pricing reads as a rate. */
+  const isOpportunity = item.kind === 'opportunity';
   const isPriced = !isRequest && item.listingType === 'sell' && typeof item.price === 'number';
   /* "Selling" stands in for an unpriced sell post — paired with a small
-     "contact for more info" note next to the action buttons. */
+     "contact for more info" note next to the action buttons. For a service
+     the same state reads as "Rate on ask". */
   const isUnpricedSell = !isRequest && item.listingType === 'sell' && !isPriced;
   const priceLabel = isRequest
     ? (item.urgent ? 'Urgent request' : 'Wanted')
     : isPriced ? `₹${item.price!.toLocaleString('en-IN')}`
-    : isUnpricedSell ? 'Selling'
+    : isUnpricedSell ? (isOpportunity ? 'Rate on ask' : 'Selling')
     : item.listingType === 'free' ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
   const desc = item.description ?? '';
@@ -745,6 +748,18 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         </section>
       ) : (
         <section style={{ padding: '20px 20px 0' }}>
+          {isOpportunity && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              marginBottom: 10,
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: '#fff', background: '#8B5CF6',
+              padding: '4px 10px', borderRadius: 999,
+            }}>
+              🛠️ Opportunity
+            </div>
+          )}
           {/* Title + engagement actions (save · share · report · admin-delete)
               share the same row. The sticky bottom bar is reserved for
               contacting the seller (email / WhatsApp). */}
@@ -1191,6 +1206,7 @@ function DesktopLayout({
   void isAdmin;
   void primaryActionLabel;
   void hasBoth;
+  const isOpportunity = item.kind === 'opportunity';
   const [reportOpen, setReportOpen] = useState(false);
   /* Owner contact for the share card — same on-demand resolve as the main
      component (raw email/phone columns are locked down). */
@@ -1447,6 +1463,18 @@ function DesktopLayout({
           display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0,
           ...((photos.length > 0 || canManage) ? { gridColumn: 2, gridRow: 1 } : {}),
         }}>
+
+          {isOpportunity && (
+            <div style={{
+              display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: '#fff', background: '#8B5CF6',
+              padding: '4px 10px', borderRadius: 999,
+            }}>
+              🛠️ Opportunity
+            </div>
+          )}
 
           {canManage ? (
             <select

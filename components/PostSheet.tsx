@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import { track, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 
-export type PostKind = 'share' | 'request' | 'event' | 'report-lf';
+export type PostKind = 'share' | 'service' | 'request' | 'event' | 'report-lf';
 
 interface PostSheetProps {
   onClose: () => void;
@@ -17,6 +17,11 @@ const POST_OPTIONS: { id: PostKind; icon: string; label: string; desc: string; c
     id: 'share',
     icon: '🎁', label: 'Share an item', desc: 'Give or sell something to your community',
     color: '#22C55E',
+  },
+  {
+    id: 'service',
+    icon: '🛠️', label: 'Offer a service', desc: 'A skill, gig, or help you can provide',
+    color: '#8B5CF6',
   },
   {
     id: 'request',

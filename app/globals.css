@@ -1584,6 +1584,9 @@ section.mobile-only { display: block; }
 .feed-card-type-chip[data-kind="request"] {
   background: rgba(22, 163, 74, 0.92);
 }
+.feed-card-type-chip[data-kind="opportunity"] {
+  background: rgba(139, 92, 246, 0.92);   /* violet — services/opportunities */
+}
 
 /* ═══════════════════════════════════════════════
    INLINE EDIT — owner-editable fields on detail screens

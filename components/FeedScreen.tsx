@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye } from 'lucide-react';
 import { Wordmark } from './Brand';
 import {
-  MARKETPLACE_ITEMS, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
+  MARKETPLACE_ITEMS, OPPORTUNITIES, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
   type MarketplaceItem, type CommunityEvent, type LostItem,
 } from '../lib/mockData';
 import { resolveItemMedia, getAvatar, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
@@ -13,7 +13,7 @@ import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import {
-  fetchMarketplaceItems, fetchRequests, fetchEvents, fetchLostFound,
+  fetchMarketplaceItems, fetchOpportunities, fetchRequests, fetchEvents, fetchLostFound,
   fetchSavedListingIds, toggleListingSave,
   onPostsChanged, searchUsers, type UserSearchHit,
   readFeedCache, writeFeedCache,
@@ -66,7 +66,7 @@ export default function FeedScreen({
      the user navigates to another bottom-nav screen, so the next visit
      reseeds this default — that's the "every new session starts on All"
      behaviour. */
-  const [activeType, setActiveType] = useState<'all' | 'requests' | 'shared'>('all');
+  const [activeType, setActiveType] = useState<'all' | 'requests' | 'shared' | 'services'>('all');
   const [query, setQuery] = useState('');
   /* Saved-listing IDs for the heart icon's filled state. Hydrated from
      Supabase on mount + after every post-change event (a delete drops
@@ -86,6 +86,7 @@ export default function FeedScreen({
      feed the dedicated tabs; events + L&F join only on the "All" tab
      (which is the default first view of every session). */
   const [items, setItems] = useState<MarketplaceItem[]>([]);
+  const [opportunities, setOpportunities] = useState<MarketplaceItem[]>([]);
   const [requests, setRequests] = useState<MarketplaceItem[]>([]);
   const [events, setEvents] = useState<CommunityEvent[]>([]);
   const [lostFound, setLostFound] = useState<LostItem[]>([]);
@@ -98,6 +99,7 @@ export default function FeedScreen({
 
     if (isDemoMode()) {
       setItems(MARKETPLACE_ITEMS);
+      setOpportunities(OPPORTUNITIES);
       setRequests([]);
       setEvents(EVENTS);
       setLostFound(LOST_FOUND_ITEMS);
@@ -106,6 +108,7 @@ export default function FeedScreen({
     }
     if (!hasSupabaseEnv) {
       setItems([]);
+      setOpportunities([]);
       setRequests([]);
       setEvents([]);
       setLostFound([]);
@@ -121,6 +124,7 @@ export default function FeedScreen({
         const cached = readFeedCache();
         if (cached) {
           setItems(cached.items);
+          setOpportunities(cached.opportunities ?? []);
           setRequests(cached.requests);
           setEvents(cached.events);
           setLostFound(cached.lostFound);
@@ -128,20 +132,22 @@ export default function FeedScreen({
         setLoading(!cached);
       }
       /* Progressive load: paint each slice the moment its own query returns
-         instead of blocking the whole feed on the slowest of the four. */
+         instead of blocking the whole feed on the slowest of the five. */
       const pItems  = fetchMarketplaceItems({ limit: 60 });
+      const pOpps   = fetchOpportunities({ limit: 60 });
       const pReq    = fetchRequests({ limit: 60 });
       const pEvents = fetchEvents();
       const pLF     = fetchLostFound();
       pItems.then(rows  => { if (!cancelled) { setItems(rows); setLoading(false); } });
+      pOpps.then(rows   => { if (!cancelled) setOpportunities(rows); });
       pReq.then(rows    => { if (!cancelled) setRequests(rows); });
       pEvents.then(rows => { if (!cancelled) setEvents(rows); });
       pLF.then(rows     => { if (!cancelled) setLostFound(rows); });
       /* Cache the fresh result + clear the spinner once everything settles. */
-      Promise.all([pItems, pReq, pEvents, pLF]).then(([i, r, e, l]) => {
+      Promise.all([pItems, pOpps, pReq, pEvents, pLF]).then(([i, o, r, e, l]) => {
         if (cancelled) return;
         setLoading(false);
-        writeFeedCache({ items: i, requests: r, events: e, lostFound: l });
+        writeFeedCache({ items: i, opportunities: o, requests: r, events: e, lostFound: l });
       });
     };
     load(true);
@@ -220,8 +226,13 @@ export default function FeedScreen({
   /* The active tab decides which pool we render:
        - 'all'      → mixed feed of items + requests + events + L&F by recency
        - 'requests' → open requests only
-       - 'shared'   → marketplace listings only (the "Shared" tab) */
-  const source = (activeType === 'requests' ? requests : items).filter(item => !blocked.has(item.user.id));
+       - 'shared'   → marketplace listings only (the "Shared" tab)
+       - 'services' → service opportunities only */
+  const pool =
+    activeType === 'requests' ? requests
+    : activeType === 'services' ? opportunities
+    : items;
+  const source = pool.filter(item => !blocked.has(item.user.id));
   const filtered = source.filter(item => {
     if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
     if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
@@ -235,10 +246,11 @@ export default function FeedScreen({
      chronologically; live rows have real timestamps, demo rows fall back
      to a positional sort. */
   type AllEntry =
-    | { kind: 'item';    item: MarketplaceItem;    sortKey: number }
-    | { kind: 'request'; item: MarketplaceItem;    sortKey: number }
-    | { kind: 'event';   event: CommunityEvent;    sortKey: number }
-    | { kind: 'lf';      lf: LostItem;             sortKey: number };
+    | { kind: 'item';        item: MarketplaceItem;    sortKey: number }
+    | { kind: 'opportunity'; item: MarketplaceItem;    sortKey: number }
+    | { kind: 'request';     item: MarketplaceItem;    sortKey: number }
+    | { kind: 'event';       event: CommunityEvent;    sortKey: number }
+    | { kind: 'lf';          lf: LostItem;             sortKey: number };
 
   const allEntries = useMemo<AllEntry[]>(() => {
     /* "Recent" sort key — older posts carry larger postedDaysAgo numbers,
@@ -247,6 +259,9 @@ export default function FeedScreen({
        timeAgo is already a human string. */
     const itemEntries: AllEntry[] = items.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
       kind: 'item' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
+    }));
+    const opportunityEntries: AllEntry[] = opportunities.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
+      kind: 'opportunity' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
     }));
     const requestEntries: AllEntry[] = requests.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
       kind: 'request' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
@@ -258,7 +273,7 @@ export default function FeedScreen({
       kind: 'lf' as const, lf, sortKey: i * 1000,
     }));
 
-    const merged = [...itemEntries, ...requestEntries, ...eventEntries, ...lfEntries];
+    const merged = [...itemEntries, ...opportunityEntries, ...requestEntries, ...eventEntries, ...lfEntries];
 
     /* Filter by category + query — events / L&F skip the category filter
        since they don't carry one, but they still honour the title query. */
@@ -275,13 +290,14 @@ export default function FeedScreen({
          * A category-less L&F post likewise shows only under "All" instead of
          * leaking into every chip (the bug where a lost football and a speaker
          * showed up under "Books"). */
-        if (e.kind === 'item')    return matchesCategory(e.item.category) && matchesQuery(e.item.title);
-        if (e.kind === 'request') return matchesCategory(e.item.category) && matchesQuery(e.item.title);
-        if (e.kind === 'event')   return matchesCategory(undefined)       && matchesQuery(e.event.title);
-        return                           matchesCategory(e.lf.category)   && matchesQuery(e.lf.title);
+        if (e.kind === 'item')        return matchesCategory(e.item.category) && matchesQuery(e.item.title);
+        if (e.kind === 'opportunity') return matchesCategory(e.item.category) && matchesQuery(e.item.title);
+        if (e.kind === 'request')     return matchesCategory(e.item.category) && matchesQuery(e.item.title);
+        if (e.kind === 'event')       return matchesCategory(undefined)       && matchesQuery(e.event.title);
+        return                               matchesCategory(e.lf.category)   && matchesQuery(e.lf.title);
       })
       .sort((a, b) => a.sortKey - b.sortKey);
-  }, [items, requests, events, lostFound, activeCategory, query, blocked]);
+  }, [items, opportunities, requests, events, lostFound, activeCategory, query, blocked]);
 
   const greetingName = (profile?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0];
 
@@ -540,7 +556,7 @@ export default function FeedScreen({
         onPick={(hit) => { track(EVT.user_card_opened, { user_id: hit.id, source: 'feed_search' }); onOpenUser?.(hit.id); }}
       />
 
-      {/* ── PILL TABS: all / requests / shared ── */}
+      {/* ── PILL TABS: all / requests / shared / services ── */}
       <section style={{ padding: '0 16px 14px' }} data-tour="feed-tabs">
         <div className="segmented">
           <button
@@ -563,6 +579,13 @@ export default function FeedScreen({
             data-active={activeType === 'shared' || undefined}
           >
             Shared
+          </button>
+          <button
+            onClick={() => { setActiveType('services'); track(EVT.feed_tab_changed, { tab: 'services' }); }}
+            aria-pressed={activeType === 'services'}
+            data-active={activeType === 'services' || undefined}
+          >
+            Services
           </button>
         </div>
       </section>
@@ -606,7 +629,7 @@ export default function FeedScreen({
                 /* Cycle aspect-ratio variants so the masonry stays
                    irregular and the user's eye keeps moving. */
                 const variant = (['xtall','tall','portrait','square','landscape'] as const)[idx % 5];
-                if (entry.kind === 'item' || entry.kind === 'request') {
+                if (entry.kind === 'item' || entry.kind === 'request' || entry.kind === 'opportunity') {
                   const it = entry.item;
                   return (
                     <FeedCard
@@ -615,12 +638,12 @@ export default function FeedScreen({
                       variant={variant}
                       isSaved={savedIds.has(it.id)}
                       hidePrice={hidePrice}
-                      /* Green stroke for both marketplace + requests so the
-                         All-tab masonry colour-codes every post-type at a
-                         glance (events purple, L&F amber, posts green). */
-                      strokeKind={entry.kind === 'request' ? 'request' : 'marketplace'}
+                      /* Colour-code every post-type at a glance: marketplace +
+                         requests green, opportunities (services) violet, events
+                         purple, L&F amber. */
+                      strokeKind={entry.kind === 'request' ? 'request' : entry.kind === 'opportunity' ? 'opportunity' : 'marketplace'}
                       onToggleSave={() => handleToggleSave(it.id)}
-                      onClick={() => { trackPostOpened(entry.kind === 'request' ? 'item' : 'item', it.id, { source: 'feed_all', is_request: !!it.isRequest }); onOpenItem(it); }}
+                      onClick={() => { trackPostOpened('item', it.id, { source: 'feed_all', is_request: !!it.isRequest }); onOpenItem(it); }}
                     />
                   );
                 }
@@ -663,7 +686,7 @@ export default function FeedScreen({
           const isAll = activeType === 'all';
           const visibleCount = isAll ? allEntries.length : filtered.length;
           const poolCount    = isAll
-            ? items.length + requests.length + events.length + lostFound.length
+            ? items.length + opportunities.length + requests.length + events.length + lostFound.length
             : source.length;
 
           if (loading && visibleCount === 0) {
@@ -684,6 +707,16 @@ export default function FeedScreen({
                   prompt="No open requests yet. Need something? Ask away!"
                   sub="Posting a request is usually faster (and cheaper) than buying new."
                   cta={{ label: 'Post a request', onClick: onPost }}
+                />
+              );
+            }
+            if (activeType === 'services') {
+              return (
+                <EmptyState
+                  icon="🛠️"
+                  prompt="No services yet. Got a skill to share?"
+                  sub="Tutoring, repairs, photography, a helping hand — offer it to your community."
+                  cta={{ label: 'Offer a service', onClick: onPost }}
                 />
               );
             }
@@ -735,10 +768,10 @@ function FeedCard({
    *  show the listing type chip (Free / Borrow / Swap) but suppress numbers. */
   hidePrice: boolean;
   /** When set, paints a coloured stroke around the card. Used on the
-   *  All-tab feed to colour-code listings + requests (green) alongside
-   *  events (purple) and L&F (amber). Undefined on the dedicated tabs
-   *  so they're not redundantly stroked. */
-  strokeKind?: 'marketplace' | 'request';
+   *  All-tab feed to colour-code listings + requests (green), opportunities
+   *  (violet), events (purple) and L&F (amber). Undefined on the dedicated
+   *  tabs so they're not redundantly stroked. */
+  strokeKind?: 'marketplace' | 'request' | 'opportunity';
 }) {
   /* Use the media (photo+video) gallery so cards autoplay videos inline
      when the user swipes to a video slide. Real listings carry their own
@@ -748,14 +781,17 @@ function FeedCard({
   const isPriced = item.listingType === 'sell' && typeof item.price === 'number';
   const ar = VARIANT_RATIOS[variant];
 
+  const isOpportunity = item.kind === 'opportunity';
+
   /* Build the price/status label once so both layouts (image + text-only)
-     stay in sync. */
+     stay in sync. Opportunities (services) frame pricing as a rate: an
+     unpriced paid service reads "Rate on ask" rather than "Selling". */
   const priceLabel = item.isRequest
     ? (item.urgent ? 'Urgent' : 'Wanted')
-    : isPriced && hidePrice                  ? 'Sell'
-    : isPriced                                ? `₹${item.price!.toLocaleString('en-IN')}`
-    : item.listingType === 'sell'             ? 'Selling'
-    : item.listingType === 'free'             ? 'Free'
+    : isPriced && hidePrice                        ? (isOpportunity ? 'Paid' : 'Sell')
+    : isPriced                                      ? `₹${item.price!.toLocaleString('en-IN')}`
+    : item.listingType === 'sell'                   ? (isOpportunity ? 'Rate on ask' : 'Selling')
+    : item.listingType === 'free'                   ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
 
   /* ── Text-only card ──
@@ -786,7 +822,7 @@ function FeedCard({
             data-kind={strokeKind}
             aria-hidden="true"
           >
-            {strokeKind === 'request' ? 'Request' : 'Shared'}
+            {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? 'Service' : 'Shared'}
           </span>
         )}
         <button
@@ -880,7 +916,7 @@ function FeedCard({
                 data-kind={strokeKind}
                 aria-hidden="true"
               >
-                {strokeKind === 'request' ? 'Request' : 'Shared'}
+                {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? 'Service' : 'Shared'}
               </span>
             )}
             <span
