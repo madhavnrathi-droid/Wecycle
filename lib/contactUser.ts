@@ -19,6 +19,9 @@ export type ContactAction =
   | 'swap'        /* Offer a swap */
   | 'request'     /* Respond to a posted request */
   | 'event'       /* Message an event organizer */
+  | 'hire'        /* Enquire about a paid service opportunity */
+  | 'help'        /* Take up a free service opportunity */
+  | 'volunteer'   /* Sign up for a volunteering opportunity */
   | 'general';    /* Generic "say hi" */
 
 export type ContactChannel = 'email' | 'whatsapp';
@@ -79,8 +82,18 @@ export function actionLabel(action: ContactAction): string {
     case 'swap':    return 'Offer a swap';
     case 'request': return 'Respond to request';
     case 'event':   return 'Message organizer';
+    case 'hire':    return 'Contact provider';
+    case 'help':    return 'Get in touch';
+    case 'volunteer': return 'Sign up to help';
     case 'general': return 'Send a message';
   }
+}
+
+/** Map an opportunity's compensation to the contact action we should fire. */
+export function opportunityAction(comp?: 'volunteer' | 'free' | 'paid'): ContactAction {
+  if (comp === 'volunteer') return 'volunteer';
+  if (comp === 'paid')      return 'hire';
+  return 'help';
 }
 
 /* ── Internals ─────────────────────────────────────── */
@@ -94,6 +107,9 @@ function subjectFor(args: BuildArgs): string {
     case 'swap':    return `Wecycle · Swap proposal: ${title}`;
     case 'request': return `Wecycle · I can help with: ${title}`;
     case 'event':   return `Wecycle · About your event: ${title}`;
+    case 'hire':    return `Wecycle · Interested in your service: ${title}`;
+    case 'help':    return `Wecycle · Taking you up on: ${title}`;
+    case 'volunteer': return `Wecycle · I'd like to volunteer: ${title}`;
     default:        return `Wecycle · About: ${title}`;
   }
 }
@@ -127,6 +143,18 @@ function bodyFor(args: BuildArgs): string {
       break;
     case 'event':
       lines.push(`I have a quick question about your event "${title}"${event?.date ? ` on ${event.date}` : ''}.`);
+      break;
+    case 'hire':
+      lines.push(`I saw your service "${title}" on Wecycle and I'd like to book / enquire.`);
+      lines.push('What’s your availability, and how does pricing work?');
+      break;
+    case 'help':
+      lines.push(`I saw "${title}" on Wecycle and I'd love to take you up on it.`);
+      lines.push('When would be a good time?');
+      break;
+    case 'volunteer':
+      lines.push(`I saw "${title}" on Wecycle and I'd like to volunteer / help out.`);
+      lines.push('Where and when should I show up?');
       break;
     default:
       lines.push(`Reaching out about "${title}" on Wecycle.`);

@@ -314,8 +314,12 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
               const tall = idx % 4 === 0 || idx % 4 === 3;
               if (entry.kind === 'item') {
                 const isMine = activeTab !== 'saved';
-                /* Pick the right action label for owner-only quick-close. */
+                /* Pick the right action label for owner-only quick-close.
+                   Opportunities (services) aren't "sold"/"given" — a
+                   volunteering call gets "Filled", any other service
+                   "Completed". */
                 const completeLabel = entry.item.isRequest ? 'Completed'
+                  : entry.item.kind === 'opportunity'      ? (entry.item.comp === 'volunteer' ? 'Filled' : 'Completed')
                   : entry.item.listingType === 'sell'      ? 'Sold'
                   : 'Given';
                 return (
@@ -330,8 +334,8 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                       if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}? It stays on your storefront with a "${completeLabel}" ribbon — delete it from the post if you want it gone.`)) return;
                       track(EVT.post_marked_complete, {
                         post_id: entry.item.id,
-                        post_kind: entry.item.isRequest ? 'request' : 'item',
-                        action: entry.item.isRequest ? 'completed' : 'sold',
+                        post_kind: entry.item.isRequest ? 'request' : entry.item.kind === 'opportunity' ? 'opportunity' : 'item',
+                        action: (entry.item.isRequest || entry.item.kind === 'opportunity') ? 'completed' : 'sold',
                       });
                       if (isDemoMode()) {
                         updateDemoPost(entry.item.id, { isClosed: true });

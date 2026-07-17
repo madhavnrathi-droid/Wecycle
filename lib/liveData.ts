@@ -46,6 +46,10 @@ interface ListingRow {
   /* 'item' (default) or 'opportunity' (a service offer). Column added by the
      add_kind_to_listings migration; existing rows default to 'item'. */
   kind: string | null;
+  /* Opportunity compensation (add_opportunity_compensation migration): 'volunteer'
+     | 'free' | 'paid', with an optional price_band when paid. Null for items. */
+  comp: string | null;
+  price_band: string | null;
   listing_type: MarketplaceItem['listingType'];
   condition: MarketplaceItem['condition'];
   price: number | null;
@@ -161,6 +165,8 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     category: row.category?.label ?? row.category_id ?? 'Other',
     categoryId: row.category_id ?? undefined,
     kind: row.kind === 'opportunity' ? 'opportunity' : 'item',
+    comp: (row.comp as MarketplaceItem['comp']) ?? undefined,
+    priceBand: (row.price_band as MarketplaceItem['priceBand']) ?? undefined,
     listingType: row.listing_type,
     price: row.price ?? undefined,
     condition: row.condition,
@@ -330,6 +336,9 @@ export interface NewListingInput {
   notifyOnEngagement?: boolean;
   /* 'item' (default) for a physical listing, 'opportunity' for a service. */
   kind?: 'item' | 'opportunity';
+  /* Opportunity-only: compensation + optional paid price band. */
+  comp?: 'volunteer' | 'free' | 'paid';
+  priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000';
 }
 
 export async function createListingWithMedia(input: NewListingInput): Promise<MarketplaceItem> {
@@ -364,6 +373,8 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       description: input.description?.trim() || null,
       category_id: categoryId,
       kind: input.kind ?? 'item',
+      comp: input.kind === 'opportunity' ? (input.comp ?? 'free') : null,
+      price_band: input.kind === 'opportunity' ? (input.priceBand ?? null) : null,
       listing_type: input.listingType,
       condition: input.condition,
       price: input.listingType === 'sell' ? (input.price ?? null) : null,
@@ -943,6 +954,9 @@ export interface EditListingPatch {
   listingType?: 'free' | 'sell' | 'borrow' | 'swap';
   price?: number;
   isHidden?: boolean;
+  /* Opportunity-only compensation edits. */
+  comp?: 'volunteer' | 'free' | 'paid';
+  priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000' | null;
 }
 
 type ListingUpdate = Database['public']['Tables']['listings']['Update'];
@@ -961,6 +975,8 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
   } else if (patch.price !== undefined) {
     update.price = patch.price;
   }
+  if (patch.comp !== undefined)        (update as { comp?: string }).comp = patch.comp;
+  if (patch.priceBand !== undefined)   (update as { price_band?: string | null }).price_band = patch.priceBand;
   if (patch.isHidden !== undefined)    update.status = patch.isHidden ? 'hidden' : 'active';
 
   const { error } = await supabase.from('listings').update(update).eq('id', id);
@@ -1187,13 +1203,14 @@ function getRecentlyViewedIds(): string[] {
 
 /** More listings from the same seller (excluding the current one). */
 export async function fetchSellerListings(
-  userId: string, excludeId: string, limit = 8,
+  userId: string, excludeId: string, limit = 8, kind: 'item' | 'opportunity' = 'item',
 ): Promise<MarketplaceItem[]> {
   if (!hasSupabaseEnv || !userId) return [];
   const { data, error } = await supabase
     .from('listings')
     .select(SELECT_WITH_JOINS)
     .eq('user_id', userId)
+    .eq('kind', kind)
     .neq('id', excludeId)
     .in('status', ['active'])
     .order('posted_at', { ascending: false })
@@ -1205,12 +1222,14 @@ export async function fetchSellerListings(
 /** Similar listings in the same category (excluding the current + same seller). */
 export async function fetchSimilarListings(
   categoryId: string | null, excludeId: string, excludeUserId: string, limit = 10,
+  kind: 'item' | 'opportunity' = 'item',
 ): Promise<MarketplaceItem[]> {
   if (!hasSupabaseEnv || !categoryId) return [];
   const { data, error } = await supabase
     .from('listings')
     .select(SELECT_WITH_JOINS)
     .eq('category_id', categoryId)
+    .eq('kind', kind)
     .neq('id', excludeId)
     .neq('user_id', excludeUserId)
     .in('status', ['active'])
@@ -1222,13 +1241,14 @@ export async function fetchSimilarListings(
 
 /** Free items in the community (listing_type = 'free'). */
 export async function fetchFreeListings(
-  excludeId: string, limit = 10,
+  excludeId: string, limit = 10, kind: 'item' | 'opportunity' = 'item',
 ): Promise<MarketplaceItem[]> {
   if (!hasSupabaseEnv) return [];
   const { data, error } = await supabase
     .from('listings')
     .select(SELECT_WITH_JOINS)
     .eq('listing_type', 'free')
+    .eq('kind', kind)
     .neq('id', excludeId)
     .in('status', ['active'])
     .order('posted_at', { ascending: false })
@@ -1241,7 +1261,7 @@ export async function fetchFreeListings(
  *  in one shot, returned in viewed-order so the most recent sits leftmost.
  *  Skips the currently-open item and removed items. */
 export async function fetchRecentlyViewedListings(
-  excludeId: string, limit = 10,
+  excludeId: string, limit = 10, kind: 'item' | 'opportunity' = 'item',
 ): Promise<MarketplaceItem[]> {
   if (!hasSupabaseEnv) return [];
   const ids = getRecentlyViewedIds().filter(id => id !== excludeId).slice(0, limit);
@@ -1250,6 +1270,7 @@ export async function fetchRecentlyViewedListings(
     .from('listings')
     .select(SELECT_WITH_JOINS)
     .in('id', ids)
+    .eq('kind', kind)
     .in('status', ['active', 'completed']);
   if (error || !data) return [];
   const items = notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
@@ -1301,11 +1322,13 @@ export async function fetchAnyOtherListings(
   excludeId: string,
   excludeUserId?: string,
   limit = 10,
+  kind: 'item' | 'opportunity' = 'item',
 ): Promise<MarketplaceItem[]> {
   if (!hasSupabaseEnv) return [];
   let q = supabase
     .from('listings')
     .select(SELECT_WITH_JOINS)
+    .eq('kind', kind)
     .neq('id', excludeId)
     .in('status', ['active'])
     .order('posted_at', { ascending: false })
@@ -1405,11 +1428,14 @@ export async function fetchProfileStats(userId: string): Promise<ProfileStats> {
     .eq('id', userId)
     .single();
 
-  /* Live counts as a fallback / for currently-active posts */
+  /* Live counts as a fallback / for currently-active posts. Only physical
+     items count toward "Shared" / impact — service opportunities aren't
+     circulated goods, so they're excluded here. */
   const listingsQ = supabase
     .from('listings')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
+    .eq('kind', 'item')
     .eq('status', 'active');
 
   const eventsQ = supabase

@@ -139,6 +139,11 @@ export interface MarketplaceItem {
      rows carrying kind='opportunity', so condition is irrelevant and pricing
      reads as a rate rather than a sale price. */
   kind?: 'item' | 'opportunity';
+  /* Compensation for an opportunity (kind='opportunity'): 'volunteer' (unpaid,
+     cause-oriented), 'free' (free help), or 'paid'. Absent for items. */
+  comp?: 'volunteer' | 'free' | 'paid';
+  /* Optional price band for a PAID opportunity when no exact rate is given. */
+  priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000';
   /* True when this card is a community *request* (someone wanting something)
      rather than a listing (someone offering). Drives the "Wanted" chip +
      "Respond / I can help" action instead of a price + listing-type verb. */
@@ -155,8 +160,11 @@ export interface MarketplaceItem {
 }
 
 /** Past-tense ribbon label for a closed listing/request, by type. */
-export function closedLabelFor(item: Pick<MarketplaceItem, 'isRequest' | 'listingType'>): string {
+export function closedLabelFor(item: Pick<MarketplaceItem, 'isRequest' | 'listingType' | 'kind' | 'comp'>): string {
   if (item.isRequest) return 'Fulfilled';
+  /* An opportunity (service) isn't "sold" or "claimed" — a volunteering call
+     gets "Filled", any other service "Completed". */
+  if (item.kind === 'opportunity') return item.comp === 'volunteer' ? 'Filled' : 'Completed';
   switch (item.listingType) {
     case 'sell':   return 'Sold';
     case 'free':   return 'Claimed';
@@ -575,39 +583,40 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
   },
 ];
 
-/* ── OPPORTUNITIES (services) ──────────────────────────
-   Service offers — a peer post type to shared items. Each is a listing row
-   with kind='opportunity': condition is irrelevant (defaults hidden) and the
-   price reads as a rate. Free = "happy to help"; a sell price = an hourly/flat
-   rate. These seed the demo-mode Services tab. */
+/* ── SERVICES & OPPORTUNITIES ───────────────────────────
+   A peer post type to shared items — anything you offer to *do* for the
+   community. Each is a listing row with kind='opportunity' spanning a
+   compensation spectrum: comp='volunteer' (unpaid, cause), 'free' (free help),
+   or 'paid' (an exact rate OR a price band). condition is irrelevant (hidden).
+   These seed the demo-mode Services & Opportunities tab. */
 export const OPPORTUNITIES: MarketplaceItem[] = [
   {
     id: 'o1', title: 'Physics & Maths Tutoring', description: 'JEE/NEET prep, 3 yrs experience. First session free. Evenings + weekends.',
-    kind: 'opportunity', category: 'Services', listingType: 'sell', price: 300, condition: 'good',
+    kind: 'opportunity', comp: 'paid', category: 'Services', listingType: 'sell', price: 300, condition: 'good',
     photoColor: '#10243A', photoIcon: '📚', location: 'Online or Meera Bhawan',
     user: USERS[1], saved: false, responses: 8, postedDaysAgo: 0, tags: ['tutoring', 'academics'],
   },
   {
     id: 'o2', title: 'Bicycle Repair & Servicing', description: 'Punctures, brakes, gears, full tune-ups. Bring it to Workshop A any evening.',
-    kind: 'opportunity', category: 'Services', listingType: 'sell', price: 150, condition: 'good',
+    kind: 'opportunity', comp: 'paid', priceBand: 'under_200', category: 'Services', listingType: 'sell', condition: 'good',
     photoColor: '#2A1A10', photoIcon: '🔧', location: 'Workshop A',
     user: USERS[5], saved: false, responses: 5, postedDaysAgo: 1, tags: ['repair', 'cycles'],
   },
   {
     id: 'o3', title: 'Guitar Lessons for Beginners', description: 'Learn your first 10 songs. Bring your own guitar. Happy to teach for free.',
-    kind: 'opportunity', category: 'Services', listingType: 'free', condition: 'good',
+    kind: 'opportunity', comp: 'free', category: 'Services', listingType: 'free', condition: 'good',
     photoColor: '#2D1A3A', photoIcon: '🎸', location: 'Krishna Bhawan common room',
     user: USERS[2], saved: false, responses: 12, postedDaysAgo: 0, tags: ['music', 'lessons'],
   },
   {
-    id: 'o4', title: 'Resume & Portfolio Reviews', description: 'Final-year CS student. I’ll review your resume + LinkedIn and give honest feedback.',
-    kind: 'opportunity', category: 'Services', listingType: 'free', condition: 'good',
-    photoColor: '#14342A', photoIcon: '📝', location: 'Online',
-    user: USERS[7], saved: false, responses: 9, postedDaysAgo: 2, tags: ['careers', 'feedback'],
+    id: 'o4', title: 'Beach Cleanup Volunteers Needed', description: 'Sunday 7am, Malpe beach. Gloves + bags provided. Come make a dent in the plastic — all welcome.',
+    kind: 'opportunity', comp: 'volunteer', category: 'Services', listingType: 'free', condition: 'good',
+    photoColor: '#0E3A2E', photoIcon: '🌱', location: 'Malpe Beach',
+    user: USERS[7], saved: false, responses: 21, postedDaysAgo: 1, tags: ['volunteering', 'environment'],
   },
   {
     id: 'o5', title: 'Event Photography', description: 'Fests, farewells, shoots. Canon 200D + edits included. Book a weekend slot.',
-    kind: 'opportunity', category: 'Services', listingType: 'sell', price: 1200, condition: 'good',
+    kind: 'opportunity', comp: 'paid', priceBand: 'over_1000', category: 'Services', listingType: 'sell', condition: 'good',
     photoColor: '#1A1810', photoIcon: '📷', location: 'Campus-wide',
     user: USERS[3], saved: false, responses: 6, postedDaysAgo: 3, tags: ['photography', 'events'],
   },

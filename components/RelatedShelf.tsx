@@ -83,22 +83,26 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
 
     const categoryKey = item.categoryId ?? null;
     const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[]);
+    /* Keep the rails on the same side of the item/service divide as the page
+       being viewed — an opportunity's rails show opportunities, an item's show
+       items. Prevents services rendering as buyable items (and vice versa). */
+    const kind: 'item' | 'opportunity' = item.kind === 'opportunity' ? 'opportunity' : 'item';
 
     Promise.all([
-      safe(fetchSellerListings(item.user.id, item.id, 8)),
-      safe(fetchSimilarListings(categoryKey, item.id, item.user.id, 10)),
-      safe(fetchFreeListings(item.id, 10)),
-      safe(fetchRecentlyViewedListings(item.id, 10)),
+      safe(fetchSellerListings(item.user.id, item.id, 8, kind)),
+      safe(fetchSimilarListings(categoryKey, item.id, item.user.id, 10, kind)),
+      safe(fetchFreeListings(item.id, 10, kind)),
+      safe(fetchRecentlyViewedListings(item.id, 10, kind)),
       safe(fetchLostFoundForAds(6)),
       /* Wider pool than needed — fallbacks draw from this. */
-      safe(fetchAnyOtherListings(item.id, undefined, 20)),
+      safe(fetchAnyOtherListings(item.id, undefined, 20, kind)),
     ]).then(([fromSeller, similar, free, recent, lostFound, pool]) => {
       if (cancelled) return;
       setData({ loading: false, fromSeller, similar, free, recent, lostFound, pool });
     });
 
     return () => { cancelled = true; };
-  }, [item.id, item.user.id, item.category]);
+  }, [item.id, item.user.id, item.category, item.kind]);
 
   const toListingCards = (items: MarketplaceItem[]): RailCard[] =>
     items.map(it => ({ kind: 'listing' as const, item: it, onClick: () => onOpenItem(it) }));
@@ -107,6 +111,8 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
     items.map(it => ({ kind: 'lostfound' as const, item: it, onClick: () => onOpenLF(it) }));
 
   /* ── Build rails with fallbacks + dedup ── */
+
+  const isOpp = item.kind === 'opportunity';
 
   const rendered = new Set<string>();
 
@@ -139,7 +145,7 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
   } else {
     /* Fallback: other sellers from the pool, day-shuffled */
     sellerRailItems = consume(shuffled(poolOtherSellers, 8));
-    sellerTitle = 'Discover other sellers';
+    sellerTitle = isOpp ? 'Discover other providers' : 'Discover other sellers';
     sellerSubtitle = undefined;
     sellerCta = undefined;
   }
@@ -151,7 +157,7 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
 
   if (data.similar.length > 0) {
     similarRailItems = consume(data.similar);
-    similarTitle = item.isRequest ? 'Similar open requests' : 'Similar items';
+    similarTitle = item.isRequest ? 'Similar open requests' : isOpp ? 'Similar opportunities' : 'Similar items';
     similarSubtitle = item.category ? `In ${item.category}` : undefined;
   } else {
     /* Fallback: anything from pool not already rendered */
@@ -193,8 +199,8 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
       />
 
       <RelatedRail
-        title="Free in your community"
-        subtitle="No money changes hands — just pick up"
+        title={isOpp ? 'Free & volunteer' : 'Free in your community'}
+        subtitle={isOpp ? 'No charge — lend a hand or learn something' : 'No money changes hands — just pick up'}
         cards={toListingCards(freeRailItems)}
         loading={data.loading}
       />

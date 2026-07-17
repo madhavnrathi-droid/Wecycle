@@ -3267,6 +3267,23 @@ img[src*="/storage/v1/object/public/"] {
   font-weight: 600;
 }
 
+/* Scrollable variant — content-sized tabs that scroll horizontally when a long
+   label (e.g. "Services & Opportunities") won't fit the row, instead of
+   squashing every tab. Used on the home feed's type tabs. */
+.segmented.segmented--scroll {
+  grid-auto-columns: max-content;
+  justify-content: start;
+  max-width: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;               /* Firefox */
+  -webkit-overflow-scrolling: touch;
+}
+.segmented.segmented--scroll::-webkit-scrollbar { display: none; }
+.segmented.segmented--scroll button {
+  text-overflow: clip;                 /* content-sized — no ellipsis needed */
+}
+
 /* ═══════════════════════════════════════════════
    CHIP ROW (horizontal scroll)
    ═══════════════════════════════════════════════ */

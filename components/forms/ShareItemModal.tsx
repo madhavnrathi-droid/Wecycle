@@ -5,6 +5,7 @@ import { Gift, Tag, MapPin, Bell } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
+import { COMP_META, COMP_OPTIONS, PRICE_BANDS, compToListing, type Comp, type PriceBand } from '../../lib/opportunity';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
@@ -46,6 +47,9 @@ export interface ShareItemForm {
   pricing: 'free' | 'sell';
   price?: number;
   photos: string[];
+  /* Service (opportunity) compensation — only used in mode="service". */
+  comp: Comp;
+  priceBand?: PriceBand;
 }
 
 const MAX_PHOTOS = 3;
@@ -54,7 +58,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
   const isService = mode === 'service';
   const [form, setForm] = useState<ShareItemForm>({
     title: '', category: isService ? 'Services' : '', condition: '', description: '',
-    location: '', pricing: 'free', photos: [],
+    location: '', pricing: 'free', photos: [], comp: 'free',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ShareItemForm, string>>>({});
   const [notifyOnEngagement, setNotifyOnEngagement] = useState(true);
@@ -80,7 +84,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
 
   const reset = () => {
     setForm({
-      title: '', category: isService ? 'Services' : '', condition: '', description: '', location: '', pricing: 'free', photos: [],
+      title: '', category: isService ? 'Services' : '', condition: '', description: '', location: '', pricing: 'free', photos: [], comp: 'free',
     });
     setNotifyOnEngagement(true);
   };
@@ -94,17 +98,21 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
       if (hasSupabaseEnv && !isDemoMode()) {
         /* Real path: upload the picker's compressed blobs + insert the row.
            Default condition to 'good' when the user didn't slide. */
+        /* Service posts derive listing_type/price from the compensation
+           choice; item posts use the free/sell pricing toggle. */
+        const svc = compToListing(form.comp, form.price);
         await createListingWithMedia({
           title: form.title,
           category: form.category,
           condition: (form.condition || 'good') as 'like_new' | 'good' | 'fair',
           description: form.description,
           location: form.location,
-          listingType: form.pricing === 'sell' ? 'sell' : 'free',
-          price: form.price,
+          listingType: isService ? svc.listingType : (form.pricing === 'sell' ? 'sell' : 'free'),
+          price: isService ? svc.price : form.price,
           media: pickerRef.current?.getMedia() ?? [],
           notifyOnEngagement,
           kind: isService ? 'opportunity' : 'item',
+          ...(isService ? { comp: form.comp, priceBand: form.comp === 'paid' ? form.priceBand : undefined } : {}),
         });
       } else {
         /* Demo path — no backend; just simulate latency. */
@@ -113,10 +121,11 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
       haptics.success();
       track(EVT.post_form_submitted, {
         post_kind: isService ? 'service' : 'share',
-        listing_type: form.pricing === 'sell' ? 'sell' : 'free',
+        listing_type: isService ? (form.comp === 'paid' ? 'sell' : 'free') : (form.pricing === 'sell' ? 'sell' : 'free'),
+        ...(isService ? { comp: form.comp, price_band: form.comp === 'paid' ? (form.priceBand ?? null) : null } : {}),
         has_photos: form.photos.length > 0,
         photo_count: form.photos.length,
-        has_price: form.pricing === 'sell' && typeof form.price === 'number',
+        has_price: isService ? (form.comp === 'paid' && typeof form.price === 'number') : (form.pricing === 'sell' && typeof form.price === 'number'),
         has_description: form.description.trim().length > 0,
         category: form.category,
       });
@@ -262,49 +271,107 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           {errors.location && <span className="field-error">{errors.location}</span>}
         </div>
 
-        <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
-          <legend className="field-label" style={{ marginBottom: 8 }}>{isService ? 'Rate' : 'Pricing'}</legend>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <button
-              type="button"
-              className="option-card"
-              aria-pressed={form.pricing === 'free'}
-              onClick={() => update('pricing', 'free')}
-            >
-              <Gift size={20} strokeWidth={1.8} />
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Free</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{isService ? 'Happy to help' : 'Give it away'}</span>
-            </button>
-            <button
-              type="button"
-              className="option-card"
-              aria-pressed={form.pricing === 'sell'}
-              onClick={() => update('pricing', 'sell')}
-            >
-              <Tag size={20} strokeWidth={1.8} />
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{isService ? 'Paid' : 'Sell'}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{isService ? 'Set a rate' : 'Set a price'}</span>
-            </button>
-          </div>
-          {form.pricing === 'sell' && (
-            <div className="field" style={{ marginTop: 10 }}>
-              <label htmlFor="si-price" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span>{isService ? 'Rate (₹)' : 'Price (₹)'}</span>
-                <span className="field-hint" style={{ fontWeight: 400 }}>
-                  {isService ? 'Optional — leave blank for "Rate on ask"' : 'Optional — leave blank for "Selling"'}
-                </span>
-              </label>
-              <input
-                id="si-price"
-                type="number" inputMode="numeric" min="1"
-                className="form-input"
-                placeholder={isService ? 'e.g. 300 / hr (or leave blank)' : 'e.g. 500 (or leave blank)'}
-                value={form.price ?? ''}
-                onChange={e => update('price', Number(e.target.value) || undefined)}
-              />
+        {isService ? (
+          /* ── Compensation: Volunteer / Free / Paid (+ price bands) ── */
+          <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
+            <legend className="field-label" style={{ marginBottom: 8 }}>Compensation</legend>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {COMP_OPTIONS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  className="option-card"
+                  aria-pressed={form.comp === c}
+                  onClick={() => update('comp', c)}
+                >
+                  <span style={{ fontSize: 20 }} aria-hidden="true">{COMP_META[c].emoji}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{COMP_META[c].label}</span>
+                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>{COMP_META[c].blurb}</span>
+                </button>
+              ))}
             </div>
-          )}
-        </fieldset>
+            {form.comp === 'paid' && (
+              <div style={{ marginTop: 12 }}>
+                <div className="field-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                  <span>Price band</span>
+                  <span className="field-hint" style={{ fontWeight: 400 }}>Pick a range — or set an exact rate below</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {PRICE_BANDS.map(b => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      className={`pill ${form.priceBand === b.id ? 'pill-active' : ''}`}
+                      aria-pressed={form.priceBand === b.id}
+                      onClick={() => setForm(f => ({ ...f, priceBand: b.id, price: undefined }))}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="field" style={{ marginTop: 10 }}>
+                  <label htmlFor="si-price" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                    <span>Exact rate (₹)</span>
+                    <span className="field-hint" style={{ fontWeight: 400 }}>Optional — overrides the band</span>
+                  </label>
+                  <input
+                    id="si-price"
+                    type="number" inputMode="numeric" min="1"
+                    className="form-input"
+                    placeholder="e.g. 300 / hr"
+                    value={form.price ?? ''}
+                    onChange={e => {
+                      const n = Number(e.target.value) || undefined;
+                      setForm(f => ({ ...f, price: n, priceBand: n !== undefined ? undefined : f.priceBand }));
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </fieldset>
+        ) : (
+          <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
+            <legend className="field-label" style={{ marginBottom: 8 }}>Pricing</legend>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button
+                type="button"
+                className="option-card"
+                aria-pressed={form.pricing === 'free'}
+                onClick={() => update('pricing', 'free')}
+              >
+                <Gift size={20} strokeWidth={1.8} />
+                <span style={{ fontWeight: 600, fontSize: 13 }}>Free</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Give it away</span>
+              </button>
+              <button
+                type="button"
+                className="option-card"
+                aria-pressed={form.pricing === 'sell'}
+                onClick={() => update('pricing', 'sell')}
+              >
+                <Tag size={20} strokeWidth={1.8} />
+                <span style={{ fontWeight: 600, fontSize: 13 }}>Sell</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Set a price</span>
+              </button>
+            </div>
+            {form.pricing === 'sell' && (
+              <div className="field" style={{ marginTop: 10 }}>
+                <label htmlFor="si-price" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                  <span>Price (₹)</span>
+                  <span className="field-hint" style={{ fontWeight: 400 }}>Optional — leave blank for &quot;Selling&quot;</span>
+                </label>
+                <input
+                  id="si-price"
+                  type="number" inputMode="numeric" min="1"
+                  className="form-input"
+                  placeholder="e.g. 500 (or leave blank)"
+                  value={form.price ?? ''}
+                  onChange={e => update('price', Number(e.target.value) || undefined)}
+                />
+              </div>
+            )}
+          </fieldset>
+        )}
 
         {/* ── Engagement notification toggle ── */}
         <NotifyToggle

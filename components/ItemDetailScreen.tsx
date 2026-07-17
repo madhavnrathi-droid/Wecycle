@@ -12,7 +12,11 @@ import RelatedShelf from './RelatedShelf';
 import type { LostItem } from '../lib/mockData';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
-import { buildContactLinks, itemAction, actionLabel, type ContactLink } from '../lib/contactUser';
+import { buildContactLinks, itemAction, opportunityAction, actionLabel, type ContactLink } from '../lib/contactUser';
+import {
+  opportunityCompLabel, opportunityHasExactPrice, compToListing,
+  COMP_META, COMP_OPTIONS, PRICE_BANDS, type Comp, type PriceBand,
+} from '../lib/opportunity';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import {
   incrementListingView, toggleListingSave,
@@ -170,6 +174,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   const [eListingType, setEListingType] = useState<'free' | 'sell' | 'borrow' | 'swap'>(
     item.listingType ?? 'free',
   );
+  /* Opportunity compensation edit state (services only). */
+  const [eComp, setEComp]               = useState<Comp>(item.comp ?? 'free');
+  const [ePriceBand, setEPriceBand]     = useState<PriceBand | undefined>(item.priceBand);
   const [eCategory, setECategory]       = useState((item.category || '').toLowerCase());
   const [eUrgent, setEUrgent]           = useState(!!item.urgent);
 
@@ -182,9 +189,11 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setELocation(item.location ?? '');
     setEPriceStr(typeof item.price === 'number' ? String(item.price) : '');
     setEListingType(item.listingType ?? 'free');
+    setEComp(item.comp ?? 'free');
+    setEPriceBand(item.priceBand);
     setECategory((item.category || '').toLowerCase());
     setEUrgent(!!item.urgent);
-  }, [item.id, item.title, item.description, item.location, item.price, item.listingType, item.category, item.urgent]);
+  }, [item.id, item.title, item.description, item.location, item.price, item.listingType, item.comp, item.priceBand, item.category, item.urgent]);
 
   const isRequestPost = !!item.isRequest;
   const isDirty = useMemo(() => {
@@ -196,10 +205,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       if (ePriceStr !== origPriceStr) return true;
       if (eListingType !== (item.listingType ?? 'free')) return true;
     }
+    if (item.kind === 'opportunity') {
+      if (eComp !== (item.comp ?? 'free')) return true;
+      if ((ePriceBand ?? null) !== (item.priceBand ?? null)) return true;
+    }
     if (eCategory !== (item.category || '').toLowerCase()) return true;
     if (isRequestPost && eUrgent !== !!item.urgent) return true;
     return false;
-  }, [eTitle, eDescription, eLocation, ePriceStr, eListingType, eCategory, eUrgent, item, isRequestPost]);
+  }, [eTitle, eDescription, eLocation, ePriceStr, eListingType, eComp, ePriceBand, eCategory, eUrgent, item, isRequestPost]);
 
   const [saving, setSaving] = useState<null | 'save' | 'repost'>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -212,12 +225,16 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setSaveError(null);
     try {
       const priceNum = ePriceStr ? Number(ePriceStr) : undefined;
+      const isOpp = item.kind === 'opportunity';
+      const svc = isOpp ? compToListing(eComp, priceNum) : null;
       if (isDemoMode()) {
         updateDemoPost(item.id, {
           title: eTitle, category: eCategory, description: eDescription,
           ...(isRequestPost
             ? { urgent: eUrgent }
-            : { location: eLocation, listingType: eListingType, price: priceNum }),
+            : isOpp
+              ? { location: eLocation, comp: eComp, priceBand: eComp === 'paid' ? ePriceBand : undefined, listingType: svc!.listingType, price: svc!.price }
+              : { location: eLocation, listingType: eListingType, price: priceNum }),
         });
       } else if (isRequestPost) {
         await updateRequestFields(item.id, {
@@ -227,7 +244,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       } else {
         await updateListingFields(item.id, {
           title: eTitle, category: eCategory, description: eDescription,
-          location: eLocation, listingType: eListingType, price: priceNum,
+          location: eLocation,
+          ...(isOpp
+            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, priceBand: eComp === 'paid' ? (ePriceBand ?? null) : null }
+            : { listingType: eListingType, price: priceNum }),
         });
       }
     } catch (e) {
@@ -235,7 +255,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     } finally {
       setSaving(null);
     }
-  }, [isDirty, saving, item.id, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, ePriceStr]);
+  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, ePriceBand, ePriceStr]);
 
   const handleSaveAndRepost = useCallback(async () => {
     if (!isDirty || saving) return;
@@ -243,12 +263,16 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setSaveError(null);
     try {
       const priceNum = ePriceStr ? Number(ePriceStr) : undefined;
+      const isOpp = item.kind === 'opportunity';
+      const svc = isOpp ? compToListing(eComp, priceNum) : null;
       if (isDemoMode()) {
         repostDemoPost(item.id, {
           title: eTitle, category: eCategory, description: eDescription,
           ...(isRequestPost
             ? { urgent: eUrgent }
-            : { location: eLocation, listingType: eListingType, price: priceNum }),
+            : isOpp
+              ? { location: eLocation, comp: eComp, priceBand: eComp === 'paid' ? ePriceBand : undefined, listingType: svc!.listingType, price: svc!.price }
+              : { location: eLocation, listingType: eListingType, price: priceNum }),
         });
       } else if (isRequestPost) {
         await repostRequest(item.id, {
@@ -258,7 +282,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       } else {
         await repostListing(item.id, {
           title: eTitle, category: eCategory, description: eDescription,
-          location: eLocation, listingType: eListingType, price: priceNum,
+          location: eLocation,
+          ...(isOpp
+            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, priceBand: eComp === 'paid' ? (ePriceBand ?? null) : null }
+            : { listingType: eListingType, price: priceNum }),
         });
       }
     } catch (e) {
@@ -266,7 +293,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     } finally {
       setSaving(null);
     }
-  }, [isDirty, saving, item.id, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, ePriceStr]);
+  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, ePriceBand, ePriceStr]);
 
   const handleDiscard = useCallback(() => {
     setETitle(item.title);
@@ -332,8 +359,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   const isUnpricedSell = !isRequest && item.listingType === 'sell' && !isPriced;
   const priceLabel = isRequest
     ? (item.urgent ? 'Urgent request' : 'Wanted')
+    : isOpportunity ? opportunityCompLabel(item)
     : isPriced ? `₹${item.price!.toLocaleString('en-IN')}`
-    : isUnpricedSell ? (isOpportunity ? 'Rate on ask' : 'Selling')
+    : isUnpricedSell ? 'Selling'
     : item.listingType === 'free' ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
   const desc = item.description ?? '';
@@ -343,7 +371,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
 
   /* The action the contact buttons fire: requests → 'request' ("I can help"),
      otherwise derived from the listing type. */
-  const action = isRequest ? 'request' as const : itemAction(item);
+  const action = isRequest ? 'request' as const
+    : isOpportunity ? opportunityAction(item.comp)
+    : itemAction(item);
 
   /* Owner contact (email/phone) resolved on demand — the raw columns are locked
      down at the DB so the feed no longer carries them. Demo uses the mock
@@ -478,6 +508,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           eLocation, setELocation,
           ePriceStr, setEPriceStr,
           eListingType, setEListingType,
+          eComp, setEComp,
+          ePriceBand, setEPriceBand,
           eCategory, setECategory,
           eUrgent, setEUrgent,
           isRequestPost,
@@ -687,24 +719,46 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
          + meta strip" layout from before. */}
       {canManage ? (
         <section style={{ padding: '24px 20px 0', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {isOpportunity && (
+            <div style={{
+              display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: '#fff', background: '#8B5CF6',
+              padding: '4px 10px', borderRadius: 999,
+            }}>
+              🛠️ Opportunity
+            </div>
+          )}
           <EditFieldRow label="Title">
             <input
               value={eTitle}
               onChange={e => setETitle(e.target.value)}
-              placeholder="What are you sharing?"
+              placeholder={isOpportunity ? 'What are you offering?' : 'What are you sharing?'}
               className="inline-edit inline-edit--h1"
               aria-label="Title"
             />
           </EditFieldRow>
 
           {!isRequestPost && (
-            <EditFieldRow label="Pricing">
-              <OwnerPriceEditor
-                listingType={eListingType}
-                priceStr={ePriceStr}
-                onListingType={setEListingType}
-                onPriceStr={setEPriceStr}
-              />
+            <EditFieldRow label={isOpportunity ? 'Compensation' : 'Pricing'}>
+              {isOpportunity ? (
+                <OwnerCompEditor
+                  comp={eComp}
+                  priceBand={ePriceBand}
+                  priceStr={ePriceStr}
+                  onComp={setEComp}
+                  onPriceBand={setEPriceBand}
+                  onPriceStr={setEPriceStr}
+                />
+              ) : (
+                <OwnerPriceEditor
+                  listingType={eListingType}
+                  priceStr={ePriceStr}
+                  onListingType={setEListingType}
+                  onPriceStr={setEPriceStr}
+                />
+              )}
             </EditFieldRow>
           )}
 
@@ -713,7 +767,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               <input
                 value={eLocation}
                 onChange={e => setELocation(e.target.value)}
-                placeholder="Where can it be picked up?"
+                placeholder={isOpportunity ? 'Where or how? (or “Online”)' : 'Where can it be picked up?'}
                 className="inline-edit inline-edit--input"
                 aria-label="Location"
               />
@@ -823,7 +877,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             <textarea
               value={eDescription}
               onChange={e => setEDescription(e.target.value)}
-              placeholder="Condition, pickup notes, why you're letting it go…"
+              placeholder={isOpportunity ? 'What you offer, experience, availability…' : 'Condition, pickup notes, why you’re letting it go…'}
               className="inline-edit inline-edit--body"
               aria-label="Description"
               rows={4}
@@ -860,7 +914,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             )}
           </>
         )}
-        {isUnpricedSell && (
+        {isUnpricedSell && !isOpportunity && (
           <p style={{
             marginTop: 12,
             padding: '8px 12px',
@@ -1148,6 +1202,8 @@ interface EditState {
   ePriceStr: string;        setEPriceStr: (v: string) => void;
   eListingType: 'free' | 'sell' | 'borrow' | 'swap';
   setEListingType: (v: 'free' | 'sell' | 'borrow' | 'swap') => void;
+  eComp: Comp;              setEComp: (v: Comp) => void;
+  ePriceBand?: PriceBand;   setEPriceBand: (v: PriceBand | undefined) => void;
   eCategory: string;        setECategory: (v: string) => void;
   eUrgent: boolean;         setEUrgent: (v: boolean) => void;
   isRequestPost: boolean;
@@ -1234,7 +1290,8 @@ function DesktopLayout({
   };
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
-    ePriceStr, setEPriceStr, eListingType, setEListingType, eCategory, setECategory,
+    ePriceStr, setEPriceStr, eListingType, setEListingType,
+    eComp, setEComp, ePriceBand, setEPriceBand, eCategory, setECategory,
     eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError,
     handleSaveChanges, handleSaveAndRepost, handleDiscard,
     photoEditOpen, setPhotoEditOpen, currentPhotoUrlsForPicker, handleSavePhotos,
@@ -1538,12 +1595,23 @@ function DesktopLayout({
               )}
             </div>
             {canManage && !isRequestPost ? (
-              <OwnerPriceEditor
-                listingType={eListingType}
-                priceStr={ePriceStr}
-                onListingType={setEListingType}
-                onPriceStr={setEPriceStr}
-              />
+              isOpportunity ? (
+                <OwnerCompEditor
+                  comp={eComp}
+                  priceBand={ePriceBand}
+                  priceStr={ePriceStr}
+                  onComp={setEComp}
+                  onPriceBand={setEPriceBand}
+                  onPriceStr={setEPriceStr}
+                />
+              ) : (
+                <OwnerPriceEditor
+                  listingType={eListingType}
+                  priceStr={ePriceStr}
+                  onListingType={setEListingType}
+                  onPriceStr={setEPriceStr}
+                />
+              )
             ) : (
               /* Price — bold black, no bounding box. */
               <div style={{
@@ -1570,12 +1638,12 @@ function DesktopLayout({
                 fontSize: 11, fontWeight: 700,
                 letterSpacing: '0.08em', textTransform: 'uppercase',
                 color: 'var(--text-secondary)',
-              }}>About this item</h2>
+              }}>{isOpportunity ? 'About this opportunity' : 'About this item'}</h2>
               {canManage ? (
                 <textarea
                   value={eDescription}
                   onChange={e => setEDescription(e.target.value)}
-                  placeholder="Describe the item — condition, why you're letting it go, pickup notes…"
+                  placeholder={isOpportunity ? 'Describe your offer — what you do, experience, availability…' : 'Describe the item — condition, why you’re letting it go, pickup notes…'}
                   className="inline-edit inline-edit--body inline-edit--body-desktop"
                   aria-label="Description"
                   rows={6}
@@ -1911,6 +1979,65 @@ function EditFieldRow({
         {label}
       </span>
       {children}
+    </div>
+  );
+}
+
+/* Compensation editor for an OPPORTUNITY (service): Volunteer / Free / Paid,
+ * with price-band chips + an optional exact rate when Paid. Mirrors the create
+ * form so the edit path can't put a service into a nonsensical borrow/swap. */
+function OwnerCompEditor({
+  comp, priceBand, priceStr, onComp, onPriceBand, onPriceStr,
+}: {
+  comp: Comp;
+  priceBand?: PriceBand;
+  priceStr: string;
+  onComp: (v: Comp) => void;
+  onPriceBand: (v: PriceBand | undefined) => void;
+  onPriceStr: (v: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="listing-type-segmented" role="radiogroup" aria-label="Compensation">
+        {COMP_OPTIONS.map(c => (
+          <button
+            key={c}
+            type="button"
+            role="radio"
+            aria-checked={comp === c}
+            data-active={comp === c || undefined}
+            onClick={() => onComp(c)}
+            className="listing-type-chip"
+          >
+            {COMP_META[c].label}
+          </button>
+        ))}
+      </div>
+      {comp === 'paid' && (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {PRICE_BANDS.map(b => (
+              <button
+                key={b.id}
+                type="button"
+                className={`pill ${priceBand === b.id ? 'pill-active' : ''}`}
+                aria-pressed={priceBand === b.id}
+                onClick={() => { onPriceBand(b.id); onPriceStr(''); }}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="number" inputMode="numeric" min="1"
+            className="inline-edit inline-edit--input"
+            placeholder="Exact rate ₹ (optional — overrides the band)"
+            value={priceStr}
+            onChange={e => { onPriceStr(e.target.value); if (e.target.value) onPriceBand(undefined); }}
+            aria-label="Exact rate"
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -752,11 +752,13 @@ export type Database = {
           community_id: string
           condition: Database["public"]["Enums"]["item_condition"]
           description: string | null
+          comp: string | null
           id: string
           is_featured: boolean
           kind: string
           listing_type: Database["public"]["Enums"]["listing_type"]
           location: string | null
+          price_band: string | null
           photo_color: string | null
           photo_icon: string | null
           photo_urls: string[]
@@ -777,11 +779,13 @@ export type Database = {
           community_id: string
           condition?: Database["public"]["Enums"]["item_condition"]
           description?: string | null
+          comp?: string | null
           id?: string
           is_featured?: boolean
           kind?: string
           listing_type: Database["public"]["Enums"]["listing_type"]
           location?: string | null
+          price_band?: string | null
           photo_color?: string | null
           photo_icon?: string | null
           photo_urls?: string[]
@@ -802,11 +806,13 @@ export type Database = {
           community_id?: string
           condition?: Database["public"]["Enums"]["item_condition"]
           description?: string | null
+          comp?: string | null
           id?: string
           is_featured?: boolean
           kind?: string
           listing_type?: Database["public"]["Enums"]["listing_type"]
           location?: string | null
+          price_band?: string | null
           photo_color?: string | null
           photo_icon?: string | null
           photo_urls?: string[]

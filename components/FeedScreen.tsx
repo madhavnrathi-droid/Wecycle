@@ -8,6 +8,7 @@ import {
   type MarketplaceItem, type CommunityEvent, type LostItem,
 } from '../lib/mockData';
 import { resolveItemMedia, getAvatar, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
+import { opportunityCompLabel, opportunityHasExactPrice } from '../lib/opportunity';
 import SavedSearchBar from './SavedSearchBar';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
@@ -556,9 +557,11 @@ export default function FeedScreen({
         onPick={(hit) => { track(EVT.user_card_opened, { user_id: hit.id, source: 'feed_search' }); onOpenUser?.(hit.id); }}
       />
 
-      {/* ── PILL TABS: all / requests / shared / services ── */}
+      {/* ── PILL TABS: all / requests / shared / services & opportunities ──
+         Scrollable variant: the last tab's label is long, so the row scrolls
+         horizontally on narrow screens instead of squashing every tab. */}
       <section style={{ padding: '0 16px 14px' }} data-tour="feed-tabs">
-        <div className="segmented">
+        <div className="segmented segmented--scroll">
           <button
             onClick={() => { setActiveType('all'); track(EVT.feed_tab_changed, { tab: 'all' }); }}
             aria-pressed={activeType === 'all'}
@@ -585,7 +588,7 @@ export default function FeedScreen({
             aria-pressed={activeType === 'services'}
             data-active={activeType === 'services' || undefined}
           >
-            Services
+            Services &amp; Opportunities
           </button>
         </div>
       </section>
@@ -714,8 +717,8 @@ export default function FeedScreen({
               return (
                 <EmptyState
                   icon="🛠️"
-                  prompt="No services yet. Got a skill to share?"
-                  sub="Tutoring, repairs, photography, a helping hand — offer it to your community."
+                  prompt="Nothing here yet. Got a skill or some time to give?"
+                  sub="Tutoring, repairs, photography, or rallying volunteers — paid or free, offer it to your community."
                   cta={{ label: 'Offer a service', onClick: onPost }}
                 />
               );
@@ -784,13 +787,15 @@ function FeedCard({
   const isOpportunity = item.kind === 'opportunity';
 
   /* Build the price/status label once so both layouts (image + text-only)
-     stay in sync. Opportunities (services) frame pricing as a rate: an
-     unpriced paid service reads "Rate on ask" rather than "Selling". */
+     stay in sync. Opportunities frame the slot as compensation: Volunteer /
+     Free / ₹rate / a price band / "Rate on ask". */
   const priceLabel = item.isRequest
     ? (item.urgent ? 'Urgent' : 'Wanted')
-    : isPriced && hidePrice                        ? (isOpportunity ? 'Paid' : 'Sell')
+    : isOpportunity
+      ? (hidePrice && opportunityHasExactPrice(item) ? 'Paid' : opportunityCompLabel(item))
+    : isPriced && hidePrice                        ? 'Sell'
     : isPriced                                      ? `₹${item.price!.toLocaleString('en-IN')}`
-    : item.listingType === 'sell'                   ? (isOpportunity ? 'Rate on ask' : 'Selling')
+    : item.listingType === 'sell'                   ? 'Selling'
     : item.listingType === 'free'                   ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
 
@@ -822,7 +827,7 @@ function FeedCard({
             data-kind={strokeKind}
             aria-hidden="true"
           >
-            {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? 'Service' : 'Shared'}
+            {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? (item.comp === 'volunteer' ? 'Volunteer' : 'Service') : 'Shared'}
           </span>
         )}
         <button
@@ -916,7 +921,7 @@ function FeedCard({
                 data-kind={strokeKind}
                 aria-hidden="true"
               >
-                {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? 'Service' : 'Shared'}
+                {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? (item.comp === 'volunteer' ? 'Volunteer' : 'Service') : 'Shared'}
               </span>
             )}
             <span
