@@ -8,7 +8,7 @@ import {
   type MarketplaceItem, type CommunityEvent, type LostItem,
 } from '../lib/mockData';
 import { resolveItemMedia, getAvatar, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
-import { opportunityCompLabel, opportunityHasExactPrice } from '../lib/opportunity';
+import { opportunityCompLabel } from '../lib/opportunity';
 import SavedSearchBar from './SavedSearchBar';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
@@ -792,7 +792,7 @@ function FeedCard({
   const priceLabel = item.isRequest
     ? (item.urgent ? 'Urgent' : 'Wanted')
     : isOpportunity
-      ? (hidePrice && opportunityHasExactPrice(item) ? 'Paid' : opportunityCompLabel(item))
+      ? (hidePrice && item.comp === 'paid' ? 'Paid' : opportunityCompLabel(item))
     : isPriced && hidePrice                        ? 'Sell'
     : isPriced                                      ? `₹${item.price!.toLocaleString('en-IN')}`
     : item.listingType === 'sell'                   ? 'Selling'

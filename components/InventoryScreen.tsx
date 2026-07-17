@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Menu, Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
 import { Wordmark } from './Brand';
 import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem } from '../lib/mockData';
+import { opportunityCompLabel } from '../lib/opportunity';
 import { resolveItemMedia, getEventPhoto, getAvatar, getLostFoundPhoto } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import { getEventMetrics } from '../lib/metrics';
@@ -513,6 +514,7 @@ function InventoryCard({
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                 {item.isRequest
                   ? (item.urgent ? 'Urgent' : 'Wanted')
+                  : item.kind === 'opportunity' ? opportunityCompLabel(item)
                   : isPriced ? `₹${item.price}`
                   : item.listingType === 'sell' ? 'Selling'
                   : item.listingType === 'free' ? 'Free'
@@ -568,6 +570,7 @@ function InventoryCard({
                   >
                     {item.isRequest
                       ? (item.urgent ? 'Urgent' : 'Wanted')
+                      : item.kind === 'opportunity' ? opportunityCompLabel(item)
                       : isPriced ? `₹${item.price}`
                       : item.listingType === 'sell' ? 'Selling'
                       : item.listingType === 'free' ? 'Free'

@@ -14,7 +14,7 @@ import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, itemAction, opportunityAction, actionLabel, type ContactLink } from '../lib/contactUser';
 import {
-  opportunityCompLabel, opportunityHasExactPrice, compToListing,
+  opportunityCompLabel, compToListing,
   COMP_META, COMP_OPTIONS, PRICE_BANDS, type Comp, type PriceBand,
 } from '../lib/opportunity';
 import { useOwnerContact } from '../lib/useOwnerContact';
@@ -301,6 +301,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setELocation(item.location ?? '');
     setEPriceStr(typeof item.price === 'number' ? String(item.price) : '');
     setEListingType(item.listingType ?? 'free');
+    setEComp(item.comp ?? 'free');
+    setEPriceBand(item.priceBand);
     setECategory((item.category || '').toLowerCase());
     setEUrgent(!!item.urgent);
   }, [item]);

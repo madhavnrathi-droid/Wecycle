@@ -20,7 +20,8 @@
 
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Search } from 'lucide-react';
-import type { MarketplaceItem, LostItem } from '../lib/mockData';
+import { closedLabelFor, type MarketplaceItem, type LostItem } from '../lib/mockData';
+import { opportunityCompLabel } from '../lib/opportunity';
 import { resolveItemMedia } from '../lib/photos';
 
 export type RailCard =
@@ -225,6 +226,8 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
   const priceLabel =
     item.isRequest
       ? 'Request'
+      : item.kind === 'opportunity'
+        ? opportunityCompLabel(item)
       : item.listingType === 'free'
         ? 'Free'
         : typeof item.price === 'number'
@@ -262,7 +265,7 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
           </div>
         )}
         {/* Type/status badge */}
-        {(item.isRequest || item.listingType === 'free' || closed) && (
+        {(item.isRequest || item.listingType === 'free' || item.kind === 'opportunity' || closed) && (
           <span style={{
             position: 'absolute', top: 8, left: 8,
             fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
@@ -270,12 +273,16 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
             color: '#fff',
             background: closed ? 'rgba(20,20,20,0.7)'
               : item.isRequest ? 'var(--accent-blue, #3B82F6)'
+              : item.kind === 'opportunity' ? '#8B5CF6'
               : 'var(--accent-green, #14B86C)',
             padding: '3px 8px',
             borderRadius: 999,
             backdropFilter: 'blur(6px)',
           }}>
-            {closed ? 'Sold' : item.isRequest ? 'Request' : 'Free'}
+            {closed ? closedLabelFor(item)
+              : item.isRequest ? 'Request'
+              : item.kind === 'opportunity' ? (item.comp === 'volunteer' ? 'Volunteer' : 'Service')
+              : 'Free'}
           </span>
         )}
       </div>

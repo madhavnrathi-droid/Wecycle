@@ -17,6 +17,7 @@
 
 import { supabase, hasSupabaseEnv } from './supabase';
 import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData';
+import { listingToComp } from './opportunity';
 import type { CompressedMedia } from './mediaCompression';
 import type { Database } from './database.types';
 
@@ -165,7 +166,12 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     category: row.category?.label ?? row.category_id ?? 'Other',
     categoryId: row.category_id ?? undefined,
     kind: row.kind === 'opportunity' ? 'opportunity' : 'item',
-    comp: (row.comp as MarketplaceItem['comp']) ?? undefined,
+    /* For legacy opportunities posted before the comp column existed, infer
+       comp from the listing_type ('sell'→paid, else free) so their labels +
+       contact CTA don't fall through to "Rate on ask" / free-help. */
+    comp: row.comp
+      ? (row.comp as MarketplaceItem['comp'])
+      : (row.kind === 'opportunity' ? listingToComp(row.listing_type) : undefined),
     priceBand: (row.price_band as MarketplaceItem['priceBand']) ?? undefined,
     listingType: row.listing_type,
     price: row.price ?? undefined,
@@ -272,6 +278,11 @@ export async function fetchListingsByUser(userId: string): Promise<MarketplaceIt
     .from('listings')
     .select(SELECT_WITH_JOINS)
     .eq('user_id', userId)
+    /* Physical items only — the public storefront's Shared masonry renders
+       ItemTiles (not opportunity-aware), and the hero "Shared" stat already
+       excludes opportunities, so keeping them out avoids a bare-₹ mislabel
+       and a count mismatch. Services surface via the feed's Services tab. */
+    .eq('kind', 'item')
     .in('status', ['active', 'completed'])
     .order('posted_at', { ascending: false });
   if (error || !data) return [];
