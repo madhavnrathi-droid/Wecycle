@@ -92,10 +92,20 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           maxAttendees: form.maxAttendees,
           media: pickerRef.current?.getMedia() ?? [],
         });
-        /* Attach the registration form right after the event exists. */
+        /* Attach the registration form right after the event exists. This is
+           caught SEPARATELY: the event is already live, so surfacing a
+           submit-level error here would invite a retry that duplicates the
+           event. Tell the user where to add the form instead. */
         if (regFields !== null && regFields.length > 0) {
-          await upsertEventForm(eventId, regFields);
-          track(EVT.event_form_saved, { event_id: eventId, field_count: regFields.length, source: 'create' });
+          try {
+            await upsertEventForm(eventId, regFields);
+            track(EVT.event_form_saved, { event_id: eventId, field_count: regFields.length, source: 'create' });
+          } catch {
+            track(EVT.post_form_failed, { post_kind: 'event', reason: 'form_attach_failed' });
+            if (typeof window !== 'undefined') {
+              window.alert('Your event is live, but the registration form could not be attached. Open the event and use the form button to add it.');
+            }
+          }
         }
       } else {
         await new Promise(r => setTimeout(r, 400));

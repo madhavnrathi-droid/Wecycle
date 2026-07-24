@@ -144,8 +144,20 @@ export default function EventRegistrationScreen({
             Loading the form…
           </div>
         ) : !form || form.fields.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-            This event no longer has a registration form — just RSVP directly.
+          /* The organizer removed the form after this snapshot was loaded —
+             don't dead-end the user: confirm the RSVP right here. */
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+            <p style={{ margin: '0 0 16px' }}>
+              This event no longer needs a registration form.
+            </p>
+            <button
+              type="button"
+              onClick={() => { haptics.success(); onSubmitted(); }}
+              className="btn btn-gradient"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}
+            >
+              <Check size={15} strokeWidth={2.4} /> Confirm RSVP
+            </button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -272,11 +284,11 @@ function FieldInput({
             {field.required && <span className="required" aria-hidden="true"> *</span>}
           </legend>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {opts.map(opt => {
+            {opts.map((opt, oi) => {
               const on = multi ? arr.includes(opt) : str === opt;
               return (
                 <button
-                  key={opt}
+                  key={`${oi}-${opt}`}
                   type="button"
                   role={multi ? 'checkbox' : 'radio'}
                   aria-checked={on}
@@ -325,7 +337,7 @@ function FieldInput({
             aria-invalid={!!error}
           >
             <option value="">Select…</option>
-            {opts.map(o => <option key={o} value={o}>{o}</option>)}
+            {opts.map((o, oi) => <option key={`${oi}-${o}`} value={o}>{o}</option>)}
           </select>
           {errEl}
         </div>

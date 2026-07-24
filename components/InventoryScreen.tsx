@@ -653,10 +653,12 @@ function InventoryEventCard({
   const isMockEvent = !Array.isArray((event as { photoUrls?: string[] }).photoUrls);
   const photo = (event as { photoUrls?: string[] }).photoUrls?.[0]
     ?? (isMockEvent ? getEventPhoto(event.id, event.eventType) : undefined);
-  const metrics = getEventMetrics(event.id);
-  /* Live events carry real counts; mock events use the demo hash numbers. */
-  const views = event.viewCount ?? metrics.views;
-  const rsvps = event.attendees || metrics.rsvps;
+  /* Live events show REAL counts only — the hash-fake numbers are for demo
+     fixtures, never for a live event that simply has zero views yet. */
+  const demoCard = isDemoMode();
+  const metrics = demoCard ? getEventMetrics(event.id) : null;
+  const views = demoCard ? (event.viewCount ?? metrics!.views) : (event.viewCount ?? 0);
+  const rsvps = demoCard ? (event.attendees || metrics!.rsvps) : event.attendees;
   const ar = tall ? '0.72' : '0.92';
 
   if (!photo && !hasUploaded && !isMockEvent) {

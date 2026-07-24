@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import BottomNav, { type Screen } from '../components/BottomNav';
 import FeedScreen from '../components/FeedScreen';
 import MarketplaceScreen from '../components/MarketplaceScreen';
@@ -38,7 +38,7 @@ import {
   updateLostFoundFields, repostLostFound, fetchPostById,
   toggleEventRsvp, fetchMyRsvpIds,
 } from '../lib/liveData';
-import { withdrawFormResponse } from '../lib/eventForms';
+import { withdrawFormResponse, fetchEventForm } from '../lib/eventForms';
 import { hasSupabaseEnv } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
@@ -109,12 +109,18 @@ export default function WecycleApp() {
      Live mode persists via event_rsvps/rpc_toggle_rsvp and hydrates on auth;
      demo mode seeds the fixture RSVPs and stays in memory. */
   const [rsvpdEvents, setRsvpdEvents] = useState<Set<string>>(new Set());
+  /* Ref mirror of rsvpdEvents so async reconciliation reads CURRENT state,
+     not the closure snapshot — makes setRsvpLocal idempotent (no double
+     attendee bumps, safe to call again with the server's authoritative
+     answer). */
+  const rsvpdRef = useRef<Set<string>>(new Set());
+  const applyRsvpSet = (ids: Set<string>) => { rsvpdRef.current = ids; setRsvpdEvents(ids); };
   useEffect(() => {
     /* isDemoMode() (the ?demo flag) — same check every other surface uses. */
-    if (isDemoMode()) { setRsvpdEvents(new Set(['e1', 'e4', 'e5'])); return; }
-    if (!user || !hasSupabaseEnv) { setRsvpdEvents(new Set()); return; }
+    if (isDemoMode()) { applyRsvpSet(new Set(['e1', 'e4', 'e5'])); return; }
+    if (!user || !hasSupabaseEnv) { applyRsvpSet(new Set()); return; }
     let cancelled = false;
-    fetchMyRsvpIds(user.id).then(ids => { if (!cancelled) setRsvpdEvents(ids); });
+    fetchMyRsvpIds(user.id).then(ids => { if (!cancelled) applyRsvpSet(ids); });
     return () => { cancelled = true; };
   }, [user, isDemo]);
 
@@ -123,65 +129,108 @@ export default function WecycleApp() {
   const [registerEditMode, setRegisterEditMode] = useState(false);
   const [insightsEvent, setInsightsEvent] = useState<CommunityEvent | null>(null);
 
+  /* Idempotent local RSVP write: no-ops (and doesn't bump the attendee
+     count) when the state already matches, so optimistic-then-reconcile
+     never double-counts. */
   const setRsvpLocal = (id: string, going: boolean) => {
-    setRsvpdEvents(prev => {
-      const next = new Set(prev);
-      if (going) next.add(id); else next.delete(id);
-      return next;
-    });
-    /* Optimistically bump the open detail's "going" count so the screen
-       reflects the action without waiting for a refetch. */
+    if (rsvpdRef.current.has(id) === going) return;
+    const next = new Set(rsvpdRef.current);
+    if (going) next.add(id); else next.delete(id);
+    applyRsvpSet(next);
     setOpenEvent(prev => (prev && prev.id === id
       ? { ...prev, attendees: Math.max(0, prev.attendees + (going ? 1 : -1)) }
       : prev));
   };
 
   /* THE central RSVP entry point — every RSVP button routes here.
-       No form  → toggle straight away (optimistic, server-backed).
+       No form  → toggle straight away (optimistic, reconciled against the
+                  RPC's returned state so a stale tab can't invert reality).
        Has form → new RSVP opens the registration screen (the submit confirms
                   it); cancelling withdraws the response along with the RSVP. */
   const requestRsvp = async (event: CommunityEvent) => {
     /* Demo mode is a guided tour — let RSVPs work without an account (they
        only live in memory). Live mode requires auth. */
     if (!user && !isDemoMode()) { setModal('auth'); return; }
-    const going = rsvpdEvents.has(event.id);
+    const going = rsvpdRef.current.has(event.id);
 
-    if (!going && event.hasForm) {
-      setRegisterEditMode(false);
-      setRegisterEvent(event);
+    if (!going) {
+      if (event.hasForm) {
+        setRegisterEditMode(false);
+        setRegisterEvent(event);
+        return;
+      }
+      /* The event object can be a stale snapshot (feed cache) that predates
+         a form the organizer added later — verify before skipping it. */
+      if (!isDemoMode() && hasSupabaseEnv) {
+        const form = await fetchEventForm(event.id).catch(() => null);
+        if (form && form.fields.length > 0) {
+          setRegisterEditMode(false);
+          setRegisterEvent({ ...event, hasForm: true });
+          return;
+        }
+      }
+      setRsvpLocal(event.id, true);
+      if (isDemoMode() || !hasSupabaseEnv) return;
+      try {
+        const result = await toggleEventRsvp(event.id);
+        /* Reconcile with the server's authoritative answer — if this tab was
+           stale and the toggle actually cancelled, reflect that. */
+        setRsvpLocal(event.id, result === 'going');
+      } catch {
+        setRsvpLocal(event.id, false);
+      }
       return;
     }
 
-    if (going && event.hasForm) {
-      if (typeof window !== 'undefined' && !window.confirm(
-        'Cancel your RSVP? Your registration response will be withdrawn too.',
-      )) return;
-    }
+    /* ── Cancel path ── */
+    if (typeof window !== 'undefined' && !window.confirm(
+      event.hasForm
+        ? 'Cancel your RSVP? Your registration response will be withdrawn too.'
+        : 'Cancel your RSVP?',
+    )) return;
 
-    /* Optimistic flip + server toggle (revert on failure). */
-    setRsvpLocal(event.id, !going);
-    if (isDemoMode() || !hasSupabaseEnv) return;
+    setRsvpLocal(event.id, false);
+    if (isDemoMode() || !hasSupabaseEnv) {
+      /* Demo keeps its promise too — drop the in-memory response. */
+      withdrawFormResponse(event.id).catch(() => {});
+      return;
+    }
+    let result: 'going' | 'cancelled' | null = null;
     try {
-      await toggleEventRsvp(event.id);
-      if (going && event.hasForm) {
+      result = await toggleEventRsvp(event.id);
+      setRsvpLocal(event.id, result === 'going');
+    } catch {
+      setRsvpLocal(event.id, true); /* toggle itself failed — restore */
+      return;
+    }
+    /* Withdraw is best-effort and SEPARATE from the toggle: if it fails the
+       RSVP is still cancelled — never resurrect "Going" over it. Attempted
+       regardless of the (possibly stale) hasForm flag; it no-ops without a
+       stored response. */
+    if (result === 'cancelled') {
+      try {
         await withdrawFormResponse(event.id);
         track(EVT.registration_withdrawn, { event_id: event.id });
-      }
-    } catch {
-      setRsvpLocal(event.id, going); /* revert */
+      } catch { /* orphaned response cleaned up on next submit/withdraw */ }
     }
   };
 
-  /* Registration submitted → confirm the RSVP (unless already going). */
+  /* Registration submitted → make sure the RSVP is confirmed. Edit mode
+     never touches the RSVP (they're already going). */
   const handleRegistrationSubmitted = async () => {
     const ev = registerEvent;
+    const wasEdit = registerEditMode;
     setRegisterEvent(null);
-    if (!ev) return;
-    if (rsvpdEvents.has(ev.id)) return; /* edit of an existing registration */
+    if (!ev || wasEdit) return;
     setRsvpLocal(ev.id, true);
     if (isDemoMode() || !hasSupabaseEnv) return;
     try {
-      await toggleEventRsvp(ev.id);
+      /* rpc_toggle_rsvp is a TOGGLE — if a stale tab thought we weren't going
+         but the server says otherwise, the first call cancels; flip it back
+         so "submit registration" always lands on GOING. */
+      let result = await toggleEventRsvp(ev.id);
+      if (result === 'cancelled') result = await toggleEventRsvp(ev.id);
+      setRsvpLocal(ev.id, result === 'going');
     } catch {
       setRsvpLocal(ev.id, false);
     }
@@ -839,6 +888,7 @@ export default function WecycleApp() {
             onClose={() => setRegisterEvent(null)}
             ariaLabel={`Register for ${registerEvent.title}`}
             width={640}
+            layer={120}
           >
             <EventRegistrationScreen
               event={registerEvent}
@@ -855,6 +905,7 @@ export default function WecycleApp() {
             onClose={() => setInsightsEvent(null)}
             ariaLabel={`Insights for ${insightsEvent.title}`}
             width={920}
+            layer={120}
           >
             <EventInsightsScreen
               event={insightsEvent}
@@ -891,17 +942,28 @@ export default function WecycleApp() {
  * listener) so keyboard users can dismiss without aiming for the X.
  */
 function DesktopDetailModal({
-  onClose, ariaLabel, children, width = 1080,
+  onClose, ariaLabel, children, width = 1080, layer = 100,
 }: {
   onClose: () => void;
   ariaLabel: string;
   children: React.ReactNode;
   /** Max box width in px — narrower for focused flows (forms), default 1080. */
   width?: number;
+  /** Stacking base — a modal layered over another modal (registration /
+   *  insights above event detail) must pass a HIGHER layer so its backdrop
+   *  actually covers the lower box (backdrop = layer, box = layer + 1). */
+  layer?: number;
 }) {
+  const boxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      if (e.key !== 'Escape') return;
+      /* Only the TOPMOST stacked modal reacts — otherwise one Escape rips
+         through the whole stack (and eats typed form answers with it). */
+      const all = document.querySelectorAll('[data-ddm]');
+      if (all.length && all[all.length - 1] !== boxRef.current) return;
+      e.preventDefault();
+      onClose();
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -923,12 +985,14 @@ function DesktopDetailModal({
           background: 'rgba(0,0,0,0.5)',
           backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)',
-          zIndex: 100,
+          zIndex: layer,
         }}
       />
       {/* Centered modal — fixed-position so it ignores page scroll. The
          inner overflow handles content scroll. */}
       <div
+        ref={boxRef}
+        data-ddm
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
@@ -939,7 +1003,7 @@ function DesktopDetailModal({
           maxHeight: '90vh',
           background: 'var(--bg-card)',
           borderRadius: 24,
-          zIndex: 101,
+          zIndex: layer + 1,
           overflow: 'hidden',
           boxShadow: '0 24px 60px rgba(0,0,0,0.32)',
           display: 'flex', flexDirection: 'column',

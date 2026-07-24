@@ -115,6 +115,7 @@ export const EVT = {
   registration_submitted:   'registration_submitted',
   registration_withdrawn:   'registration_withdrawn',
   insights_opened:          'insights_opened',
+  insights_tab_changed:     'insights_tab_changed',
   insights_exported:        'insights_exported',
 
   /* ── Profile + settings ─── */

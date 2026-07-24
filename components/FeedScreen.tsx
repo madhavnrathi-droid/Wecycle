@@ -979,10 +979,12 @@ function EventFeedCard({
   const photo = uploaded && uploaded.length > 0
     ? uploaded[0]
     : getEventPhoto(event.id, event.eventType);
-  /* Live events carry real counts; mock events fall back to the demo hash. */
-  const metrics = getEventMetrics(event.id);
-  const rsvps = event.attendees || metrics.rsvps;
-  const views = event.viewCount ?? metrics.views;
+  /* Live events show REAL counts only — the hash-fake fallback is for demo
+     fixtures, never for a live event that simply has zero views yet. */
+  const demo = isDemoMode();
+  const metrics = demo ? getEventMetrics(event.id) : null;
+  const rsvps = demo ? (event.attendees || metrics!.rsvps) : event.attendees;
+  const views = demo ? (event.viewCount ?? metrics!.views) : (event.viewCount ?? 0);
   return (
     <button
       type="button"

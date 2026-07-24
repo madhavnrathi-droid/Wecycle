@@ -132,7 +132,9 @@ export interface FeedCache {
   opportunities?: MarketplaceItem[];
 }
 
-const FEED_CACHE_KEY = 'wecycle.feedCache.v1';
+/* v2: events gained hasForm/viewCount/saveCount — old cached shapes would
+   bypass registration forms and show fabricated counts, so bump the key. */
+const FEED_CACHE_KEY = 'wecycle.feedCache.v2';
 const FEED_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; /* ignore caches older than a week */
 
 export function readFeedCache(): FeedCache | null {
@@ -896,10 +898,36 @@ export async function updateEvent(id: string, patch: EditEventPatch) {
   notifyPostsChanged();
 }
 
+/** Best-effort purge of every registration-form upload under an event's
+ *  folder in the private form-uploads bucket ({eventId}/{userId}/file). The
+ *  organizer-delete storage policy makes this legal for the event's owner.
+ *  DB rows cascade on delete; storage objects don't — hence this sweep. */
+export async function purgeEventFormUploads(eventId: string): Promise<void> {
+  if (!hasSupabaseEnv) return;
+  try {
+    const bucket = supabase.storage.from('form-uploads');
+    const { data: folders } = await bucket.list(eventId, { limit: 200 });
+    if (!folders?.length) return;
+    const paths: string[] = [];
+    for (const folder of folders) {
+      const { data: files } = await bucket.list(`${eventId}/${folder.name}`, { limit: 100 });
+      for (const f of files ?? []) paths.push(`${eventId}/${folder.name}/${f.name}`);
+    }
+    if (paths.length) await bucket.remove(paths);
+  } catch {
+    /* cleanup is best-effort — orphaned objects are invisible (private
+       bucket) and harmless beyond storage space */
+  }
+}
+
 export async function deleteEvent(id: string) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   removedIds.add(id);
   notifyPostsChanged();
+  /* Purge form-upload files FIRST — after the row deletion cascades away the
+     events row, the organizer-delete storage policy can no longer verify
+     ownership and the objects would orphan. */
+  await purgeEventFormUploads(id);
   const { data, error } = await supabase.from('events').delete().eq('id', id).select('id');
   if (error || !data || data.length === 0) {
     removedIds.delete(id);

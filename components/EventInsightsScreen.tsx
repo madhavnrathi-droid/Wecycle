@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ChevronLeft, Eye, Heart, MessageCircle, Users, Download, Paperclip, ChevronDown,
+  ChevronLeft, Eye, Heart, MessageCircle, Users, Download, Paperclip, ChevronDown, Trash2,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { USERS } from '../lib/mockData';
@@ -19,7 +19,7 @@ import {
   fetchEventAttendees, fetchEventCommentCount, type EventAttendee,
 } from '../lib/liveData';
 import {
-  fetchEventForm, fetchEventResponses, signedFormFileUrl, fileAnswerName,
+  fetchEventForm, fetchEventResponses, deleteFormResponse, signedFormFileUrl, fileAnswerName,
   responsesToCsv, FIELD_TYPE_META,
   type EventFormRecord, type FormResponse, type FormField,
 } from '../lib/eventForms';
@@ -92,7 +92,9 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
   const demoMetrics = demo ? getEventMetrics(event.id) : null;
   const views = demo ? (demoMetrics?.views ?? 0) : (event.viewCount ?? 0);
   const saves = demo ? ((demoMetrics?.views ?? 40) % 37) + 3 : (event.saveCount ?? 0);
-  const going = event.attendees;
+  /* Going: the freshly-fetched attendee list is the truth in live mode — the
+     event prop can be a stale snapshot and would contradict the tab count. */
+  const going = !demo && loaded ? attendees.length : event.attendees;
 
   const hasFormTab = !!form && form.fields.length > 0;
 
@@ -172,7 +174,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
         {/* ── Tabs ── */}
         <div className="segmented" style={{ marginBottom: 16, maxWidth: 420 }}>
           <button
-            onClick={() => { setTab('attendees'); track(EVT.insights_opened, { event_id: event.id, tab: 'attendees' }); }}
+            onClick={() => { setTab('attendees'); track(EVT.insights_tab_changed, { event_id: event.id, tab: 'attendees' }); }}
             aria-pressed={tab === 'attendees'}
             data-active={tab === 'attendees' || undefined}
           >
@@ -180,7 +182,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
           </button>
           {hasFormTab && (
             <button
-              onClick={() => { setTab('responses'); track(EVT.insights_opened, { event_id: event.id, tab: 'responses' }); }}
+              onClick={() => { setTab('responses'); track(EVT.insights_tab_changed, { event_id: event.id, tab: 'responses' }); }}
               aria-pressed={tab === 'responses'}
               data-active={tab === 'responses' || undefined}
             >
@@ -217,7 +219,23 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
             ) : view === 'summary' ? (
               <ResponseSummary form={form!} responses={responses} isDesktop={isDesktop} />
             ) : (
-              <IndividualResponses form={form!} responses={responses} onOpenUser={onOpenUser} />
+              <IndividualResponses
+                form={form!}
+                responses={responses}
+                onOpenUser={onOpenUser}
+                onDelete={async (r) => {
+                  if (typeof window !== 'undefined' && !window.confirm(
+                    `Remove ${r.user.name}'s response? This deletes their answers and any uploaded files (their RSVP stays).`,
+                  )) return;
+                  try {
+                    await deleteFormResponse(r.id, event.id);
+                    haptics.selection();
+                    setResponses(prev => prev.filter(x => x.id !== r.id));
+                  } catch (e) {
+                    if (typeof window !== 'undefined') window.alert((e as Error).message || 'Could not remove the response.');
+                  }
+                }}
+              />
             )}
           </div>
         )}
@@ -470,8 +488,9 @@ function FileAnswerList({ field, responses }: { field: FormField; responses: For
 
 /* ── Responses: individual view ───────────────────── */
 
-function IndividualResponses({ form, responses, onOpenUser }: {
+function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
   form: EventFormRecord; responses: FormResponse[]; onOpenUser?: (u: User) => void;
+  onDelete?: (r: FormResponse) => void | Promise<void>;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -481,26 +500,44 @@ function IndividualResponses({ form, responses, onOpenUser }: {
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-lg)', padding: 14,
         }}>
-          <button
-            type="button"
-            onClick={() => onOpenUser?.(r.user)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-              background: 'none', border: 'none', padding: 0, marginBottom: 10,
-              cursor: onOpenUser ? 'pointer' : 'default', fontFamily: 'inherit',
-            }}
-          >
-            <span style={{
-              width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-              background: r.user.color,
-            }} aria-hidden="true">
-              <img src={getAvatar(r.user.id)} alt="" width={30} height={30} draggable={false} />
-            </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{r.user.name}</span>
-              <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>{r.submittedAt}</span>
-            </span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={() => onOpenUser?.(r.user)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, textAlign: 'left',
+                background: 'none', border: 'none', padding: 0,
+                cursor: onOpenUser ? 'pointer' : 'default', fontFamily: 'inherit',
+              }}
+            >
+              <span style={{
+                width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                background: r.user.color,
+              }} aria-hidden="true">
+                <img src={getAvatar(r.user.id)} alt="" width={30} height={30} draggable={false} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{r.user.name}</span>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>{r.submittedAt}</span>
+              </span>
+            </button>
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(r)}
+                aria-label={`Remove ${r.user.name}'s response`}
+                title="Remove this response"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 28, height: 28, flexShrink: 0,
+                  background: 'var(--bg-inset)', border: '1px solid var(--border-subtle)',
+                  borderRadius: 8, cursor: 'pointer', color: 'var(--accent-rose)',
+                }}
+              >
+                <Trash2 size={13} strokeWidth={2} />
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {form.fields.map(f => {
               const a = r.answers[f.id];

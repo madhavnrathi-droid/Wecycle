@@ -20,7 +20,7 @@
 import { supabase, hasSupabaseEnv } from './supabase';
 import { isDemoMode } from './demoMode';
 import { USERS, type User } from './mockData';
-import { profileToUser, type JoinedProfile } from './liveData';
+import { profileToUser, purgeEventFormUploads, type JoinedProfile } from './liveData';
 
 /* ── Field model ───────────────────────────────────── */
 
@@ -117,8 +117,12 @@ export function validateFields(fields: FormField[]): string | null {
   if (!fields.length) return 'Add at least one question';
   for (const f of fields) {
     if (!f.label.trim()) return 'Every question needs a label';
-    if (FIELD_TYPE_META[f.type].hasOptions && !(f.options ?? []).some(o => o.trim())) {
-      return `"${f.label.trim()}" needs at least one option`;
+    if (FIELD_TYPE_META[f.type].hasOptions) {
+      const opts = (f.options ?? []).map(o => o.trim()).filter(Boolean);
+      if (!opts.length) return `"${f.label.trim()}" needs at least one option`;
+      if (new Set(opts.map(o => o.toLowerCase())).size !== opts.length) {
+        return `"${f.label.trim()}" has duplicate options — make each one unique`;
+      }
     }
   }
   return null;
@@ -233,6 +237,33 @@ export async function deleteEventForm(eventId: string): Promise<void> {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   const { error } = await supabase.from('event_forms').delete().eq('event_id', eventId);
   if (error) throw error;
+  /* Response rows cascade with the form; their uploaded files don't — sweep
+     the event's upload folder (organizer storage-delete policy allows it). */
+  await purgeEventFormUploads(eventId);
+}
+
+/** Organizer-only: remove a single (e.g. abusive/forged) response, including
+ *  its uploaded files. RLS enforces that only the event organizer (or the
+ *  responder themselves) can perform the delete. */
+export async function deleteFormResponse(responseId: string, eventId: string): Promise<void> {
+  if (isDemoMode()) {
+    DEMO_RESPONSES[eventId] = (DEMO_RESPONSES[eventId] ?? []).filter(r => r.id !== responseId);
+    return;
+  }
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  /* Grab the row first so we can clean up its file answers. */
+  const { data } = await supabase
+    .from('event_form_responses')
+    .select('answers')
+    .eq('id', responseId)
+    .maybeSingle();
+  const { error } = await supabase.from('event_form_responses').delete().eq('id', responseId);
+  if (error) throw error;
+  const paths = Object.values(((data as { answers?: FormAnswers } | null)?.answers) ?? {})
+    .filter((v): v is string => typeof v === 'string' && v.startsWith(`${eventId}/`));
+  if (paths.length) {
+    supabase.storage.from('form-uploads').remove(paths).then(() => {}, () => {});
+  }
 }
 
 /** The signed-in user's own response for an event (null if none). */
@@ -277,6 +308,12 @@ export async function submitFormResponse(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in first');
 
+  /* Snapshot the previous submission BEFORE writing — any stored file path
+     that the new answers no longer reference gets cleaned up afterwards
+     (covers both replace-file and remove-file, which the UI signals by
+     clearing the answer to ''). */
+  const previous = await fetchMyFormResponse(eventId);
+
   const final: FormAnswers = { ...answers };
   let n = 0;
   for (const f of fields) {
@@ -290,11 +327,6 @@ export async function submitFormResponse(
       .from('form-uploads')
       .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type });
     if (upErr) throw upErr;
-    /* Replacing an earlier upload? Best-effort delete of the old object. */
-    const prev = final[f.id];
-    if (typeof prev === 'string' && prev && !prev.startsWith('demo/')) {
-      supabase.storage.from('form-uploads').remove([prev]).then(() => {}, () => {});
-    }
     final[f.id] = path;
   }
 
@@ -308,6 +340,14 @@ export async function submitFormResponse(
       submitted_at: new Date().toISOString(),
     } as never, { onConflict: 'event_id,user_id' } as never);
   if (error) throw error;
+
+  /* Best-effort storage cleanup of paths dropped by this re-submission. */
+  const kept = new Set(Object.values(final).filter((v): v is string => typeof v === 'string'));
+  const stale = Object.values(previous?.answers ?? {})
+    .filter((v): v is string => typeof v === 'string' && v.startsWith(`${eventId}/`) && !kept.has(v));
+  if (stale.length) {
+    supabase.storage.from('form-uploads').remove(stale).then(() => {}, () => {});
+  }
   return final;
 }
 
