@@ -26,8 +26,7 @@ import {
   fetchEventForm, fetchEventResponses, upsertEventForm, deleteEventForm,
   validateFields, type FormField,
 } from '../lib/eventForms';
-import FormBuilder from './forms/FormBuilder';
-import Modal from './Modal';
+import FormBuilderScreen from './forms/FormBuilderScreen';
 import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
 import ShareCardModal from './ShareCardModal';
@@ -1062,72 +1061,21 @@ export default function EventDetailScreen({
           onSave={handleSaveEventPhotos}
         />
       )}
-      {/* ── Registration form manager (owner) ── */}
+      {/* ── Registration form manager (owner) — dedicated full-page builder.
+           Back returns to this detail screen exactly as it was. */}
       {isOwner && (
-        <Modal
-          open={manageFormOpen}
-          onClose={() => setManageFormOpen(false)}
-          title={mfHadForm ? 'Edit registration form' : 'Add registration form'}
-          maxWidth={640}
-          footer={
-            <>
-              {mfHadForm && (
-                <button
-                  type="button"
-                  onClick={removeManagedForm}
-                  disabled={mfSaving}
-                  className="btn btn-secondary"
-                  style={{ flex: 1, color: 'var(--accent-rose)' }}
-                >
-                  Remove
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setManageFormOpen(false)}
-                className="btn btn-secondary"
-                style={{ flex: 1 }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveManagedForm}
-                disabled={mfSaving || mfLoading}
-                className="btn btn-gradient"
-                style={{ flex: 2 }}
-              >
-                {mfSaving ? 'Saving…' : 'Save form'}
-              </button>
-            </>
-          }
-        >
-          {mfLoading ? (
-            <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              Loading…
-            </div>
-          ) : (
-            <>
-              {mfResponseCount > 0 && (
-                <div style={{
-                  padding: '9px 12px', marginBottom: 4,
-                  background: 'rgba(245,132,0,0.10)',
-                  border: '1px solid rgba(245,132,0,0.3)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 12, lineHeight: 1.5, color: 'var(--text-primary)',
-                }}>
-                  ⚠️ {mfResponseCount} response{mfResponseCount === 1 ? '' : 's'} already collected.
-                  Existing answers keep their values — edits apply to future submissions.
-                </div>
-              )}
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                People fill this in when they RSVP. Answers land in your Insights.
-              </p>
-              <FormBuilder fields={mfFields} onChange={f => { setMfFields(f); setMfError(null); }} />
-              {mfError && <span className="field-error">{mfError}</span>}
-            </>
-          )}
-        </Modal>
+        <FormBuilderScreen
+          open={manageFormOpen && !mfLoading}
+          subtitle={event.title}
+          fields={mfFields}
+          onChange={f => { setMfFields(f); setMfError(null); }}
+          onBack={() => setManageFormOpen(false)}
+          onSave={saveManagedForm}
+          saving={mfSaving}
+          error={mfError}
+          responseCount={mfResponseCount}
+          onRemove={mfHadForm ? removeManagedForm : undefined}
+        />
       )}
       <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
     </div>

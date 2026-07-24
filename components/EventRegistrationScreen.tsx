@@ -119,10 +119,9 @@ export default function EventRegistrationScreen({
         {/* ── Event context card ── */}
         <div style={{
           display: 'flex', flexDirection: 'column', gap: 6,
-          padding: '12px 14px', marginBottom: 18,
+          padding: '14px 16px', marginBottom: 20,
           background: 'var(--bg-inset)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)',
+          borderRadius: 16,
           fontSize: 12.5, color: 'var(--text-secondary)',
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -194,29 +193,54 @@ export default function EventRegistrationScreen({
         {/* ── Submit CTA ── */}
         {form && form.fields.length > 0 && (
           <div style={isDesktop
-            ? { marginTop: 22, display: 'flex', gap: 8 }
+            ? { marginTop: 26, display: 'flex', justifyContent: 'center' }
             : {
-                position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
-                display: 'flex', gap: 8,
-                padding: '12px 16px calc(12px + env(safe-area-inset-bottom))',
-                background: 'var(--bg-base)',
-                borderTop: '1px solid var(--border-subtle)',
-                maxWidth: 430, margin: '0 auto',
+                position: 'fixed', left: 0, right: 0, zIndex: 40,
+                bottom: 'calc(14px + env(safe-area-inset-bottom))',
+                display: 'flex', justifyContent: 'center',
+                padding: '0 16px',
+                pointerEvents: 'none',
               }}>
-            <button type="button" onClick={onBack} className="btn btn-secondary" style={{ flex: 1 }}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="btn btn-gradient"
-              style={{ flex: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
-            >
-              {submitting
-                ? <><Loader2 size={15} strokeWidth={2.2} className="spin" /> Submitting…</>
-                : editMode ? 'Save changes' : <><Check size={15} strokeWidth={2.4} /> Submit &amp; RSVP</>}
-            </button>
+            {/* Floating action pill — soft shadow, no bordered bar. */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              width: '100%', maxWidth: 480,
+              padding: 8,
+              background: 'var(--bg-card)',
+              borderRadius: 999,
+              boxShadow: '0 2px 6px rgba(28,28,26,0.06), 0 12px 36px rgba(28,28,26,0.14)',
+              pointerEvents: 'auto',
+            }}>
+              <button
+                type="button"
+                onClick={onBack}
+                style={{
+                  height: 44, padding: '0 18px', borderRadius: 999, flexShrink: 0,
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                style={{
+                  flex: 1, height: 44, borderRadius: 999,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: submitting ? 'wait' : 'pointer',
+                  fontSize: 13.5, fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  fontFamily: 'inherit',
+                }}
+              >
+                {submitting
+                  ? <><Loader2 size={15} strokeWidth={2.2} className="spin" /> Submitting…</>
+                  : editMode ? 'Save changes' : <><Check size={15} strokeWidth={2.4} /> Submit &amp; RSVP</>}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -294,22 +318,26 @@ function FieldInput({
                   aria-checked={on}
                   onClick={() => { haptics.selection(); toggle(opt); }}
                   style={{
+                    /* Selection reads through FILL, not a border box — quiet
+                       tonal row that turns solid when picked. */
                     display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '11px 12px', textAlign: 'left', width: '100%',
-                    background: on ? 'var(--bg-card)' : 'var(--bg-inset)',
-                    border: `1.5px solid ${on ? 'var(--text-primary)' : 'var(--border-subtle)'}`,
-                    borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                    padding: '12px 14px', textAlign: 'left', width: '100%',
+                    background: on ? 'var(--text-primary)' : 'var(--bg-inset)',
+                    border: 'none',
+                    borderRadius: 14, cursor: 'pointer',
                     fontSize: 13.5, fontWeight: on ? 600 : 500,
-                    color: 'var(--text-primary)', fontFamily: 'inherit',
+                    color: on ? 'var(--bg-base)' : 'var(--text-primary)',
+                    fontFamily: 'inherit',
+                    transition: 'background 140ms, color 140ms',
                   }}
                 >
                   <span aria-hidden="true" style={{
                     width: 17, height: 17, flexShrink: 0,
                     borderRadius: multi ? 5 : '50%',
-                    border: `1.5px solid ${on ? 'var(--text-primary)' : 'var(--border-strong)'}`,
-                    background: on ? 'var(--text-primary)' : 'transparent',
+                    border: on ? 'none' : '1.5px solid var(--border-strong)',
+                    background: on ? 'var(--bg-base)' : 'transparent',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--bg-base)',
+                    color: 'var(--text-primary)',
                   }}>
                     {on && <Check size={11} strokeWidth={3} />}
                   </span>
@@ -367,10 +395,9 @@ function FieldInput({
           {file || existingPath ? (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 9,
-              padding: '10px 12px',
+              padding: '11px 14px',
               background: 'var(--bg-inset)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-md)',
+              borderRadius: 14,
             }}>
               <Paperclip size={14} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
               <span style={{
@@ -395,10 +422,10 @@ function FieldInput({
               className="press-scale"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '11px 14px', width: '100%', justifyContent: 'center',
+                padding: '12px 14px', width: '100%', justifyContent: 'center',
                 background: 'var(--bg-inset)',
-                border: '1px dashed var(--border-strong)',
-                borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                border: 'none',
+                borderRadius: 14, cursor: 'pointer',
                 fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
               }}
             >

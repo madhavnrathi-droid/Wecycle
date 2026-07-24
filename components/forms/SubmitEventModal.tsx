@@ -1,10 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { MapPin, ClipboardList, ChevronDown } from 'lucide-react';
+import { MapPin, ClipboardList, ChevronRight } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
-import FormBuilder from './FormBuilder';
+import FormBuilderScreen from './FormBuilderScreen';
 import { createEvent } from '../../lib/liveData';
 import { upsertEventForm, validateFields, type FormField } from '../../lib/eventForms';
 import { isDemoMode } from '../../lib/demoMode';
@@ -48,9 +48,25 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const pickerRef = useRef<PhotoPickerHandle>(null);
-  /* Registration form (optional). null = no form; [] = builder open, empty. */
+  /* Registration form (optional). null = no form attached. The builder is a
+     dedicated full-page surface (FormBuilderScreen) — the modal underneath
+     stays mounted, so the event draft survives the round trip. */
   const [regFields, setRegFields] = useState<FormField[] | null>(null);
   const [regError, setRegError] = useState<string | null>(null);
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  const closeBuilder = () => {
+    /* Done/back both keep the draft. Validate softly: an empty draft simply
+       means "no form" so the summary row doesn't advertise zero questions. */
+    setBuilderOpen(false);
+    setRegFields(prev => (prev !== null && prev.length === 0 ? null : prev));
+  };
+  const builderSave = () => {
+    const bad = regFields !== null && regFields.length > 0 ? validateFields(regFields) : null;
+    setRegError(bad);
+    if (bad) return;
+    closeBuilder();
+  };
 
   const update = <K extends keyof EventForm>(key: K, value: EventForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -136,6 +152,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
   };
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -277,69 +294,60 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           />
         </div>
 
-        {/* ── Registration form (optional, Google-Forms-style builder) ──
-           When attached, RSVPing routes people through the form before the
-           RSVP confirms; responses land in the organizer's Insights. */}
+        {/* ── Registration form (optional) — building happens on a dedicated
+           full-page surface; this row is just the doorway + summary. */}
         <section style={{ marginBottom: 14 }}>
-          {regFields === null ? (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.selection();
+              if (regFields === null) setRegFields([]);
+              setRegError(null);
+              setBuilderOpen(true);
+            }}
+            className="press-scale"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+              padding: '13px 14px', textAlign: 'left',
+              background: 'var(--bg-inset)',
+              border: 'none',
+              borderRadius: 16, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            <span style={{
+              width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+              background: 'rgba(139,92,246,0.12)', color: '#8B5CF6',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            }} aria-hidden="true">
+              <ClipboardList size={18} strokeWidth={2} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>
+                {regFields !== null && regFields.length > 0
+                  ? `Registration form · ${regFields.length} question${regFields.length === 1 ? '' : 's'}`
+                  : 'Add a registration form'}
+              </span>
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>
+                {regFields !== null && regFields.length > 0
+                  ? 'Tap to edit — people fill it in when they RSVP'
+                  : 'Optional — collect names, choices or files when people RSVP'}
+              </span>
+            </span>
+            <ChevronRight size={16} strokeWidth={2} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          </button>
+          {regFields !== null && regFields.length > 0 && (
             <button
               type="button"
-              onClick={() => { haptics.selection(); setRegFields([]); }}
-              className="press-scale"
+              onClick={() => { haptics.selection(); setRegFields(null); setRegError(null); }}
               style={{
-                display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-                padding: '13px 14px', textAlign: 'left',
-                background: 'var(--bg-inset)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-lg)', cursor: 'pointer', fontFamily: 'inherit',
+                marginTop: 6, background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, color: 'var(--accent-rose)', fontFamily: 'inherit',
               }}
             >
-              <span style={{
-                width: 38, height: 38, borderRadius: 'var(--radius-md)', flexShrink: 0,
-                background: 'rgba(139,92,246,0.12)', color: '#8B5CF6',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }} aria-hidden="true">
-                <ClipboardList size={18} strokeWidth={2} />
-              </span>
-              <span style={{ flex: 1 }}>
-                <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Add a registration form
-                </span>
-                <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>
-                  Optional — collect names, choices or files when people RSVP
-                </span>
-              </span>
-              <ChevronDown size={16} strokeWidth={2} style={{ color: 'var(--text-muted)', transform: 'rotate(-90deg)' }} />
+              Remove form
             </button>
-          ) : (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-                <label className="field-label" style={{ margin: 0 }}>
-                  Registration form
-                  {regFields.length > 0 && (
-                    <span className="field-hint" style={{ fontWeight: 400, marginLeft: 6 }}>
-                      {regFields.length} question{regFields.length === 1 ? '' : 's'}
-                    </span>
-                  )}
-                </label>
-                <button
-                  type="button"
-                  onClick={() => { haptics.selection(); setRegFields(null); setRegError(null); }}
-                  style={{
-                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    fontSize: 12, fontWeight: 600, color: 'var(--accent-rose)', fontFamily: 'inherit',
-                  }}
-                >
-                  Remove form
-                </button>
-              </div>
-              <FormBuilder fields={regFields} onChange={f => { setRegFields(f); setRegError(null); }} />
-              <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                People will fill this in when they RSVP — their answers show up in your event&rsquo;s Insights.
-              </p>
-              {regError && <span className="field-error">{regError}</span>}
-            </div>
           )}
+          {regError && <span className="field-error">{regError}</span>}
         </section>
 
         {/* ── Event photos (up to 3, drag-reorder, camera or library, auto-compressed) ── */}
@@ -372,5 +380,19 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         )}
       </form>
     </Modal>
+
+    {/* Full-page builder — covers the modal + bottom nav; back returns here
+        with the event draft untouched. */}
+    <FormBuilderScreen
+      open={open && builderOpen}
+      subtitle={form.title.trim() || 'New event'}
+      fields={regFields ?? []}
+      onChange={f => { setRegFields(f); setRegError(null); }}
+      onBack={closeBuilder}
+      onSave={builderSave}
+      error={regError}
+      saveLabel="Done"
+    />
+    </>
   );
 }

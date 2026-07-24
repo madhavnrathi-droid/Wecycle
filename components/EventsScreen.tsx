@@ -300,10 +300,9 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
       ) : (
         <section style={{ padding: '4px 20px 20px' }}>
           <div style={{
-            padding: '20px 18px',
-            background: 'var(--bg-surface)',
-            border: '1px dashed var(--border-default)',
-            borderRadius: 16,
+            padding: '22px 18px',
+            background: 'var(--bg-inset)',
+            borderRadius: 18,
             textAlign: 'center',
           }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -542,9 +541,9 @@ function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEve
     <article style={{
       display: 'flex', gap: 12,
       padding: 10,
-      background: 'var(--bg-surface)',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: 16,
+      background: 'var(--bg-card)',
+      borderRadius: 18,
+      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
     }}>
       <button
         type="button"

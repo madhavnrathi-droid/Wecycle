@@ -1,12 +1,13 @@
 'use client';
 
 /* ── Registration-form BUILDER (Google-Forms-style) ────────────────────────
- * Used inline in SubmitEventModal (create) and in the owner's "Registration
- * form" manager on EventDetailScreen (edit). Pure controlled component:
- * renders `fields`, emits every mutation through `onChange`.
+ * Used by FormBuilderScreen (the dedicated full-page builder). Pure
+ * controlled component: renders `fields`, emits every mutation via
+ * `onChange`.
  *
- * Deliberately no drag-and-drop — up/down arrows are reliable on touch and
- * keyboards alike, and match the app's no-dnd convention.
+ * Visual language: soft white pills on the cream base — no bordered boxes,
+ * ghost icon buttons, tonal inputs, hairline separation. Reordering uses
+ * up/down arrows (reliable on touch; matches the app's no-drag convention).
  */
 
 import { useState } from 'react';
@@ -16,6 +17,9 @@ import {
   type FormField, type FormFieldType,
 } from '../../lib/eventForms';
 import { haptics } from '../../lib/haptics';
+
+/* Soft elevation used by every floating pill in the builder. */
+const PILL_SHADOW = '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)';
 
 interface FormBuilderProps {
   fields: FormField[];
@@ -49,7 +53,7 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {fields.map((f, idx) => (
         <FieldCard
           key={f.id}
@@ -63,26 +67,32 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
         />
       ))}
 
-      {/* ── Add-question palette ── */}
+      {/* ── Add-question palette — soft pill sheet, no dashed frame ── */}
       {paletteOpen ? (
         <div style={{
-          border: '1px dashed var(--border-strong)',
-          borderRadius: 'var(--radius-lg)', padding: 12,
+          background: 'var(--bg-card)',
+          borderRadius: 20, padding: '14px 14px 12px',
+          boxShadow: PILL_SHADOW,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span className="field-label" style={{ margin: 0 }}>Add a question</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              textTransform: 'uppercase', color: 'var(--text-muted)',
+            }}>
+              Add a question
+            </span>
             {fields.length > 0 && (
               <button
                 type="button"
                 onClick={() => setPaletteOpen(false)}
                 aria-label="Close question palette"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'inline-flex' }}
               >
                 <X size={14} strokeWidth={2} />
               </button>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))', gap: 6 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {FIELD_TYPE_ORDER.map(t => (
               <button
                 key={t}
@@ -91,17 +101,16 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
                 className="press-scale"
                 title={FIELD_TYPE_META[t].hint}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 7,
-                  padding: '9px 10px',
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  padding: '9px 14px',
                   background: 'var(--bg-inset)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer', textAlign: 'left',
-                  fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+                  border: 'none', borderRadius: 999,
+                  cursor: 'pointer',
+                  fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
                   fontFamily: 'inherit',
                 }}
               >
-                <span aria-hidden="true" style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{FIELD_TYPE_META[t].icon}</span>
+                <span aria-hidden="true" style={{ fontSize: 13 }}>{FIELD_TYPE_META[t].icon}</span>
                 {FIELD_TYPE_META[t].label}
               </button>
             ))}
@@ -113,23 +122,24 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
           onClick={() => setPaletteOpen(true)}
           className="press-scale"
           style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '10px 12px',
-            background: 'var(--bg-inset)',
-            border: '1px dashed var(--border-strong)',
-            borderRadius: 'var(--radius-md)',
+            alignSelf: 'center',
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            padding: '11px 20px',
+            background: 'var(--bg-card)',
+            border: 'none', borderRadius: 999,
+            boxShadow: PILL_SHADOW,
             cursor: 'pointer', fontSize: 13, fontWeight: 600,
             color: 'var(--text-primary)', fontFamily: 'inherit',
           }}
         >
-          <Plus size={14} strokeWidth={2.2} /> Add question
+          <Plus size={15} strokeWidth={2.2} /> Add question
         </button>
       )}
     </div>
   );
 }
 
-/* ── One editable question card ───────────────────── */
+/* ── One editable question — a floating white pill ── */
 
 function FieldCard({
   field, index, count, onPatch, onMoveUp, onMoveDown, onRemove,
@@ -145,40 +155,46 @@ function FieldCard({
   const meta = FIELD_TYPE_META[field.type];
   const options = field.options ?? [];
 
+  /* Tonal, borderless input used throughout the card. */
+  const tonalInput: React.CSSProperties = {
+    border: 'none',
+    background: 'var(--bg-inset)',
+    borderRadius: 12,
+  };
+
   return (
     <div style={{
-      background: 'var(--bg-inset)',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 12,
+      background: 'var(--bg-card)',
+      borderRadius: 20,
+      padding: '14px 16px 14px',
+      boxShadow: PILL_SHADOW,
     }}>
-      {/* Row 1: type chip + reorder/delete controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+      {/* Row 1: quiet type label + ghost controls, split by a hairline */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
         <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-          color: 'var(--text-secondary)',
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          padding: '3px 8px', borderRadius: 999,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+          color: 'var(--text-muted)',
         }}>
-          <span aria-hidden="true">{meta.icon}</span> {meta.label}
+          <span aria-hidden="true" style={{ fontSize: 12 }}>{meta.icon}</span> {meta.label}
         </span>
         <span style={{ flex: 1 }} />
-        <IconBtn label={`Move question ${index + 1} up`} disabled={index === 0} onClick={onMoveUp}>
-          <ChevronUp size={14} strokeWidth={2} />
-        </IconBtn>
-        <IconBtn label={`Move question ${index + 1} down`} disabled={index === count - 1} onClick={onMoveDown}>
-          <ChevronDown size={14} strokeWidth={2} />
-        </IconBtn>
-        <IconBtn label={`Delete question ${index + 1}`} onClick={onRemove} danger>
-          <Trash2 size={13} strokeWidth={2} />
-        </IconBtn>
+        <GhostBtn label={`Move question ${index + 1} up`} disabled={index === 0} onClick={onMoveUp}>
+          <ChevronUp size={15} strokeWidth={2} />
+        </GhostBtn>
+        <GhostBtn label={`Move question ${index + 1} down`} disabled={index === count - 1} onClick={onMoveDown}>
+          <ChevronDown size={15} strokeWidth={2} />
+        </GhostBtn>
+        <span aria-hidden="true" style={{ width: 1, height: 16, background: 'var(--border-subtle)', margin: '0 4px' }} />
+        <GhostBtn label={`Delete question ${index + 1}`} onClick={onRemove} danger>
+          <Trash2 size={14} strokeWidth={2} />
+        </GhostBtn>
       </div>
 
       {/* Row 2: the question label */}
       <input
         className="form-input"
+        style={{ ...tonalInput, marginBottom: meta.hasOptions ? 8 : 0 }}
         placeholder={
           field.type === 'file' ? 'e.g. Upload your ID card / poster (PDF or image)'
           : meta.hasOptions ? 'e.g. Which slot works for you?'
@@ -187,7 +203,6 @@ function FieldCard({
         value={field.label}
         onChange={e => onPatch({ label: e.target.value })}
         aria-label={`Question ${index + 1} label`}
-        style={{ marginBottom: meta.hasOptions ? 8 : 0 }}
       />
 
       {/* Row 3: options (choice types only) */}
@@ -195,12 +210,12 @@ function FieldCard({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {options.map((opt, oi) => (
             <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 12, width: 16, textAlign: 'center' }}>
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 12, width: 18, textAlign: 'center', flexShrink: 0 }}>
                 {field.type === 'checkboxes' ? '☐' : field.type === 'dropdown' ? `${oi + 1}.` : '○'}
               </span>
               <input
                 className="form-input"
-                style={{ flex: 1 }}
+                style={{ ...tonalInput, flex: 1 }}
                 value={opt}
                 placeholder={`Option ${oi + 1}`}
                 onChange={e => {
@@ -210,13 +225,13 @@ function FieldCard({
                 }}
                 aria-label={`Question ${index + 1} option ${oi + 1}`}
               />
-              <IconBtn
+              <GhostBtn
                 label={`Remove option ${oi + 1}`}
                 disabled={options.length <= 1}
                 onClick={() => onPatch({ options: options.filter((_, i) => i !== oi) })}
               >
                 <X size={13} strokeWidth={2} />
-              </IconBtn>
+              </GhostBtn>
             </div>
           ))}
           <button
@@ -225,7 +240,7 @@ function FieldCard({
             style={{
               alignSelf: 'flex-start',
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'none', border: 'none', padding: '4px 2px',
+              background: 'none', border: 'none', padding: '4px 2px 0 24px',
               cursor: 'pointer', fontSize: 12, fontWeight: 600,
               color: 'var(--text-secondary)', fontFamily: 'inherit',
             }}
@@ -235,25 +250,41 @@ function FieldCard({
         </div>
       )}
 
-      {/* Row 4: required toggle */}
+      {/* Row 4: required — quiet pill switch, not a checkbox box */}
       <label style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        marginTop: 10, cursor: 'pointer', userSelect: 'none',
+        marginTop: 12, cursor: 'pointer', userSelect: 'none',
         fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)',
       }}>
-        <input
-          type="checkbox"
-          checked={field.required}
-          onChange={e => onPatch({ required: e.target.checked })}
-          style={{ width: 15, height: 15, accentColor: 'var(--text-primary)' }}
-        />
+        <span style={{ position: 'relative', display: 'inline-block', width: 34, height: 20, flexShrink: 0 }}>
+          <input
+            type="checkbox"
+            checked={field.required}
+            onChange={e => onPatch({ required: e.target.checked })}
+            aria-label={`Question ${index + 1} required`}
+            style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+          />
+          <span aria-hidden="true" style={{
+            position: 'absolute', inset: 0, borderRadius: 999,
+            background: field.required ? 'var(--text-primary)' : 'var(--bg-inset)',
+            transition: 'background 180ms',
+          }} />
+          <span aria-hidden="true" style={{
+            position: 'absolute', top: 3, left: field.required ? 17 : 3,
+            width: 14, height: 14, borderRadius: '50%',
+            background: '#fff',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+            transition: 'left 180ms cubic-bezier(.2,.8,.2,1)',
+          }} />
+        </span>
         Required
       </label>
     </div>
   );
 }
 
-function IconBtn({
+/* Ghost icon button — no box, just the glyph with a hover-friendly hit area. */
+function GhostBtn({
   children, label, onClick, disabled, danger,
 }: {
   children: React.ReactNode;
@@ -270,12 +301,11 @@ function IconBtn({
       aria-label={label}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 28, height: 28,
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 8, cursor: disabled ? 'default' : 'pointer',
-        color: disabled ? 'var(--border-strong)' : danger ? 'var(--accent-rose)' : 'var(--text-secondary)',
-        opacity: disabled ? 0.5 : 1,
+        width: 30, height: 30,
+        background: 'transparent', border: 'none',
+        borderRadius: 999, cursor: disabled ? 'default' : 'pointer',
+        color: disabled ? 'var(--border-strong)' : danger ? 'var(--accent-rose)' : 'var(--text-muted)',
+        opacity: disabled ? 0.45 : 1,
       }}
     >
       {children}

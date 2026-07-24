@@ -561,9 +561,10 @@ export default function WecycleApp() {
     );
   }
 
-  /* Event registration (form-fill) — stacks ABOVE the event detail takeover
-     so Back returns to the event. Mobile only; desktop renders as a modal. */
-  if (registerEvent && !isDesktop) {
+  /* Event registration (form-fill) — a dedicated full page on EVERY
+     breakpoint (no nav, no dock, nothing but the form). Stacks ABOVE the
+     event detail so Back returns to the event exactly as it was. */
+  if (registerEvent) {
     return (
       <>
         <a href="#main" className="skip-link">Skip to main content</a>
@@ -880,24 +881,6 @@ export default function WecycleApp() {
             </DesktopDetailModal>
           );
         })()}
-
-        {/* Registration form-fill (desktop) — narrower centered modal, layered
-            above the event detail modal. */}
-        {isDesktop && registerEvent && (
-          <DesktopDetailModal
-            onClose={() => setRegisterEvent(null)}
-            ariaLabel={`Register for ${registerEvent.title}`}
-            width={640}
-            layer={120}
-          >
-            <EventRegistrationScreen
-              event={registerEvent}
-              editMode={registerEditMode}
-              onBack={() => setRegisterEvent(null)}
-              onSubmitted={handleRegistrationSubmitted}
-            />
-          </DesktopDetailModal>
-        )}
 
         {/* Organizer insights (desktop). */}
         {isDesktop && insightsEvent && (

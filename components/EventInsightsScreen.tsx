@@ -142,9 +142,9 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
             className="press-scale"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 12px',
+              padding: '8px 14px',
               background: 'var(--bg-inset)',
-              border: '1px solid var(--border-subtle)',
+              border: 'none',
               borderRadius: 999, cursor: 'pointer',
               fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
             }}
@@ -250,8 +250,8 @@ function StatTile({ icon, value, label }: { icon: React.ReactNode; value: number
   return (
     <div style={{
       background: 'var(--bg-card)',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: 14, padding: '14px 14px 12px',
+      borderRadius: 18, padding: '14px 16px 12px',
+      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', marginBottom: 6 }}>
         {icon}
@@ -274,20 +274,24 @@ function AttendeeList({ attendees, onOpenUser }: { attendees: EventAttendee[]; o
       </div>
     );
   }
+  /* Flat list, hairline-separated — not a stack of boxed cards. */
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{
+      background: 'var(--bg-card)',
+      borderRadius: 20, padding: '4px 16px',
+      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
+    }}>
       {attendees.map((a, i) => (
         <button
           key={`${a.user.id}-${i}`}
           type="button"
           onClick={() => onOpenUser?.(a.user)}
-          className="press-scale"
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            padding: '10px 12px', width: '100%', textAlign: 'left',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-lg)', cursor: onOpenUser ? 'pointer' : 'default',
+            padding: '12px 0', width: '100%', textAlign: 'left',
+            background: 'transparent', border: 'none',
+            borderBottom: i < attendees.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+            cursor: onOpenUser ? 'pointer' : 'default',
             fontFamily: 'inherit',
           }}
         >
@@ -370,8 +374,8 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
   return (
     <div style={{
       background: 'var(--bg-card)',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: 'var(--radius-lg)', padding: 14,
+      borderRadius: 20, padding: 16,
+      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
         <span aria-hidden="true" style={{ fontSize: 13 }}>{meta.icon}</span>
@@ -466,9 +470,9 @@ function FileAnswerList({ field, responses }: { field: FormField; responses: For
             className="press-scale"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 10px', width: '100%', textAlign: 'left',
-              background: 'var(--bg-inset)', border: '1px solid var(--border-subtle)',
-              borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+              padding: '9px 12px', width: '100%', textAlign: 'left',
+              background: 'var(--bg-inset)', border: 'none',
+              borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
             }}
           >
             <Paperclip size={13} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
@@ -497,8 +501,8 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
       {responses.map(r => (
         <div key={r.id} style={{
           background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)', padding: 14,
+          borderRadius: 20, padding: 16,
+          boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <button
@@ -529,9 +533,9 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
                 title="Remove this response"
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 28, height: 28, flexShrink: 0,
-                  background: 'var(--bg-inset)', border: '1px solid var(--border-subtle)',
-                  borderRadius: 8, cursor: 'pointer', color: 'var(--accent-rose)',
+                  width: 30, height: 30, flexShrink: 0,
+                  background: 'transparent', border: 'none',
+                  borderRadius: 999, cursor: 'pointer', color: 'var(--accent-rose)',
                 }}
               >
                 <Trash2 size={13} strokeWidth={2} />
