@@ -29,6 +29,8 @@ interface InventoryScreenProps {
   onOpenItem: (item: MarketplaceItem) => void;
   /** Opens an event detail screen — used when an event card in Uploads is tapped */
   onOpenEvent: (event: CommunityEvent) => void;
+  /** Opens the organizer insights screen for one of MY events. */
+  onOpenEventInsights?: (event: CommunityEvent) => void;
   /** Opens the Lost & Found detail sheet (lifted to app/page.tsx). */
   onOpenLF?: (item: LostItem) => void;
 }
@@ -46,7 +48,7 @@ type UploadEntry =
   | { kind: 'event'; event: CommunityEvent }
   | { kind: 'lostfound'; lf: LostItem };
 
-export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, onOpenItem, onOpenEvent, onOpenLF }: InventoryScreenProps) {
+export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, onOpenItem, onOpenEvent, onOpenEventInsights, onOpenLF }: InventoryScreenProps) {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -364,6 +366,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     event={entry.event}
                     tall={tall}
                     onClick={() => onOpenEvent(entry.event)}
+                    onInsights={onOpenEventInsights ? () => onOpenEventInsights(entry.event) : undefined}
                     onDelete={async () => {
                       if (typeof window !== 'undefined' && !window.confirm(`Delete event "${entry.event.title}"?`)) return;
                       track(EVT.post_deleted, { post_id: entry.event.id, post_kind: 'event' });
@@ -641,8 +644,8 @@ function CompleteButton({
 /* ── Event tile for the Shared tab ──────────────── */
 
 function InventoryEventCard({
-  event, tall, onClick, onDelete,
-}: { event: CommunityEvent; tall: boolean; onClick: () => void; onDelete?: () => void | Promise<void> }) {
+  event, tall, onClick, onDelete, onInsights,
+}: { event: CommunityEvent; tall: boolean; onClick: () => void; onDelete?: () => void | Promise<void>; onInsights?: () => void }) {
   /* Real (Supabase) events carry photoUrls; mock events fall back to a curated
      Unsplash cover. If a real event has no photo, we render text-only too. */
   const hasUploaded = Array.isArray((event as { photoUrls?: string[] }).photoUrls)
@@ -651,6 +654,9 @@ function InventoryEventCard({
   const photo = (event as { photoUrls?: string[] }).photoUrls?.[0]
     ?? (isMockEvent ? getEventPhoto(event.id, event.eventType) : undefined);
   const metrics = getEventMetrics(event.id);
+  /* Live events carry real counts; mock events use the demo hash numbers. */
+  const views = event.viewCount ?? metrics.views;
+  const rsvps = event.attendees || metrics.rsvps;
   const ar = tall ? '0.72' : '0.92';
 
   if (!photo && !hasUploaded && !isMockEvent) {
@@ -689,12 +695,13 @@ function InventoryEventCard({
             }}>
               <span>{event.date.split(' ').slice(0, 3).join(' ')}</span>
               <span style={{ display: 'inline-flex', gap: 8 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Eye size={10} strokeWidth={2} />{metrics.views}</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Users size={10} strokeWidth={2} />{metrics.rsvps}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Eye size={10} strokeWidth={2} />{views}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Users size={10} strokeWidth={2} />{rsvps}</span>
               </span>
             </div>
           </button>
         </article>
+        {onInsights && <CompleteButton label="Insights" onClick={onInsights} isClosed={false} />}
         {onDelete && <CompleteButton label="Delete" onClick={onDelete} isClosed={false} />}
       </div>
     );
@@ -725,16 +732,17 @@ function InventoryEventCard({
             <p className="feed-card-title">{event.title}</p>
             <div className="feed-card-meta" style={{ gap: 10 }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                <Eye size={10} strokeWidth={2} />{metrics.views}
+                <Eye size={10} strokeWidth={2} />{views}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                <Users size={10} strokeWidth={2} />{metrics.rsvps}
+                <Users size={10} strokeWidth={2} />{rsvps}
               </span>
               <span className="feed-card-price">{event.date.split(' ').slice(0, 3).join(' ')}</span>
             </div>
           </div>
         </button>
       </div>
+      {onInsights && <CompleteButton label="Insights" onClick={onInsights} isClosed={false} />}
       {onDelete && <CompleteButton label="Delete" onClick={onDelete} isClosed={false} />}
     </div>
   );

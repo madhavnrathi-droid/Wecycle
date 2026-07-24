@@ -108,6 +108,15 @@ export const EVT = {
   comment_posted:           'comment_posted',
   rsvp_toggled:             'rsvp_toggled',
 
+  /* ── Event registration forms + organizer insights ─── */
+  event_form_saved:         'event_form_saved',
+  event_form_removed:       'event_form_removed',
+  registration_opened:      'registration_opened',
+  registration_submitted:   'registration_submitted',
+  registration_withdrawn:   'registration_withdrawn',
+  insights_opened:          'insights_opened',
+  insights_exported:        'insights_exported',
+
   /* ── Profile + settings ─── */
   storefront_opened:        'storefront_opened',
   account_edited:           'account_edited',

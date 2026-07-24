@@ -979,7 +979,10 @@ function EventFeedCard({
   const photo = uploaded && uploaded.length > 0
     ? uploaded[0]
     : getEventPhoto(event.id, event.eventType);
+  /* Live events carry real counts; mock events fall back to the demo hash. */
   const metrics = getEventMetrics(event.id);
+  const rsvps = event.attendees || metrics.rsvps;
+  const views = event.viewCount ?? metrics.views;
   return (
     <button
       type="button"
@@ -992,23 +995,38 @@ function EventFeedCard({
       <img src={photo} alt="" className="feed-card-img" loading="lazy" style={{ background: isCutoutUrl(photo) ? '#fff' : undefined }} />
       <span style={{
         position: 'absolute', top: 10, left: 10,
-        background: 'rgba(168,85,247,0.92)', color: '#fff',
-        backdropFilter: 'blur(8px)', borderRadius: 999,
-        padding: '4px 10px',
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        display: 'inline-flex', alignItems: 'center', gap: 4, zIndex: 3,
+        display: 'inline-flex', alignItems: 'center', gap: 5, zIndex: 3,
       }}>
-        <CalendarDays size={10} strokeWidth={2} /> Event
+        <span style={{
+          background: 'rgba(168,85,247,0.92)', color: '#fff',
+          backdropFilter: 'blur(8px)', borderRadius: 999,
+          padding: '4px 10px',
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+        }}>
+          <CalendarDays size={10} strokeWidth={2} /> Event
+        </span>
+        {event.hasForm && (
+          <span style={{
+            background: 'rgba(139,92,246,0.92)', color: '#fff',
+            backdropFilter: 'blur(8px)', borderRadius: 999,
+            padding: '4px 8px',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}>
+            📋 Register
+          </span>
+        )}
       </span>
       <div className="feed-card-overlay" data-cut={isCutoutUrl(photo) || undefined}>
         <p className="feed-card-title">{event.title}</p>
         <div className="feed-card-meta" style={{ gap: 10 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <UsersIcon size={10} strokeWidth={2} /> {metrics.rsvps}
+            <UsersIcon size={10} strokeWidth={2} /> {rsvps}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Eye size={10} strokeWidth={2} /> {metrics.views}
+            <Eye size={10} strokeWidth={2} /> {views}
           </span>
           <span className="feed-card-price">{event.date.split(' ').slice(0, 3).join(' ')}</span>
         </div>

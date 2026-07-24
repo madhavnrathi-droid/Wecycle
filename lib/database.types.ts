@@ -384,6 +384,180 @@ export type Database = {
           },
         ]
       }
+      content_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: string
+          reporter_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          target_id: string
+          target_type: string
+          target_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason: string
+          reporter_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id: string
+          target_type: string
+          target_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string
+          reporter_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string
+          target_type?: string
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          last_message: string | null
+          last_message_at: string | null
+          last_sender_id: string | null
+          listing_id: string | null
+          subject: string | null
+          user_a: string
+          user_b: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message?: string | null
+          last_message_at?: string | null
+          last_sender_id?: string | null
+          listing_id?: string | null
+          subject?: string | null
+          user_a: string
+          user_b: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message?: string | null
+          last_message_at?: string | null
+          last_sender_id?: string | null
+          listing_id?: string | null
+          subject?: string | null
+          user_a?: string
+          user_b?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_form_responses: {
+        Row: {
+          answers: Json
+          event_id: string
+          form_id: string
+          id: string
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          event_id: string
+          form_id: string
+          id?: string
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          event_id?: string
+          form_id?: string
+          id?: string
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_form_responses_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_form_responses_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "event_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_form_responses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "event_form_responses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_forms: {
+        Row: {
+          created_at: string
+          event_id: string
+          fields: Json
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          fields?: Json
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          fields?: Json
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_forms_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_rsvps: {
         Row: {
           event_id: string
@@ -427,6 +601,46 @@ export type Database = {
           },
         ]
       }
+      event_saves: {
+        Row: {
+          event_id: string
+          saved_at: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          saved_at?: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          saved_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_saves_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_saves_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "event_saves_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           attendee_count: number
@@ -442,11 +656,13 @@ export type Database = {
           max_attendees: number | null
           organizer_id: string
           photo_urls: string[]
+          save_count: number
           starts_at: string
           status: Database["public"]["Enums"]["event_status"]
           title: string
           updated_at: string
           video_urls: string[]
+          view_count: number
         }
         Insert: {
           attendee_count?: number
@@ -462,11 +678,13 @@ export type Database = {
           max_attendees?: number | null
           organizer_id: string
           photo_urls?: string[]
+          save_count?: number
           starts_at: string
           status?: Database["public"]["Enums"]["event_status"]
           title: string
           updated_at?: string
           video_urls?: string[]
+          view_count?: number
         }
         Update: {
           attendee_count?: number
@@ -482,11 +700,13 @@ export type Database = {
           max_attendees?: number | null
           organizer_id?: string
           photo_urls?: string[]
+          save_count?: number
           starts_at?: string
           status?: Database["public"]["Enums"]["event_status"]
           title?: string
           updated_at?: string
           video_urls?: string[]
+          view_count?: number
         }
         Relationships: [
           {
@@ -750,20 +970,21 @@ export type Database = {
         Row: {
           category_id: string | null
           community_id: string
+          comp: string | null
           condition: Database["public"]["Enums"]["item_condition"]
           description: string | null
-          comp: string | null
           id: string
           is_featured: boolean
           kind: string
           listing_type: Database["public"]["Enums"]["listing_type"]
           location: string | null
-          price_band: string | null
+          notify_on_engagement: boolean | null
           photo_color: string | null
           photo_icon: string | null
           photo_urls: string[]
           posted_at: string
           price: number | null
+          price_band: string | null
           response_count: number
           save_count: number
           status: Database["public"]["Enums"]["listing_status"]
@@ -777,20 +998,21 @@ export type Database = {
         Insert: {
           category_id?: string | null
           community_id: string
+          comp?: string | null
           condition?: Database["public"]["Enums"]["item_condition"]
           description?: string | null
-          comp?: string | null
           id?: string
           is_featured?: boolean
           kind?: string
           listing_type: Database["public"]["Enums"]["listing_type"]
           location?: string | null
-          price_band?: string | null
+          notify_on_engagement?: boolean | null
           photo_color?: string | null
           photo_icon?: string | null
           photo_urls?: string[]
           posted_at?: string
           price?: number | null
+          price_band?: string | null
           response_count?: number
           save_count?: number
           status?: Database["public"]["Enums"]["listing_status"]
@@ -804,20 +1026,21 @@ export type Database = {
         Update: {
           category_id?: string | null
           community_id?: string
+          comp?: string | null
           condition?: Database["public"]["Enums"]["item_condition"]
           description?: string | null
-          comp?: string | null
           id?: string
           is_featured?: boolean
           kind?: string
           listing_type?: Database["public"]["Enums"]["listing_type"]
           location?: string | null
-          price_band?: string | null
+          notify_on_engagement?: boolean | null
           photo_color?: string | null
           photo_icon?: string | null
           photo_urls?: string[]
           posted_at?: string
           price?: number | null
+          price_band?: string | null
           response_count?: number
           save_count?: number
           status?: Database["public"]["Enums"]["listing_status"]
@@ -871,6 +1094,7 @@ export type Database = {
           id: string
           last_seen: string | null
           last_seen_date: string | null
+          notify_on_engagement: boolean | null
           photo_color: string | null
           photo_icon: string | null
           photo_urls: string[]
@@ -894,6 +1118,7 @@ export type Database = {
           id?: string
           last_seen?: string | null
           last_seen_date?: string | null
+          notify_on_engagement?: boolean | null
           photo_color?: string | null
           photo_icon?: string | null
           photo_urls?: string[]
@@ -917,6 +1142,7 @@ export type Database = {
           id?: string
           last_seen?: string | null
           last_seen_date?: string | null
+          notify_on_engagement?: boolean | null
           photo_color?: string | null
           photo_icon?: string | null
           photo_urls?: string[]
@@ -970,6 +1196,41 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -1059,6 +1320,7 @@ export type Database = {
           contact_whatsapp_enabled: boolean
           course: string | null
           department: string | null
+          email: string | null
           full_name: string | null
           graduating_year: number | null
           hide_listings_from_search: boolean
@@ -1097,6 +1359,7 @@ export type Database = {
           contact_whatsapp_enabled?: boolean
           course?: string | null
           department?: string | null
+          email?: string | null
           full_name?: string | null
           graduating_year?: number | null
           hide_listings_from_search?: boolean
@@ -1135,6 +1398,7 @@ export type Database = {
           contact_whatsapp_enabled?: boolean
           course?: string | null
           department?: string | null
+          email?: string | null
           full_name?: string | null
           graduating_year?: number | null
           hide_listings_from_search?: boolean
@@ -1220,6 +1484,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_seen_at: string
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_seen_at?: string
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_seen_at?: string
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       reactions: {
         Row: {
@@ -1314,8 +1611,10 @@ export type Database = {
           category_id: string | null
           community_id: string
           description: string | null
+          expires_at: string | null
           id: string
           need_by_date: string | null
+          notify_on_engagement: boolean | null
           offer_count: number
           photo_urls: string[]
           posted_at: string
@@ -1330,8 +1629,10 @@ export type Database = {
           category_id?: string | null
           community_id: string
           description?: string | null
+          expires_at?: string | null
           id?: string
           need_by_date?: string | null
+          notify_on_engagement?: boolean | null
           offer_count?: number
           photo_urls?: string[]
           posted_at?: string
@@ -1346,8 +1647,10 @@ export type Database = {
           category_id?: string | null
           community_id?: string
           description?: string | null
+          expires_at?: string | null
           id?: string
           need_by_date?: string | null
+          notify_on_engagement?: boolean | null
           offer_count?: number
           photo_urls?: string[]
           posted_at?: string
@@ -1389,6 +1692,30 @@ export type Database = {
           },
         ]
       }
+      saved_searches: {
+        Row: {
+          created_at: string
+          id: string
+          query: string
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          query: string
+          scope?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          query?: string
+          scope?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       saves: {
         Row: {
           listing_id: string
@@ -1428,6 +1755,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_blocks: {
+        Row: {
+          blocker_id: string
+          created_at: string
+          target_id: string
+        }
+        Insert: {
+          blocker_id: string
+          created_at?: string
+          target_id: string
+        }
+        Update: {
+          blocker_id?: string
+          created_at?: string
+          target_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -1487,9 +1832,24 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_my_account: { Args: never; Returns: undefined }
+      get_contact: {
+        Args: { target: string }
+        Returns: {
+          contact_email_enabled: boolean
+          contact_whatsapp_enabled: boolean
+          email: string
+          phone: string
+        }[]
+      }
+      get_or_create_conversation: {
+        Args: { _listing_id?: string; _other_user: string; _subject?: string }
+        Returns: string
+      }
       invoke_send_push: { Args: never; Returns: undefined }
       is_community_admin: { Args: { _community_id: string }; Returns: boolean }
       is_community_member: { Args: { _community_id: string }; Returns: boolean }
+      is_wecycle_admin: { Args: never; Returns: boolean }
       mark_expired_alerts: { Args: never; Returns: number }
       password_policy: { Args: never; Returns: Json }
       purge_old_expired_alerts: { Args: never; Returns: number }
@@ -1514,6 +1874,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      rpc_increment_event_view: {
+        Args: { _event_id: string }
+        Returns: undefined
+      }
       rpc_increment_listing_view: {
         Args: { _listing_id: string }
         Returns: undefined
@@ -1523,6 +1887,7 @@ export type Database = {
         Returns: number
       }
       rpc_my_impact_summary: { Args: never; Returns: Json }
+      rpc_toggle_event_save: { Args: { _event_id: string }; Returns: boolean }
       rpc_toggle_like: {
         Args: {
           _entity_id: string
@@ -1532,6 +1897,26 @@ export type Database = {
       }
       rpc_toggle_rsvp: { Args: { _event_id: string }; Returns: string }
       rpc_toggle_save: { Args: { _listing_id: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      subscribers_for_text: {
+        Args: { _exclude_user: string; _scope: string; _text: string }
+        Returns: {
+          auth: string
+          endpoint: string
+          matched_query: string
+          p256dh: string
+        }[]
+      }
+      upsert_push_subscription: {
+        Args: {
+          _auth: string
+          _endpoint: string
+          _p256dh: string
+          _user_agent?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       alert_status: "active" | "matched" | "expired" | "cancelled"

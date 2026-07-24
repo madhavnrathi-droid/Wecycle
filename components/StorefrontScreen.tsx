@@ -724,6 +724,15 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
               <Users size={11} strokeWidth={1.8} /> {event.attendees}
             </span>
+            {event.hasForm && (
+              <span style={{
+                color: '#8B5CF6', background: 'rgba(139,92,246,0.12)',
+                padding: '1px 7px', borderRadius: 999,
+                fontSize: 9.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase',
+              }}>
+                📋 Register
+              </span>
+            )}
           </div>
         </div>
       </button>

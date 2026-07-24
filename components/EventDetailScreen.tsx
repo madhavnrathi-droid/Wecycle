@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
   Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus,
+  BarChart3, ClipboardList,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { getEventPhotos, getAvatar } from '../lib/photos';
@@ -17,7 +18,16 @@ import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { shareLink, addEventToCalendar } from '../lib/share';
-import { updateEvent, updateEventMedia } from '../lib/liveData';
+import {
+  updateEvent, updateEventMedia,
+  incrementEventView, toggleEventSave, fetchSavedEventIds,
+} from '../lib/liveData';
+import {
+  fetchEventForm, fetchEventResponses, upsertEventForm, deleteEventForm,
+  validateFields, type FormField,
+} from '../lib/eventForms';
+import FormBuilder from './forms/FormBuilder';
+import Modal from './Modal';
 import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
 import ShareCardModal from './ShareCardModal';
@@ -33,6 +43,10 @@ interface EventDetailScreenProps {
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
   onDelete?: () => void | Promise<void>;
+  /** Owner-only: open the metrics/attendees/responses screen. */
+  onOpenInsights?: () => void;
+  /** Going + has a form: reopen the registration to view/edit answers. */
+  onEditRegistration?: () => void;
 }
 
 const EVENT_TYPES: { id: CommunityEvent['eventType']; label: string }[] = [
@@ -85,6 +99,7 @@ const TYPE_LABEL: Record<CommunityEvent['eventType'], string> = {
 
 export default function EventDetailScreen({
   event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onDelete,
+  onOpenInsights, onEditRegistration,
 }: EventDetailScreenProps) {
   /* Prefer the organizer's uploaded photos; mock events fall back to the
      curated Unsplash covers. Real events with no upload → empty array → we
@@ -109,6 +124,96 @@ export default function EventDetailScreen({
   const { isDesktop } = useBreakpoint();
 
   const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
+
+  /* ── Views — count one per open (live only; mirrors the listing pattern). */
+  useEffect(() => {
+    if (!isDemoMode()) incrementEventView(event.id);
+  }, [event.id]);
+
+  /* ── Save (heart) — real persistence via event_saves. */
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    if (!user || isDemoMode()) { setSaved(false); return; }
+    let cancelled = false;
+    fetchSavedEventIds(user.id).then(ids => { if (!cancelled) setSaved(ids.has(event.id)); });
+    return () => { cancelled = true; };
+  }, [event.id, user]);
+  const handleToggleSave = () => {
+    if (!user && !isDemoMode()) { onRequireAuth(); return; }
+    if (saved) haptics.selection(); else haptics.success();
+    track(EVT.save_toggled, { post_id: event.id, post_kind: 'event', saved: !saved });
+    setSaved(s => !s);
+    if (isDemoMode()) return;
+    toggleEventSave(event.id).catch(() => setSaved(s => !s)); /* revert on failure */
+  };
+
+  /* ── Registration form management (owner). Lazy-loaded on open. */
+  const [manageFormOpen, setManageFormOpen] = useState(false);
+  const [mfFields, setMfFields] = useState<FormField[]>([]);
+  const [mfHadForm, setMfHadForm] = useState(false);
+  const [mfResponseCount, setMfResponseCount] = useState(0);
+  const [mfLoading, setMfLoading] = useState(false);
+  const [mfSaving, setMfSaving] = useState(false);
+  const [mfError, setMfError] = useState<string | null>(null);
+  const [hasFormLocal, setHasFormLocal] = useState<boolean | null>(null);
+  const effectiveHasForm = hasFormLocal ?? !!event.hasForm;
+
+  const openManageForm = async () => {
+    haptics.selection();
+    setManageFormOpen(true);
+    setMfLoading(true);
+    setMfError(null);
+    try {
+      const [f, responses] = await Promise.all([
+        fetchEventForm(event.id),
+        fetchEventResponses(event.id),
+      ]);
+      setMfFields(f?.fields ?? []);
+      setMfHadForm(!!f && f.fields.length > 0);
+      setMfResponseCount(responses.length);
+    } finally {
+      setMfLoading(false);
+    }
+  };
+
+  const saveManagedForm = async () => {
+    const bad = validateFields(mfFields);
+    if (bad) { setMfError(bad); return; }
+    setMfSaving(true);
+    setMfError(null);
+    try {
+      await upsertEventForm(event.id, mfFields);
+      track(EVT.event_form_saved, { event_id: event.id, field_count: mfFields.length, source: 'edit' });
+      haptics.success();
+      setHasFormLocal(true);
+      setManageFormOpen(false);
+    } catch (e) {
+      setMfError((e as Error).message ?? 'Could not save the form');
+    } finally {
+      setMfSaving(false);
+    }
+  };
+
+  const removeManagedForm = async () => {
+    if (typeof window !== 'undefined' && !window.confirm(
+      mfResponseCount > 0
+        ? `Remove the registration form? This permanently deletes the ${mfResponseCount} response${mfResponseCount === 1 ? '' : 's'} collected so far. Export the CSV from Insights first if you need them.`
+        : 'Remove the registration form? RSVPs will confirm directly.',
+    )) return;
+    setMfSaving(true);
+    setMfError(null);
+    try {
+      await deleteEventForm(event.id);
+      track(EVT.event_form_removed, { event_id: event.id, had_responses: mfResponseCount > 0 });
+      haptics.selection();
+      setHasFormLocal(false);
+      setManageFormOpen(false);
+    } catch (e) {
+      setMfError((e as Error).message ?? 'Could not remove the form');
+    } finally {
+      setMfSaving(false);
+    }
+  };
 
   /* ── Inline edit state (owner only) ── */
   const initial = useMemo(() => parseEventDateTime(event.date, event.time), [event.date, event.time]);
@@ -213,10 +318,10 @@ export default function EventDetailScreen({
   };
 
   const handleRsvpClick = () => {
-    if (!user) { onRequireAuth(); return; }
+    if (!user && !isDemoMode()) { onRequireAuth(); return; }
     /* `rsvpd` is the *current* state — fire the event with the resulting state. */
     if (isRsvpd) haptics.selection(); else haptics.success();
-    track(EVT.rsvp_toggled, { event_id: event.id, rsvp: !event.rsvpd, event_type: event.eventType });
+    track(EVT.rsvp_toggled, { event_id: event.id, rsvp: !isRsvpd, event_type: event.eventType, has_form: !!event.hasForm });
     onRsvp();
   };
 
@@ -319,6 +424,15 @@ export default function EventDetailScreen({
               onClick={handleAddToCalendar}
             >
               <CalendarDays size={17} strokeWidth={1.8} />
+            </button>
+          )}
+          {isOwner && onOpenInsights && (
+            <button
+              aria-label="View insights"
+              className="theme-toggle"
+              onClick={() => { haptics.selection(); onOpenInsights(); }}
+            >
+              <BarChart3 size={17} strokeWidth={1.8} />
             </button>
           )}
           <button
@@ -792,39 +906,73 @@ export default function EventDetailScreen({
                 </button>
               </>
             ) : (
-              onDelete && (
+              <>
+                {onOpenInsights && (
+                  <button
+                    onClick={() => { haptics.selection(); onOpenInsights(); }}
+                    style={{
+                      flex: 1, minWidth: 130, height: 52, padding: '0 16px', borderRadius: 999,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <BarChart3 size={16} strokeWidth={2} /> Insights
+                  </button>
+                )}
                 <button
-                  onClick={async () => {
-                    if (typeof window !== 'undefined' && !window.confirm('Delete this event permanently?')) return;
-                    await onDelete();
-                    onBack();
-                  }}
+                  onClick={openManageForm}
+                  aria-label={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
+                  title={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
                   style={{
-                    flex: 1, height: 52, padding: '0 18px', borderRadius: 999,
-                    background: 'transparent', color: 'var(--accent-rose)',
-                    border: '1px solid var(--accent-rose)', cursor: 'pointer',
-                    fontSize: 14, fontWeight: 600,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    width: 52, height: 52, borderRadius: 999,
+                    background: effectiveHasForm ? 'rgba(139,92,246,0.12)' : 'var(--bg-surface)',
+                    border: `1px solid ${effectiveHasForm ? 'rgba(139,92,246,0.4)' : 'var(--border-subtle)'}`,
+                    color: effectiveHasForm ? '#8B5CF6' : 'var(--text-secondary)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', flexShrink: 0,
                   }}
                 >
-                  <Trash2 size={16} strokeWidth={2} /> Delete event
+                  <ClipboardList size={17} strokeWidth={1.8} />
                 </button>
-              )
+                {onDelete && (
+                  <button
+                    onClick={async () => {
+                      if (typeof window !== 'undefined' && !window.confirm('Delete this event permanently?')) return;
+                      await onDelete();
+                      onBack();
+                    }}
+                    aria-label="Delete event"
+                    title="Delete event"
+                    style={{
+                      width: 52, height: 52, borderRadius: 999,
+                      background: 'transparent', color: 'var(--accent-rose)',
+                      border: '1px solid var(--accent-rose)', cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}
+                  >
+                    <Trash2 size={16} strokeWidth={2} />
+                  </button>
+                )}
+              </>
             )
           ) : (
           <>
           <button
-            aria-label="Save"
+            aria-label={saved ? 'Unsave event' : 'Save event'}
+            aria-pressed={saved}
+            onClick={handleToggleSave}
             style={{
               width: 52, height: 52, borderRadius: 999,
               background: 'var(--bg-surface)',
               border: '1px solid var(--border-subtle)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--text-secondary)',
+              color: saved ? '#ED2E50' : 'var(--text-secondary)',
               cursor: 'pointer', flexShrink: 0,
             }}
           >
-            <Heart size={18} strokeWidth={1.8} />
+            <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
           </button>
           <button
             onClick={handleRsvpClick}
@@ -885,6 +1033,23 @@ export default function EventDetailScreen({
           </>
           )}
         </div>
+        {/* Going + form → quick access to their own submission. */}
+        {!isOwner && isRsvpd && !!event.hasForm && onEditRegistration && (
+          <button
+            type="button"
+            onClick={() => { haptics.selection(); onEditRegistration(); }}
+            style={{
+              alignSelf: 'center',
+              background: 'none', border: 'none', padding: '2px 4px',
+              cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              color: 'var(--text-secondary)', fontFamily: 'inherit',
+              textDecoration: 'underline', textDecorationStyle: 'dotted',
+              pointerEvents: 'auto',
+            }}
+          >
+            View / edit your registration
+          </button>
+        )}
         </div>
       </section>
       {isOwner && (
@@ -896,6 +1061,73 @@ export default function EventDetailScreen({
           allowVideo={false}
           onSave={handleSaveEventPhotos}
         />
+      )}
+      {/* ── Registration form manager (owner) ── */}
+      {isOwner && (
+        <Modal
+          open={manageFormOpen}
+          onClose={() => setManageFormOpen(false)}
+          title={mfHadForm ? 'Edit registration form' : 'Add registration form'}
+          maxWidth={640}
+          footer={
+            <>
+              {mfHadForm && (
+                <button
+                  type="button"
+                  onClick={removeManagedForm}
+                  disabled={mfSaving}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, color: 'var(--accent-rose)' }}
+                >
+                  Remove
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setManageFormOpen(false)}
+                className="btn btn-secondary"
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveManagedForm}
+                disabled={mfSaving || mfLoading}
+                className="btn btn-gradient"
+                style={{ flex: 2 }}
+              >
+                {mfSaving ? 'Saving…' : 'Save form'}
+              </button>
+            </>
+          }
+        >
+          {mfLoading ? (
+            <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              Loading…
+            </div>
+          ) : (
+            <>
+              {mfResponseCount > 0 && (
+                <div style={{
+                  padding: '9px 12px', marginBottom: 4,
+                  background: 'rgba(245,132,0,0.10)',
+                  border: '1px solid rgba(245,132,0,0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 12, lineHeight: 1.5, color: 'var(--text-primary)',
+                }}>
+                  ⚠️ {mfResponseCount} response{mfResponseCount === 1 ? '' : 's'} already collected.
+                  Existing answers keep their values — edits apply to future submissions.
+                </div>
+              )}
+              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                People fill this in when they RSVP. Answers land in your Insights.
+              </p>
+              <FormBuilder fields={mfFields} onChange={f => { setMfFields(f); setMfError(null); }} />
+              {mfError && <span className="field-error">{mfError}</span>}
+            </>
+          )}
+        </Modal>
       )}
       <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
     </div>

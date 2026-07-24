@@ -23,7 +23,7 @@ import type { Database } from './database.types';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
-interface JoinedProfile {
+export interface JoinedProfile {
   id: string;
   username?: string | null;
   full_name?: string | null;
@@ -74,7 +74,7 @@ function daysAgo(iso: string): number {
   return Math.max(0, Math.floor(diff / 86_400_000));
 }
 
-function profileToUser(p: JoinedProfile | null | undefined, fallbackId: string): User {
+export function profileToUser(p: JoinedProfile | null | undefined, fallbackId: string): User {
   return {
     id: p?.id ?? fallbackId,
     name: p?.full_name || p?.username || 'Wecycle member',
@@ -480,7 +480,9 @@ export interface NewEventInput {
   media: CompressedMedia[];
 }
 
-export async function createEvent(input: NewEventInput) {
+/** Returns the new event's id so callers can attach extras (e.g. a
+ *  registration form) right after creation. */
+export async function createEvent(input: NewEventInput): Promise<string> {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in to post');
@@ -494,7 +496,7 @@ export async function createEvent(input: NewEventInput) {
      time is blank. */
   const startsAt = new Date(`${input.date}T${input.time || '00:00'}:00`).toISOString();
 
-  const { error } = await supabase.from('events').insert({
+  const { data, error } = await supabase.from('events').insert({
     organizer_id: user.id,
     community_id: communityId,
     title: input.title.trim(),
@@ -507,9 +509,10 @@ export async function createEvent(input: NewEventInput) {
     cover_url: photoUrls[0] ?? null,
     photo_urls: photoUrls,
     video_urls: videoUrls,
-  });
+  }).select('id').single();
   if (error) throw error;
   notifyPostsChanged();
+  return (data as { id: string }).id;
 }
 
 /* ════════════════════════════════════════════════════
@@ -668,7 +671,8 @@ const EVENT_SELECT = `
   organizer:profiles!events_organizer_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
     is_online, contact_email_enabled, contact_whatsapp_enabled
-  )
+  ),
+  form:event_forms(id)
 `;
 
 interface EventRowLite {
@@ -682,10 +686,15 @@ interface EventRowLite {
   location: string;
   max_attendees: number | null;
   attendee_count: number | null;
+  view_count: number | null;
+  save_count: number | null;
   photo_urls: string[] | null;
   video_urls: string[] | null;
   cover_url: string | null;
   organizer?: JoinedProfile | null;
+  /* event_forms is UNIQUE on event_id, so the join is a single object (or
+     null). Presence = "this event has a registration form". */
+  form?: { id: string } | null;
 }
 
 function fmtDate(iso: string): string {
@@ -712,6 +721,9 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
     organizer: profileToUser(row.organizer, row.organizer_id),
     tags: [],
     rsvpd: false,
+    hasForm: !!row.form,
+    viewCount: row.view_count ?? 0,
+    saveCount: row.save_count ?? 0,
     photoUrls: row.photo_urls ?? [],
     videoUrls: row.video_urls ?? [],
   };
@@ -761,6 +773,98 @@ export async function purgeExpiredEvents() {
   const cutoff = new Date().toISOString();
   await supabase.from('events').delete().lt('starts_at', cutoff);
   notifyPostsChanged();
+}
+
+/* ── RSVPs (real persistence — event_rsvps + rpc_toggle_rsvp) ──── */
+
+/** Toggle the signed-in user's RSVP. Returns the resulting state. The DB
+ *  trigger maintains events.attendee_count and notifies the organizer. */
+export async function toggleEventRsvp(eventId: string): Promise<'going' | 'cancelled'> {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { data, error } = await supabase.rpc('rpc_toggle_rsvp', { _event_id: eventId });
+  if (error) throw error;
+  notifyPostsChanged();
+  return (data as string) === 'going' ? 'going' : 'cancelled';
+}
+
+/** Ids of events the user is going to — hydrates the app-level RSVP set. */
+export async function fetchMyRsvpIds(userId: string): Promise<Set<string>> {
+  if (!hasSupabaseEnv || !userId) return new Set();
+  const { data, error } = await supabase
+    .from('event_rsvps')
+    .select('event_id')
+    .eq('user_id', userId)
+    .eq('status', 'going');
+  if (error || !data) return new Set();
+  return new Set((data as Array<{ event_id: string }>).map(r => r.event_id));
+}
+
+export interface EventAttendee {
+  user: User;
+  rsvpedAt: string;
+}
+
+/** Attendee list for the organizer's insights — profiles join carries only
+ *  the non-PII columns (email/phone stay locked behind get_contact). */
+export async function fetchEventAttendees(eventId: string): Promise<EventAttendee[]> {
+  if (!hasSupabaseEnv) return [];
+  const { data, error } = await supabase
+    .from('event_rsvps')
+    .select(`
+      user_id, rsvped_at,
+      user:profiles!event_rsvps_user_id_fkey(
+        id, username, full_name, initials, avatar_url, avatar_color, role, is_online
+      )
+    `)
+    .eq('event_id', eventId)
+    .eq('status', 'going')
+    .order('rsvped_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as unknown as Array<{
+    user_id: string; rsvped_at: string; user?: JoinedProfile | null;
+  }>).map(r => ({
+    user: profileToUser(r.user, r.user_id),
+    rsvpedAt: r.rsvped_at,
+  }));
+}
+
+/* ── Event views + saves (insights metrics) ────────── */
+
+/** Fire-and-forget view bump — mirrors incrementListingView. */
+export function incrementEventView(id: string): void {
+  if (!hasSupabaseEnv) return;
+  supabase.rpc('rpc_increment_event_view' as never, { _event_id: id } as never).then(() => {}, () => {});
+}
+
+/** Toggle a save (heart) on an event. Returns the new saved state. */
+export async function toggleEventSave(id: string): Promise<boolean> {
+  if (!hasSupabaseEnv) return false;
+  const { data, error } = await supabase.rpc('rpc_toggle_event_save' as never, { _event_id: id } as never);
+  if (error) throw error;
+  return !!data;
+}
+
+/** Event ids the user has saved (hydrates hearts). */
+export async function fetchSavedEventIds(userId: string): Promise<Set<string>> {
+  if (!hasSupabaseEnv || !userId) return new Set();
+  const { data, error } = await supabase
+    .from('event_saves' as never)
+    .select('event_id' as never)
+    .eq('user_id' as never, userId as never);
+  if (error || !data) return new Set();
+  return new Set((data as unknown as Array<{ event_id: string }>).map(r => r.event_id));
+}
+
+/** Comment count for one event — head-count query, same pattern as
+ *  fetchProfileStats. Used by organizer insights. */
+export async function fetchEventCommentCount(eventId: string): Promise<number> {
+  if (!hasSupabaseEnv) return 0;
+  const { count } = await supabase
+    .from('comments')
+    .select('id', { count: 'exact', head: true })
+    .eq('entity_type', 'event')
+    .eq('entity_id', eventId);
+  return count ?? 0;
 }
 
 /* ── Event edit + delete ───────────────────────────── */

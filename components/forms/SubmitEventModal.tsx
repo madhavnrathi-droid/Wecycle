@@ -1,10 +1,12 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { MapPin } from 'lucide-react';
+import { MapPin, ClipboardList, ChevronDown } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import FormBuilder from './FormBuilder';
 import { createEvent } from '../../lib/liveData';
+import { upsertEventForm, validateFields, type FormField } from '../../lib/eventForms';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
@@ -46,6 +48,9 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const pickerRef = useRef<PhotoPickerHandle>(null);
+  /* Registration form (optional). null = no form; [] = builder open, empty. */
+  const [regFields, setRegFields] = useState<FormField[] | null>(null);
+  const [regError, setRegError] = useState<string | null>(null);
 
   const update = <K extends keyof EventForm>(key: K, value: EventForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -67,11 +72,17 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!validate()) return;
+    /* Registration form (when attached) must be publishable. */
+    if (regFields !== null) {
+      const bad = validateFields(regFields);
+      setRegError(bad);
+      if (bad) return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
       if (hasSupabaseEnv && !isDemoMode()) {
-        await createEvent({
+        const eventId = await createEvent({
           title: form.title,
           eventType: form.eventType as 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge',
           date: form.date,
@@ -81,6 +92,11 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           maxAttendees: form.maxAttendees,
           media: pickerRef.current?.getMedia() ?? [],
         });
+        /* Attach the registration form right after the event exists. */
+        if (regFields !== null && regFields.length > 0) {
+          await upsertEventForm(eventId, regFields);
+          track(EVT.event_form_saved, { event_id: eventId, field_count: regFields.length, source: 'create' });
+        }
       } else {
         await new Promise(r => setTimeout(r, 400));
       }
@@ -91,10 +107,14 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         has_max_attendees: typeof form.maxAttendees === 'number',
         has_description: form.description.trim().length > 0,
         has_photos: form.photos.length > 0,
+        has_registration_form: regFields !== null && regFields.length > 0,
+        registration_field_count: regFields?.length ?? 0,
       });
       onSubmit?.(form);
       pickerRef.current?.clear();
       setForm({ title: '', eventType: '', date: '', time: '', location: '', description: '', photos: [] });
+      setRegFields(null);
+      setRegError(null);
       onClose();
     } catch (err) {
       haptics.error();
@@ -246,6 +266,71 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
             onChange={e => update('maxAttendees', Number(e.target.value) || undefined)}
           />
         </div>
+
+        {/* ── Registration form (optional, Google-Forms-style builder) ──
+           When attached, RSVPing routes people through the form before the
+           RSVP confirms; responses land in the organizer's Insights. */}
+        <section style={{ marginBottom: 14 }}>
+          {regFields === null ? (
+            <button
+              type="button"
+              onClick={() => { haptics.selection(); setRegFields([]); }}
+              className="press-scale"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                padding: '13px 14px', textAlign: 'left',
+                background: 'var(--bg-inset)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-lg)', cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <span style={{
+                width: 38, height: 38, borderRadius: 'var(--radius-md)', flexShrink: 0,
+                background: 'rgba(139,92,246,0.12)', color: '#8B5CF6',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }} aria-hidden="true">
+                <ClipboardList size={18} strokeWidth={2} />
+              </span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Add a registration form
+                </span>
+                <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>
+                  Optional — collect names, choices or files when people RSVP
+                </span>
+              </span>
+              <ChevronDown size={16} strokeWidth={2} style={{ color: 'var(--text-muted)', transform: 'rotate(-90deg)' }} />
+            </button>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label className="field-label" style={{ margin: 0 }}>
+                  Registration form
+                  {regFields.length > 0 && (
+                    <span className="field-hint" style={{ fontWeight: 400, marginLeft: 6 }}>
+                      {regFields.length} question{regFields.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { haptics.selection(); setRegFields(null); setRegError(null); }}
+                  style={{
+                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, color: 'var(--accent-rose)', fontFamily: 'inherit',
+                  }}
+                >
+                  Remove form
+                </button>
+              </div>
+              <FormBuilder fields={regFields} onChange={f => { setRegFields(f); setRegError(null); }} />
+              <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                People will fill this in when they RSVP — their answers show up in your event&rsquo;s Insights.
+              </p>
+              {regError && <span className="field-error">{regError}</span>}
+            </div>
+          )}
+        </section>
 
         {/* ── Event photos (up to 3, drag-reorder, camera or library, auto-compressed) ── */}
         <section>

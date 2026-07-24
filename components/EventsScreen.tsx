@@ -17,7 +17,10 @@ interface EventsScreenProps {
   onCreate: () => void;
   onOpenEvent: (event: CommunityEvent) => void;
   rsvpdEvents: Set<string>;
-  onToggleRsvp: (id: string) => void;
+  /* Takes the whole event (not just the id) — the app-level handler needs
+     `hasForm` to decide whether to route the RSVP through the registration
+     form before confirming. */
+  onToggleRsvp: (event: CommunityEvent) => void;
 }
 
 /* ── Filter definitions ───────────────────────────── */
@@ -123,7 +126,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
         return at - bt;
       })
       .map(({ e }) => e);
-  }, [rsvpd]);
+  }, [rsvpd, allEvents]);
 
   const rest = filtered;
 
@@ -289,7 +292,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
             <UpcomingRsvpCard
               key={event.id}
               event={event}
-              onCancel={() => toggleRsvp(event.id)}
+              onCancel={() => toggleRsvp(event)}
               onOpen={() => onOpenEvent(event)}
             />
           ))}
@@ -331,7 +334,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
                 key={event.id}
                 event={event}
                 isRsvpd={rsvpd.has(event.id)}
-                onRsvp={() => toggleRsvp(event.id)}
+                onRsvp={() => toggleRsvp(event)}
                 onOpen={() => onOpenEvent(event)}
               />
             ))}
@@ -568,11 +571,21 @@ function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEve
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
             <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
               fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
               textTransform: 'uppercase', color: 'var(--text-muted)',
               marginBottom: 3,
             }}>
               {labelForType(event.eventType)}
+              {event.hasForm && (
+                <span style={{
+                  color: '#8B5CF6', background: 'rgba(139,92,246,0.12)',
+                  padding: '1px 6px', borderRadius: 999,
+                  fontSize: 9, fontWeight: 700,
+                }}>
+                  📋 Register
+                </span>
+              )}
             </div>
             <h3 style={{
               margin: 0, fontSize: 14, fontWeight: 600,
@@ -615,7 +628,9 @@ function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEve
           flexShrink: 0,
         }}
       >
-        {isRsvpd ? <><Check size={11} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-1px' }} /> Going</> : 'RSVP'}
+        {isRsvpd
+          ? <><Check size={11} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-1px' }} /> Going</>
+          : event.hasForm ? 'Register' : 'RSVP'}
       </button>
     </article>
   );

@@ -188,6 +188,12 @@ export interface CommunityEvent {
   organizer: User;
   tags: string[];
   rsvpd: boolean;
+  /* True when the organizer attached a registration form — RSVPing routes
+     through the form-fill screen before confirming. */
+  hasForm?: boolean;
+  /* Real metric counts from the DB (absent on mock events → metric fallbacks). */
+  viewCount?: number;
+  saveCount?: number;
 }
 
 export interface LostItem {
@@ -653,6 +659,7 @@ export const EVENTS: CommunityEvent[] = [
     organizer: USERS[3],
     tags: ['repair', 'weekly', 'skills'],
     rsvpd: false,
+    hasForm: true,   /* demo registration form — see lib/eventForms DEMO_FORMS */
   },
   {
     id: 'e3',
@@ -668,6 +675,7 @@ export const EVENTS: CommunityEvent[] = [
     organizer: USERS[0],
     tags: ['cleanup', 'environment', 'team'],
     rsvpd: false,
+    hasForm: true,   /* demo form + seeded responses power the insights demo */
   },
   {
     id: 'e4',

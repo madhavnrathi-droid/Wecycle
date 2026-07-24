@@ -10,6 +10,8 @@ import InventoryScreen from '../components/InventoryScreen';
 import LostFoundScreen, { LostFoundDetailSheet, type LFSavePatch } from '../components/LostFoundScreen';
 import ItemDetailScreen from '../components/ItemDetailScreen';
 import EventDetailScreen from '../components/EventDetailScreen';
+import EventRegistrationScreen from '../components/EventRegistrationScreen';
+import EventInsightsScreen from '../components/EventInsightsScreen';
 import AccountScreen from '../components/AccountScreen';
 import ActivityScreen from '../components/ActivityScreen';
 import SettingsScreen from '../components/SettingsScreen';
@@ -31,7 +33,13 @@ import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/mockData';
 import { MY_EVENT_IDS } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
-import { deletePostById, deleteEvent, purgeExpiredEvents, purgeExpiredRequests, updateLostFoundFields, repostLostFound, fetchPostById } from '../lib/liveData';
+import {
+  deletePostById, deleteEvent, purgeExpiredEvents, purgeExpiredRequests,
+  updateLostFoundFields, repostLostFound, fetchPostById,
+  toggleEventRsvp, fetchMyRsvpIds,
+} from '../lib/liveData';
+import { withdrawFormResponse } from '../lib/eventForms';
+import { hasSupabaseEnv } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
@@ -96,13 +104,89 @@ export default function WecycleApp() {
     return !!user && it.user.id === user.id;
   };
   const [editingAlert, setEditingAlert] = useState<WecycleAlert | null>(null);
-  /* Track RSVPs at app-level so EventsScreen + EventDetailScreen stay in sync */
-  const [rsvpdEvents, setRsvpdEvents] = useState<Set<string>>(new Set(['e1', 'e4', 'e5']));
-  const toggleRsvp = (id: string) => setRsvpdEvents(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+
+  /* ── RSVPs — app-level so EventsScreen + EventDetailScreen stay in sync.
+     Live mode persists via event_rsvps/rpc_toggle_rsvp and hydrates on auth;
+     demo mode seeds the fixture RSVPs and stays in memory. */
+  const [rsvpdEvents, setRsvpdEvents] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    /* isDemoMode() (the ?demo flag) — same check every other surface uses. */
+    if (isDemoMode()) { setRsvpdEvents(new Set(['e1', 'e4', 'e5'])); return; }
+    if (!user || !hasSupabaseEnv) { setRsvpdEvents(new Set()); return; }
+    let cancelled = false;
+    fetchMyRsvpIds(user.id).then(ids => { if (!cancelled) setRsvpdEvents(ids); });
+    return () => { cancelled = true; };
+  }, [user, isDemo]);
+
+  /* Registration form-fill + organizer insights sub-surfaces. */
+  const [registerEvent, setRegisterEvent] = useState<CommunityEvent | null>(null);
+  const [registerEditMode, setRegisterEditMode] = useState(false);
+  const [insightsEvent, setInsightsEvent] = useState<CommunityEvent | null>(null);
+
+  const setRsvpLocal = (id: string, going: boolean) => {
+    setRsvpdEvents(prev => {
+      const next = new Set(prev);
+      if (going) next.add(id); else next.delete(id);
+      return next;
+    });
+    /* Optimistically bump the open detail's "going" count so the screen
+       reflects the action without waiting for a refetch. */
+    setOpenEvent(prev => (prev && prev.id === id
+      ? { ...prev, attendees: Math.max(0, prev.attendees + (going ? 1 : -1)) }
+      : prev));
+  };
+
+  /* THE central RSVP entry point — every RSVP button routes here.
+       No form  → toggle straight away (optimistic, server-backed).
+       Has form → new RSVP opens the registration screen (the submit confirms
+                  it); cancelling withdraws the response along with the RSVP. */
+  const requestRsvp = async (event: CommunityEvent) => {
+    /* Demo mode is a guided tour — let RSVPs work without an account (they
+       only live in memory). Live mode requires auth. */
+    if (!user && !isDemoMode()) { setModal('auth'); return; }
+    const going = rsvpdEvents.has(event.id);
+
+    if (!going && event.hasForm) {
+      setRegisterEditMode(false);
+      setRegisterEvent(event);
+      return;
+    }
+
+    if (going && event.hasForm) {
+      if (typeof window !== 'undefined' && !window.confirm(
+        'Cancel your RSVP? Your registration response will be withdrawn too.',
+      )) return;
+    }
+
+    /* Optimistic flip + server toggle (revert on failure). */
+    setRsvpLocal(event.id, !going);
+    if (isDemoMode() || !hasSupabaseEnv) return;
+    try {
+      await toggleEventRsvp(event.id);
+      if (going && event.hasForm) {
+        await withdrawFormResponse(event.id);
+        track(EVT.registration_withdrawn, { event_id: event.id });
+      }
+    } catch {
+      setRsvpLocal(event.id, going); /* revert */
+    }
+  };
+
+  /* Registration submitted → confirm the RSVP (unless already going). */
+  const handleRegistrationSubmitted = async () => {
+    const ev = registerEvent;
+    setRegisterEvent(null);
+    if (!ev) return;
+    if (rsvpdEvents.has(ev.id)) return; /* edit of an existing registration */
+    setRsvpLocal(ev.id, true);
+    if (isDemoMode() || !hasSupabaseEnv) return;
+    try {
+      await toggleEventRsvp(ev.id);
+    } catch {
+      setRsvpLocal(ev.id, false);
+    }
+  };
+
   const [lfDefaultStatus, setLfDefaultStatus] = useState<'lost' | 'found' | undefined>();
 
   /* First-time onboarding tour — fires only when the local "done" flag is
@@ -155,11 +239,11 @@ export default function WecycleApp() {
    * visible jump. */
   useIsoLayoutEffect(() => {
     if (isDesktop) return; /* desktop overlays are modals; the feed stays put */
-    const overlay = !!(openItem || openEvent || openStorefront || subScreen);
+    const overlay = !!(openItem || openEvent || openStorefront || subScreen || registerEvent || insightsEvent);
     if (!overlay) return;
     const main = document.getElementById('main');
     if (main) main.scrollTop = 0;
-  }, [isDesktop, openItem, openEvent, openStorefront, subScreen]);
+  }, [isDesktop, openItem, openEvent, openStorefront, subScreen, registerEvent, insightsEvent]);
 
   /* Service worker */
   useEffect(() => {
@@ -428,6 +512,44 @@ export default function WecycleApp() {
     );
   }
 
+  /* Event registration (form-fill) — stacks ABOVE the event detail takeover
+     so Back returns to the event. Mobile only; desktop renders as a modal. */
+  if (registerEvent && !isDesktop) {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <EventRegistrationScreen
+              event={registerEvent}
+              editMode={registerEditMode}
+              onBack={() => setRegisterEvent(null)}
+              onSubmitted={handleRegistrationSubmitted}
+            />
+          </main>
+        </div>
+      </>
+    );
+  }
+
+  /* Organizer insights — stacks above the event detail takeover. */
+  if (insightsEvent && !isDesktop) {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <EventInsightsScreen
+              event={insightsEvent}
+              onBack={() => setInsightsEvent(null)}
+              onOpenUser={(u) => { setInsightsEvent(null); setOpenEvent(null); openStorefrontFor(u); }}
+            />
+          </main>
+        </div>
+      </>
+    );
+  }
+
   /* Event detail — full takeover on mobile, modal overlay on desktop. */
   if (openEvent && !isDesktop) {
     /* Ownership: demo flag relies on MY_EVENT_IDS; live mode trusts the
@@ -444,13 +566,15 @@ export default function WecycleApp() {
               isRsvpd={rsvpdEvents.has(openEvent.id)}
               isOwner={isOwner || isAdmin}
               onBack={() => setOpenEvent(null)}
-              onRsvp={() => toggleRsvp(openEvent.id)}
+              onRsvp={() => requestRsvp(openEvent)}
               onRequireAuth={() => setModal('auth')}
               onOpenStorefront={openStorefrontFor}
               onDelete={(isOwner || isAdmin) ? async () => {
                 if (isDemoMode()) { deleteDemoPost(openEvent.id); return; }
                 await deleteEvent(openEvent.id);
               } : undefined}
+              onOpenInsights={(isOwner || isAdmin) ? () => setInsightsEvent(openEvent) : undefined}
+              onEditRegistration={() => { setRegisterEditMode(true); setRegisterEvent(openEvent); }}
             />
           </main>
         </div>
@@ -538,7 +662,7 @@ export default function WecycleApp() {
               onCreate={openSubmitEvent}
               onOpenEvent={setOpenEvent}
               rsvpdEvents={rsvpdEvents}
-              onToggleRsvp={toggleRsvp}
+              onToggleRsvp={requestRsvp}
             />
           )}
           {activeScreen === 'lost_found' && (
@@ -569,6 +693,7 @@ export default function WecycleApp() {
               onPostNew={() => requireAuth('post-picker')}
               onOpenItem={setOpenItem}
               onOpenEvent={setOpenEvent}
+              onOpenEventInsights={setInsightsEvent}
               onOpenLF={(lf) => setOpenLF(lf)}
             />
           )}
@@ -693,17 +818,51 @@ export default function WecycleApp() {
                 isRsvpd={rsvpdEvents.has(openEvent.id)}
                 isOwner={isOwner || isAdmin}
                 onBack={() => setOpenEvent(null)}
-                onRsvp={() => toggleRsvp(openEvent.id)}
+                onRsvp={() => requestRsvp(openEvent)}
                 onRequireAuth={() => setModal('auth')}
                 onOpenStorefront={openStorefrontFor}
                 onDelete={(isOwner || isAdmin) ? async () => {
                   if (isDemoMode()) { deleteDemoPost(openEvent.id); return; }
                   await deleteEvent(openEvent.id);
                 } : undefined}
+                onOpenInsights={(isOwner || isAdmin) ? () => setInsightsEvent(openEvent) : undefined}
+                onEditRegistration={() => { setRegisterEditMode(true); setRegisterEvent(openEvent); }}
               />
             </DesktopDetailModal>
           );
         })()}
+
+        {/* Registration form-fill (desktop) — narrower centered modal, layered
+            above the event detail modal. */}
+        {isDesktop && registerEvent && (
+          <DesktopDetailModal
+            onClose={() => setRegisterEvent(null)}
+            ariaLabel={`Register for ${registerEvent.title}`}
+            width={640}
+          >
+            <EventRegistrationScreen
+              event={registerEvent}
+              editMode={registerEditMode}
+              onBack={() => setRegisterEvent(null)}
+              onSubmitted={handleRegistrationSubmitted}
+            />
+          </DesktopDetailModal>
+        )}
+
+        {/* Organizer insights (desktop). */}
+        {isDesktop && insightsEvent && (
+          <DesktopDetailModal
+            onClose={() => setInsightsEvent(null)}
+            ariaLabel={`Insights for ${insightsEvent.title}`}
+            width={920}
+          >
+            <EventInsightsScreen
+              event={insightsEvent}
+              onBack={() => setInsightsEvent(null)}
+              onOpenUser={(u) => { setInsightsEvent(null); setOpenEvent(null); openStorefrontFor(u); }}
+            />
+          </DesktopDetailModal>
+        )}
 
         {isDesktop && openStorefront && (
           <DesktopDetailModal onClose={() => setOpenStorefront(null)} ariaLabel={`${openStorefront.name}'s storefront`}>
@@ -732,11 +891,13 @@ export default function WecycleApp() {
  * listener) so keyboard users can dismiss without aiming for the X.
  */
 function DesktopDetailModal({
-  onClose, ariaLabel, children,
+  onClose, ariaLabel, children, width = 1080,
 }: {
   onClose: () => void;
   ariaLabel: string;
   children: React.ReactNode;
+  /** Max box width in px — narrower for focused flows (forms), default 1080. */
+  width?: number;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -774,7 +935,7 @@ function DesktopDetailModal({
         style={{
           position: 'fixed', left: '50%', top: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 'min(1080px, 94vw)',
+          width: `min(${width}px, 94vw)`,
           maxHeight: '90vh',
           background: 'var(--bg-card)',
           borderRadius: 24,
