@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { lockBodyScroll } from '../lib/bodyLock';
 
 interface ModalProps {
   open: boolean;
@@ -28,12 +29,12 @@ export default function Modal({
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  /* Body scroll lock */
+  /* Body scroll lock — ref-counted so a full-page surface layered above
+     (e.g. the form builder) can hold its own lock without the restore order
+     wedging the body. */
   useEffect(() => {
     if (!open) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = original; };
+    return lockBodyScroll();
   }, [open]);
 
   /* Keyboard + focus management — runs ONLY when the modal opens/closes */
@@ -53,6 +54,10 @@ export default function Modal({
     target?.focus();
 
     const handleKey = (e: KeyboardEvent) => {
+      /* A full-page surface (form builder, [data-fbs]) layered above this
+         modal owns the keyboard — stand down so Escape doesn't rip through
+         both layers and Tab isn't yanked back into the covered modal. */
+      if (document.querySelector('[data-fbs]')) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onCloseRef.current();

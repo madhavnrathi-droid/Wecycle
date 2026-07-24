@@ -40,6 +40,7 @@ import {
 } from '../lib/liveData';
 import { withdrawFormResponse, fetchEventForm } from '../lib/eventForms';
 import { hasSupabaseEnv } from '../lib/supabase';
+import { lockBodyScroll } from '../lib/bodyLock';
 import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
@@ -287,7 +288,11 @@ export default function WecycleApp() {
    * top — the product photo + name first — flush before paint so there's no
    * visible jump. */
   useIsoLayoutEffect(() => {
-    if (isDesktop) return; /* desktop overlays are modals; the feed stays put */
+    /* Desktop overlays are modals with their own scroll shells — EXCEPT the
+       registration fill, which is a full #main takeover on every breakpoint
+       and would otherwise inherit the previous screen's scroll offset
+       (opening mid-form, above-the-fold required fields unseen). */
+    if (isDesktop && !registerEvent) return;
     const overlay = !!(openItem || openEvent || openStorefront || subScreen || registerEvent || insightsEvent);
     if (!overlay) return;
     const main = document.getElementById('main');
@@ -949,11 +954,10 @@ function DesktopDetailModal({
       onClose();
     };
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockBodyScroll();
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      unlock();
     };
   }, [onClose]);
 

@@ -9,9 +9,10 @@
  * base with hairline dividers, matching the app's reference direction.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ChevronLeft, Trash2, Check, Loader2 } from 'lucide-react';
 import FormBuilder from './FormBuilder';
+import { lockBodyScroll } from '../../lib/bodyLock';
 import type { FormField } from '../../lib/eventForms';
 
 interface FormBuilderScreenProps {
@@ -25,6 +26,8 @@ interface FormBuilderScreenProps {
   /** Primary action. Validation happens in the caller. */
   onSave: () => void | Promise<void>;
   saving?: boolean;
+  /** True while the existing form/responses are still being fetched. */
+  loading?: boolean;
   error?: string | null;
   /** When editing a live form that already has responses. */
   responseCount?: number;
@@ -36,20 +39,64 @@ interface FormBuilderScreenProps {
 
 export default function FormBuilderScreen({
   open, subtitle, fields, onChange, onBack, onSave,
-  saving, error, responseCount = 0, onRemove, saveLabel = 'Save form',
+  saving, loading, error, responseCount = 0, onRemove, saveLabel = 'Save form',
 }: FormBuilderScreenProps) {
-  /* Lock the page underneath while the builder owns the viewport. */
+  const rootRef = useRef<HTMLDivElement>(null);
+  const onBackRef = useRef(onBack);
+  onBackRef.current = onBack;
+
+  /* Own the viewport: ref-counted body lock (a Modal underneath holds its own
+     lock — counting prevents the restore-order wedge), move focus IN, trap
+     Tab inside, own Escape (capture phase, so the covered Modal's document
+     listener never sees it), and hand focus back on close. */
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    const unlock = lockBodyScroll();
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const focusTimer = setTimeout(() => {
+      rootRef.current?.querySelector<HTMLElement>('button, input, [tabindex]')?.focus();
+    }, 30);
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onBackRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const root = rootRef.current;
+      if (!root) return;
+      e.stopPropagation(); /* keep the covered Modal's trap out of it */
+      const focusables = Array.from(root.querySelectorAll<HTMLElement>(
+        'button, input, textarea, select, [tabindex]:not([tabindex="-1"])',
+      )).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || !root.contains(active)) { e.preventDefault(); first.focus(); return; }
+      if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    };
+    /* Capture phase → runs before (and suppresses) bubble listeners like
+       Modal.tsx's document-level Escape/Tab handling. */
+    document.addEventListener('keydown', onKey, true);
+
+    return () => {
+      clearTimeout(focusTimer);
+      document.removeEventListener('keydown', onKey, true);
+      unlock();
+      prevFocus?.focus?.();
+    };
   }, [open]);
 
   if (!open) return null;
 
   return (
     <div
+      ref={rootRef}
+      data-fbs
       role="dialog"
       aria-modal="true"
       aria-label="Registration form builder"
@@ -93,7 +140,7 @@ export default function FormBuilderScreen({
             in your event&rsquo;s Insights.
           </p>
 
-          {responseCount > 0 && (
+          {responseCount > 0 && !loading && (
             <div style={{
               padding: '10px 14px', marginBottom: 16,
               background: 'rgba(245,132,0,0.10)',
@@ -105,7 +152,16 @@ export default function FormBuilderScreen({
             </div>
           )}
 
-          <FormBuilder fields={fields} onChange={onChange} />
+          {loading ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '48px 0', color: 'var(--text-muted)', fontSize: 13,
+            }}>
+              <Loader2 size={15} strokeWidth={2.2} className="spin" /> Loading your form…
+            </div>
+          ) : (
+            <FormBuilder fields={fields} onChange={onChange} />
+          )}
 
           {error && (
             <div role="alert" style={{
@@ -163,7 +219,7 @@ export default function FormBuilderScreen({
           <button
             type="button"
             onClick={onSave}
-            disabled={saving}
+            disabled={saving || loading}
             style={{
               height: 44, padding: '0 22px', borderRadius: 999,
               background: 'var(--text-primary)', color: 'var(--bg-base)',

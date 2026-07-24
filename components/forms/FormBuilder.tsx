@@ -250,24 +250,26 @@ function FieldCard({
         </div>
       )}
 
-      {/* Row 4: required — quiet pill switch, not a checkbox box */}
+      {/* Row 4: required — quiet pill switch. The checkbox overlays the whole
+          switch (full-size, focusable, AT-visible); the focus ring draws on
+          the track via .pill-switch CSS. */}
       <label style={{
         display: 'flex', alignItems: 'center', gap: 8,
         marginTop: 12, cursor: 'pointer', userSelect: 'none',
         fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)',
       }}>
-        <span style={{ position: 'relative', display: 'inline-block', width: 34, height: 20, flexShrink: 0 }}>
+        <span className="pill-switch" style={{ width: 34, height: 20 }}>
           <input
             type="checkbox"
             checked={field.required}
             onChange={e => onPatch({ required: e.target.checked })}
             aria-label={`Question ${index + 1} required`}
-            style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
           />
-          <span aria-hidden="true" style={{
+          <span className="pill-switch-track" aria-hidden="true" style={{
             position: 'absolute', inset: 0, borderRadius: 999,
             background: field.required ? 'var(--text-primary)' : 'var(--bg-inset)',
             transition: 'background 180ms',
+            pointerEvents: 'none',
           }} />
           <span aria-hidden="true" style={{
             position: 'absolute', top: 3, left: field.required ? 17 : 3,
@@ -275,6 +277,7 @@ function FieldCard({
             background: '#fff',
             boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
             transition: 'left 180ms cubic-bezier(.2,.8,.2,1)',
+            pointerEvents: 'none',
           }} />
         </span>
         Required

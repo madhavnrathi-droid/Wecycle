@@ -1065,13 +1065,14 @@ export default function EventDetailScreen({
            Back returns to this detail screen exactly as it was. */}
       {isOwner && (
         <FormBuilderScreen
-          open={manageFormOpen && !mfLoading}
+          open={manageFormOpen}
           subtitle={event.title}
           fields={mfFields}
           onChange={f => { setMfFields(f); setMfError(null); }}
           onBack={() => setManageFormOpen(false)}
           onSave={saveManagedForm}
           saving={mfSaving}
+          loading={mfLoading}
           error={mfError}
           responseCount={mfResponseCount}
           onRemove={mfHadForm ? removeManagedForm : undefined}
