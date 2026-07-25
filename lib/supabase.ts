@@ -9,7 +9,57 @@
  * and vanished (posts not saving, delete/like doing nothing). localStorage
  * persistence attaches the bearer token reliably on every request. */
 import { createClient } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 import type { Database } from './database.types';
+
+/* ── Session storage ────────────────────────────────────────────────────────
+ * WEB: the default localStorage adapter. Sessions already survive restarts —
+ * Supabase rotates the refresh token indefinitely, so a signed-in user stays
+ * signed in and we never re-send an OTP.
+ *
+ * NATIVE (Capacitor): localStorage lives in the WebView's data, which Android
+ * and iOS can wipe on a cache clear or under storage pressure — that would
+ * silently sign people out and cost another OTP. Persist to Preferences
+ * instead (SharedPreferences / UserDefaults), which is app data and survives.
+ * Supabase accepts an async adapter here (the same contract React Native's
+ * AsyncStorage uses). Loaded lazily so the web bundle never pulls it in.
+ */
+type PrefsModule = typeof import('@capacitor/preferences');
+let prefsPromise: Promise<PrefsModule> | null = null;
+function prefs(): Promise<PrefsModule> {
+  if (!prefsPromise) prefsPromise = import('@capacitor/preferences');
+  return prefsPromise;
+}
+
+const nativeSessionStorage = {
+  async getItem(key: string): Promise<string | null> {
+    const { Preferences } = await prefs();
+    const { value } = await Preferences.get({ key });
+    if (value != null) return value;
+    /* One-time migration: anyone signed in on a build before this shipped has
+       their session in the WebView's localStorage. Adopt it so updating the
+       app doesn't sign them out, then keep it natively from here on. */
+    try {
+      const legacy = window.localStorage.getItem(key);
+      if (legacy != null) {
+        await Preferences.set({ key, value: legacy });
+        return legacy;
+      }
+    } catch { /* localStorage unavailable — nothing to migrate */ }
+    return null;
+  },
+  async setItem(key: string, value: string): Promise<void> {
+    const { Preferences } = await prefs();
+    await Preferences.set({ key, value });
+  },
+  async removeItem(key: string): Promise<void> {
+    const { Preferences } = await prefs();
+    await Preferences.remove({ key });
+    /* Clear the legacy copy too, or the migration above would resurrect a
+       session the user just signed out of. */
+    try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+  },
+};
 
 /**
  * Browser Supabase client — uses publishable key, safe to ship to the client.
@@ -107,12 +157,17 @@ export function getSupabase() {
     return _client;
   }
 
+  /* Guarded on `window` so a client component rendering on the server (where
+     Capacitor has no bridge) still gets the plain web client. */
+  const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+
   _client = createClient<Database>(url, key, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storageKey: 'wecycle-auth',
+      ...(isNative ? { storage: nativeSessionStorage } : {}),
     },
   });
   return _client;
