@@ -16,7 +16,7 @@ Everything needed to submit `page.wecycle.app` to Google Play. Copy-paste the an
 | Signed with | upload key, alias `wecycle` (self-signed cert — Play re-signs; this is expected) |
 | Upload-key SHA-256 | `90:6D:E3:42:66:44:94:69:AC:64:18:D6:D0:A0:BF:10:1F:56:04:2C:15:D7:CD:FF:10:D0:CA:99:C0:CE:29:01` |
 
-This SHA is **already published** in `https://wecycle-seven.vercel.app/.well-known/assetlinks.json`.
+This SHA is **already published** in `https://wecycle.page/.well-known/assetlinks.json`.
 
 ---
 
@@ -33,7 +33,7 @@ When you upload the AAB, Google enrolls you in **Play App Signing** and generate
      "<PASTE THE PLAY APP-SIGNING SHA-256 HERE>"
    ]
    ```
-4. Redeploy the web (`vercel --prod`). Verify `https://wecycle-seven.vercel.app/.well-known/assetlinks.json` now lists both.
+4. Redeploy the web (`vercel --prod`). Verify `https://wecycle.page/.well-known/assetlinks.json` now lists both.
 
 Until this is done the app still installs and runs — it just shows the address bar. Do it before public launch.
 
@@ -72,8 +72,8 @@ Built for students, by students. Reduce waste, save money, and build a more reso
 - **App category:** `Shopping` (alternatives: Lifestyle, Social)
 - **Tags:** marketplace, community, reuse, students, sustainability
 - **Contact email:** `madhav.n.rathi@gmail.com`
-- **Website:** `https://wecycle-seven.vercel.app`
-- **Privacy policy URL:** `https://wecycle-seven.vercel.app/privacy` ✅ live (200)
+- **Website:** `https://wecycle.page`
+- **Privacy policy URL:** `https://wecycle.page/privacy` ✅ live (200)
 
 ### Graphics you must upload (Play needs these as separate uploads)
 | Asset | Spec | Status |
@@ -100,7 +100,7 @@ Built for students, by students. Reduce waste, save money, and build a more reso
 
 **Does your app collect or share user data?** → **Yes.**
 **Is all data encrypted in transit?** → **Yes** (HTTPS everywhere).
-**Do you provide a way to request data deletion?** → **Yes** → deletion URL: `https://wecycle-seven.vercel.app/delete-account` (also in-app: Settings → Delete account).
+**Do you provide a way to request data deletion?** → **Yes** → deletion URL: `https://wecycle.page/delete-account` (also in-app: Settings → Delete account).
 
 **Data collected** (mark *Collected*; none is *Shared* for sale — analytics providers are processors):
 

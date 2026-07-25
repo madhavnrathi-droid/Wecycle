@@ -46,7 +46,13 @@ export async function POST(req: Request) {
   const srcRef = req.headers.get('origin') || req.headers.get('referer');
   let srcHost: string | null = null;
   if (srcRef) { try { srcHost = new URL(srcRef).host; } catch { /* malformed */ } }
-  if (!host || srcHost !== host) {
+  /* The Capacitor app is NOT same-origin: its WebView serves the bundled
+     export from `https://localhost` (Android) / `capacitor://localhost` (iOS)
+     and calls this route on the deployed origin, so a strict host match would
+     403 our own app. Bare `localhost` (no port) is exactly those two schemes —
+     a local dev server is `localhost:3000` and still won't match. */
+  const isNativeShell = srcHost === 'localhost';
+  if (!host || (srcHost !== host && !isNativeShell)) {
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
   }
 

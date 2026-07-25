@@ -24,7 +24,7 @@ const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:hello@wecycle.app
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-const APP_URL = Deno.env.get('APP_URL') ?? 'https://wecycle-seven.vercel.app';
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://wecycle.page';
 
 interface WebhookBody {
   type: 'INSERT' | 'UPDATE' | 'DELETE';

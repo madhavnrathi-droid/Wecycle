@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
 import { AuthProvider } from "../lib/AuthContext";
+import { SITE_URL } from "../lib/siteUrl";
 import SessionSplash from "../components/SessionSplash";
 import NativeInit from "../components/NativeInit";
 import "./globals.css";
@@ -28,7 +29,7 @@ const GTM_ID = "GTM-T59PDHDF";
 const GA4_MEASUREMENT_ID = "G-FR9104LN7N";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://wecycle-seven.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   title: "Wecycle — Community Operating System",
   description:
     "Circulate resources within your community — share, swap, repair, and request what you need. Built for campuses, apartments, and neighborhoods.",

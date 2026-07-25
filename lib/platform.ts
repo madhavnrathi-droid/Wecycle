@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { SITE_URL } from './siteUrl';
 
 /**
  * Native-vs-web helpers for the Capacitor app.
@@ -7,7 +8,7 @@ import { Capacitor } from '@capacitor/core';
  * server-backed (currently just the remove.bg proxy) targets the deployed web
  * origin instead of being same-origin. On the web `apiBase()` is '' (same-origin).
  */
-export const WEB_ORIGIN = 'https://wecycle-seven.vercel.app';
+export const WEB_ORIGIN = SITE_URL;
 
 export function isNativeApp(): boolean {
   return typeof window !== 'undefined' && Capacitor.isNativePlatform();
