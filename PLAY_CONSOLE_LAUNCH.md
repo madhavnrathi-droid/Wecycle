@@ -46,10 +46,12 @@ The app requires sign-in, so Google's reviewer needs a working test account.
 - Console → **App access** → choose **"All or some functionality is restricted"**.
 - Add an instruction set:
   - **Username:** `playreview@wecycle.page`
-  - **Password:** `<the reviewer password you set>`
+  - **Password:** `WecycleReview2026`
   - **Instructions:** "Enter the email and password on the sign-in screen, tap Sign in. This is a campus reuse marketplace; browse the feed, open a listing, tap a category."
 
-(There's a reviewer bypass wired for this exact email in the auth screen.)
+(This exact email + password is wired as a reviewer bypass in `components/AuthModal.tsx`
+— `REVIEW_EMAIL` / `REVIEW_PASSWORD`. It opens a **demo session**, so the reviewer sees a
+populated app and never touches real member data. Change both together if you rotate it.)
 
 ---
 

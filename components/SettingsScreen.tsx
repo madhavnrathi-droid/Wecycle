@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   ChevronLeft, ChevronRight,
   Bell, BellRing, Shield, Tag, Info,
-  MessageSquare, Globe, EyeOff, Trash2, Loader2, UserX,
+  MessageSquare, Globe, EyeOff, Trash2, Loader2, UserX, Lock,
 } from 'lucide-react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push';
 import { getBlockedUsers, unblockUser, onBlocksChange, type BlockedUser } from '../lib/moderation';
@@ -21,10 +21,11 @@ interface SettingsScreenProps {
   onOpenNotifications: () => void;
   onOpenFeedback: () => void;
   onOpenAccount: () => void;
+  onOpenPassword?: () => void;
 }
 
 export default function SettingsScreen({
-  onBack, onOpenNotifications, onOpenFeedback, onOpenAccount,
+  onBack, onOpenNotifications, onOpenFeedback, onOpenAccount, onOpenPassword,
 }: SettingsScreenProps) {
   const { user, isDemo, signOut, profile } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -404,6 +405,14 @@ export default function SettingsScreen({
           subtitle={user ? (isDemo ? 'Demo session' : 'Signed in') : 'Not signed in'}
           onClick={onOpenAccount}
         />
+        {user && onOpenPassword && (
+          <LinkCard
+            icon={<Lock size={16} strokeWidth={1.8} />}
+            title="Password"
+            subtitle={isDemo ? 'Demo session' : 'Change your sign-in password'}
+            onClick={onOpenPassword}
+          />
+        )}
         <Card>
           <div style={{ padding: '14px 16px' }}>
             <p style={{

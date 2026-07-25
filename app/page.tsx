@@ -17,6 +17,7 @@ import ActivityScreen from '../components/ActivityScreen';
 import SettingsScreen from '../components/SettingsScreen';
 import NotificationsScreen from '../components/NotificationsScreen';
 import FeedbackScreen from '../components/FeedbackScreen';
+import ChangePasswordScreen from '../components/ChangePasswordScreen';
 import StorefrontScreen from '../components/StorefrontScreen';
 import Drawer from '../components/Drawer';
 import PostSheet from '../components/PostSheet';
@@ -65,7 +66,7 @@ type ModalKind =
   | 'alert-form';
 
 export default function WecycleApp() {
-  const { user, profile, isDemo, isAdmin } = useAuth();
+  const { user, profile, isDemo, isAdmin, signOut } = useAuth();
   /* `isDesktop` decides between full-page takeover (mobile) and modal-
    * theatre overlay (desktop) for item/event/storefront detail surfaces.
    * The L&F sheet already branches internally; the others wrap below. */
@@ -260,7 +261,7 @@ export default function WecycleApp() {
   /* Sub-screens that take over the viewport. We keep a stack so "back" always
      returns to the previous screen (e.g. Settings → Notifications → back → Settings),
      and entering one directly from the drawer pops back to the main app. */
-  type SubScreen = 'settings' | 'notifications' | 'feedback';
+  type SubScreen = 'settings' | 'notifications' | 'feedback' | 'password';
   const [subStack, setSubStack] = useState<SubScreen[]>([]);
   const subScreen: SubScreen | null = subStack[subStack.length - 1] ?? null;
   const pushSub = (s: SubScreen) => setSubStack(prev => [...prev, s]);
@@ -532,6 +533,7 @@ export default function WecycleApp() {
               onOpenNotifications={() => pushSub('notifications')}
               onOpenFeedback={() => pushSub('feedback')}
               onOpenAccount={() => { clearSubStack(); goToAccount(); }}
+              onOpenPassword={() => pushSub('password')}
             />
           </main>
         </div>
@@ -560,6 +562,27 @@ export default function WecycleApp() {
         <div className="app-container">
           <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
             <FeedbackScreen onBack={popSub} />
+          </main>
+        </div>
+      </>
+    );
+  }
+  if (subScreen === 'password') {
+    return (
+      <>
+        <a href="#main" className="skip-link">Skip to main content</a>
+        <div className="app-container">
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
+            <ChangePasswordScreen
+              onBack={popSub}
+              /* "I don't know my current password" → sign out and use the
+                 emailed-code reset, which is the only way in without it. */
+              onForgot={async () => {
+                clearSubStack();
+                await signOut();
+                setModal('auth');
+              }}
+            />
           </main>
         </div>
       </>

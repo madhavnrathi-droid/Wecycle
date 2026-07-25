@@ -68,6 +68,8 @@ export const EVT = {
   sign_up_started:          'sign_up_started',
   sign_up_email_submitted:  'sign_up_email_submitted',
   sign_up_otp_sent:         'sign_up_otp_sent',
+  password_set:             'password_set',
+  password_reset_requested: 'password_reset_requested',
   /** GA4 reserved event — fires once per signed-in user, ever. */
   sign_up:                  'sign_up',
   /** GA4 reserved event — fires every successful OTP verify. */
