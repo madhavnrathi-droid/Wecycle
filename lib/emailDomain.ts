@@ -6,9 +6,9 @@
  *
  * The rule is on the DOMAIN, never the local part: `manipal@gmail.com` is a
  * Gmail address and is rejected, while `x.230905@learner.manipal.edu` passes.
- * Any domain label containing "manipal" qualifies, so every MAHE variant works
- * without maintaining an exhaustive list:
- *     learner.manipal.edu   manipal.edu   manipal.com   mahe.manipal.edu   …
+ * A domain qualifies when it IS one of the Manipal roots or is a subdomain of
+ * one — see MANIPAL_ROOT_DOMAINS below for why that's a suffix test and not a
+ * "contains manipal" test.
  *
  * Mirrored server-side by the enforce_manipal_signup_email trigger on
  * auth.users, so this can't be bypassed by calling the API directly. Keep the
@@ -49,22 +49,44 @@ export function isExemptEmail(email: string): boolean {
   return DOMAIN_EXEMPT_EMAILS.includes(email.trim().toLowerCase());
 }
 
-/* The domain must also END in a real TLD, or "learner.manipal.ed" (a genuine
-   typo) would pass the label test and we'd pay to email a domain that doesn't
-   resolve. Deliberately broad — it only has to be a plausible suffix, not an
-   exhaustive registry. */
-const PLAUSIBLE_TLD = /\.(edu|com|org|net|in|edu\.in|ac\.in|co\.in|ac\.uk|edu\.au)$/i;
+/* The Manipal mail domains that actually exist — each verified to have live MX
+ * records (Microsoft 365):
+ *     learner.manipal.edu   students   (a subdomain of manipal.edu)
+ *     manipal.edu           staff / faculty
+ *     manipal.com           Manipal group
+ * Listing ROOTS and accepting any subdomain of them keeps this future-proof for
+ * new MAHE subdomains without an exhaustive list.
+ *
+ * This is an exact-suffix rule, NOT a substring one. A "does the domain contain
+ * manipal" test looks equivalent and isn't: `manipal.com.attacker.net` contains
+ * a manipal label, so a substring rule accepts any address at a domain an
+ * attacker can register for pocket change. Suffix-matching is the whole
+ * guarantee — don't loosen it.
+ *
+ * If MAHE turns out to use a domain that isn't a subdomain of these, add the
+ * root here AND to the enforce_manipal_signup_email trigger. Anyone caught out
+ * meanwhile has the help link on the auth screen. */
+export const MANIPAL_ROOT_DOMAINS: ReadonlyArray<string> = [
+  'manipal.edu',
+  'manipal.com',
+] as const;
+
+/* A syntactically real hostname: dot-separated labels, each starting and ending
+ * alphanumeric. Checked before the suffix test because a suffix match alone lets
+ * malformed domains through — `.manipal.edu` ends with ".manipal.edu" but has an
+ * empty first label, so it can't exist in DNS and can never receive the code.
+ * Letting it past would spend an email on an address that provably can't reply,
+ * which is the one thing this gate is here to stop. */
+const HOSTNAME = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/;
 
 /** True when the address belongs to a Manipal domain (or is exempt). */
 export function isManipalEmail(email: string): boolean {
   if (isExemptEmail(email)) return true;
   const domain = emailDomainOf(email);
-  if (!domain) return false;
-  /* Label-scoped so the LOCAL part can never qualify an address
-     (manipal@gmail.com stays rejected), and permissive within the domain so
-     every MAHE sub-domain works without an exhaustive list. */
-  const hasManipalLabel = domain.split('.').some(label => label.includes('manipal'));
-  return hasManipalLabel && PLAUSIBLE_TLD.test(domain);
+  if (!domain || !HOSTNAME.test(domain)) return false;
+  return MANIPAL_ROOT_DOMAINS.some(
+    root => domain === root || domain.endsWith(`.${root}`),
+  );
 }
 
 /** Did they *nearly* type a Manipal domain? Returns the intended domain. */
