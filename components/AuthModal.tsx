@@ -30,7 +30,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Mail, User, ArrowLeft, IdCard, KeyRound, Loader2, Phone, BookOpen, Lock, Eye, EyeOff,
-  GraduationCap, LifeBuoy,
+  GraduationCap, LifeBuoy, MailWarning,
 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
@@ -97,12 +97,49 @@ function readStoredMode(): AuthMode {
  * self-limiting: it can only ever fire for someone finishing their own
  * interrupted sign-up, so it's not a way to make us email a stranger.
  */
+/** How long after an unconfirmed sign-up we start saying the address looks
+ *  unreachable. Long enough that a slow-but-working mailbox isn't maligned. */
+const STALE_SIGNUP_MS = 10 * 60 * 1000;
+/** How long to wait on the code screen before offering the "it isn't coming"
+ *  explanation. Campus mail via Outlook is routinely 20–30s. */
+const CODE_OVERDUE_MS = 45 * 1000;
+
 function rememberIncompleteSignup(email: string) {
-  try { localStorage.setItem(PENDING_SIGNUP_KEY, email.trim().toLowerCase()); } catch { /* private mode */ }
+  try {
+    localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+      email: email.trim().toLowerCase(),
+      at: Date.now(),
+    }));
+  } catch { /* private mode */ }
 }
+
+/** The stored marker, tolerating the bare-string format written by the first
+ *  release of this (treated as "no timestamp", so never counted as stale). */
+function readIncompleteSignup(): { email: string; at: number } | null {
+  try {
+    const raw = localStorage.getItem(PENDING_SIGNUP_KEY);
+    if (!raw) return null;
+    if (!raw.startsWith('{')) return { email: raw, at: 0 };
+    const parsed = JSON.parse(raw) as { email?: unknown; at?: unknown };
+    if (typeof parsed.email !== 'string') return null;
+    return { email: parsed.email, at: typeof parsed.at === 'number' ? parsed.at : 0 };
+  } catch {
+    return null;
+  }
+}
+
 function isIncompleteSignup(email: string): boolean {
-  try { return localStorage.getItem(PENDING_SIGNUP_KEY) === email.trim().toLowerCase(); } catch { return false; }
+  return readIncompleteSignup()?.email === email.trim().toLowerCase();
 }
+
+/** Started a sign-up for this address long enough ago that the code should
+ *  have landed by now, and never finished it. */
+function isStaleIncompleteSignup(email: string): boolean {
+  const marker = readIncompleteSignup();
+  if (!marker || marker.email !== email.trim().toLowerCase()) return false;
+  return marker.at > 0 && Date.now() - marker.at > STALE_SIGNUP_MS;
+}
+
 function clearIncompleteSignup() {
   try { localStorage.removeItem(PENDING_SIGNUP_KEY); } catch { /* private mode */ }
 }
@@ -136,6 +173,13 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const codeInputRef = useRef<HTMLInputElement | null>(null);
 
+  /* When the current code was sent, and whether enough time has passed that it
+     really should have arrived. Supabase's built-in sender gives us no bounce
+     feed, so "no code came back" is the only unreachable-address signal we
+     have — and it's the same signal for a closed mailbox and a wrong address. */
+  const [sentAt, setSentAt] = useState(0);
+  const [codeOverdue, setCodeOverdue] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     /* Force 'signin' alongside the reset so "Back to sign in" has somewhere
@@ -151,6 +195,15 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
       return () => clearTimeout(t);
     }
   }, [step]);
+
+  /* Restarts on every send (sentAt changes), so a resend gives the new code a
+     fresh grace period instead of scolding immediately. */
+  useEffect(() => {
+    setCodeOverdue(false);
+    if (step !== 'confirm' || !sentAt) return;
+    const t = setTimeout(() => setCodeOverdue(true), CODE_OVERDUE_MS);
+    return () => clearTimeout(t);
+  }, [step, sentAt]);
 
   useEffect(() => () => {
     if (resendTimer.current) clearInterval(resendTimer.current);
@@ -179,6 +232,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     setPassword(''); setPassword2(''); setShowPassword(false); setCode('');
     pendingPassword.current = '';
     setSubmitting(false); setError(null); setInfo(null); setResendSecs(0);
+    setSentAt(0); setCodeOverdue(false);
     if (resendTimer.current) clearInterval(resendTimer.current);
   };
   const handleClose = () => { resetAll(); onClose(); };
@@ -201,6 +255,10 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     ? emailGateProblem(email, resetting ? 'reset' : mode)
     : null;
   const domainOk = !domainProblem;
+  /* Returning to a sign-up whose code never got entered — see
+     isStaleIncompleteSignup. Only worth saying on the sign-up form. */
+  const staleSignup =
+    emailOk && domainOk && mode === 'signup' && !resetting && isStaleIncompleteSignup(email);
   const phoneOk = phone.trim() === '' || PHONE_LIKE.test(phone.trim());
   /* Only surfaced once they've typed enough to be worth judging. */
   const passwordProblem = password ? validatePassword(password, { email, name }) : null;
@@ -260,6 +318,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     /* The account row now exists but is unconfirmed and has no password yet —
        see recoverIncompleteSignup for why that needs remembering. */
     if (purpose === 'signup') rememberIncompleteSignup(email);
+    setSentAt(Date.now());
     setPending(purpose);
     setStep('confirm');
     setCode('');
@@ -622,10 +681,25 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   {domainProblem}
                 </span>
               ) : emailOk && isManipalEmail(email) && mode === 'signup' && !resetting ? (
+                /* Echo the address back rather than just saying "recognised".
+                   The domain is already proven; what's left to get wrong is the
+                   name or roll number, and reading it back is the only chance to
+                   catch that before we spend a code on a mailbox that will
+                   never answer. */
                 <span className="field-hint" style={{ color: '#16A34A' }}>
-                  Manipal address recognised.
+                  We’ll email your code to {email.trim().toLowerCase()}
                 </span>
               ) : null}
+              {/* Came back to a sign-up they never finished — the likeliest
+                  reason the code never arrived is that the mailbox is closed
+                  (which happens after graduating) or the address was mistyped. */}
+              {staleSignup && (
+                <span className="field-hint" style={{ color: '#B45309', lineHeight: 1.5 }}>
+                  You started signing up with this address but never entered the code.
+                  If it never arrived, that mailbox may be closed or the address
+                  slightly wrong — check it, or use the help link below.
+                </span>
+              )}
             </div>
 
             {/* Password — sign in + sign up, not during reset */}
@@ -864,6 +938,101 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 {resendSecs > 0 ? `Resend in ${resendSecs}s` : 'Resend code'}
               </button>
             </div>
+
+            {/* The code should have landed by now and hasn't been entered.
+                We can't see bounces — Supabase's sender doesn't report them —
+                so this is inferred from silence. Hence "may": it names the two
+                real causes without asserting which, and every line is something
+                the reader can act on. */}
+            {codeOverdue && (
+              <div role="status" style={{
+                padding: '12px 14px', borderRadius: 14,
+                background: 'var(--bg-inset)', lineHeight: 1.55,
+              }}>
+                <p style={{
+                  margin: '0 0 6px', fontSize: 13, fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <MailWarning size={14} strokeWidth={2} aria-hidden="true" />
+                  Still no code?
+                </p>
+                <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--text-muted)' }}>
+                  Check your spam or Junk folder first — campus mail often files it there.
+                  {pending === 'reset'
+                    /* Don't assert the mailbox is at fault here. On a reset the
+                       likeliest cause is that there's no account — which the
+                       code above deliberately refuses to confirm either way, so
+                       silence is expected and says nothing about the mailbox. */
+                    ? ' If it never turns up, one of these is usually why:'
+                    : ' If it never turns up, the address may not be receiving mail:'}
+                </p>
+                <ul style={{
+                  margin: '0 0 10px', paddingLeft: 18,
+                  fontSize: 12.5, color: 'var(--text-muted)',
+                }}>
+                  {pending === 'reset' && (
+                    <li style={{ marginBottom: 3 }}>
+                      No Wecycle account on this address yet? There’s nothing to reset —
+                      sign up instead.
+                    </li>
+                  )}
+                  <li style={{ marginBottom: 3 }}>
+                    Graduated or left? Manipal closes the mailbox, so nothing can reach it.
+                  </li>
+                  <li>
+                    Or the address is slightly off — <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.
+                    Use “Change email” above to fix it.
+                  </li>
+                </ul>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
+                  {pending === 'reset' && (
+                    /* Naming sign-up as the fix and then making them find it
+                       would be its own dead end. */
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep('credentials');
+                        setPending(null);
+                        setResetting(false);
+                        setCode(''); setError(null); setInfo(null);
+                        setSentAt(0);
+                        switchMode('signup');
+                      }}
+                      style={{
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
+                        textDecoration: 'underline', textDecorationStyle: 'dotted',
+                      }}
+                    >
+                      <GraduationCap size={13} strokeWidth={2} aria-hidden="true" />
+                      Sign up instead
+                    </button>
+                  )}
+                  <a
+                    href={`mailto:${HELP_EMAIL}?subject=${encodeURIComponent(
+                      pending === 'reset'
+                        ? 'Wecycle — password reset code never arrived'
+                        : 'Wecycle — sign-up code never arrived',
+                    )}&body=${encodeURIComponent(
+                      pending === 'reset'
+                        ? `I tried to reset my Wecycle password for ${email.trim()} and the code hasn't arrived.`
+                        : `I tried to sign up with ${email.trim()} and the code hasn't arrived.`,
+                    )}`}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
+                      textDecoration: 'underline', textDecorationStyle: 'dotted',
+                    }}
+                  >
+                    <LifeBuoy size={13} strokeWidth={2} aria-hidden="true" />
+                    Email us and we’ll sort it out
+                  </a>
+                </div>
+              </div>
+            )}
           </>
         )}
 
