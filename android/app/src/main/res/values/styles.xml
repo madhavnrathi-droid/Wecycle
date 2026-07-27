@@ -13,6 +13,12 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- The app draws behind the status bar, and the web layer now caps that
+             strip with an opaque light fill (.app-container::before). Without
+             this the system draws the clock and battery in white, which is
+             invisible on it. values-night/ flips this back to white icons for
+             the dark strip. -->
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
 

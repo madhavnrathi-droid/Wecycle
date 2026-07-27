@@ -538,9 +538,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         className="mobile-only-nav"
         style={{
           position: 'sticky', top: 0, zIndex: 30,
-          background: 'var(--bg-overlay)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          /* Opaque. --bg-overlay is 88% alpha, so content showed
+             through the header as it scrolled past. */
+          background: 'var(--bg-card)',
           padding: '10px 12px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}
@@ -1304,9 +1304,9 @@ function DesktopLayout({
       {/* Slim top bar: breadcrumb always visible + title/price/CTA fade in after hero */}
       <header role="banner" style={{
         position: 'sticky', top: 0, zIndex: 30,
-        background: 'var(--bg-overlay)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        /* Opaque. --bg-overlay is 88% alpha, so content showed
+           through the header as it scrolled past. */
+        background: 'var(--bg-card)',
         borderBottom: '1px solid var(--border-subtle)',
         padding: '10px 24px',
         display: 'flex', alignItems: 'center', gap: 12,

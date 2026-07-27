@@ -83,9 +83,9 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
       <header
         style={{
           position: 'sticky', top: 0, zIndex: 30,
-          background: 'var(--bg-overlay)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          /* Opaque. --bg-overlay is 88% alpha, so the feed showed
+             through the header as it scrolled past. */
+          background: 'var(--bg-card)',
           padding: '10px 12px',
           display: 'flex', alignItems: 'center', gap: 8,
         }}

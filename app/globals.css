@@ -594,6 +594,24 @@ body {
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
 }
+/* …but padding on a SCROLL container only sets where content starts. It does
+   not clip: scroll down and the content travels up through that strip, so feed
+   cards end up sitting behind the status bar with the clock drawn over them.
+   The sticky headers can't cover it either — they stick below the padding edge.
+   So cap the inset with a fixed opaque bar. Height collapses to 0 wherever
+   there's no inset (desktop, Android without a cutout), making it inert there.
+   Below modals (z 200+) and above page content; the headers sit at z 30. */
+.app-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--bg-card);
+  z-index: 35;
+  pointer-events: none;
+}
 @media (min-width: 720px) {
   .app-container { max-width: min(92vw, 1480px); }
 }

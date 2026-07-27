@@ -62,9 +62,9 @@ export default function MarketplaceScreen() {
       {/* ── HEADER (mobile) ── */}
       <header className="mobile-only-nav" style={{
         position: 'sticky', top: 0, zIndex: 30,
-        background: 'var(--bg-overlay)',
-        backdropFilter: 'blur(28px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+        /* Opaque. --bg-overlay is 88% alpha, so content showed
+           through the header as it scrolled past. */
+        background: 'var(--bg-card)',
         borderBottom: '1px solid var(--border-subtle)',
         padding: '14px 16px 12px',
       }}>
