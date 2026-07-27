@@ -33,7 +33,7 @@ export default function PrivacyPolicy() {
         <h2 style={h2}>1. Information we collect</h2>
         <p style={p}><strong>Information you provide</strong></p>
         <ul style={ul}>
-          <li style={li}><strong>Account &amp; profile:</strong> your email address (used for sign-in via a one-time code), display name, and — only if you choose to add them — your college ID, phone number, course, department, graduating year, and residence type.</li>
+          <li style={li}><strong>Account &amp; profile:</strong> your Manipal email address and a password you choose (stored only as a salted hash — we never see it); a one-time code emailed to you confirms the address when you sign up and lets you reset a forgotten password. Plus your display name, and — only if you choose to add them — your college ID, phone number, course, department, graduating year, and residence type.</li>
           <li style={li}><strong>Content you post:</strong> item listings, requests, events, lost &amp; found reports, comments, and any photos or videos you upload.</li>
           <li style={li}><strong>Contact preferences:</strong> whether you allow others to reach you by email and/or WhatsApp about your posts.</li>
           <li style={li}><strong>Support messages:</strong> anything you send us via feedback or email.</li>

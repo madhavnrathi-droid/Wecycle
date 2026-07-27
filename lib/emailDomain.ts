@@ -29,6 +29,22 @@ export const DOMAIN_EXEMPT_EMAILS: ReadonlyArray<string> = [
   ...ADMIN_EMAILS,
 ] as const;
 
+/* People who already had an account when the Manipal rule arrived.
+ *
+ * "No non-Manipal signups" is about who may JOIN. Taking an account away from
+ * someone who already has one is a different thing, and it's not what was
+ * asked for — so these addresses can still sign in and still reset their
+ * password. They deliberately do NOT get to sign up: the exemption is checked
+ * only for the 'signin' and 'reset' purposes, so it cannot create anything.
+ *
+ * New non-Manipal accounts are impossible (the sign-up gate plus the
+ * enforce_manipal_signup_email trigger), so this list can only ever shrink.
+ * To actually remove one of these members, delete their row in Supabase —
+ * dropping them from this list alone just locks them out of their own data. */
+export const LEGACY_MEMBER_EMAILS: ReadonlyArray<string> = [
+  'divanshigo@gmail.com',
+] as const;
+
 /** Domains people typo when they mean a Manipal one → what they probably meant.
  *  Only ever consulted AFTER isManipalEmail() has said no, so a pattern that
  *  happens to also match the correct spelling can't misfire on a valid
@@ -119,12 +135,23 @@ export function emailGateProblem(
      perfectly good address. */
   if (isManipalEmail(trimmed)) return null;
 
+  /* Getting back into an account you already have is not signing up. Only
+     'signin' and 'reset' consult this, so a grandfathered address still can't
+     create anything. */
+  if (purpose !== 'signup' && LEGACY_MEMBER_EMAILS.includes(trimmed.toLowerCase())) {
+    return null;
+  }
+
   const suggestion = manipalTypoSuggestion(trimmed);
   if (suggestion) return `Did you mean @${suggestion}?`;
 
   const domain = emailDomainOf(trimmed);
   const named = domain ? `@${domain} addresses` : 'That address';
-  return purpose === 'signin'
-    ? `${named} can’t sign in — Wecycle accounts use your Manipal email.`
-    : `${named} can’t be used. Wecycle is Manipal-only — sign up with your Manipal email (e.g. …@learner.manipal.edu).`;
+  if (purpose === 'signin') {
+    return `${named} can’t sign in — Wecycle accounts use your Manipal email. Already a member? Use the help link below.`;
+  }
+  if (purpose === 'reset') {
+    return `${named} can’t be used here — reset the password on your Manipal email instead. Already a member on this address? Use the help link below.`;
+  }
+  return `${named} can’t be used. Wecycle is Manipal-only — sign up with your Manipal email (e.g. …@learner.manipal.edu).`;
 }

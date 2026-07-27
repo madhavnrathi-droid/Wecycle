@@ -51,6 +51,12 @@ type Pending = 'signup' | 'reset' | null;
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
+  /** Open straight into the emailed-code reset. Used by the "I don't know my
+   *  current password" hand-off, where landing on the sign-in form would ask
+   *  for the very password the user just said they don't have. */
+  startInReset?: boolean;
+  /** Pre-fill the email — saves retyping it after that hand-off. */
+  initialEmail?: string;
 }
 
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -62,6 +68,7 @@ const MIN_OTP_LENGTH = 6;
 const MAX_OTP_LENGTH = 10;
 const RESEND_SECONDS = 30;
 const AUTH_MODE_KEY = 'wecycle.lastAuthMode';
+const PENDING_SIGNUP_KEY = 'wecycle.incompleteSignup';
 
 const REVIEW_EMAIL = 'playreview@wecycle.page';
 const REVIEW_PASSWORD = 'WecycleReview2026';
@@ -76,7 +83,31 @@ function readStoredMode(): AuthMode {
   }
 }
 
-export default function AuthModal({ open, onClose }: AuthModalProps) {
+/* ── Abandoned sign-ups ───────────────────────────────────────────────────
+ * Sign-up creates the account row at the "email me a code" step, but the
+ * password is only stored after the code is verified. Walk away in between and
+ * the account exists with no password — so coming back and signing in with the
+ * password you *chose* fails as "Invalid login credentials", not "Email not
+ * confirmed", and the resend-the-code branch never fires. You'd be told your
+ * password is wrong when it's the one you picked.
+ *
+ * GoTrue returns the same invalid_credentials for a genuinely wrong password,
+ * so this can't be told apart server-side. Instead we remember locally that
+ * THIS browser started a sign-up for THIS address. That keeps the recovery
+ * self-limiting: it can only ever fire for someone finishing their own
+ * interrupted sign-up, so it's not a way to make us email a stranger.
+ */
+function rememberIncompleteSignup(email: string) {
+  try { localStorage.setItem(PENDING_SIGNUP_KEY, email.trim().toLowerCase()); } catch { /* private mode */ }
+}
+function isIncompleteSignup(email: string): boolean {
+  try { return localStorage.getItem(PENDING_SIGNUP_KEY) === email.trim().toLowerCase(); } catch { return false; }
+}
+function clearIncompleteSignup() {
+  try { localStorage.removeItem(PENDING_SIGNUP_KEY); } catch { /* private mode */ }
+}
+
+export default function AuthModal({ open, onClose, startInReset, initialEmail }: AuthModalProps) {
   const [step, setStep] = useState<Step>('credentials');
   const [mode, setMode] = useState<AuthMode>('signin');
   /* Forgot / set-a-password flow — collects email only, ends at 'newpassword'. */
@@ -106,8 +137,13 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
   const codeInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (open) setMode(readStoredMode());
-  }, [open]);
+    if (!open) return;
+    /* Force 'signin' alongside the reset so "Back to sign in" has somewhere
+       sensible to land. */
+    setMode(startInReset ? 'signin' : readStoredMode());
+    setResetting(!!startInReset);
+    if (initialEmail) setEmail(initialEmail);
+  }, [open, startInReset, initialEmail]);
 
   useEffect(() => {
     if (step === 'confirm') {
@@ -209,11 +245,30 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         } : {}),
       },
     });
-    if (err) throw err;
+    if (err) {
+      /* A reset for an address with no account returns 422 otp_disabled
+         ("Signups not allowed for otp") because shouldCreateUser is false.
+         Surfacing that would say out loud which addresses have accounts — ask
+         for a real member's address and you get a code, ask for anyone else's
+         and you get an error, one probe at a time. Carry on to the code step
+         instead, so both cases look and behave the same; an address with no
+         account simply has no code that will ever verify. */
+      const noSuchAccount =
+        purpose === 'reset' && /signups not allowed|otp_disabled/i.test(err.message);
+      if (!noSuchAccount) throw err;
+    }
+    /* The account row now exists but is unconfirmed and has no password yet —
+       see recoverIncompleteSignup for why that needs remembering. */
+    if (purpose === 'signup') rememberIncompleteSignup(email);
     setPending(purpose);
     setStep('confirm');
     setCode('');
-    setInfo(`We emailed a code to ${email.trim()}. It expires in 10 minutes.`);
+    setInfo(
+      purpose === 'reset'
+        /* Deliberately non-committal — see above. */
+        ? `If ${email.trim()} has a Wecycle account, a code is on its way. It expires in 10 minutes.`
+        : `We emailed a code to ${email.trim()}. It expires in 10 minutes.`,
+    );
     startResendCooldown();
   };
 
@@ -281,14 +336,23 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         password,
       });
       if (err) throw err;
+      clearIncompleteSignup();
       track(EVT.login, { method: 'password' });
       handleClose();
     } catch (err) {
       const msg = (err as Error)?.message ?? '';
       /* Signed up but never confirmed → the password is fine, the address
          isn't proven yet. Send a fresh code and put them on the code step
-         instead of showing a dead end. */
-      if (/email not confirmed/i.test(msg)) {
+         instead of showing a dead end.
+
+         The invalid-credentials half covers the abandoned sign-up: the account
+         has no password at all, so the right answer is still "confirm the
+         address", not "your password is wrong". Guarded by the local marker so
+         it only fires for a sign-up this browser started. */
+      if (
+        /email not confirmed/i.test(msg) ||
+        (/invalid login credentials/i.test(msg) && !resetting && isIncompleteSignup(email))
+      ) {
         try {
           pendingPassword.current = password;
           await sendCode('signup');
@@ -339,6 +403,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           track(EVT.password_set, { context: 'signup' });
         }
         pendingPassword.current = '';
+        clearIncompleteSignup();
         track(EVT.login, { method: 'signup' });
         handleClose();
         return;
@@ -362,6 +427,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     try {
       const { error: err } = await supabase.auth.updateUser({ password });
       if (err) throw err;
+      clearIncompleteSignup();
       track(EVT.password_set, { context: resetting || pending === 'reset' ? 'reset' : 'signup' });
       track(EVT.login, { method: 'password_set' });
       handleClose();

@@ -74,6 +74,10 @@ export default function WecycleApp() {
   const storageMode = isDemo ? 'demo' as const : 'supabase' as const;
   const [activeScreen, setActiveScreen] = useState<Screen>('feed');
   const [modal, setModal] = useState<ModalKind>(null);
+  /* Set when the auth modal is opened from "I don't know my current password",
+     so it lands on the emailed-code reset with the address already filled in
+     rather than on a sign-in form asking for that same password. */
+  const [authReset, setAuthReset] = useState<{ email: string } | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openItem, setOpenItem] = useState<MarketplaceItem | null>(null);
   const [openEvent, setOpenEvent] = useState<CommunityEvent | null>(null);
@@ -374,7 +378,7 @@ export default function WecycleApp() {
     }
   }, []);
 
-  const closeModal = () => setModal(null);
+  const closeModal = () => { setModal(null); setAuthReset(null); };
 
   const requireAuth = (next: ModalKind) => {
     if (!user) {
@@ -494,7 +498,12 @@ export default function WecycleApp() {
             />
           </main>
         </div>
-        <AuthModal open={modal === 'auth'} onClose={closeModal} />
+        <AuthModal
+          open={modal === 'auth'}
+          onClose={closeModal}
+          startInReset={!!authReset}
+          initialEmail={authReset?.email}
+        />
       </>
     );
   }
@@ -578,8 +587,10 @@ export default function WecycleApp() {
               /* "I don't know my current password" → sign out and use the
                  emailed-code reset, which is the only way in without it. */
               onForgot={async () => {
+                const addr = (user as { email?: string } | null)?.email ?? profile?.email ?? '';
                 clearSubStack();
                 await signOut();
+                setAuthReset({ email: addr });
                 setModal('auth');
               }}
             />
@@ -656,7 +667,12 @@ export default function WecycleApp() {
             />
           </main>
         </div>
-        <AuthModal open={modal === 'auth'} onClose={closeModal} />
+        <AuthModal
+          open={modal === 'auth'}
+          onClose={closeModal}
+          startInReset={!!authReset}
+          initialEmail={authReset?.email}
+        />
       </>
     );
   }
@@ -824,7 +840,12 @@ export default function WecycleApp() {
             alert={editingAlert}
           />
         )}
-        <AuthModal open={modal === 'auth'} onClose={closeModal} />
+        <AuthModal
+          open={modal === 'auth'}
+          onClose={closeModal}
+          startInReset={!!authReset}
+          initialEmail={authReset?.email}
+        />
 
         {/* ── LOST & FOUND DETAIL SHEET ──
            Lifted from LostFoundScreen so it can also be opened from Inventory.

@@ -50,14 +50,36 @@ export function validatePassword(pw: string, ctx: PasswordCheckContext = {}): st
 
   /* Don't let the password be (or contain) the identity it protects. */
   const local = (ctx.email ?? '').split('@')[0].toLowerCase();
-  if (local.length >= 4 && lower.includes(local)) {
+  if (identityHit(lower, local)) {
     return 'Don’t use your email address in the password';
   }
-  const firstName = (ctx.name ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
-  if (firstName.length >= 4 && lower.includes(firstName)) {
+  const name = (ctx.name ?? '').trim().toLowerCase();
+  const firstName = name.split(/\s+/)[0] ?? '';
+  /* The whole name run together ("mirasharma") is as common as the first name
+     alone, and wouldn't be caught by the first-name test on its own. */
+  if (identityHit(lower, firstName) || identityHit(lower, name.replace(/\s+/g, ''))) {
     return 'Don’t use your name in the password';
   }
   return null;
+}
+
+/* Is `token` (a first name or email local part) really being used AS the
+ * password, rather than just happening to appear inside a longer word?
+ *
+ * A bare `includes` reads as equivalent and rejects perfectly good passphrases:
+ * "mira" ⊂ "adMIRAble", "riya" ⊂ "pRIYAnkasongs", "amar" ⊂ "tAMARindchutney".
+ * Being told "don't use your name" about a password that doesn't contain your
+ * name is the kind of thing that makes people give up and pick something worse.
+ * So flag it only in the shapes a name-based password actually takes: the token
+ * standing on its own (mira1988, riya.2026), or the password being built off the
+ * front or back of it (mirasharma, miraabcd, 2026mira). A plain length ratio
+ * looked like a reasonable stand-in for that and isn't — at 50% it flags
+ * "bananas1" for anyone named Anna. */
+function identityHit(lowerPw: string, token: string): boolean {
+  if (token.length < 4) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (new RegExp(`(?:^|[^a-z])${escaped}(?:[^a-z]|$)`).test(lowerPw)) return true;
+  return lowerPw.startsWith(token) || lowerPw.endsWith(token);
 }
 
 export type PasswordStrength = 0 | 1 | 2 | 3;
@@ -91,8 +113,11 @@ export function humanAuthError(raw: string | undefined | null, mode: 'signin' | 
   if (!m) return 'Something went wrong — please try again.';
 
   if (m.includes('invalid login credentials')) {
+    /* Quote the control by the words actually printed on it (AuthModal's
+       "Forgot password? Set a new one") — naming a button that isn't there
+       sends people hunting for it. */
     return mode === 'signin'
-      ? 'That email and password don’t match. If you joined before passwords existed, use “Set / reset password”.'
+      ? 'That email and password don’t match. If you joined before passwords existed, use “Forgot password? Set a new one” below.'
       : 'Those details didn’t match — please try again.';
   }
   if (m.includes('email not confirmed')) {
@@ -110,11 +135,22 @@ export function humanAuthError(raw: string | undefined | null, mode: 'signin' | 
   if (m.includes('for security purposes') || m.includes('rate limit') || m.includes('too many')) {
     return 'We’ve sent too many emails just now — wait a minute and try again.';
   }
-  if (m.includes('token has expired') || m.includes('expired')) {
-    return 'That code has expired — request a fresh one.';
+  /* GoTrue returns ONE error for a mistyped code and an expired one:
+     "Token has expired or is invalid" (otp_expired). Saying "expired" sends
+     people straight to Resend — which invalidates the code still sitting in
+     their inbox and then trips the per-address email rate limit, so a single
+     typo turns into a dead end. Don't claim to know which case it is; retyping
+     is free and is the more likely fix. */
+  if (m.includes('expired') || (m.includes('invalid') && (m.includes('token') || m.includes('otp')))) {
+    return 'That code didn’t match, or it has expired. Retype the latest code — or request a fresh one.';
   }
-  if (m.includes('invalid') && (m.includes('token') || m.includes('otp'))) {
-    return 'That code didn’t match. Check the latest email and try again.';
+  /* signInWithOtp({shouldCreateUser:false}) on an address with no account →
+     422 otp_disabled, "Signups not allowed for otp". Showing that raw is both
+     gibberish and an account-existence oracle: a green "we emailed a code"
+     versus this error tells an attacker exactly who has an account. Answer
+     identically either way. */
+  if (m.includes('signups not allowed') || m.includes('otp_disabled')) {
+    return 'If that address has a Wecycle account, a code is on its way. Check your inbox.';
   }
   if (m.includes('new password should be different')) {
     return 'That’s already your current password — choose a new one.';
