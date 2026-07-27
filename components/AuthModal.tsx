@@ -30,6 +30,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Mail, User, ArrowLeft, IdCard, KeyRound, Loader2, Phone, BookOpen, Lock, Eye, EyeOff,
+  GraduationCap, LifeBuoy,
 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
@@ -40,6 +41,7 @@ import { Logomark } from './Brand';
 import {
   validatePassword, passwordStrength, humanAuthError, MIN_PASSWORD_LENGTH,
 } from '../lib/password';
+import { emailGateProblem, isManipalEmail } from '../lib/emailDomain';
 
 type Step = 'credentials' | 'confirm' | 'newpassword';
 type AuthMode = 'signin' | 'signup';
@@ -63,6 +65,7 @@ const AUTH_MODE_KEY = 'wecycle.lastAuthMode';
 
 const REVIEW_EMAIL = 'playreview@wecycle.page';
 const REVIEW_PASSWORD = 'WecycleReview2026';
+const HELP_EMAIL = 'wecycle.page@gmail.com';
 
 function readStoredMode(): AuthMode {
   if (typeof window === 'undefined') return 'signin';
@@ -154,6 +157,14 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
 
   /* ── Validation ─────────────────────────────────────── */
   const emailOk = EMAIL_LIKE.test(email.trim());
+  /* Manipal-only. Checked here, client-side, so a rejected address never costs
+     us an OTP email — and enforced again by a trigger on auth.users so the API
+     can't be called around it. Only surfaced once the address is well-formed,
+     so it doesn't nag mid-typing. */
+  const domainProblem = emailOk
+    ? emailGateProblem(email, resetting ? 'reset' : mode)
+    : null;
+  const domainOk = !domainProblem;
   const phoneOk = phone.trim() === '' || PHONE_LIKE.test(phone.trim());
   /* Only surfaced once they've typed enough to be worth judging. */
   const passwordProblem = password ? validatePassword(password, { email, name }) : null;
@@ -161,13 +172,13 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
   const strength = passwordStrength(password);
 
   const credentialsReady =
-    resetting ? emailOk
+    resetting ? emailOk && domainOk
     : mode === 'signup'
-      ? name.trim().length > 0 && emailOk && termsAgreed && phoneOk
+      ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk
         && !passwordProblem && passwordsMatch
       /* Sign-in: don't judge the password, just require something typed —
          the server is the authority on whether it's right. */
-      : emailOk && password.length > 0;
+      : emailOk && domainOk && password.length > 0;
 
   const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   const codeOk = cleanCode.length >= MIN_OTP_LENGTH && cleanCode.length <= MAX_OTP_LENGTH;
@@ -209,6 +220,11 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
   /* ── Step 1 submit ──────────────────────────────────── */
   const submitCredentials = async () => {
     if (!credentialsReady || submitting) return;
+    /* Hard stop before ANY network call — the disabled button is a courtesy,
+       this is the thing that guarantees we never pay for an email to an
+       address that can't hold an account. */
+    const gate = emailGateProblem(email, resetting ? 'reset' : mode);
+    if (gate) { setInfo(null); setError(gate); return; }
     setError(null); setInfo(null); setSubmitting(true);
     try {
       /* Reviewer bypass — demo session only, never touches real data. */
@@ -462,11 +478,35 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
 
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
               {resetting
-                ? 'Enter your email and we’ll send a code. Once it’s confirmed you can pick a new password.'
+                ? 'Enter your Manipal email and we’ll send a code. Once it’s confirmed you can pick a new password.'
                 : mode === 'signin'
-                  ? 'Sign in with your email and password.'
+                  ? 'Sign in with your Manipal email and password.'
                   : 'Create your account. We’ll email one code to confirm your address — after that it’s just your password.'}
             </p>
+
+            {/* Manipal-only notice — stated up front on sign-up so nobody
+                fills the whole form before finding out. */}
+            {mode === 'signup' && !resetting && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '11px 13px',
+                background: 'var(--bg-inset)',
+                borderRadius: 14,
+              }}>
+                <span aria-hidden="true" style={{
+                  color: 'var(--text-primary)', flexShrink: 0,
+                  display: 'inline-flex', marginTop: 1,
+                }}>
+                  <GraduationCap size={16} strokeWidth={1.9} />
+                </span>
+                <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                  <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Manipal students &amp; staff only.</strong>{' '}
+                  Sign up with your Manipal address — <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@learner.manipal.edu</span>{' '}
+                  or <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@manipal.edu</span>. Personal
+                  addresses like Gmail won’t work.
+                </span>
+              </div>
+            )}
 
             {/* Sign-up only: full name (required) */}
             {mode === 'signup' && !resetting && (
@@ -499,19 +539,27 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 type="email"
                 inputMode="email"
                 className="form-input"
-                placeholder="you@gmail.com"
+                placeholder="you@learner.manipal.edu"
                 value={email}
                 maxLength={80}
                 onChange={e => setEmail(e.target.value)}
                 autoComplete="email"
+                aria-invalid={!!domainProblem}
+                aria-describedby={domainProblem ? 'auth-email-problem' : undefined}
                 required
                 autoFocus
               />
-              {mode === 'signup' && !resetting && (
-                <span className="field-hint">
-                  Any email works — your college address, a Gmail, anything you check often.
+              {/* Rejected domain (or a near-miss typo) — shown the moment the
+                  address is well-formed, long before any send. */}
+              {domainProblem ? (
+                <span id="auth-email-problem" className="field-hint" style={{ color: 'var(--accent-rose)' }}>
+                  {domainProblem}
                 </span>
-              )}
+              ) : emailOk && isManipalEmail(email) && mode === 'signup' && !resetting ? (
+                <span className="field-hint" style={{ color: '#16A34A' }}>
+                  Manipal address recognised.
+                </span>
+              ) : null}
             </div>
 
             {/* Password — sign in + sign up, not during reset */}
@@ -818,6 +866,27 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
             {error}
           </div>
         )}
+
+        {/* ── Help ──
+           Opens the user's mail app with the subject prefilled. Available on
+           every step, since the step you're stuck on is the one you need help
+           with. A plain mailto anchor so it works in the native shell too. */}
+        <a
+          href={`mailto:${HELP_EMAIL}?subject=${encodeURIComponent('Wecycle — help signing in')}`}
+          style={{
+            alignSelf: 'center',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            marginTop: 2, padding: '7px 12px',
+            borderRadius: 999,
+            background: 'var(--bg-inset)',
+            color: 'var(--text-secondary)',
+            fontSize: 12, fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          <LifeBuoy size={13} strokeWidth={2} />
+          Trouble signing in? Email us
+        </a>
       </form>
     </Modal>
   );
