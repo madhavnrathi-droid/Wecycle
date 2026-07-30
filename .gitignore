@@ -47,3 +47,20 @@ next-env.d.ts
 # Untracked so it stops shipping in the repo. (Rotate that old key separately.)
 Wecycle Circular Economy Platform/
 Wecycle Circular Economy Platform.zip
+
+# Superseded native experiments — the Capacitor shell in android/ is the real
+# one. Kept locally for reference, not part of the repo.
+mobile-expo/
+android-twa/
+assets/
+expo-qr.png
+
+# Claude Code worktrees
+.claude/
+
+# Android signing — never commit the keystore or its password. The release
+# build reads them from local files that stay on this machine only.
+*.keystore
+*.jks
+.keystore-password
+service-account*.json

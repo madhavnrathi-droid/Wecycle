@@ -24,7 +24,7 @@
  * session so the screens stay navigable.
  *
  * App-review test account: playreview@wecycle.page + REVIEW_PASSWORD below —
- * signs into DEMO mode (never real data). Mirrored in PLAY_CONSOLE_LAUNCH.md.
+ * signs into DEMO mode (never real data). Mirrored in docs/play-console-launch.md.
  */
 
 import { useEffect, useRef, useState } from 'react';

@@ -13,8 +13,9 @@
  *
  * THE FIX
  * -------
- * When Wecycle runs inside the Expo WebView wrapper (mobile-expo/App.tsx),
- * the page can talk to the native layer via `window.ReactNativeWebView`.
+ * When Wecycle runs inside a React-Native WebView wrapper (an earlier Expo
+ * shell used this; the Capacitor shell doesn't need it), the page can talk
+ * to the native layer via `window.ReactNativeWebView`.
  * We post a small JSON message; the Expo side catches it and calls
  * `expo-haptics`, which drives the real Taptic Engine. So:
  *
