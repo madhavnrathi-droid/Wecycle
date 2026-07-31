@@ -64,3 +64,6 @@ expo-qr.png
 *.jks
 .keystore-password
 service-account*.json
+
+# Supabase CLI scratch — version checks and link state, not source.
+supabase/.temp/
