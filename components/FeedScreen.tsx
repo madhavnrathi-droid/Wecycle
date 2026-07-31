@@ -28,7 +28,6 @@ import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
-import LiveCounter from './LiveCounter';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -453,15 +452,6 @@ export default function FeedScreen({
             </p>
           </div>
 
-          {/* Right: Live Activities widget. On mobile, sits inline with the
-              greeting (current home-feed look). On desktop, this slot is
-              hidden — the counter is mounted alongside the marketing banner
-              below so the greeting row stays clean (greeting + search only). */}
-          {mounted && (
-            <div className="mobile-only" style={{ display: 'flex', alignSelf: 'stretch', flex: 1, minWidth: 0 }}>
-              <LiveCounter />
-            </div>
-          )}
         </div>
 
         {/* Search lives inline with the greeting on desktop */}
@@ -504,16 +494,11 @@ export default function FeedScreen({
         <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
 
-      {/* ── DESKTOP MARKETING BANNER + LIVE COUNTER ──
-         Side-by-side row on desktop. Smaller banner (so it doesn't dominate
-         the feed) with the live counter widget filling the remaining width
-         to its right. Mobile uses the separate banner mount above + the
-         inline counter inside the greeting row. */}
+      {/* ── DESKTOP MARKETING BANNER ──
+         Full-width on desktop now that the live-activity counter is gone.
+         Mobile uses the separate banner mount above. */}
       <section className="marketing-banner-mount-desktop" style={{ padding: '0 16px 20px' }}>
-        <div className="feed-hero-row">
-          <MarketingBanner slides={bannerSlides} variant="wide" />
-          {mounted && <LiveCounter />}
-        </div>
+        <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
 
       {/* ── MOBILE SEARCH (under banner) ── */}

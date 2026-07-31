@@ -892,32 +892,6 @@ section.mobile-only { display: block; }
   }
 }
 
-/* ── DESKTOP HERO ROW ──
-   Banner (smaller) + LiveCounter side-by-side. Hidden on mobile via parent
-   .marketing-banner-mount-desktop visibility. */
-.feed-hero-row { display: contents; }
-@media (min-width: 1024px) {
-  .feed-hero-row {
-    display: flex;
-    flex-direction: row;
-    gap: 16px;
-    align-items: stretch;
-  }
-  .feed-hero-row .marketing-banner-wide {
-    /* Equal-width column with the counter — 50/50 split of the row. The
-       2:1 aspect of the artwork is preserved by the card's own
-       aspect-ratio rule; height follows naturally. */
-    flex: 1 1 0;
-    min-width: 0;
-    margin-inline: 0;
-  }
-  .feed-hero-row .wc-widget {
-    flex: 1 1 0;
-    min-width: 0;
-    align-self: stretch;
-  }
-}
-
 /* ═══════════════════════════════════════════════
    MARKETING BANNER (use-case carousel on the home feed)
    ───────────────────────────────────────────────

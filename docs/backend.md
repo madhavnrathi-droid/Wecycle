@@ -116,24 +116,27 @@ Allowed image mime types: `image/jpeg`, `image/png`, `image/webp`, `image/gif` (
 | `trg_notify_reaction` | Notify entity owner when liked. |
 | `trg_notify_comment` | Notify entity owner on comments. |
 
-## Frontend API layer
+## Frontend data layer
 
-`lib/api/*` — typed wrappers around Supabase, grouped by domain:
+**`lib/liveData.ts` is the live data layer** — listings, requests, events, RSVPs,
+lost & found, saves, contact resolution, plus the realtime `onPostsChanged`
+subscription. Domain-specific modules sit alongside it: `lib/eventForms.ts`,
+`lib/alerts.ts`, `lib/comments.ts`, `lib/metrics.ts`, `lib/moderation.ts`,
+`lib/savedSearches.ts`, `lib/photos.ts`.
 
-```typescript
-import { auth, listings, requests, events, lostFound,
-         feed, impact, inventory, notifications, storage,
-         communities } from '@/lib/api';
+`lib/api/*` is an **earlier, unused** attempt at the same thing. Its runtime
+functions have no callers; only three type-only imports keep it alive
+(`Profile` in `lib/AuthContext.tsx`, `FeedEntityType` in `lib/comments.ts` and
+`components/CommentsSection.tsx`). Don't add to it, and don't assume a function
+there is what the app actually runs. Removing it means relocating those two
+types first.
 
-// Examples:
-const { data, error } = await listings.listListings({ communityId, listingType: 'free' });
-const { liked } = await feed.toggleLike('listing', listingId);
-const { path, publicUrl } = await storage.uploadPhoto('listings', file);
-const summary = await impact.getMyImpact();
-
-// Realtime:
-const unsubscribe = notifications.subscribeToNotifications(userId, n => console.log('new!', n));
-```
+One rule worth knowing before writing a `profiles` query: **`profiles` has no
+table-level SELECT grant, only a column allow-list**, and `email`/`phone` are
+deliberately excluded. Naming a non-granted column makes Postgres refuse the
+whole select with `42501` — which surfaces as a null row, not an obvious error.
+Read contact details through the `get_contact` RPC (`lib/useOwnerContact.ts`),
+which honours the owner's share preferences.
 
 ## Authentication
 
