@@ -705,15 +705,19 @@ export default function WecycleApp() {
                 /* Search-result tap → load the full profile shape the
                    storefront expects, then open it. We fetch a fresh row so
                    we don't carry stale data from the search hit. */
-                const { data } = await supabase
+                /* Deliberately does NOT select email/phone. Those columns have no
+                   SELECT grant for `authenticated` (see the column-grant lockdown
+                   migration), and naming a non-granted column makes Postgres
+                   refuse the WHOLE select — which landed here as `data === null`
+                   and a tap that silently did nothing. The detail screens resolve
+                   contact on demand through useOwnerContact → get_contact, which
+                   honours the owner's share prefs. */
+                const { data, error } = await supabase
                   .from('profiles')
-                  .select('id, full_name, initials, avatar_color, role, is_online, email, phone, contact_email_enabled, contact_whatsapp_enabled')
+                  .select('id, full_name, initials, avatar_color, role, is_online, contact_email_enabled, contact_whatsapp_enabled')
                   .eq('id', userId)
                   .single();
-                if (!data) return;
-                /* Cast through unknown — the generated Database types don't
-                   know about the new `email` column yet (added in the
-                   add_email_to_profiles migration). */
+                if (error || !data) return;
                 const p = data as unknown as {
                   id: string;
                   full_name: string | null;
@@ -721,8 +725,6 @@ export default function WecycleApp() {
                   avatar_color: string | null;
                   role: string | null;
                   is_online: boolean | null;
-                  email: string | null;
-                  phone: string | null;
                   contact_email_enabled: boolean | null;
                   contact_whatsapp_enabled: boolean | null;
                 };
@@ -739,8 +741,10 @@ export default function WecycleApp() {
                   impactScore: 0,
                   badges: [],
                   isOnline: p.is_online ?? false,
-                  email: p.email ?? undefined,
-                  phone: p.phone ?? undefined,
+                  /* Left undefined on purpose — resolved per share-prefs by
+                     useOwnerContact on the screens that offer a contact button. */
+                  email: undefined,
+                  phone: undefined,
                   contact: {
                     email: p.contact_email_enabled ?? true,
                     whatsapp: p.contact_whatsapp_enabled ?? false,
