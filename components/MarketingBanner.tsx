@@ -89,26 +89,77 @@ export default function MarketingBanner({
     setImgErrored(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
 
+  /* How many slides are visible at once.
+   *
+   * Desktop shows two cards side by side (see the `wide` rules in globals.css);
+   * mobile shows one. Rather than duplicate that breakpoint in JS — where it
+   * would drift from the CSS the moment either changes — measure the rendered
+   * slides. A ResizeObserver keeps it right through window resizes, font-size
+   * changes and the desktop/mobile switch.
+   *
+   * This only decides how many dots there are and where the track stops.
+   * Scrolling itself never multiplies a pitch; goTo asks each slide for its own
+   * offsetLeft, so nothing here has to be pixel-exact. */
+  const [perView, setPerView] = useState(1);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const measure = () => {
+      const first = track.children[0] as HTMLElement | undefined;
+      if (!first || !first.offsetWidth) return;
+      /* Layout offsets, never getBoundingClientRect(): the two disagree
+         whenever the page is visually scaled (browser zoom, a scaled preview
+         pane), and offsetLeft is the space scrollLeft lives in. It also
+         absorbs the column-gap and any margin for free. */
+      const second = track.children[1] as HTMLElement | undefined;
+      const pitch = second ? second.offsetLeft - first.offsetLeft : first.offsetWidth;
+      if (pitch <= 0) return;
+      /* Round to the nearest whole card so a sub-pixel remainder can't read
+         as 1.97 cards and collapse perView back to 1. */
+      setPerView(Math.max(1, Math.round(track.clientWidth / pitch)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(track);
+    return () => ro.disconnect();
+  }, [slides.length]);
+
+  /* Last index that still fills every visible column. With 5 slides shown two
+     at a time this is 3, giving the pairs (0,1) (1,2) (2,3) (3,4) — always two
+     different cards, never a repeat and never a gap. */
+  const maxIndex = Math.max(0, slides.length - perView);
+
+  /* Scroll to a slide by asking the DOM where it is, rather than multiplying a
+     measured pitch. Same reason as the pitch comment above — arithmetic on
+     measured widths drifts under page scaling and lands off the snap point,
+     where mandatory snapping then does something arbitrary. offsetLeft is the
+     authoritative answer and scrollLeft shares its coordinate space. */
   const goTo = useCallback((i: number, behavior: ScrollBehavior = 'smooth') => {
     const track = trackRef.current;
     if (!track) return;
-    track.scrollTo({ left: track.clientWidth * i, behavior });
-    setActive(i);
-  }, []);
+    const target = Math.max(0, Math.min(i, Math.max(0, slides.length - perView)));
+    const child = track.children[target] as HTMLElement | undefined;
+    if (!child) return;
+    track.scrollTo({ left: child.offsetLeft, behavior });
+    setActive(target);
+  }, [perView, slides.length]);
 
   /* Auto-advance */
   useEffect(() => {
     if (paused || slides.length < 2 || intervalMs <= 0) return;
+    if (maxIndex === 0) return; /* everything already on screen — nothing to cycle */
     const t = setInterval(() => {
       setActive(prev => {
-        const next = (prev + 1) % slides.length;
+        const next = prev >= maxIndex ? 0 : prev + 1;
         const track = trackRef.current;
-        if (track) track.scrollTo({ left: track.clientWidth * next, behavior: 'smooth' });
+        const child = track?.children[next] as HTMLElement | undefined;
+        if (track && child) track.scrollTo({ left: child.offsetLeft, behavior: 'smooth' });
         return next;
       });
     }, intervalMs);
     return () => clearInterval(t);
-  }, [paused, intervalMs, slides.length]);
+  }, [paused, intervalMs, slides.length, maxIndex]);
 
   /* Sync active dot with manual swipe. */
   useEffect(() => {
@@ -119,8 +170,17 @@ export default function MarketingBanner({
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        const i = Math.round(track.scrollLeft / Math.max(track.clientWidth, 1));
-        setActive(prev => (prev === i ? prev : Math.max(0, Math.min(slides.length - 1, i))));
+        /* Nearest slide by position, for the same reason goTo reads offsetLeft:
+           no division by a measured pitch. */
+        let nearest = 0;
+        let best = Infinity;
+        for (let k = 0; k <= maxIndex; k++) {
+          const child = track.children[k] as HTMLElement | undefined;
+          if (!child) break;
+          const d = Math.abs(child.offsetLeft - track.scrollLeft);
+          if (d < best) { best = d; nearest = k; }
+        }
+        setActive(prev => (prev === nearest ? prev : nearest));
       });
     };
     track.addEventListener('scroll', onScroll, { passive: true });
@@ -128,7 +188,7 @@ export default function MarketingBanner({
       track.removeEventListener('scroll', onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [slides.length]);
+  }, [slides.length, maxIndex]);
 
   const pauseNow = () => {
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
@@ -226,9 +286,12 @@ export default function MarketingBanner({
         })}
       </div>
 
-      {slides.length > 1 && (
+      {/* One dot per scroll POSITION, not per slide. Showing two cards at a
+          time means four positions across five slides, so a dot-per-slide
+          would leave the last one permanently unreachable. */}
+      {maxIndex > 0 && (
         <div className="marketing-banner-dots" aria-hidden="true">
-          {slides.map((_, i) => (
+          {Array.from({ length: maxIndex + 1 }, (_, i) => (
             <button
               key={i}
               type="button"
@@ -240,7 +303,11 @@ export default function MarketingBanner({
                 goTo(i);
                 resumeSoon(3500);
               }}
-              aria-label={`Show slide ${i + 1} of ${slides.length}`}
+              aria-label={
+                perView > 1
+                  ? `Show slides ${i + 1}–${i + perView} of ${slides.length}`
+                  : `Show slide ${i + 1} of ${slides.length}`
+              }
             />
           ))}
         </div>

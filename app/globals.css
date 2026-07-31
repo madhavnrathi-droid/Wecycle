@@ -943,11 +943,45 @@ section.mobile-only { display: block; }
   aspect-ratio: 2 / 1;
   border-radius: 18px;
 }
+/* ── DESKTOP: two cards side by side ──
+   Below 1024px this stays a single full-width 2:1 hero. From 1024px up, the
+   row shows TWO cards and scrolls one card at a time (the step is measured in
+   MarketingBanner.tsx, so this breakpoint is the single source of truth).
+
+   The container drops its own aspect-ratio here and lets the cards size
+   themselves — each is half the row minus the gap, and keeps the artwork's 2:1
+   — so the row height follows the cards instead of being a second number to
+   keep in sync with the gap. */
 @media (min-width: 1024px) {
   .marketing-banner-wide {
-    max-width: 640px;
+    --banner-gap: 16px;
+    max-width: 1120px;
     margin-inline: auto;
+    aspect-ratio: auto;
+    height: auto;
+    /* The corners and the shadow move to the cards — left on the section they
+       would draw one rounded, shadowed box around BOTH cards and the gap. */
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .marketing-banner-wide .marketing-banner-track {
+    height: auto;
+    column-gap: var(--banner-gap);
+    /* Proximity, not mandatory: mandatory snapping fights the programmatic
+       scrollTo while the row is mid-flight between two positions. */
+    scroll-snap-type: x proximity;
+    /* Room for the cards' shadow, which would otherwise be clipped by the
+       track's own overflow. */
+    padding-block: 4px;
+  }
+  .marketing-banner-wide .marketing-banner-slide {
+    flex: 0 0 calc((100% - var(--banner-gap)) / 2);
+    aspect-ratio: 2 / 1;
     border-radius: 22px;
+    overflow: hidden;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.08),
+      0 8px 24px -10px rgba(0, 0, 0, 0.22);
   }
 }
 
