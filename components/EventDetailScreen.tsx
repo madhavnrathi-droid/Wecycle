@@ -12,7 +12,7 @@ import OnlineBadge from './OnlineBadge';
 import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
-import { buildContactLinks, type ContactLink } from '../lib/contactUser';
+import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
@@ -382,6 +382,9 @@ export default function EventDetailScreen({
   /* When both channels are accepted we render two named buttons inline with
      the RSVP CTA. When only one, the message button sits beside RSVP. */
   const hasBoth = contactLinks.length >= 2;
+  /* Signed-out viewers can't resolve channels (get_contact is auth-only),
+     so they get a sign-in prompt instead of no button at all. */
+  const gate = contactGate(!!user, contactLinks);
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 140, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -1026,6 +1029,20 @@ export default function EventDetailScreen({
                 {contactLinks[0].channel === 'whatsapp'
                   ? <WhatsAppGlyph />
                   : <Mail size={16} strokeWidth={1.8} />}
+              </button>
+            ) : gate === 'sign-in' ? (
+              <button
+                onClick={onRequireAuth}
+                aria-label={`Sign in to message ${event.organizer?.name ?? 'the organizer'}`}
+                style={{
+                  width: 52, height: 52, borderRadius: 999,
+                  background: 'var(--bg-surface)', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <Mail size={16} strokeWidth={1.8} />
               </button>
             ) : null
           )}

@@ -12,7 +12,7 @@ import RelatedShelf from './RelatedShelf';
 import type { LostItem } from '../lib/mockData';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
-import { buildContactLinks, itemAction, opportunityAction, actionLabel, type ContactLink } from '../lib/contactUser';
+import { buildContactLinks, contactGate, itemAction, opportunityAction, actionLabel, type ContactLink } from '../lib/contactUser';
 import {
   opportunityCompLabel, compToListing,
   COMP_META, COMP_OPTIONS, PRICE_BANDS, type Comp, type PriceBand,
@@ -452,6 +452,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
      action label ("Request to borrow"). When both, we surface two named
      buttons ("Email Aditya" + "WhatsApp Aditya") side by side. */
   const hasBoth = contactLinks.length >= 2;
+  /* 'links' | 'sign-in' | 'none' — see contactGate. Signed-out viewers can
+     never resolve channels, so they get a sign-in CTA rather than a dead end. */
+  const gate = contactGate(!!user, contactLinks);
 
   /* Sticky title bar — fires when the hero photo scrolls out of view.
      IntersectionObserver is cheaper than a scroll listener: no per-frame
@@ -627,11 +630,17 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
           </span>
         )}
-        {/* Mini contact CTA — hidden when item is closed or no contact channels */}
-        {!item.isClosed && contactLinks.length > 0 && (
+        {/* Mini contact CTA. Also shown when signed out, where it prompts
+            sign-in — the channels simply aren't resolvable yet. */}
+        {!item.isClosed && (contactLinks.length > 0 || gate === 'sign-in') && (
           <button
-            aria-label={contactLinks[0].ariaLabel}
-            onClick={() => handleContactClick(contactLinks[0])}
+            aria-label={gate === 'sign-in'
+              ? `Sign in to contact ${item.user.name}`
+              : contactLinks[0].ariaLabel}
+            onClick={() => {
+              if (gate === 'sign-in') { onRequireAuth(); return; }
+              handleContactClick(contactLinks[0]);
+            }}
             style={{
               width: 36, height: 36, borderRadius: 999, border: 'none',
               background: 'var(--text-primary)', color: 'var(--bg-base)',
@@ -986,6 +995,32 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             <ChevronRight size={16} strokeWidth={1.8} color="var(--text-muted)" />
           )}
         </button>
+
+        {/* The address in plain text, outside the button so it can be selected
+            and copied — some people would rather paste it into their own mail
+            client than be thrown into a mailto: handler. Rendered only once
+            get_contact has returned it, and that RPC already enforces the
+            owner's share preference, so its presence IS the permission. */}
+        {ownerContact.email && (
+          <p style={{
+            margin: '8px 4px 0',
+            fontSize: 12, color: 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', gap: 6,
+            userSelect: 'text',
+          }}>
+            <Mail size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <a
+              href={contactLinks.find(l => l.channel === 'email')?.href ?? `mailto:${ownerContact.email}`}
+              style={{
+                color: 'var(--text-secondary)',
+                textDecoration: 'underline', textDecorationStyle: 'dotted',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}
+            >
+              {ownerContact.email}
+            </a>
+          </p>
+        )}
       </section>
 
       {/* ── COMMENTS (mobile) ── */}
@@ -1150,8 +1185,29 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
             </button>
           ))}
-          {/* Fallback — closed item or no contact at all → profile */}
-          {(item.isClosed || contactLinks.length === 0) && (
+          {/* Signed out → the channels can't be resolved yet (get_contact needs
+              auth), so offer the thing they actually want and let sign-in be the
+              means. Showing "view profile" here told every pre-signup visitor
+              the seller was unreachable. */}
+          {!item.isClosed && gate === 'sign-in' && (
+            <button
+              onClick={onRequireAuth}
+              aria-label={`Sign in to contact ${item.user.name}`}
+              style={{
+                flex: 1, height: 52, borderRadius: 999,
+                background: 'var(--text-primary)', color: 'var(--bg-base)',
+                border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <Mail size={15} strokeWidth={2} />
+              Contact {item.isRequest ? 'requester' : 'seller'}
+            </button>
+          )}
+          {/* Genuinely nothing to offer: closed post, or a signed-in viewer and
+              an owner who shares no channel at all. */}
+          {(item.isClosed || gate === 'none') && (
             <button
               onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
               aria-label={`View ${item.user.name}'s profile`}

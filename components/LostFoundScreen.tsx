@@ -29,7 +29,7 @@ import { useAuth } from '../lib/AuthContext';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
-import { buildContactLinks, type ContactLink } from '../lib/contactUser';
+import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
@@ -980,6 +980,29 @@ export function LostFoundDetailSheet({
               a.channel === 'email' ? -1 : b.channel === 'email' ? 1 : 0,
             );
             if (ordered.length === 0) {
+              /* Signed out is NOT the same as "no channel". get_contact needs
+                 auth, so an empty list here usually just means we haven't been
+                 allowed to look yet — telling a visitor the reporter can't be
+                 reached would be plainly false. */
+              if (contactGate(!!user, contactLinks) === 'sign-in') {
+                return (
+                  <button
+                    onClick={onRequireAuth}
+                    aria-label={`Sign in to contact ${item.user.name}`}
+                    style={{
+                      flex: '1 1 160px', minWidth: 0,
+                      height: 48, borderRadius: 14,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <Mail size={16} strokeWidth={2} />
+                    Contact reporter
+                  </button>
+                );
+              }
               return (
                 <p style={{
                   margin: 0, padding: 12,

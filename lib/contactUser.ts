@@ -57,6 +57,23 @@ interface BuildArgs {
  *      mode. If a user truly doesn't want email, they should delete the post.
  *    - WhatsApp is opt-in: only shown when phone is set AND the owner has
  *      explicitly turned on contact_whatsapp_enabled. */
+/** Why a viewer has no contact channels, which decides what the button says.
+ *
+ *  A signed-OUT viewer can never have channels: contact details come from the
+ *  get_contact RPC, which is SECURITY DEFINER and executable by `authenticated`
+ *  only. So an empty list means "sign in to see this", NOT "this seller can't
+ *  be reached" — and the UI must say so, otherwise every post shows a
+ *  view-the-profile consolation prize to exactly the people who haven't signed
+ *  up yet. Only once we ARE signed in does an empty list genuinely mean the
+ *  owner shares nothing.
+ */
+export type ContactGate = 'links' | 'sign-in' | 'none';
+
+export function contactGate(viewerSignedIn: boolean, links: ContactLink[]): ContactGate {
+  if (links.length > 0) return 'links';
+  return viewerSignedIn ? 'none' : 'sign-in';
+}
+
 export function buildContactLinks(args: BuildArgs): ContactLink[] {
   const out: ContactLink[] = [];
   const { owner } = args;
