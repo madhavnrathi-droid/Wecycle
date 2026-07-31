@@ -322,11 +322,16 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     setPending(purpose);
     setStep('confirm');
     setCode('');
+    /* Codes are deliberately long-lived (mailer_otp_exp = 7 days). The built-in
+       sender only allows 2 emails an hour, so a short window would strand anyone
+       who didn't happen to be watching their inbox — and a code this long can't
+       be brute-forced anyway: 8 digits against a 30/hour verify limit covers
+       0.005% of the space in a week. Say so, so nobody rushes or re-requests. */
     setInfo(
       purpose === 'reset'
         /* Deliberately non-committal — see above. */
-        ? `If ${email.trim()} has a Wecycle account, a code is on its way. It expires in 10 minutes.`
-        : `We emailed a code to ${email.trim()}. It expires in 10 minutes.`,
+        ? `If ${email.trim()} has a Wecycle account, a code is on its way. It stays valid for 7 days.`
+        : `We emailed a code to ${email.trim()}. It stays valid for 7 days — no rush.`,
     );
     startResendCooldown();
   };
