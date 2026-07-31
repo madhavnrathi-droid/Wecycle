@@ -391,7 +391,6 @@ export default function FeedScreen({
           <button
             aria-label="Your profile"
             onClick={onOpenAccount}
-            data-tour="topnav-account"
             style={{
               width: 34, height: 34, borderRadius: '50%',
               background: 'var(--bg-inset)',
@@ -467,7 +466,6 @@ export default function FeedScreen({
             onChange={e => setQuery(e.target.value)}
             className="search-pill"
             aria-label="Search items"
-            data-tour="feed-search"
             style={{ width: '100%' }}
           />
           {query && (
@@ -545,7 +543,7 @@ export default function FeedScreen({
       {/* ── PILL TABS: all / requests / shared / services & opportunities ──
          Scrollable variant: the last tab's label is long, so the row scrolls
          horizontally on narrow screens instead of squashing every tab. */}
-      <section style={{ padding: '0 16px 14px' }} data-tour="feed-tabs">
+      <section style={{ padding: '0 16px 14px' }}>
         <div className="segmented segmented--scroll">
           <button
             onClick={() => { setActiveType('all'); track(EVT.feed_tab_changed, { tab: 'all' }); }}

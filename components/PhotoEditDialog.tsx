@@ -28,6 +28,7 @@ import { X, Loader2 } from 'lucide-react';
 import PhotoPicker, { type PhotoPickerHandle } from './PhotoPicker';
 import { uploadMedia } from '../lib/liveData';
 import type { CompressedMedia } from '../lib/mediaCompression';
+import { Z_LAYER, zPanel } from '../lib/zLayers';
 
 interface PhotoEditDialogProps {
   open: boolean;
@@ -115,7 +116,7 @@ export default function PhotoEditDialog({
             background: 'rgba(0,0,0,0.45)',
             backdropFilter: 'blur(6px)',
             WebkitBackdropFilter: 'blur(6px)',
-            zIndex: 200,
+            zIndex: Z_LAYER.dialogNested,
           }}
         />
         <Dialog.Content
@@ -129,7 +130,7 @@ export default function PhotoEditDialog({
             background: 'var(--bg-card)',
             borderRadius: 20,
             padding: '20px 20px 24px',
-            zIndex: 201,
+            zIndex: zPanel(Z_LAYER.dialogNested),
             boxShadow: '0 24px 60px rgba(0,0,0,0.24)',
             display: 'flex',
             flexDirection: 'column',

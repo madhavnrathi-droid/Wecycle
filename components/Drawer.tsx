@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import {
   X, User, Settings, MessageSquare, Send, Bell,
-  Heart, LogOut, ChevronRight, Sparkles,
+  Heart, LogOut, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getAvatar } from '../lib/photos';
@@ -28,7 +28,6 @@ const SECTIONS: { items: { id: string; label: string; icon: IconCmp; desc?: stri
   {
     items: [
       { id: 'feedback', label: 'Give feedback',   icon: MessageSquare },
-      { id: 'tour',     label: 'Replay tour',     icon: Sparkles, desc: 'Walk through the app again' },
       { id: 'invite',   label: 'Invite friends',  icon: Send },
     ],
   },

@@ -26,13 +26,12 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
     onChange(next);
   };
   return (
-    <nav aria-label="Primary" className="mobile-only-nav bottom-nav" data-tour="bottom-nav">
+    <nav aria-label="Primary" className="mobile-only-nav bottom-nav">
       <div className="bottom-nav-inner">
         <NavButton
           label="Home"
           isActive={active === 'feed' || active === 'market'}
           onClick={() => navigate('feed')}
-          tourId="nav-home"
         >
           <Home size={20} strokeWidth={(active === 'feed' || active === 'market') ? 2 : 1.7} />
         </NavButton>
@@ -41,7 +40,6 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           label="Events"
           isActive={active === 'events'}
           onClick={() => navigate('events')}
-          tourId="nav-events"
         >
           <CalendarDays size={20} strokeWidth={active === 'events' ? 2 : 1.7} />
         </NavButton>
@@ -50,7 +48,6 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           onClick={() => { haptics.medium(); onPost(); }}
           aria-label="Create post"
           className="bottom-nav-post"
-          data-tour="nav-post"
         >
           <Plus size={22} strokeWidth={2} />
         </button>
@@ -60,7 +57,6 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           ariaLabel="Lost & Found"
           isActive={active === 'lost_found'}
           onClick={() => navigate('lost_found')}
-          tourId="nav-lostfound"
         >
           {/* PackageSearch — a box with a magnifier overlay. Literally "find
               stuff in this box". Visually distinct from both the plain Search
@@ -73,7 +69,6 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
           label="Inventory"
           isActive={active === 'inventory'}
           onClick={() => navigate('inventory')}
-          tourId="nav-inventory"
         >
           <Package size={20} strokeWidth={active === 'inventory' ? 2 : 1.7} />
         </NavButton>
@@ -83,7 +78,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
 }
 
 function NavButton({
-  label, ariaLabel, isActive, onClick, children, tourId,
+  label, ariaLabel, isActive, onClick, children,
 }: {
   label: string;
   /** Screen-reader name, when the visible pill label is abbreviated
@@ -92,7 +87,6 @@ function NavButton({
   isActive: boolean;
   onClick: () => void;
   children: React.ReactNode;
-  tourId?: string;
 }) {
   return (
     <button
@@ -101,7 +95,6 @@ function NavButton({
       aria-current={isActive ? 'page' : undefined}
       className="bottom-nav-btn"
       data-active={isActive || undefined}
-      data-tour={tourId}
     >
       {children}
       {/* Label rendered inline next to the icon. The pill-expansion CSS

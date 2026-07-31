@@ -63,7 +63,6 @@ export const EVT = {
   onboarding_step_viewed:   'onboarding_step_viewed',
   onboarding_completed:     'onboarding_completed',
   onboarding_skipped:       'onboarding_skipped',
-  tour_replayed:            'tour_replayed',
 
   sign_up_started:          'sign_up_started',
   sign_up_email_submitted:  'sign_up_email_submitted',

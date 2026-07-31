@@ -33,6 +33,7 @@ import { buildContactLinks, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
+import { Z_LAYER, zPanel } from '../lib/zLayers';
 
 interface LostFoundScreenProps {
   onReport: (defaultStatus?: 'lost' | 'found') => void;
@@ -555,7 +556,7 @@ export function LostFoundDetailSheet({
           background: 'rgba(0,0,0,0.4)',
           backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)',
-          zIndex: 100,
+          zIndex: Z_LAYER.content,
         }}
       />
       <div role="dialog" aria-label={item.title} style={
@@ -570,7 +571,7 @@ export function LostFoundDetailSheet({
           background: 'var(--bg-card)',
           borderRadius: 24,
           padding: 0,
-          zIndex: 101,
+          zIndex: zPanel(Z_LAYER.content),
           overflow: 'hidden',
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
@@ -583,7 +584,7 @@ export function LostFoundDetailSheet({
           background: 'var(--bg-card)',
           borderTopLeftRadius: 24, borderTopRightRadius: 24,
           padding: '14px 20px calc(20px + env(safe-area-inset-bottom, 0px))',
-          zIndex: 101,
+          zIndex: zPanel(Z_LAYER.content),
           maxHeight: '88svh',
           overflowY: 'auto',
         }

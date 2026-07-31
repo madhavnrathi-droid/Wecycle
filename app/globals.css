@@ -2601,14 +2601,14 @@ section.mobile-only { display: block; }
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 100;
+  z-index: 300; /* Z_LAYER.dialog */
   animation: fade-in 0.18s var(--ease-smooth);
 }
 
 /* Default (mobile): bottom sheet */
 .modal {
   position: fixed;
-  z-index: 101;
+  z-index: 301; /* Z_LAYER.dialog panel */
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   display: flex;
@@ -3037,7 +3037,7 @@ img[src*="/storage/v1/object/public/"] {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.4);
   backdrop-filter: blur(4px);
-  z-index: 100;
+  z-index: 400; /* Z_LAYER.dialogNested */
   animation: fade-in 0.18s ease;
 }
 /* The picker sheet now appears at the TOP of the open modal panel,
@@ -3051,7 +3051,7 @@ img[src*="/storage/v1/object/public/"] {
   background: var(--bg-card);
   border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
   padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 16px;
-  z-index: 101;
+  z-index: 401; /* Z_LAYER.dialogNested panel */
   box-shadow: 0 14px 36px rgba(0,0,0,0.18);
   animation: slide-down 0.22s var(--ease-smooth);
   display: flex; flex-direction: column;
@@ -3857,7 +3857,7 @@ img[src*="/storage/v1/object/public/"] {
   max-width: 360px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border-subtle);
-  z-index: 100;
+  z-index: 200; /* Z_LAYER.drawer */
   display: flex;
   flex-direction: column;
   animation: drawer-slide-in 0.25s var(--ease-out);

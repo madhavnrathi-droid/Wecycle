@@ -23,6 +23,7 @@ import {
 import { shareLink } from '../lib/share';
 import { sfxOpen, sfxShare, sfxTap } from '../lib/sfx';
 import { haptics } from '../lib/haptics';
+import { Z_LAYER } from '../lib/zLayers';
 
 interface Props {
   open: boolean;
@@ -152,7 +153,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
           position: 'fixed', inset: 0,
           background: 'rgba(0,0,0,0.55)',
           backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-          zIndex: 300,
+          zIndex: Z_LAYER.shareCard,
         }} />
         <Dialog.Content
           aria-describedby={undefined}

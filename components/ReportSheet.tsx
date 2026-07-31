@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { X, Check, Loader2 } from 'lucide-react';
 import { REPORT_REASONS, reportContent, blockUser } from '../lib/moderation';
 import type { ReportTargetType } from '../lib/moderation';
+import { Z_LAYER, zPanel } from '../lib/zLayers';
 
 type ReportReason = typeof REPORT_REASONS[number];
 
@@ -137,7 +138,7 @@ export default function ReportSheet({
           background: 'rgba(0,0,0,0.5)',
           backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)',
-          zIndex: 100,
+          zIndex: Z_LAYER.dialog,
         }}
       />
 
@@ -152,7 +153,7 @@ export default function ReportSheet({
           bottom: 0,
           left: 0,
           right: 0,
-          zIndex: 101,
+          zIndex: zPanel(Z_LAYER.dialog),
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'flex-end',
