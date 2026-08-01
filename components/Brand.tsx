@@ -3,7 +3,7 @@
 /* ── Wecycle brand marks ──────────────────────────────────────────────
  * The single source of truth for rendering the logo. Two marks:
  *
- *   <Wordmark/>  — the cursive "Wecycle" lettering. Use in top headers and
+ *   <Wordmark/>  — the "Wecycle" lettering. Use in top headers and
  *                  anywhere the full brand name is appropriate.
  *   <Logomark/>  — the looped "W" symbol. Use for compact / square contexts:
  *                  splash, auth, onboarding, avatars-of-the-app, favicons.
@@ -24,8 +24,10 @@ interface WordmarkProps {
   alt?: string;
 }
 
-/* Intrinsic aspect ratios of the trimmed source art (w / h). */
-const WORDMARK_AR = 1719 / 607;   // ≈ 2.832
+/* Intrinsic aspect ratios of the trimmed source art (w / h). Keep in step with
+ * the actual files in /public/brand — this only sizes the width attribute that
+ * reserves layout space, but a wrong value makes the header jump on load. */
+const WORDMARK_AR = 885 / 240;    // ≈ 3.688
 const LOGOMARK_AR = 1;            // square
 
 export function Wordmark({ height = 26, className, style, alt = 'Wecycle' }: WordmarkProps) {

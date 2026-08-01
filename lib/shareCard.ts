@@ -18,7 +18,7 @@
  *     never the dark UI behind it).
  *   • Footer: title + price, location, description, a translucent reward pill /
  *     event stat-chips, a clean person row (avatar · name · verified) and the
- *     cursive wecycle wordmark centred as the signature. No fake buttons — the
+ *     Wecycle wordmark centred as the signature. No fake buttons — the
  *     card is shared as an image alongside the real product link.
  *
  * Shared as an IMAGE via the Web Share files API; falls back to PNG download +
@@ -412,7 +412,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
 
 /* ── footers (single source of truth: measure when draw=false) ──── */
 
-/** Centred cursive wecycle wordmark — the signature that anchors the card. */
+/** Centred Wecycle wordmark — the signature that anchors the card. */
 function wordmarkSignature(ctx: CanvasRenderingContext2D, f: FooterCtx, y: number, draw: boolean): number {
   const wmH = 56, wmW = wmH * WORDMARK_AR;
   if (draw && f.wordmark) ctx.drawImage(tintImage(f.wordmark, wmW, wmH, '#ffffff'), (f.W - wmW) / 2, y, wmW, wmH);
