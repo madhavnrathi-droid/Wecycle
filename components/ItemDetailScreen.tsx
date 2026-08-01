@@ -12,7 +12,7 @@ import RelatedShelf from './RelatedShelf';
 import type { LostItem } from '../lib/mockData';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
-import { buildContactLinks, contactGate, itemAction, opportunityAction, actionLabel, type ContactLink } from '../lib/contactUser';
+import { buildContactLinks, contactGate, itemAction, opportunityAction, actionLabel, type ContactLink, type ContactGate } from '../lib/contactUser';
 import {
   opportunityCompLabel, compToListing,
   COMP_META, COMP_OPTIONS, PRICE_BANDS, type Comp, type PriceBand,
@@ -496,6 +496,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         onOpenItem={onOpenItem}
         onOpenLF={onOpenLF}
         contactLinks={contactLinks}
+        gate={gate}
         primaryActionLabel={primaryActionLabel}
         handleContactClick={handleContactClick}
         hasBoth={hasBoth}
@@ -1297,6 +1298,8 @@ interface DesktopLayoutProps {
   onOpenItem?: (item: MarketplaceItem) => void;
   onOpenLF?: (item: LostItem & { photoUrls?: string[] }) => void;
   contactLinks: ContactLink[];
+  /** 'links' | 'sign-in' | 'none' — see contactGate. */
+  gate: ContactGate;
   primaryActionLabel: string;
   handleContactClick: (link: ContactLink) => void;
   hasBoth: boolean;
@@ -1313,10 +1316,9 @@ function DesktopLayout({
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   onOpenItem, onOpenLF,
-  contactLinks, primaryActionLabel, handleContactClick, hasBoth,
+  contactLinks, gate, primaryActionLabel, handleContactClick, hasBoth,
   canManage, onDelete, isAdmin, isOwner, heroSentinelRef, heroVisible, editState,
 }: DesktopLayoutProps) {
-  void onRequireAuth;
   void isAdmin;
   void primaryActionLabel;
   void hasBoth;
@@ -1902,7 +1904,23 @@ function DesktopLayout({
                     {link.channel === 'whatsapp' ? `WhatsApp ${item.user.name.split(' ')[0]}` : `Email ${item.user.name.split(' ')[0]}`}
                   </button>
                 ))}
-                {contactLinks.length === 0 && (
+                {gate === 'sign-in' && (
+                  <button
+                    onClick={onRequireAuth}
+                    aria-label={`Sign in to contact ${item.user.name}`}
+                    style={{
+                      flex: 1, height: 52, borderRadius: 14,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <Mail size={16} strokeWidth={2} />
+                    Contact {item.isRequest ? 'requester' : 'seller'}
+                  </button>
+                )}
+                {gate === 'none' && (
                   <button
                     onClick={() => onOpenStorefront?.(item.user)}
                     aria-label={`View ${item.user.name}'s profile`}

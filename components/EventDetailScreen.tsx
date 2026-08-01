@@ -57,22 +57,39 @@ const EVENT_TYPES: { id: CommunityEvent['eventType']; label: string }[] = [
   { id: 'challenge', label: 'Challenge' },
 ];
 
-/* Parse the human-formatted date/time string on a CommunityEvent into ISO
- * components we can re-emit. Events store starts_at as ISO, but the mapper
- * pretty-formats it for display — we don't have the raw ISO here. So we
- * round-trip via the formatted strings: re-parse what we display. */
-function parseEventDateTime(dateStr: string, timeStr: string): { date: string; time: string } {
-  /* dateStr like "Sat, 24 May 2026"; timeStr like "5:30pm" */
+/* Seed the organizer's <input type="date"> / <input type="time"> from an event.
+ *
+ * This used to re-parse the DISPLAY strings — `new Date("Sat, Aug 15, 2026 " +
+ * "11:00pm")` — after stripping the space before am/pm. V8 rejects that form,
+ * so it returned Invalid Date for EVERY real event (verified against the actual
+ * fmtDate/fmtTime output: 5 of 5 invalid). Both inputs were therefore always
+ * blank, and saving with only one of them filled recomposed starts_at as
+ * 1970-01-01, which hid the event and then let purgeExpiredEvents delete it
+ * outright — taking its RSVPs and form responses with it.
+ *
+ * Now it reads the raw ISO the mapper carries through, and only falls back to
+ * parsing display text for demo fixtures (which have no startsAt). The fallback
+ * keeps the am/pm space so it actually parses.
+ */
+function parseEventDateTime(
+  dateStr: string, timeStr: string, startsAt?: string,
+): { date: string; time: string } {
+  const fromDate = (d: Date) => ({
+    date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+    time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+  });
+
+  if (startsAt) {
+    const d = new Date(startsAt);
+    if (!Number.isNaN(d.getTime())) return fromDate(d);
+  }
+
+  /* Demo/mock fallback only. Re-insert the space am/pm needs to be parseable. */
   try {
-    const combined = `${dateStr} ${timeStr.replace(/\s+/g, '')}`;
-    const d = new Date(combined);
+    const spaced = timeStr.trim().replace(/\s*(am|pm)$/i, ' $1');
+    const d = new Date(`${dateStr} ${spaced}`);
     if (Number.isNaN(d.getTime())) return { date: '', time: '' };
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${mi}` };
+    return fromDate(d);
   } catch {
     return { date: '', time: '' };
   }
@@ -215,7 +232,10 @@ export default function EventDetailScreen({
   };
 
   /* ── Inline edit state (owner only) ── */
-  const initial = useMemo(() => parseEventDateTime(event.date, event.time), [event.date, event.time]);
+  const initial = useMemo(
+    () => parseEventDateTime(event.date, event.time, event.startsAt),
+    [event.date, event.time, event.startsAt],
+  );
   const [eTitle, setETitle]             = useState(event.title);
   const [eDescription, setEDescription] = useState(event.description ?? '');
   const [eLocation, setELocation]       = useState(event.location);

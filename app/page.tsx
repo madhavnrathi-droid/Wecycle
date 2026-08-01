@@ -238,7 +238,17 @@ export default function WecycleApp() {
       if (result === 'cancelled') result = await toggleEventRsvp(ev.id);
       setRsvpLocal(ev.id, result === 'going');
     } catch {
+      /* The form answers are already stored at this point, so failing quietly
+         left the worst possible split: the organizer sees a response while the
+         person is NOT on the attendee list, and nobody is told. Say so, and say
+         what to do about it. */
       setRsvpLocal(ev.id, false);
+      if (typeof window !== 'undefined') {
+        window.alert(
+          `Your answers for "${ev.title}" were saved, but we couldn't add you to the attendee list. `
+          + 'Open the event and tap RSVP to finish — your answers are still there.',
+        );
+      }
     }
   };
 
@@ -670,6 +680,7 @@ export default function WecycleApp() {
           <div key={activeScreen} className="motion-rise">
           {activeScreen === 'feed' && (
             <FeedScreen
+              onRequireAuth={() => setModal('auth')}
               onPost={() => requireAuth('post-picker')}
               onOpenMenu={() => setDrawerOpen(true)}
               onOpenAccount={goToAccount}
@@ -968,7 +979,16 @@ function DesktopDetailModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      /* Only the TOPMOST stacked modal reacts — otherwise one Escape rips
+      /* Anything layered ABOVE the theatre owns Escape. Overlays that sit on
+         top (the auth/composer Modal, the share card's Radix dialog, the report
+         sheet) call preventDefault in a capture-phase listener but not
+         stopPropagation, so this bubble-phase listener still fires — and used
+         to close the product underneath as well, discarding unsaved inline
+         edits. Checking defaultPrevented is what makes the stack behave. */
+      if (e.defaultPrevented) return;
+      /* Full-page surfaces stand down the same way Modal.tsx does. */
+      if (document.querySelector('[data-fbs]')) return;
+      /* Only the TOPMOST stacked theatre reacts — otherwise one Escape rips
          through the whole stack (and eats typed form answers with it). */
       const all = document.querySelectorAll('[data-ddm]');
       if (all.length && all[all.length - 1] !== boxRef.current) return;

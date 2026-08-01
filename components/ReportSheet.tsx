@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useAuth } from '../lib/AuthContext';
 import { X, Check, Loader2 } from 'lucide-react';
 import { REPORT_REASONS, reportContent, blockUser } from '../lib/moderation';
 import type { ReportTargetType } from '../lib/moderation';
@@ -33,6 +34,12 @@ export default function ReportSheet({
   const [submitted, setSubmitted] = useState(false);
   const [blockConfirm, setBlockConfirm] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
+  /* reportContent/blockUser return false on failure — including when the
+     viewer isn't signed in, since the RLS policies key on auth.uid(). Both
+     used to swallow that: the report button just reset, and Block closed the
+     sheet as if it had worked. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { user, isDemo } = useAuth();
 
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -63,9 +70,18 @@ export default function ReportSheet({
   /* ESC closes */
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    /* Capture phase + preventDefault + stopPropagation: this sheet sits ABOVE
+       the desktop detail theatre, so Escape must close only the sheet. Bubbling
+       it also closed the product underneath. Same approach FormBuilderScreen
+       already uses. */
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
   }, [open, onClose]);
 
   /* focus trap */
@@ -95,6 +111,11 @@ export default function ReportSheet({
 
   const handleSubmit = useCallback(async () => {
     if (!selectedReason || loading) return;
+    setActionError(null);
+    if (!user && !isDemo) {
+      setActionError('Sign in to report this — reports are tied to your account so we can follow up.');
+      return;
+    }
     setLoading(true);
     const ok = await reportContent({
       targetType,
@@ -110,17 +131,28 @@ export default function ReportSheet({
         onReported?.();
         onClose();
       }, 1800);
+    } else {
+      setActionError('That report didn’t go through. Check your connection and try again.');
     }
-  }, [selectedReason, loading, targetType, targetId, targetUserId, details, onReported, onClose]);
+  }, [selectedReason, loading, user, isDemo, targetType, targetId, targetUserId, details, onReported, onClose]);
 
   const handleBlock = useCallback(async () => {
     if (!targetUserId) return;
+    setActionError(null);
+    if (!user && !isDemo) {
+      setActionError('Sign in to block someone — the block is saved to your account.');
+      return;
+    }
     if (!blockConfirm) { setBlockConfirm(true); return; }
     setBlockLoading(true);
-    await blockUser(targetUserId);
+    const ok = await blockUser(targetUserId);
     setBlockLoading(false);
-    onClose();
-  }, [targetUserId, blockConfirm, onClose]);
+    /* Only dismiss on success. Closing regardless reported a block that never
+       happened, and the person stayed visible. */
+    if (ok) { onClose(); return; }
+    setBlockConfirm(false);
+    setActionError('Couldn’t block them just now. Check your connection and try again.');
+  }, [targetUserId, blockConfirm, user, isDemo, onClose]);
 
   if (!open) return null;
 
@@ -287,6 +319,18 @@ export default function ReportSheet({
                   {details.length}/1000
                 </div>
               </div>
+
+              {/* Why the last attempt didn't work. Without this the report
+                  button simply reset and Block closed as if it had succeeded. */}
+              {actionError && (
+                <div role="alert" style={{
+                  marginBottom: 10, padding: '10px 12px', borderRadius: 12,
+                  background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose)',
+                  fontSize: 12.5, fontWeight: 500, lineHeight: 1.45,
+                }}>
+                  {actionError}
+                </div>
+              )}
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: 10 }}>

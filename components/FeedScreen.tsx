@@ -44,11 +44,13 @@ interface FeedScreenProps {
   /** Fired when a user-search-result card is tapped. Routes to the
    *  matching storefront. */
   onOpenUser?: (userId: string) => void;
+  /** Opens the sign-in dialog. Needed because saving is account-bound. */
+  onRequireAuth?: () => void;
 }
 
 export default function FeedScreen({
   onPost, onOpenMenu, onOpenAccount, onOpenItem, onOpenEvent, onOpenLF,
-  onBannerAction, onOpenUser,
+  onBannerAction, onOpenUser, onRequireAuth,
 }: FeedScreenProps) {
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -174,6 +176,12 @@ export default function FeedScreen({
      the local set, fires the Supabase RPC, and reverts on failure. Demo
      mode skips the RPC and just keeps the local heart state. */
   const handleToggleSave = (listingId: string) => {
+    /* Saving is account-bound — it lives in the `saves` table. Flipping the
+       heart locally for a signed-out visitor filled the icon and then dropped
+       it on the next tab switch (savedIds only rehydrates for a signed-in
+       user), which reads as the app quietly losing their data. Ask them to
+       sign in instead of pretending it worked. */
+    if (!user && !isDemoMode()) { onRequireAuth?.(); return; }
     const wasSaved = savedIds.has(listingId);
     /* Saving feels rewarding (success pop); un-saving is a quieter tick. */
     if (wasSaved) haptics.selection(); else haptics.success();

@@ -20,18 +20,35 @@ export function useOwnerContact(
   ownerId: string | undefined,
   fallback: { email?: string; phone?: string },
 ): { email?: string; phone?: string } {
-  const { isDemo } = useAuth();
+  const { user, isDemo } = useAuth();
   const [contact, setContact] = useState<{ email?: string; phone?: string }>(fallback);
+  /* Depend on the id, not the user object — the object identity changes on
+     every token refresh, which would refetch on a timer for no reason. */
+  const viewerId = user?.id ?? null;
 
   useEffect(() => {
-    if (isDemo || !ownerId) { setContact(fallback); return; }
+    if (isDemo) { setContact(fallback); return; }
+    if (!ownerId) { setContact({}); return; }
+
+    /* Clear first. Without this the hook kept serving the PREVIOUS owner's
+       address while the new fetch was in flight — so stepping post → post
+       through the related shelf showed one seller's email on another's post. */
+    setContact({});
+
+    /* get_contact is SECURITY DEFINER and executable by `authenticated` only,
+       so there is nothing to ask for until the viewer is signed in. viewerId is
+       in the dep list precisely so signing in from the post refetches and the
+       contact button unlocks without a reload — it previously stayed a sign-in
+       prompt forever. */
+    if (!viewerId) return;
+
     let alive = true;
     fetchContact(ownerId).then(c => { if (alive) setContact(c); });
     return () => { alive = false; };
     /* `fallback` is a fresh object each render — intentionally excluded so we
-       don't refetch on every parent re-render; ownerId/isDemo are what matter. */
+       don't refetch on every parent re-render. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerId, isDemo]);
+  }, [ownerId, isDemo, viewerId]);
 
   return contact;
 }

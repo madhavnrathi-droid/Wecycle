@@ -179,8 +179,15 @@ export interface CommunityEvent {
   title: string;
   description: string;
   eventType: 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge';
+  /** Human-formatted for display, e.g. "Sat, Aug 15, 2026". Never parse these
+   *  back — use `startsAt`. Re-parsing the formatted strings is what silently
+   *  blanked the organizer's edit form and rescheduled events to 1970. */
   date: string;
   time: string;
+  /** Raw ISO timestamp from the DB, when this event came from Supabase.
+   *  Absent on mock/demo fixtures. The edit form seeds its date + time inputs
+   *  from this, so it round-trips exactly instead of via `toLocaleString`. */
+  startsAt?: string;
   location: string;
   attendees: number;
   maxAttendees?: number;

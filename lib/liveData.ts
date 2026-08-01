@@ -716,6 +716,9 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
     eventType: row.event_type,
     date: fmtDate(row.starts_at),
     time: fmtTime(row.starts_at),
+    /* Carry the raw timestamp so the organizer's edit form never has to
+       re-parse the formatted strings above. */
+    startsAt: row.starts_at,
     location: row.location,
     attendees: row.attendee_count ?? 0,
     maxAttendees: row.max_attendees ?? undefined,
@@ -773,7 +776,13 @@ export async function fetchEventsByUser(userId: string): Promise<CommunityEvent[
 export async function purgeExpiredEvents() {
   if (!hasSupabaseEnv) return;
   const cutoff = new Date().toISOString();
-  await supabase.from('events').delete().lt('starts_at', cutoff);
+  /* Floor the window. An unbounded `lt(starts_at, now)` hard-deletes ANY row
+     with a past timestamp — including one corrupted to 1970 by a bad write,
+     which is how a live event could disappear permanently along with its RSVPs
+     and form responses. Anything older than a year is not an expired event, it
+     is a bug or a hand-edit, and it should survive for someone to look at. */
+  const floor = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from('events').delete().lt('starts_at', cutoff).gt('starts_at', floor);
   notifyPostsChanged();
 }
 
@@ -890,8 +899,30 @@ export async function updateEvent(id: string, patch: EditEventPatch) {
   if (patch.description !== undefined) update.description = patch.description.trim() || null;
   if (patch.maxAttendees !== undefined) update.max_attendees = patch.maxAttendees ?? null;
   if (patch.date !== undefined || patch.time !== undefined) {
-    /* Recompose starts_at from whichever parts we have. */
-    update.starts_at = new Date(`${patch.date ?? '1970-01-01'}T${patch.time || '00:00'}:00`).toISOString();
+    /* Recompose starts_at — but NEVER from a half-filled patch. This used to
+       default the missing half to '1970-01-01' or '00:00', so an organizer who
+       changed only the time silently moved their event to 1 Jan 1970; it then
+       vanished from every listing and the expired-event purge deleted it for
+       good, cascading its RSVPs and form responses. Merge against the row's
+       current value instead, and refuse anything that doesn't parse. */
+    const { data: current, error: readErr } = await supabase
+      .from('events').select('starts_at').eq('id', id).single();
+    if (readErr) throw readErr;
+    const base = current?.starts_at ? new Date(current.starts_at) : null;
+    const baseValid = base && !Number.isNaN(base.getTime());
+    const two = (n: number) => String(n).padStart(2, '0');
+    const datePart = patch.date
+      || (baseValid ? `${base!.getFullYear()}-${two(base!.getMonth() + 1)}-${two(base!.getDate())}` : '');
+    const timePart = patch.time
+      || (baseValid ? `${two(base!.getHours())}:${two(base!.getMinutes())}` : '');
+    if (!datePart || !timePart) {
+      throw new Error('Add both a date and a start time before saving.');
+    }
+    const next = new Date(`${datePart}T${timePart}:00`);
+    if (Number.isNaN(next.getTime())) {
+      throw new Error('That date and time didn’t make sense — please re-enter them.');
+    }
+    update.starts_at = next.toISOString();
   }
   const { error } = await supabase.from('events').update(update as never).eq('id', id);
   if (error) throw error;

@@ -129,7 +129,11 @@ export const DEFAULT_SETTINGS: UserSettings = {
   },
   contact: {
     email: true,
-    whatsapp: true,
+    /* Must match profiles.contact_whatsapp_enabled, which defaults to FALSE.
+       Defaulting this to true made Settings show WhatsApp as already enabled
+       while the DB flag was off, so it never appeared on the user's posts and
+       there was nothing to toggle to fix it. */
+    whatsapp: false,
   },
 };
 

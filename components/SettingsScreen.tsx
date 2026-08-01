@@ -339,7 +339,11 @@ export default function SettingsScreen({
               : 'Add your phone number on the Account screen to enable WhatsApp contact.'}
           >
             <Toggle
-              on={!!profile?.phone && settings.contact.whatsapp}
+              /* Read the PROFILE column, not local settings: get_contact keys
+                 off the DB, so that is the only value that decides whether
+                 WhatsApp actually shows up on your posts. */
+              on={!!profile?.phone
+                && !!(profile as { contact_whatsapp_enabled?: boolean } | null)?.contact_whatsapp_enabled}
               onChange={(v) => setContact({ whatsapp: v })}
               disabled={!profile?.phone}
             />
