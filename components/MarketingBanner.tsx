@@ -20,7 +20,9 @@
  *     illustration for that "abstract hand-drawn" feel.
  *
  * Motion:
- *   - Auto-advance every 4 s (pauses on touch/hover, resumes 2 s after)
+ *   - Auto-advance every 4 s. Ticks are skipped while the pointer is over
+ *     the banner (checked at tick time, not latched) and paused briefly
+ *     after a touch or a dot tap.
  *   - Subtle float on the illustration
  *   - Slow drift on the background blobs
  *   - prefers-reduced-motion disables every animation
@@ -79,6 +81,12 @@ export default function MarketingBanner({
   slides, variant = 'compact', intervalMs = 4000,
 }: MarketingBannerProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  /* While a programmatic scroll animates, the scroll listener would keep
+     recomputing `active` from the in-flight position and clobber the index we
+     just set — which made auto-advance jump around (2 -> 1 -> 3) instead of
+     stepping in order. Ignore scroll events until the animation settles. */
+  const settleUntil = useRef(0);
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,6 +149,7 @@ export default function MarketingBanner({
     const target = Math.max(0, Math.min(i, Math.max(0, slides.length - perView)));
     const child = track.children[target] as HTMLElement | undefined;
     if (!child) return;
+    settleUntil.current = Date.now() + 700;
     track.scrollTo({ left: child.offsetLeft, behavior });
     setActive(target);
   }, [perView, slides.length]);
@@ -150,11 +159,21 @@ export default function MarketingBanner({
     if (paused || slides.length < 2 || intervalMs <= 0) return;
     if (maxIndex === 0) return; /* everything already on screen — nothing to cycle */
     const t = setInterval(() => {
+      /* Ask the DOM whether the pointer is on us RIGHT NOW rather than trusting
+         a latched hover flag. Pausing via onMouseEnter/onMouseLeave state meant
+         a mouseenter with no matching mouseleave — pointer resting over the
+         banner when the page loads, a leave swallowed during a re-render —
+         latched `paused` true forever and the carousel never advanced again.
+         Skipping a tick is self-healing; a stuck boolean isn't. */
+      if (sectionRef.current?.matches(':hover')) return;
       setActive(prev => {
         const next = prev >= maxIndex ? 0 : prev + 1;
         const track = trackRef.current;
         const child = track?.children[next] as HTMLElement | undefined;
-        if (track && child) track.scrollTo({ left: child.offsetLeft, behavior: 'smooth' });
+        if (track && child) {
+          settleUntil.current = Date.now() + 700;
+          track.scrollTo({ left: child.offsetLeft, behavior: 'smooth' });
+        }
         return next;
       });
     }, intervalMs);
@@ -170,6 +189,8 @@ export default function MarketingBanner({
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
+        /* Our own animation is still running — don't fight it. */
+        if (Date.now() < settleUntil.current) return;
         /* Nearest slide by position, for the same reason goTo reads offsetLeft:
            no division by a measured pitch. */
         let nearest = 0;
@@ -204,11 +225,10 @@ export default function MarketingBanner({
 
   return (
     <section
+      ref={sectionRef}
       className={`marketing-banner marketing-banner-${variant}`}
       aria-label="What you can do on Wecycle"
       aria-roledescription="carousel"
-      onMouseEnter={pauseNow}
-      onMouseLeave={() => resumeSoon()}
       onTouchStart={pauseNow}
       onTouchEnd={() => resumeSoon()}
     >

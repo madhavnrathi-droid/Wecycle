@@ -955,8 +955,9 @@ section.mobile-only { display: block; }
 @media (min-width: 1024px) {
   .marketing-banner-wide {
     --banner-gap: 16px;
-    max-width: 1120px;
-    margin-inline: auto;
+    /* No max-width: the row fills its column so there are no dead gutters
+       beside it. The app container is already capped, so this stays sane on an
+       ultrawide monitor — the banner just tracks whatever width the feed has. */
     aspect-ratio: auto;
     height: auto;
     /* The corners and the shadow move to the cards — left on the section they
