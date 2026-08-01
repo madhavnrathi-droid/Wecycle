@@ -1,19 +1,42 @@
 # Authentication
 
-Wecycle uses **password sign-in with a one-time emailed code only where an address must be proven** — at sign-up, and for password resets. Membership is **Manipal-only**, enforced before any email is sent and again at the database.
+Wecycle uses **password sign-in**. An emailed one-time code is used only for **password resets**. Membership is **Manipal-only**, enforced client-side and again at the database.
+
+Sign-up email confirmation is controlled by a single switch, **`REQUIRE_EMAIL_CONFIRMATION` in `lib/authConfig.ts`**, currently **off**. Both sign-up paths are implemented in `components/AuthModal.tsx`; the flag picks one. Read `lib/authConfig.ts` before changing anything here — the flag must stay the inverse of Supabase's `mailer_autoconfirm`, and it carries a security constraint (below).
+
+### Why it's off
+
+Supabase's built-in sender allows **2 emails an hour** and can't be raised without a verified sending domain. Sign-up spent one of those, so the third person to join in any hour couldn't create an account at all: the code never arrived, so the password was never stored, so there was nothing to come back to.
 
 ## The flows
 
-### Sign up
-1. User fills name, Manipal email, password (+ optional profile fields), accepts terms.
+### Sign up — confirmation OFF (current)
+1. User fills name, Manipal email, password (+ optional profile fields), accepts terms, **and ticks a checkbox that reads their address back to them**.
+2. `signUp({ email, password, options: { data: {…} } })` — one request. Supabase's `mailer_autoconfirm` confirms the address inline and returns a session, so the user is signed in immediately. **No email is sent.**
+
+Nothing can be left half-finished: the account and the password are written together. Because nothing verifies the address, the read-back checkbox is the only typo check there is, so it's required rather than advisory, and it retracts itself if the address is edited afterwards.
+
+A repeat sign-up returns `422 user_already_exists` → "That email already has an account — sign in instead, or reset the password."
+
+### Sign up — confirmation ON
+1. As above, minus the read-back checkbox (verifying the code *is* the check).
 2. `signInWithOtp({ shouldCreateUser: true, data: {…} })` provisions the account and emails a code. The chosen password is held client-side (a ref, never storage) until the address is proven.
 3. `verifyOtp({ type: 'email' })` confirms the address and signs the user in.
-4. `updateUser({ password })` stores the password. From then on, sign-in is password-only.
+4. `updateUser({ password })` stores the password.
 
-An abandoned sign-up (code never entered) leaves an account with no password. A localStorage marker (set only by the browser that started the sign-up) routes a returning user back to "confirm your address" instead of a misleading "wrong password" error.
+An abandoned sign-up (code never entered) leaves an account with no password. A localStorage marker (set only by the browser that started the sign-up) routes a returning user back to "confirm your address" instead of a misleading "wrong password" error. That recovery only runs while the flag is on — see below.
+
+### ⚠️ The constraint: no unconfirmed rows while confirmation is off
+
+While `mailer_autoconfirm` is on, an **unconfirmed** row in `auth.users` can be claimed by anyone who knows the address, **with no password**. GoTrue's `/signup` only raises `user_already_exists` for *confirmed* users; for an unconfirmed one it confirms the row and issues a session while deliberately discarding the submitted password. Verified against this project on 2026-08-01, and re-verified closed after the fix.
+
+Two things keep this shut, and both must stay:
+
+- The two leftover unconfirmed rows from the emailed-code era were confirmed on 2026-08-01. Check with `select email from auth.users where email_confirmed_at is null;` — it must return nothing.
+- `sendCode` passes `shouldCreateUser` **only when the flag is on**, so `signInWithOtp` can't mint an unconfirmed row. Don't simplify that back to `purpose === 'signup'`. For the same reason the abandoned-sign-up recovery in the sign-in error path is gated on the flag.
 
 ### Sign in
-`signInWithPassword`. If the server answers *email not confirmed*, the modal silently sends a fresh code and moves to the confirm step — no dead ends.
+`signInWithPassword`, in both modes. The password grant rejects unconfirmed users unconditionally (it doesn't consult `mailer_autoconfirm`), which is another reason no unconfirmed row may be left lying around. While the flag is on, an *email not confirmed* answer makes the modal send a fresh code and move to the confirm step; while it's off that can't arise, and the reset flow is the recovery route.
 
 ### Forgot password
 `signInWithOtp({ shouldCreateUser: false })` → code → `verifyOtp` → choose a new password. Two properties worth knowing:
@@ -33,7 +56,7 @@ Accounts require a Manipal address. The rule lives in **two places that must sta
 
 Beyond the domain check, the UI catches the human failure modes *before* an email is spent:
 
-- The field hint **reads the address back** ("We'll email your code to …") — the domain is guaranteed by the gate, so the only thing left to mistype is the local part.
+- The address is **read back** to the user — the domain is guaranteed by the gate, so the only thing left to mistype is the local part. With confirmation off this is the required checkbox ("I've checked that *you@learner.manipal.edu* is spelled correctly…"); with it on, a field hint ("We'll email your code to …").
 - Typo'd domains get a correction ("Did you mean @learner.manipal.edu?").
 - If a code doesn't arrive within 45 s, a panel explains the likely causes — spam folder, a mailbox closed after graduation, a slightly-wrong address — each with an action. The reset variant leads with "you may not have an account yet — sign up instead", because that's the likeliest cause there and the anti-enumeration design means the UI can't say so directly.
 

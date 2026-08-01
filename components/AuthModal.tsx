@@ -1,18 +1,28 @@
 'use client';
 
-/* Email + PASSWORD authentication. An emailed code is used ONLY to prove the
- * address is real — at sign-up, and when setting/resetting a password.
+/* Email + PASSWORD authentication.
  *
  *   Sign in    — email + password → signInWithPassword(). No email sent.
- *   Sign up    — details + password → we email a code → verifyOtp() confirms
- *                the address and opens a session → updateUser() stores the
- *                password they chose. One email, ever.
- *   Set/reset  — email → code → choose a new password. This is also how the
- *                pre-password accounts (who never had one) get in.
+ *   Sign up    — depends on REQUIRE_EMAIL_CONFIRMATION (lib/authConfig.ts):
+ *                  off (today) — details + password → signUp() creates the
+ *                    account, confirms it inline and returns a session. No
+ *                    email at all. A required checkbox makes the user read
+ *                    their address back instead, since nothing else will
+ *                    catch a typo.
+ *                  on          — details + password → we email a code →
+ *                    verifyOtp() confirms the address and opens a session →
+ *                    updateUser() stores the password they chose.
+ *   Set/reset  — email → code → choose a new password, ALWAYS. Reset has to
+ *                prove the address or it would be a way into any account.
+ *                This is also how the pre-password accounts get in.
  *
- * Why the code is a *sign-in* OTP rather than Supabase's "confirm signup"
- * link: the magic-link template on this project already emits a numeric code,
- * so this path needs no dashboard template edits and sends exactly one email.
+ * Both sign-up paths live here; the flag picks one. Read lib/authConfig.ts
+ * before touching either — the flag has to stay in step with Supabase's
+ * `mailer_autoconfirm` or sign-up fails quietly.
+ *
+ * Why the reset code is a *sign-in* OTP rather than Supabase's recovery link:
+ * the magic-link template on this project already emits a numeric code, so
+ * this path needs no dashboard template edits and sends exactly one email.
  * verifyOtp(type:'email') confirms email_confirmed_at just the same.
  *
  * Code length is deliberately NOT pinned to a constant — Supabase's Email OTP
@@ -42,6 +52,7 @@ import {
   validatePassword, passwordStrength, humanAuthError, MIN_PASSWORD_LENGTH,
 } from '../lib/password';
 import { emailGateProblem, isManipalEmail } from '../lib/emailDomain';
+import { REQUIRE_EMAIL_CONFIRMATION } from '../lib/authConfig';
 
 type Step = 'credentials' | 'confirm' | 'newpassword';
 type AuthMode = 'signin' | 'signup';
@@ -157,6 +168,10 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const [phone, setPhone] = useState('');
   const [department, setDepartment] = useState('');
   const [termsAgreed, setTermsAgreed] = useState(false);
+  /* Only asked when sign-up sends no code (REQUIRE_EMAIL_CONFIRMATION off).
+     Cleared whenever the address changes — a tick against the old spelling
+     confirms nothing. */
+  const [emailChecked, setEmailChecked] = useState(false);
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -228,7 +243,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     setResetting(false);
     setPending(null);
     setName(''); setCollegeId(''); setEmail('');
-    setPhone(''); setDepartment(''); setTermsAgreed(false);
+    setPhone(''); setDepartment(''); setTermsAgreed(false); setEmailChecked(false);
     setPassword(''); setPassword2(''); setShowPassword(false); setCode('');
     pendingPassword.current = '';
     setSubmitting(false); setError(null); setInfo(null); setResendSecs(0);
@@ -265,11 +280,16 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const passwordsMatch = password.length > 0 && password === password2;
   const strength = passwordStrength(password);
 
+  /* With no code to prove the address, reading it back is the only typo check
+     there is — so it's required, not advisory. Nothing to ask when a code is
+     coming: verifying it IS the check. */
+  const emailCheckSatisfied = REQUIRE_EMAIL_CONFIRMATION || emailChecked;
+
   const credentialsReady =
     resetting ? emailOk && domainOk
     : mode === 'signup'
       ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk
-        && !passwordProblem && passwordsMatch
+        && emailCheckSatisfied && !passwordProblem && passwordsMatch
       /* Sign-in: don't judge the password, just require something typed —
          the server is the authority on whether it's right. */
       : emailOk && domainOk && password.length > 0;
@@ -284,23 +304,78 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     setError(humanAuthError(msg, mode2));
   };
 
+  /* The sign-up details, in the shape the auth.users → profiles trigger reads
+     (handle_new_auth_user picks these out of raw_user_meta_data). Shared by
+     both sign-up paths so they can never drift apart and start creating
+     differently-populated profiles. */
+  const signupMetadata = () => ({
+    full_name: name.trim() || undefined,
+    initials: name.trim() ? initialsOf(name) : undefined,
+    college_id: collegeId.trim() || undefined,
+    ...(phone.trim() ? { phone: phone.trim() } : {}),
+    ...(department.trim() ? { department: department.trim() } : {}),
+  });
+
+  /* ── Create the account outright, no email ──────────────
+   * The REQUIRE_EMAIL_CONFIRMATION=off path. signUp() writes the account and
+   * the password in one request, and — because Supabase's mailer_autoconfirm
+   * is on to match the flag — confirms the address inline and hands back a
+   * session. One request, no email, nothing to come back and finish.
+   */
+  const createAccountWithPassword = async () => {
+    const addr = email.trim();
+    const { data, error: err } = await supabase.auth.signUp({
+      email: addr,
+      password,
+      options: { data: signupMetadata() },
+    });
+    if (err) throw err;
+
+    /* Anti-enumeration decoy: when confirmation is ON, GoTrue answers a repeat
+       sign-up with a user carrying an empty `identities` array — no error, no
+       session — so an existing member can't be told apart from a new one. Only
+       reachable if mailer_autoconfirm has drifted out of step with the flag,
+       but a form that silently does nothing is the worst outcome available, so
+       name it. The message matches what humanAuthError already knows. */
+    if (!data.session && (data.user?.identities?.length ?? 0) === 0) {
+      throw new Error('User already registered');
+    }
+
+    /* A session should always come back. If confirmation got switched on at
+       the project without the flag following, it won't — but the account and
+       password now exist, so sign in with them rather than stranding someone
+       on a form that looks like it failed. */
+    if (!data.session) {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email: addr, password });
+      if (signInErr) throw signInErr;
+    }
+
+    /* No half-finished state exists on this path, so clear any marker left by
+       an earlier attempt under the emailed-code flow. */
+    clearIncompleteSignup();
+    track(EVT.password_set, { context: 'signup' });
+    track(EVT.login, { method: 'signup' });
+    handleClose();
+  };
+
   /* ── Email a code (sign-up confirmation, or set/reset password) ── */
   const sendCode = async (purpose: Exclude<Pending, null>) => {
     const { error: err } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
         /* Sign-up provisions the account; reset must never create one (that
-           would silently turn a typo into a new account). */
-        shouldCreateUser: purpose === 'signup',
-        ...(purpose === 'signup' ? {
-          data: {
-            full_name: name.trim() || undefined,
-            initials: name.trim() ? initialsOf(name) : undefined,
-            college_id: collegeId.trim() || undefined,
-            ...(phone.trim() ? { phone: phone.trim() } : {}),
-            ...(department.trim() ? { department: department.trim() } : {}),
-          },
-        } : {}),
+           would silently turn a typo into a new account).
+
+           The REQUIRE_EMAIL_CONFIRMATION half is a security guard, not a
+           tidiness one. shouldCreateUser:true mints an UNCONFIRMED auth.users
+           row, and while Supabase's mailer_autoconfirm is on, an unconfirmed
+           row is claimable by anyone who knows the address: POST /signup skips
+           its "user already exists" check for unconfirmed users, confirms the
+           row, and returns a live session — without ever checking a password.
+           So while confirmation is off, nothing here may create a row; only
+           signUp() may, and signUp confirms as it goes. */
+        shouldCreateUser: purpose === 'signup' && REQUIRE_EMAIL_CONFIRMATION,
+        ...(purpose === 'signup' ? { data: signupMetadata() } : {}),
       },
     });
     if (err) {
@@ -387,6 +462,10 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
           has_phone: !!phone.trim(),
           has_department: !!department.trim(),
         });
+        if (!REQUIRE_EMAIL_CONFIRMATION) {
+          await createAccountWithPassword();
+          return;
+        }
         /* Hold the chosen password until the code proves the address. */
         pendingPassword.current = password;
         await sendCode('signup');
@@ -412,10 +491,20 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
          The invalid-credentials half covers the abandoned sign-up: the account
          has no password at all, so the right answer is still "confirm the
          address", not "your password is wrong". Guarded by the local marker so
-         it only fires for a sign-up this browser started. */
+         it only fires for a sign-up this browser started.
+
+         All of which only applies while sign-up goes through an emailed code.
+         With confirmation off, sign-up is atomic — there is no half-finished
+         account to rescue and every row is confirmed as it's created — and this
+         branch must not run: it would ask for a code that proves nothing and,
+         for an address with no account, couldn't create one anyway (sendCode
+         withholds shouldCreateUser in that mode, deliberately). The reset flow
+         is the recovery route there. */
       if (
-        /email not confirmed/i.test(msg) ||
-        (/invalid login credentials/i.test(msg) && !resetting && isIncompleteSignup(email))
+        REQUIRE_EMAIL_CONFIRMATION && mode === 'signin' && !resetting && (
+          /email not confirmed/i.test(msg) ||
+          (/invalid login credentials/i.test(msg) && isIncompleteSignup(email))
+        )
       ) {
         try {
           pendingPassword.current = password;
@@ -428,7 +517,10 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
         }
       }
       fail(
-        resetting ? 'send_reset_code' : mode === 'signup' ? 'send_signup_code' : 'password_signin',
+        resetting ? 'send_reset_code'
+        : mode === 'signup'
+          ? (REQUIRE_EMAIL_CONFIRMATION ? 'send_signup_code' : 'signup_with_password')
+          : 'password_signin',
         err,
         resetting ? 'reset' : mode,
       );
@@ -533,7 +625,8 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     step === 'confirm' ? (submitting ? 'Verifying…' : 'Verify email')
     : step === 'newpassword' ? (submitting ? 'Saving…' : 'Save password')
     : resetting ? (submitting ? 'Sending…' : 'Email me a code')
-    : mode === 'signup' ? (submitting ? 'Sending…' : 'Create account')
+    : mode === 'signup'
+      ? (submitting ? (REQUIRE_EMAIL_CONFIRMATION ? 'Sending…' : 'Creating account…') : 'Create account')
     : (submitting ? 'Signing in…' : 'Sign in');
 
   const primaryDisabled = submitting || (
@@ -611,7 +704,9 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 ? 'Enter your Manipal email and we’ll send a code. Once it’s confirmed you can pick a new password.'
                 : mode === 'signin'
                   ? 'Sign in with your Manipal email and password.'
-                  : 'Create your account. We’ll email one code to confirm your address — after that it’s just your password.'}
+                  : REQUIRE_EMAIL_CONFIRMATION
+                    ? 'Create your account. We’ll email one code to confirm your address — after that it’s just your password.'
+                    : 'Create your account with your Manipal email and a password. No code to wait for — you’re in straight away.'}
             </p>
 
             {/* Manipal-only notice — stated up front on sign-up so nobody
@@ -672,7 +767,9 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 placeholder="you@learner.manipal.edu"
                 value={email}
                 maxLength={80}
-                onChange={e => setEmail(e.target.value)}
+                /* Editing the address retracts the "I've checked it" tick —
+                   it was a promise about the old spelling. */
+                onChange={e => { setEmail(e.target.value); setEmailChecked(false); }}
                 autoComplete="email"
                 aria-invalid={!!domainProblem}
                 aria-describedby={domainProblem ? 'auth-email-problem' : undefined}
@@ -685,12 +782,17 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 <span id="auth-email-problem" className="field-hint" style={{ color: 'var(--accent-rose)' }}>
                   {domainProblem}
                 </span>
-              ) : emailOk && isManipalEmail(email) && mode === 'signup' && !resetting ? (
+              ) : emailOk && isManipalEmail(email) && mode === 'signup' && !resetting
+                  && REQUIRE_EMAIL_CONFIRMATION ? (
                 /* Echo the address back rather than just saying "recognised".
                    The domain is already proven; what's left to get wrong is the
                    name or roll number, and reading it back is the only chance to
                    catch that before we spend a code on a mailbox that will
-                   never answer. */
+                   never answer.
+
+                   Only when a code is actually coming — with confirmation off
+                   the read-back moved into the checkbox below, and printing the
+                   same address twice a few lines apart reads as a glitch. */
                 <span className="field-hint" style={{ color: '#16A34A' }}>
                   We’ll email your code to {email.trim().toLowerCase()}
                 </span>
@@ -827,6 +929,40 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   maxLength={60}
                 />
               </div>
+            )}
+
+            {/* Sign-up only: read the address back (required).
+                Nothing verifies the address on this path, so a typo is silent
+                and permanent: no code fails to arrive, no error appears, the
+                account just works while being unreachable — and password reset,
+                which does email, has nowhere to send to. Printing the address
+                inside the sentence they're agreeing to is the whole point; a
+                generic "my email is correct" would be skimmed past. */}
+            {mode === 'signup' && !resetting && !REQUIRE_EMAIL_CONFIRMATION && (
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                cursor: 'pointer',
+                padding: '11px 13px',
+                background: 'var(--bg-inset)',
+                borderRadius: 14,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={emailChecked}
+                  onChange={e => setEmailChecked(e.target.checked)}
+                  style={{ marginTop: 2, accentColor: 'var(--color-lime, #5C7A00)', flexShrink: 0 }}
+                  required
+                />
+                <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                  <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    I’ve checked that{' '}
+                    {emailOk && domainOk ? email.trim().toLowerCase() : 'my email above'}{' '}
+                    is spelled correctly.
+                  </strong>{' '}
+                  It’s how buyers and sellers reach me — and the only way back into
+                  my account if I forget my password.
+                </span>
+              </label>
             )}
 
             {/* Sign-up only: terms checkbox (required) */}

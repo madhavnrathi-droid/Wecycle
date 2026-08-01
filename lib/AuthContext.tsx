@@ -118,11 +118,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       'larger_text, hide_prices_on_feed';
     /* Run the profile select and the contact RPC in parallel — they're
        independent, so there's no reason to await one before the other. */
-    const [{ data }, contact] = await Promise.all([
+    const [{ data, error }, contact] = await Promise.all([
       supabase.from('profiles').select(cols).eq('id', uid).single(),
       fetchContact(uid),
     ]);
-    if (!data) return;
+    /* A failed profile load used to return in silence, which is indistinguishable
+       from a signed-in user who simply has no name: the greeting quietly falls
+       back to the email local-part and every profile-driven preference reverts
+       to its default. Say so, or the next person to hit this has nothing to go on. */
+    if (!data) {
+      // eslint-disable-next-line no-console
+      console.error('[wecycle] profile load failed for', uid, error);
+      return;
+    }
     setProfile({
       ...(data as unknown as Record<string, unknown>),
       email: contact.email ?? null,

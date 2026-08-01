@@ -13,7 +13,7 @@ import {
   type UserSettings,
 } from '../lib/settings';
 import { useAuth } from '../lib/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase, rpcUntyped } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
 
 interface SettingsScreenProps {
@@ -148,9 +148,10 @@ export default function SettingsScreen({
       /* Demo mode: nothing on the server to delete — just wipe local state. */
       if (!isDemo) {
         track(EVT.settings_changed, { group: 'account', setting_key: 'delete', value: 'true' });
-        const { error } = await (supabase.rpc as unknown as (
-          fn: string, args: Record<string, unknown>,
-        ) => Promise<{ error: unknown }>)('delete_my_account', {});
+        /* Via rpcUntyped: this was a cast of `supabase.rpc`, which called into
+           supabase-js with `this` undefined and threw before the RPC was ever
+           sent — so "Delete my account" reported a failure and deleted nothing. */
+        const { error } = await rpcUntyped('delete_my_account', {});
         if (error) {
           window.alert(`Couldn't delete your account: ${(error as { message?: string }).message ?? 'unknown error'}`);
           return;

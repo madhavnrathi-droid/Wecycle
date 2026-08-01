@@ -12,7 +12,7 @@
  * rather than throwing.
  */
 
-import { supabase, hasSupabaseEnv } from './supabase';
+import { supabase, hasSupabaseEnv, rpcUntyped } from './supabase';
 
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '';
 
@@ -67,10 +67,10 @@ async function persist(sub: PushSubscription): Promise<void> {
   if (!hasSupabaseEnv) return;
   const json = sub.toJSON();
   const keys = json.keys ?? {};
-  // RPC isn't in the generated types yet → cast (mirrors liveData patterns).
-  await (supabase.rpc as unknown as (
-    fn: string, args: Record<string, unknown>,
-  ) => Promise<unknown>)('upsert_push_subscription', {
+  /* RPC isn't in the generated types yet — go through rpcUntyped. Calling a
+     cast of `supabase.rpc` (as this did) leaves `this` undefined inside
+     supabase-js and throws, so no subscription was ever stored. */
+  await rpcUntyped('upsert_push_subscription', {
     _endpoint: sub.endpoint,
     _p256dh: keys.p256dh ?? '',
     _auth: keys.auth ?? '',

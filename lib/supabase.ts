@@ -179,4 +179,36 @@ export const supabase = new Proxy({} as ReturnType<typeof getSupabase>, {
     Reflect.get(getSupabase(), prop, receiver),
 });
 
+/**
+ * Call a Postgres function that isn't in the generated `Database` types.
+ *
+ * ALWAYS use this instead of casting `supabase.rpc` at the call site.
+ * supabase-js implements the method as `rpc(fn, args) { return
+ * this.rest.rpc(...) }`, so lifting it off the client —
+ *
+ *     const f = supabase.rpc as unknown as (…) => …;  await f(name, args);
+ *     await (supabase.rpc as unknown as (…) => …)(name, args);
+ *
+ * — invokes it with `this` undefined and throws `Cannot read properties of
+ * undefined (reading 'rest')`. Both spellings look like ordinary type
+ * narrowing and neither is a type error, which is why three call sites shipped
+ * with it: it silently disabled profile loading (the throw escaped
+ * fetchContact into AuthContext's Promise.all, leaving every signed-in user
+ * with a null profile), push registration, and account deletion.
+ *
+ * Binding to `getSupabase()` rather than the Proxy keeps `this` pointing at the
+ * real client, so the internal `this.rest` lookup resolves normally.
+ */
+export async function rpcUntyped<T = unknown>(
+  fn: string,
+  args: Record<string, unknown> = {},
+): Promise<{ data: T | null; error: { message?: string } | null }> {
+  const client = getSupabase() as unknown as {
+    rpc: (
+      fn: string, args: Record<string, unknown>,
+    ) => Promise<{ data: T | null; error: { message?: string } | null }>;
+  };
+  return client.rpc(fn, args);
+}
+
 export type { Database } from './database.types';

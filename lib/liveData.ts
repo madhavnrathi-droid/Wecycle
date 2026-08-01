@@ -15,7 +15,7 @@
  * empty arrays and create throws a friendly error.
  */
 
-import { supabase, hasSupabaseEnv } from './supabase';
+import { supabase, hasSupabaseEnv, rpcUntyped } from './supabase';
 import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData';
 import { listingToComp } from './opportunity';
 import type { CompressedMedia } from './mediaCompression';
@@ -107,14 +107,22 @@ export function profileToUser(p: JoinedProfile | null | undefined, fallbackId: s
    which returns the OWN row in full and others' filtered by their share prefs. */
 export async function fetchContact(userId: string): Promise<{ email?: string; phone?: string }> {
   if (!hasSupabaseEnv || !userId) return {};
-  /* get_contact was added out-of-band and isn't in the generated Database
-     types — call it through a narrow cast rather than `any`. */
-  const rpc = supabase.rpc as unknown as (
-    fn: string, args: Record<string, unknown>,
-  ) => Promise<{ data: Array<{ email: string | null; phone: string | null }> | null; error: unknown }>;
-  const { data, error } = await rpc('get_contact', { target: userId });
-  if (error || !data || data.length === 0) return {};
-  return { email: data[0].email ?? undefined, phone: data[0].phone ?? undefined };
+  /* get_contact isn't in the generated Database types — see rpcUntyped, which
+     also explains why this must not be spelled as a cast of `supabase.rpc`.
+     Anything thrown here reaches AuthContext.loadRealProfile's Promise.all and
+     stops the profile from loading at all, so belt-and-braces: swallow. */
+  type Row = { email: string | null; phone: string | null };
+  try {
+    const { data, error } = await rpcUntyped<Row[]>('get_contact', { target: userId });
+    if (error || !data || data.length === 0) return {};
+    return { email: data[0].email ?? undefined, phone: data[0].phone ?? undefined };
+  } catch {
+    /* try/catch, not .catch() — a synchronous throw (a bad client, a module that
+       failed to load) never produces a promise for .catch to attach to, which is
+       exactly how the original bug escaped. Contact details are a nice-to-have;
+       nothing here is worth taking the profile load down with it. */
+    return {};
+  }
 }
 
 /* ── Feed cache (stale-while-revalidate) ───────────────
