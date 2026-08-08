@@ -54,6 +54,8 @@ interface ListingRow {
   /* Opportunity rate period (optional_price_and_rate_period_for_opportunities
      migration). Null on items and on opportunities that didn't say. */
   rate_period: string | null;
+  /* Upper end of a rate range; `price` is the lower end. Both optional. */
+  price_max: number | null;
   listing_type: MarketplaceItem['listingType'];
   condition: MarketplaceItem['condition'];
   price: number | null;
@@ -187,6 +189,7 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
       : (row.kind === 'opportunity' ? listingToComp(row.listing_type) : undefined),
     priceBand: (row.price_band as MarketplaceItem['priceBand']) ?? undefined,
     ratePeriod: (row.rate_period as MarketplaceItem['ratePeriod']) ?? undefined,
+    priceMax: row.price_max ?? undefined,
     listingType: row.listing_type,
     price: row.price ?? undefined,
     condition: row.condition,
@@ -366,6 +369,8 @@ export interface NewListingInput {
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000';
   /* Optional, like every other part of a paid rate. */
   ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project';
+  /* Upper end of a rate range (price = lower end). Optional. */
+  priceMax?: number;
 }
 
 export async function createListingWithMedia(input: NewListingInput): Promise<MarketplaceItem> {
@@ -403,6 +408,7 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       comp: input.kind === 'opportunity' ? (input.comp ?? 'free') : null,
       price_band: input.kind === 'opportunity' ? (input.priceBand ?? null) : null,
       rate_period: input.kind === 'opportunity' ? (input.ratePeriod ?? null) : null,
+      price_max:   input.kind === 'opportunity' ? (input.priceMax   ?? null) : null,
       listing_type: input.listingType,
       condition: input.condition,
       /* A null price on a 'sell' row is allowed and means "no number given" —
@@ -1149,6 +1155,7 @@ export interface EditListingPatch {
   comp?: 'volunteer' | 'free' | 'paid';
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000' | null;
   ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project' | null;
+  priceMax?: number | null;
 }
 
 type ListingUpdate = Database['public']['Tables']['listings']['Update'];
@@ -1170,6 +1177,7 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
   if (patch.comp !== undefined)        (update as { comp?: string }).comp = patch.comp;
   if (patch.priceBand !== undefined)   (update as { price_band?: string | null }).price_band = patch.priceBand;
   if (patch.ratePeriod !== undefined)  (update as { rate_period?: string | null }).rate_period = patch.ratePeriod;
+  if (patch.priceMax !== undefined)    (update as { price_max?: number | null }).price_max = patch.priceMax;
   if (patch.isHidden !== undefined)    update.status = patch.isHidden ? 'hidden' : 'active';
 
   const { error } = await supabase.from('listings').update(update).eq('id', id);

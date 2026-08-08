@@ -6,8 +6,9 @@ import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
 import {
-  COMP_META, COMP_OPTIONS, PRICE_BANDS, RATE_PERIODS, compToListing,
-  type Comp, type PriceBand, type RatePeriod,
+  COMP_META, COMP_OPTIONS, RATE_PERIODS, RATE_BASIS_OPTIONS,
+  compToListing, opportunityCompLabel,
+  type Comp, type RatePeriod,
 } from '../../lib/opportunity';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
@@ -54,8 +55,11 @@ export interface ShareItemForm {
      Every field below `comp` is optional: a paid gig can be posted with no
      amount, no range and no period, and reads as "Rate on ask". */
   comp: Comp;
-  priceBand?: PriceBand;
   ratePeriod?: RatePeriod;
+  /* Upper end of the rate range; `price` is the lower end. Both optional, and
+     either alone is meaningful. The old four-bucket priceBand is retired —
+     see the Rate block below. */
+  priceMax?: number;
 }
 
 const MAX_PHOTOS = 3;
@@ -77,8 +81,15 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
     setErrors(e => ({ ...e, [key]: undefined }));
   };
 
+  /* The only invalid rate is a backwards one. Caught here so the DB's
+     listings_price_max_check can never be what tells the user. */
+  const rateRangeBackwards =
+    typeof form.price === 'number' && typeof form.priceMax === 'number'
+    && form.priceMax < form.price;
+
   const validate = () => {
     const e: typeof errors = {};
+    if (rateRangeBackwards) e.priceMax = 'The second number should be the higher one.';
     if (!form.title.trim()) e.title = 'Required';
     if (!form.category) e.category = 'Pick a category';
     /* Condition is now OPTIONAL — defaults to 'good' on submit if not chosen. */
@@ -120,8 +131,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           kind: isService ? 'opportunity' : 'item',
           ...(isService ? {
             comp: form.comp,
-            priceBand:  form.comp === 'paid' ? form.priceBand  : undefined,
             ratePeriod: form.comp === 'paid' ? form.ratePeriod : undefined,
+            priceMax:   form.comp === 'paid' ? form.priceMax   : undefined,
           } : {}),
         });
       } else {
@@ -134,8 +145,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
         listing_type: isService ? (form.comp === 'paid' ? 'sell' : 'free') : (form.pricing === 'sell' ? 'sell' : 'free'),
         ...(isService ? {
           comp: form.comp,
-          price_band:  form.comp === 'paid' ? (form.priceBand  ?? null) : null,
           rate_period: form.comp === 'paid' ? (form.ratePeriod ?? null) : null,
+          has_rate_range: form.comp === 'paid' && typeof form.priceMax === 'number',
         } : {}),
         has_photos: form.photos.length > 0,
         photo_count: form.photos.length,
@@ -304,13 +315,27 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                 </button>
               ))}
             </div>
-            {/* ── Rate — every part optional ──
-                The old version led with a "Price band" label that read as a
-                required field, then an "Exact rate" input, and picking Paid
-                without filling either made the insert fail outright. Now the
-                whole block states up front that it can be skipped, an amount
-                is paired with a period so a number actually means something,
-                and every control toggles off when tapped again. */}
+            {/* ── Rate ──
+                Rebuilt on the pattern every big job platform converges on:
+                a BASIS (what the money is per) plus a RANGE (from–to). LinkedIn
+                asks for "either a salary or a salary range" and requires the pay
+                period alongside it; Indeed's guidance is the same shape
+                ("₹22–₹25/hour"); Upwork's first fork is hourly-vs-fixed, which
+                is why "Fixed for the job" is one of the basis choices rather
+                than a separate concept.
+
+                Two things we do differently, on purpose:
+                  - No dropdowns. LinkedIn puts Amount and Frequency behind two
+                    selects, which hides the options and is slow on a phone.
+                    Pills show every choice at once and toggle off when tapped.
+                  - We say out loud that a rate gets more replies. Leaving pay
+                    blank is allowed everywhere and costs the poster dearly —
+                    around 60% of people won't apply to a post with no pay — yet
+                    no platform mentions it. Still optional; just not silent.
+
+                The four fixed bands (Under ₹200 / ₹200–500 / …) are gone: they
+                couldn't express anything outside four buckets and stopped making
+                sense next to a period. Old rows carrying one still render. */}
             {form.comp === 'paid' && (
               <div style={{
                 marginTop: 12, padding: '14px 14px 16px',
@@ -319,66 +344,80 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
                   <span className="field-label" style={{ margin: 0 }}>Rate</span>
                   <span className="field-hint" style={{ fontWeight: 400, textAlign: 'right' }}>
-                    All optional — you can agree it in the comments
+                    Optional — but a rate gets more replies
                   </span>
                 </div>
 
-                {/* Amount + what it's per. Neither implies the other. */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <span aria-hidden="true" style={{
-                    fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0,
-                  }}>₹</span>
+                {/* Basis first: it makes the amounts below unambiguous. */}
+                <div className="field-hint" style={{ fontWeight: 400, marginBottom: 6 }}>Paid per</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+                  {RATE_BASIS_OPTIONS.map(id => {
+                    const meta = RATE_PERIODS.find(p => p.id === id)!;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`pill ${form.ratePeriod === id ? 'pill-active' : ''}`}
+                        aria-pressed={form.ratePeriod === id}
+                        onClick={() => setForm(f => ({ ...f, ratePeriod: f.ratePeriod === id ? undefined : id }))}
+                      >
+                        {meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* A real range. Either end alone is meaningful, so neither
+                    input requires the other. */}
+                <div className="field-hint" style={{ fontWeight: 400, marginBottom: 6 }}>
+                  {form.ratePeriod === 'project' ? 'Budget' : 'How much'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span aria-hidden="true" style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0 }}>₹</span>
                   <input
                     id="si-price"
                     type="number" inputMode="numeric" min="0"
                     className="form-input"
                     style={{ flex: 1, minWidth: 0 }}
-                    placeholder="Amount (skip if you'd rather not say)"
-                    aria-label="Rate amount (optional)"
+                    placeholder="From"
+                    aria-label="Rate from (optional)"
                     value={form.price ?? ''}
-                    onChange={e => {
-                      const n = Number(e.target.value) || undefined;
-                      /* An amount and a range are two ways of saying the same
-                         thing, so entering one clears the other. */
-                      setForm(f => ({ ...f, price: n, priceBand: n !== undefined ? undefined : f.priceBand }));
-                    }}
+                    onChange={e => update('price', Number(e.target.value) || undefined)}
+                  />
+                  <span aria-hidden="true" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>–</span>
+                  <input
+                    type="number" inputMode="numeric" min="0"
+                    className="form-input"
+                    style={{ flex: 1, minWidth: 0 }}
+                    placeholder="To"
+                    aria-label="Rate up to (optional)"
+                    value={form.priceMax ?? ''}
+                    onChange={e => update('priceMax', Number(e.target.value) || undefined)}
                   />
                 </div>
+                {rateRangeBackwards && (
+                  <span className="field-hint" style={{ color: 'var(--accent-rose)', marginTop: 6, display: 'block' }}>
+                    The second number should be the higher one.
+                  </span>
+                )}
 
-                <div className="field-hint" style={{ fontWeight: 400, marginBottom: 6 }}>Charged per</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
-                  {RATE_PERIODS.map(p => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={`pill ${form.ratePeriod === p.id ? 'pill-active' : ''}`}
-                      aria-pressed={form.ratePeriod === p.id}
-                      /* Tapping the selected one clears it — nothing here is a
-                         one-way door. */
-                      onClick={() => setForm(f => ({ ...f, ratePeriod: f.ratePeriod === p.id ? undefined : p.id }))}
-                    >
-                      {p.label.replace('Per ', '')}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="field-hint" style={{ fontWeight: 400, marginBottom: 6 }}>Or give a rough range</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                  {PRICE_BANDS.map(b => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      className={`pill ${form.priceBand === b.id ? 'pill-active' : ''}`}
-                      aria-pressed={form.priceBand === b.id}
-                      onClick={() => setForm(f => (
-                        f.priceBand === b.id
-                          ? { ...f, priceBand: undefined }
-                          : { ...f, priceBand: b.id, price: undefined }
-                      ))}
-                    >
-                      {b.label}
-                    </button>
-                  ))}
+                {/* What the card will actually say. No platform shows this, and
+                    it is the only way to know your rate reads the way you meant
+                    before you publish it. */}
+                <div style={{
+                  marginTop: 12, paddingTop: 10,
+                  borderTop: '1px solid var(--border-subtle)',
+                  fontSize: 12, color: 'var(--text-muted)',
+                }}>
+                  Shows on your post as{' '}
+                  <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+                    {opportunityCompLabel({
+                      comp: 'paid',
+                      price: form.price ?? null,
+                      priceMax: form.priceMax ?? null,
+                      ratePeriod: form.ratePeriod ?? null,
+                    })}
+                  </strong>
                 </div>
               </div>
             )}

@@ -17,10 +17,12 @@ export type PriceBand = 'under_200' | '200_500' | '500_1000' | 'over_1000';
  *  different offers, so a bare number is close to meaningless on its own. */
 export type RatePeriod = 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project';
 
-/** Minimal shape the label helpers need — MarketplaceItem satisfies it. */
+/** Minimal shape the label helpers need — MarketplaceItem satisfies it.
+ *  `price` is the FROM end of a range and `priceMax` the optional TO end. */
 export interface CompShape {
   comp?: Comp | null;
   price?: number | null;
+  priceMax?: number | null;
   priceBand?: PriceBand | null;
   ratePeriod?: RatePeriod | null;
 }
@@ -45,16 +47,29 @@ export const PRICE_BANDS: { id: PriceBand; label: string }[] = [
 
 /** Ordered roughly by how often a campus gig uses them: an hour or a session
  *  for tutoring and repairs, a month for an internship, a project for design
- *  and photography work. */
+ *  and photography work.
+ *
+ *  `label` is the picker's wording; `short` is the suffix on a card. Note
+ *  'project' reads as "Fixed for the job" rather than "Per project" — on every
+ *  freelance platform the first fork is hourly-vs-fixed (Upwork's two contract
+ *  types), and "fixed" is what people call it. */
 export const RATE_PERIODS: { id: RatePeriod; label: string; short: string }[] = [
-  { id: 'hour',    label: 'Per hour',    short: '/hr' },
-  { id: 'session', label: 'Per session', short: '/session' },
-  { id: 'day',     label: 'Per day',     short: '/day' },
-  { id: 'week',    label: 'Per week',    short: '/week' },
-  { id: 'month',   label: 'Per month',   short: '/month' },
-  { id: 'year',    label: 'Per year',    short: '/year' },
-  { id: 'project', label: 'Per project', short: '/project' },
+  { id: 'hour',    label: 'Hour',              short: '/hr' },
+  { id: 'session', label: 'Session',           short: '/session' },
+  { id: 'day',     label: 'Day',               short: '/day' },
+  { id: 'week',    label: 'Week',              short: '/week' },
+  { id: 'month',   label: 'Month',             short: '/month' },
+  { id: 'year',    label: 'Year',              short: '/year' },
+  { id: 'project', label: 'Fixed for the job', short: ' fixed' },
 ];
+
+/** What the picker actually offers. 'year' stays valid in the type and the DB
+ *  (older rows and the label path still handle it) but isn't offered: a student
+ *  gig priced by the year is an internship stipend, i.e. Month. Six options fit
+ *  two tidy rows of pills — no dropdown, which hides the choices and is slow to
+ *  operate on a phone. */
+export const RATE_BASIS_OPTIONS: RatePeriod[] =
+  ['hour', 'session', 'day', 'week', 'month', 'project'];
 
 export function priceBandLabel(b?: PriceBand | null): string | null {
   return PRICE_BANDS.find(x => x.id === b)?.label ?? null;
@@ -70,9 +85,30 @@ export function ratePeriodLabel(p?: RatePeriod | null): string | null {
   return RATE_PERIODS.find(x => x.id === p)?.label ?? null;
 }
 
-/** True only when the opportunity carries an exact numeric rate (renders a ₹). */
+/** True when the opportunity carries any numeric rate at all (renders a ₹) —
+ *  either end of the range counts. */
 export function opportunityHasExactPrice(o: CompShape): boolean {
-  return o.comp === 'paid' && typeof o.price === 'number';
+  return o.comp === 'paid' && (typeof o.price === 'number' || typeof o.priceMax === 'number');
+}
+
+const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
+/** The money part of a paid opportunity, period excluded. Null when no number
+ *  was given at all. Every partial combination is legitimate — a poster may
+ *  know their floor, their ceiling, both, or neither. */
+export function rateAmountLabel(o: CompShape): string | null {
+  const from = typeof o.price    === 'number' ? o.price    : null;
+  const to   = typeof o.priceMax === 'number' ? o.priceMax : null;
+  /* One ₹ for a range, not two: "₹200–500" rather than "₹200–₹500". The cards
+     are ~190px wide and Indian digit grouping is already long
+     ("₹1,50,000–₹2,00,000/month" doesn't fit; the single-symbol form does). */
+  if (from !== null && to !== null) {
+    return from === to ? inr(from) : `${inr(from)}–${to.toLocaleString('en-IN')}`;
+  }
+  if (from !== null) return inr(from);
+  if (to !== null)   return `Up to ${inr(to)}`;
+  /* Fall back to a legacy band (retired from the forms, still rendered). */
+  return priceBandLabel(o.priceBand);
 }
 
 /** The compensation label shown in the price slot on cards + detail.
@@ -84,14 +120,13 @@ export function opportunityCompLabel(o: CompShape): string {
   if (o.comp === 'volunteer') return 'Volunteer';
   if (o.comp === 'free')      return 'Free';
   /* paid (default when comp is absent but listing came through as sell) */
-  const per = ratePeriodSuffix(o.ratePeriod);
-  if (typeof o.price === 'number') return `₹${o.price.toLocaleString('en-IN')}${per}`;
-  const band = priceBandLabel(o.priceBand);
-  if (band) return `${band}${per}`;
-  /* No number at all. If they at least said "per month", that's still useful
-     signal, so keep it rather than flattening to a bare "Rate on ask". */
+  const amount = rateAmountLabel(o);
+  if (amount) return `${amount}${ratePeriodSuffix(o.ratePeriod)}`;
+  /* No number at all — which is a legitimate way to post. If they at least
+     said what it's charged against, keep that: it's real information. */
+  if (o.ratePeriod === 'project') return 'Fixed rate on ask';
   const label = ratePeriodLabel(o.ratePeriod);
-  return label ? `Rate on ask · ${label.toLowerCase()}` : 'Rate on ask';
+  return label ? `Rate on ask · per ${label.toLowerCase()}` : 'Rate on ask';
 }
 
 /** Past-tense ribbon label for a completed opportunity. */

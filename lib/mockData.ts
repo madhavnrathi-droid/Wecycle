@@ -148,6 +148,9 @@ export interface MarketplaceItem {
      a month. Always optional: NULL/absent means the poster didn't say, which
      is a legitimate answer and never blocks posting. */
   ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project';
+  /* Upper end of a rate range; `price` is the lower end. Either end alone is
+     valid ("₹300", "Up to ₹500"), as is neither ("Rate on ask"). */
+  priceMax?: number;
   /* True when this card is a community *request* (someone wanting something)
      rather than a listing (someone offering). Drives the "Wanted" chip +
      "Respond / I can help" action instead of a price + listing-type verb. */
