@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
 import { Wordmark } from './Brand';
 import {
   MARKETPLACE_ITEMS, OPPORTUNITIES, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
@@ -24,7 +24,6 @@ import { getSettings, onSettingsChange } from '../lib/settings';
 import { getBlockedUserIds, onBlocksChange } from '../lib/moderation';
 import { track, trackPostOpened, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
-import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
@@ -63,11 +62,10 @@ export default function FeedScreen({
   }, []);
 
   const [activeCategory, setActiveCategory] = useState('all');
-  /* Default tab = "All" — a chronological mix of every Wecycle activity
-     (shared items, requests, events, lost-found). FeedScreen unmounts when
-     the user navigates to another bottom-nav screen, so the next visit
-     reseeds this default — that's the "every new session starts on All"
-     behaviour. */
+  /* Default tab = "All" — the storefront view (themed rails). FeedScreen
+     unmounts when the user navigates to another bottom-nav screen, so the
+     next visit reseeds this default — that's the "every new session starts
+     on the storefront" behaviour. */
   const [activeType, setActiveType] = useState<'all' | 'requests' | 'shared' | 'services'>('all');
   const [query, setQuery] = useState('');
   /* Saved-listing IDs for the heart icon's filled state. Hydrated from
@@ -172,7 +170,7 @@ export default function FeedScreen({
     return () => { cancelled = true; off(); };
   }, [mounted, user]);
 
-  /* Single toggle handler shared by every FeedCard. Optimistically flips
+  /* Single toggle handler shared by every card. Optimistically flips
      the local set, fires the Supabase RPC, and reverts on failure. Demo
      mode skips the RPC and just keeps the local heart state. */
   const handleToggleSave = (listingId: string) => {
@@ -231,8 +229,8 @@ export default function FeedScreen({
     return () => clearTimeout(t);
   }, [query, mounted]);
 
-  /* The active tab decides which pool we render:
-       - 'all'      → mixed feed of items + requests + events + L&F by recency
+  /* The active tab decides which pool the GRID view renders (the storefront
+     rails on the All tab ignore this and pull from every pool directly):
        - 'requests' → open requests only
        - 'shared'   → marketplace listings only (the "Shared" tab)
        - 'services' → service opportunities only */
@@ -247,12 +245,11 @@ export default function FeedScreen({
     return true;
   });
 
-  /* ── "All" tab entries ──────────────────────────────
-     Mix every content type into a single masonry, ordered by recency. The
-     discriminated union lets the renderer pick the right tile component
-     per kind. Each entry carries a sortKey so we can interleave items
-     chronologically; live rows have real timestamps, demo rows fall back
-     to a positional sort. */
+  /* ── "All" tab GRID entries (shown when a category/search narrows the
+     storefront) ──────────────────────────────────────────────────────
+     Mix every content type into a single list, ordered by recency. The
+     discriminated union lets the renderer pick the right card component
+     per kind. */
   type AllEntry =
     | { kind: 'item';        item: MarketplaceItem;    sortKey: number }
     | { kind: 'opportunity'; item: MarketplaceItem;    sortKey: number }
@@ -283,21 +280,14 @@ export default function FeedScreen({
 
     const merged = [...itemEntries, ...opportunityEntries, ...requestEntries, ...eventEntries, ...lfEntries];
 
-    /* Filter by category + query — events / L&F skip the category filter
-       since they don't carry one, but they still honour the title query. */
+    /* Filter by category + query — events skip the category filter since
+       they don't carry one, but they still honour the title query. */
     const matchesQuery = (t: string) => !query || t.toLowerCase().includes(query.toLowerCase());
     const matchesCategory = (cat?: string) =>
       activeCategory === 'all' || (cat ?? '').toLowerCase() === activeCategory;
 
     return merged
       .filter(e => {
-        /* Every kind now respects the active category chip. Items, requests
-         * and Lost & Found posts carry a category, so they appear only under
-         * their own chip (and under "All"). Events have no category, so they
-         * surface only under "All" — never mislabeled inside a goods chip.
-         * A category-less L&F post likewise shows only under "All" instead of
-         * leaking into every chip (the bug where a lost football and a speaker
-         * showed up under "Books"). */
         if (e.kind === 'item')        return matchesCategory(e.item.category) && matchesQuery(e.item.title);
         if (e.kind === 'opportunity') return matchesCategory(e.item.category) && matchesQuery(e.item.title);
         if (e.kind === 'request')     return matchesCategory(e.item.category) && matchesQuery(e.item.title);
@@ -308,6 +298,91 @@ export default function FeedScreen({
   }, [items, opportunities, requests, events, lostFound, activeCategory, query, blocked]);
 
   const greetingName = (profile?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0];
+
+  /* ── Storefront rails (the "All" home view) ─────────────────────────
+     Segregate the mixed feed into themed, horizontally-scrolling rows —
+     an e-commerce storefront rather than a Pinterest wall. Each rail is
+     computed from the already-loaded pools, filtered for blocks + closed
+     posts, and only rendered when it has enough to fill a row. */
+  const liveItems    = items.filter(it => !blocked.has(it.user.id) && !it.isClosed);
+  const freshItems   = useMemo(
+    () => [...liveItems].sort((a, b) => a.postedDaysAgo - b.postedDaysAgo).slice(0, 12),
+    [liveItems],
+  );
+  const freeItems    = liveItems.filter(it => it.listingType === 'free').slice(0, 12);
+  const openRequests = requests.filter(it => !blocked.has(it.user.id) && !it.isClosed).slice(0, 12);
+  const services     = opportunities.filter(it => !blocked.has(it.user.id) && !it.isClosed).slice(0, 12);
+  const upcoming     = events.filter(ev => !blocked.has(ev.organizer.id)).slice(0, 12);
+  const lostItems    = lostFound.filter(lf => !blocked.has(lf.user.id) && lf.status === 'lost');
+  const foundItems   = lostFound.filter(lf => !blocked.has(lf.user.id) && lf.status === 'found').slice(0, 12);
+  const itemsByCat   = (cat: string) => liveItems.filter(it => (it.category || '').toLowerCase() === cat).slice(0, 12);
+
+  /* Category rails, each with its own bit of copy. Only the ones with a
+     couple of items to show survive — a rail of one looks broken. */
+  const CATEGORY_RAILS = [
+    { id: 'furniture',   title: 'Dorm glow-up',       sub: 'Desks, chairs, the whole set-up' },
+    { id: 'electronics', title: 'Gently-used gadgets', sub: 'Half the price, all the specs' },
+    { id: 'books',       title: 'Passed-down reads',   sub: 'Someone survived this syllabus' },
+    { id: 'sports',      title: 'Game on',             sub: 'Gear after a second player' },
+    { id: 'kitchen',     title: 'Midnight-Maggi kit',  sub: 'Kettles, pans, mugs and more' },
+    { id: 'tools',       title: 'Borrow the toolbox',  sub: 'Fix it without buying it' },
+  ] as const;
+  const categoryRails = CATEGORY_RAILS
+    .map(r => ({ ...r, list: itemsByCat(r.id) }))
+    .filter(r => r.list.length >= 2);
+
+  /* Storefront when nothing is narrowing the view; a product grid the
+     moment a category, a type tab, or a search takes over. */
+  const showStorefront = activeType === 'all' && activeCategory === 'all' && !query.trim();
+  const railCount =
+    (lostItems.length ? 1 : 0) + (foundItems.length ? 1 : 0) +
+    (freshItems.length >= 3 ? 1 : 0) + (freeItems.length >= 2 ? 1 : 0) +
+    categoryRails.length + (openRequests.length ? 1 : 0) +
+    (services.length ? 1 : 0) + (upcoming.length ? 1 : 0);
+
+  /* One card renderer for every marketplace-shaped post (item / request /
+     opportunity), so rails and the grid stay visually identical. */
+  const renderProduct = (
+    it: MarketplaceItem,
+    source: string,
+    badgeKind?: 'request' | 'opportunity' | 'free',
+    key?: string,
+  ) => (
+    <ProductCard
+      key={key}
+      item={it}
+      isSaved={savedIds.has(it.id)}
+      hidePrice={hidePrice}
+      badgeKind={badgeKind}
+      onToggleSave={() => handleToggleSave(it.id)}
+      onClick={() => { trackPostOpened('item', it.id, { source, is_request: !!it.isRequest }); onOpenItem(it); }}
+    />
+  );
+
+  /* Grid renderer for a mixed All-tab entry (used when a filter narrows the
+     storefront into a product grid). */
+  const renderEntry = (entry: AllEntry) => {
+    if (entry.kind === 'item' || entry.kind === 'request' || entry.kind === 'opportunity') {
+      const badge = entry.kind === 'request' ? 'request' : entry.kind === 'opportunity' ? 'opportunity' : undefined;
+      return renderProduct(entry.item, 'feed_all', badge, `${entry.kind}-${entry.item.id}`);
+    }
+    if (entry.kind === 'event') {
+      return (
+        <EventCard
+          key={`event-${entry.event.id}`}
+          event={entry.event}
+          onClick={() => { trackPostOpened('event', entry.event.id, { source: 'feed_all' }); onOpenEvent?.(entry.event); }}
+        />
+      );
+    }
+    return (
+      <LostFoundCard
+        key={`lf-${entry.lf.id}`}
+        lf={entry.lf}
+        onClick={() => { trackPostOpened('lostfound', entry.lf.id, { source: 'feed_all', lf_status: entry.lf.status }); onOpenLF?.(entry.lf); }}
+      />
+    );
+  };
 
   /* Marketing banner slides — promote each Wecycle use case to first-time
      visitors. Hand-drawn / abstract aesthetic: each card uses a Wecycle
@@ -423,9 +498,6 @@ export default function FeedScreen({
 
       {/* ── GREETING + MARKETING BANNER + DESKTOP-INLINE SEARCH ── */}
       <section className="feed-greeting-row" style={{ padding: '14px 20px 16px' }}>
-        {/* Greeting text + live-counter widget sit side-by-side at equal
-            height. On very narrow screens (<380 px) they stack vertically via
-            flex-wrap — the widget takes a full row of its own. */}
         <div style={{
           display: 'flex',
           flexDirection: 'row',
@@ -437,8 +509,6 @@ export default function FeedScreen({
         }}
           className="feed-greeting-text"
         >
-          {/* Left: greeting text block — centered vertically so it reads level
-              with the counter widget beside it. */}
           <div style={{ minWidth: 0, flexShrink: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <h1 style={{
               margin: 0,
@@ -492,17 +562,12 @@ export default function FeedScreen({
         </div>
       </section>
 
-      {/* ── MOBILE MARKETING BANNER ──
-         Wide variant sized down for mobile. Sits BETWEEN the greeting and
-         the search bar so it reads like a hero strip. Hidden on desktop —
-         the desktop mount below the search row takes over there. */}
+      {/* ── MOBILE MARKETING BANNER ── */}
       <section className="marketing-banner-mount-mobile" style={{ padding: '0 16px 16px' }}>
         <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
 
-      {/* ── DESKTOP MARKETING BANNER ──
-         Full-width on desktop now that the live-activity counter is gone.
-         Mobile uses the separate banner mount above. */}
+      {/* ── DESKTOP MARKETING BANNER ── */}
       <section className="marketing-banner-mount-desktop" style={{ padding: '0 16px 20px' }}>
         <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
@@ -538,9 +603,7 @@ export default function FeedScreen({
         </div>
       </section>
 
-      {/* ── USER SEARCH RESULTS ──
-         Appears above the tabs whenever the query yields one or more user
-         matches. Clicking a card opens that user's storefront. */}
+      {/* ── USER SEARCH RESULTS ── */}
       <UserSearchResults
         results={userHits}
         query={query}
@@ -548,9 +611,7 @@ export default function FeedScreen({
         onPick={(hit) => { track(EVT.user_card_opened, { user_id: hit.id, source: 'feed_search' }); onOpenUser?.(hit.id); }}
       />
 
-      {/* ── PILL TABS: all / requests / shared / services & opportunities ──
-         Scrollable variant: the last tab's label is long, so the row scrolls
-         horizontally on narrow screens instead of squashing every tab. */}
+      {/* ── TYPE TABS: all / requests / shared / services & opportunities ── */}
       <section style={{ padding: '0 16px 14px' }}>
         <div className="segmented segmented--scroll">
           <button
@@ -584,10 +645,7 @@ export default function FeedScreen({
         </div>
       </section>
 
-      {/* ── SAVED SEARCH / NOTIFY-ME (Requests tab only) ──
-         Lets a student say "ping me when a cycle is posted" and shows a live
-         banner when open requests already match — the retention hook for a
-         board that's empty more often than not early on. */}
+      {/* ── SAVED SEARCH / NOTIFY-ME (Requests tab only) ── */}
       {activeType === 'requests' && (
         <SavedSearchBar
           requests={requests}
@@ -596,190 +654,303 @@ export default function FeedScreen({
         />
       )}
 
-      {/* ── CATEGORY CHIPS ── */}
-      <section style={{ padding: '0 0 12px' }}>
-        <div className="chip-row">
-          {CATEGORIES.slice(0, 7).map(cat => (
+      {/* ── CATEGORY TILES ──
+         E-commerce-style shortcut strip. Tapping a tile filters the whole
+         page down to that category (which flips the storefront into a
+         product grid); "All" brings the storefront back. */}
+      <section style={{ padding: '2px 0 16px' }}>
+        <div className="cat-strip">
+          {CATEGORIES.map(cat => (
             <button
               key={cat.id}
+              type="button"
+              className="cat-tile"
+              data-active={activeCategory === cat.id || undefined}
               onClick={() => { setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id }); }}
-              className={`pill ${activeCategory === cat.id ? 'pill-active' : ''}`}
             >
-              {cat.label}
+              <span className="cat-tile-ico" aria-hidden="true">{cat.icon}</span>
+              <span className="cat-tile-label">{cat.label}</span>
             </button>
           ))}
         </div>
       </section>
 
-      {/* ── MASONRY (Pinterest-style waterfall) ──
-         Tight side padding so the grid reads as edge-to-edge on desktop —
-         the .app-container already gives us the outer gutter. The "All" tab
-         renders a mixed feed (items + requests + events + L&F); other tabs
-         render their dedicated pool. */}
-      <section className="masonry-shell" style={{ padding: '0 8px' }}>
-        <div className="masonry-2">
-          {activeType === 'all'
-            ? allEntries.map((entry, idx) => {
-                /* Cycle aspect-ratio variants so the masonry stays
-                   irregular and the user's eye keeps moving. */
-                const variant = (['xtall','tall','portrait','square','landscape'] as const)[idx % 5];
-                if (entry.kind === 'item' || entry.kind === 'request' || entry.kind === 'opportunity') {
-                  const it = entry.item;
-                  return (
-                    <FeedCard
-                      key={`${entry.kind}-${it.id}`}
-                      item={it}
-                      variant={variant}
-                      isSaved={savedIds.has(it.id)}
-                      hidePrice={hidePrice}
-                      /* Colour-code every post-type at a glance: marketplace +
-                         requests green, opportunities (services) violet, events
-                         purple, L&F amber. */
-                      strokeKind={entry.kind === 'request' ? 'request' : entry.kind === 'opportunity' ? 'opportunity' : 'marketplace'}
-                      onToggleSave={() => handleToggleSave(it.id)}
-                      onClick={() => { trackPostOpened('item', it.id, { source: 'feed_all', is_request: !!it.isRequest }); onOpenItem(it); }}
-                    />
-                  );
-                }
-                if (entry.kind === 'event') {
-                  return (
-                    <EventFeedCard
-                      key={`event-${entry.event.id}`}
-                      event={entry.event}
-                      variant={variant}
-                      onClick={() => { trackPostOpened('event', entry.event.id, { source: 'feed_all' }); onOpenEvent?.(entry.event); }}
-                    />
-                  );
-                }
+      {showStorefront ? (
+        /* ══ STOREFRONT: themed rails ══ */
+        <div className="storefront">
+          {loading && railCount === 0 && (
+            <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
+              Setting up the storefront…
+            </div>
+          )}
+
+          {/* LOST — slow auto-scrolling loop so it takes zero effort to spot yours */}
+          {lostItems.length > 0 && (
+            <section className="rail">
+              <div className="rail-head">
+                <div style={{ minWidth: 0 }}>
+                  <h2 className="rail-title">Lost on campus 👀</h2>
+                  <p className="rail-sub">No effort needed — just glance as it drifts by</p>
+                </div>
+                <button type="button" className="rail-seeall" onClick={() => onBannerAction?.('lost-found')}>
+                  All lost <ChevronRight size={14} strokeWidth={2.2} />
+                </button>
+              </div>
+              <LostMarquee
+                items={lostItems}
+                onOpen={lf => { trackPostOpened('lostfound', lf.id, { source: 'feed_lost_marquee', lf_status: lf.status }); onOpenLF?.(lf); }}
+              />
+            </section>
+          )}
+
+          {/* FOUND — its own row */}
+          {foundItems.length > 0 && (
+            <Rail title="Found & waiting 🙌" sub="Someone’s looking for these — is one yours?" onSeeAll={() => onBannerAction?.('lost-found')}>
+              {foundItems.map(lf => (
+                <div className="rail-item" key={lf.id}>
+                  <LostFoundCard lf={lf} onClick={() => { trackPostOpened('lostfound', lf.id, { source: 'feed_found_rail', lf_status: lf.status }); onOpenLF?.(lf); }} />
+                </div>
+              ))}
+            </Rail>
+          )}
+
+          {/* JUST DROPPED — newest shared items */}
+          {freshItems.length >= 3 && (
+            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" onSeeAll={() => setActiveType('shared')}>
+              {freshItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_fresh')}</div>)}
+            </Rail>
+          )}
+
+          {/* FREE */}
+          {freeItems.length >= 2 && (
+            <Rail title="Free & up for grabs 🎁" sub="₹0. Yes, really." onSeeAll={() => setActiveType('shared')}>
+              {freeItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_free', 'free')}</div>)}
+            </Rail>
+          )}
+
+          {/* CATEGORY RAILS */}
+          {categoryRails.map(r => (
+            <Rail key={r.id} title={r.title} sub={r.sub} onSeeAll={() => { setActiveCategory(r.id); track(EVT.category_filter_changed, { category: r.id }); }}>
+              {r.list.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, `feed_cat_${r.id}`)}</div>)}
+            </Rail>
+          ))}
+
+          {/* WANTED (requests) */}
+          {openRequests.length > 0 && (
+            <Rail title="Wanted on campus 🙋" sub="Got one gathering dust? Make someone’s week." onSeeAll={() => setActiveType('requests')}>
+              {openRequests.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_requests', 'request')}</div>)}
+            </Rail>
+          )}
+
+          {/* SERVICES */}
+          {services.length > 0 && (
+            <Rail title="Skills for hire 🛠️" sub="Tutors, fixers, photographers — your people" onSeeAll={() => setActiveType('services')}>
+              {services.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_services', 'opportunity')}</div>)}
+            </Rail>
+          )}
+
+          {/* EVENTS */}
+          {upcoming.length > 0 && (
+            <Rail title="Happening soon 📅" sub="RSVP in a tap" onSeeAll={() => onBannerAction?.('events')}>
+              {upcoming.map(ev => (
+                <div className="rail-item" key={ev.id}>
+                  <EventCard event={ev} onClick={() => { trackPostOpened('event', ev.id, { source: 'feed_events_rail' }); onOpenEvent?.(ev); }} />
+                </div>
+              ))}
+            </Rail>
+          )}
+
+          {!loading && railCount === 0 && (
+            <EmptyState
+              prompt="Looks like the feed's just sprouting. Be the first to share something!"
+              sub="Post a free find, a borrow request, or an event — your community's waiting."
+              cta={{ label: 'Post the first thing', onClick: onPost }}
+            />
+          )}
+        </div>
+      ) : (
+        /* ══ PRODUCT GRID: category / search / focused tab ══ */
+        <section className="pgrid-shell">
+          <div className="pgrid">
+            {activeType === 'all'
+              ? allEntries.map(entry => renderEntry(entry))
+              : filtered.map(item => renderProduct(
+                  item,
+                  `feed_${activeType}`,
+                  activeType === 'requests' ? 'request' : activeType === 'services' ? 'opportunity' : undefined,
+                  item.id,
+                ))}
+          </div>
+
+          {(() => {
+            const isAll = activeType === 'all';
+            const visibleCount = isAll ? allEntries.length : filtered.length;
+            const poolCount    = isAll
+              ? items.length + opportunities.length + requests.length + events.length + lostFound.length
+              : source.length;
+
+            if (loading && visibleCount === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
+                  Loading the feed…
+                </div>
+              );
+            }
+            if (visibleCount > 0) return null;
+
+            if (poolCount === 0) {
+              if (activeType === 'requests') {
                 return (
-                  <LostFoundFeedCard
-                    key={`lf-${entry.lf.id}`}
-                    lf={entry.lf}
-                    variant={variant}
-                    onClick={() => { trackPostOpened('lostfound', entry.lf.id, { source: 'feed_all', lf_status: entry.lf.status }); onOpenLF?.(entry.lf); }}
+                  <EmptyState
+                    icon="🙋"
+                    prompt="No open requests yet. Need something? Ask away!"
+                    sub="Posting a request is usually faster (and cheaper) than buying new."
+                    cta={{ label: 'Post a request', onClick: onPost }}
                   />
                 );
-              })
-            : filtered.map((item, idx) => (
-              <FeedCard
-                key={item.id}
-                item={item}
-                variant={(['xtall','tall','portrait','square','landscape'] as const)[idx % 5]}
-                isSaved={savedIds.has(item.id)}
-                hidePrice={hidePrice}
-                onToggleSave={() => handleToggleSave(item.id)}
-                onClick={() => { trackPostOpened('item', item.id, { source: `feed_${activeType}`, is_request: !!item.isRequest }); onOpenItem(item); }}
-              />
-            ))}
-        </div>
-
-        {(() => {
-          /* Decide which "is this empty?" pipeline to use for the empty
-             state. The "All" tab merges 4 sources, so we check the merged
-             entries; other tabs check their single source/filtered pair. */
-          const isAll = activeType === 'all';
-          const visibleCount = isAll ? allEntries.length : filtered.length;
-          const poolCount    = isAll
-            ? items.length + opportunities.length + requests.length + events.length + lostFound.length
-            : source.length;
-
-          if (loading && visibleCount === 0) {
-            return (
-              <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
-                Loading the feed…
-              </div>
-            );
-          }
-          if (visibleCount > 0) return null;
-
-          if (poolCount === 0) {
-            /* Truly empty pool — first-mover prompt, tab-aware copy. */
-            if (activeType === 'requests') {
+              }
+              if (activeType === 'services') {
+                return (
+                  <EmptyState
+                    icon="🛠️"
+                    prompt="Nothing here yet. Got a skill or some time to give?"
+                    sub="Tutoring, repairs, photography, or rallying volunteers — paid or free, offer it to your community."
+                    cta={{ label: 'Offer a service', onClick: onPost }}
+                  />
+                );
+              }
               return (
                 <EmptyState
-                  icon="🙋"
-                  prompt="No open requests yet. Need something? Ask away!"
-                  sub="Posting a request is usually faster (and cheaper) than buying new."
-                  cta={{ label: 'Post a request', onClick: onPost }}
+                  prompt="Looks like the feed's just sprouting. Be the first to share something!"
+                  sub="Post a free find, a borrow request, or an event — your community's waiting."
+                  cta={{ label: 'Post the first thing', onClick: onPost }}
                 />
               );
             }
-            if (activeType === 'services') {
-              return (
-                <EmptyState
-                  icon="🛠️"
-                  prompt="Nothing here yet. Got a skill or some time to give?"
-                  sub="Tutoring, repairs, photography, or rallying volunteers — paid or free, offer it to your community."
-                  cta={{ label: 'Offer a service', onClick: onPost }}
-                />
-              );
-            }
+
+            /* Filter / search returned no rows — softer "no match" copy. */
             return (
               <EmptyState
-                prompt="Looks like the feed's just sprouting. Be the first to share something!"
-                sub="Post a free find, a borrow request, or an event — your community's waiting."
-                cta={{ label: 'Post the first thing', onClick: onPost }}
+                icon="🔍"
+                prompt="No matches for that search."
+                sub="Try a different keyword or tap “All” to clear the category."
+                compact
               />
             );
-          }
-
-          /* Filter / search returned no rows — softer "no match" copy. */
-          return (
-            <EmptyState
-              icon="🔍"
-              prompt="No matches for that search."
-              sub="Try a different keyword or clear the category filter."
-              compact
-            />
-          );
-        })()}
-      </section>
+          })()}
+        </section>
+      )}
     </div>
   );
 }
 
-/* ── CARD ──────────────────────────────────────── */
+/* ── Layout: a themed horizontal rail ─────────────────── */
+function Rail({
+  title, sub, onSeeAll, children,
+}: { title: string; sub: string; onSeeAll?: () => void; children: React.ReactNode }) {
+  return (
+    <section className="rail">
+      <div className="rail-head">
+        <div style={{ minWidth: 0 }}>
+          <h2 className="rail-title">{title}</h2>
+          <p className="rail-sub">{sub}</p>
+        </div>
+        {onSeeAll && (
+          <button type="button" className="rail-seeall" onClick={onSeeAll}>
+            See all <ChevronRight size={14} strokeWidth={2.2} />
+          </button>
+        )}
+      </div>
+      <div className="rail-track">{children}</div>
+    </section>
+  );
+}
 
-type FeedCardVariant = 'xtall' | 'tall' | 'portrait' | 'square' | 'landscape';
+/* ── The Lost marquee: a slow, seamless auto-scroll loop ──
+   Lost items drift past on their own so nobody has to actively hunt for
+   what they lost. Two identical copies of the list sit side by side; the
+   track translates left by exactly one copy's width and repeats, so the
+   seam is invisible. Speed is held constant (px/sec) regardless of how
+   many items there are, and pauses on hover/focus. `prefers-reduced-motion`
+   turns it into an ordinary scroll strip. */
+function LostMarquee({ items, onOpen }: { items: LostItem[]; onOpen: (lf: LostItem) => void }) {
+  const firstRef = useRef<HTMLDivElement | null>(null);
+  const secondRef = useRef<HTMLDivElement | null>(null);
+  const [vars, setVars] = useState<React.CSSProperties>({});
 
-const VARIANT_RATIOS: Record<FeedCardVariant, string> = {
-  xtall:     '0.58',   /* ~3:5  — dramatic vertical */
-  tall:      '0.72',   /* ~4:5.5 */
-  portrait:  '0.82',
-  square:    '1.00',
-  landscape: '1.20',   /* short, wide-ish */
-};
+  /* Repeat the base list until a single copy is wide enough to fill a phone,
+     so short lists (1–2 lost items) still loop without a visible gap. */
+  const reps = Math.max(1, Math.ceil(8 / Math.max(1, items.length)));
+  const loop = Array.from({ length: reps }).flatMap((_, r) =>
+    items.map((lf, i) => ({ lf, key: `${r}-${i}-${lf.id}` })),
+  );
 
-function FeedCard({
-  item, variant, isSaved, onToggleSave, onClick, hidePrice, strokeKind,
+  useEffect(() => {
+    const measure = () => {
+      const a = firstRef.current, b = secondRef.current;
+      if (!a || !b) return;
+      /* offsetLeft is layout-space (unaffected by the running transform), so
+         the gap between the two copies IS one copy's width — exactly the
+         distance to translate for a seamless loop. */
+      const dist = b.offsetLeft - a.offsetLeft;
+      if (dist <= 0) return;
+      const SPEED = 26; /* px per second — slow and ambient */
+      setVars({
+        ['--loop']: `-${dist}px`,
+        ['--dur']: `${Math.max(24, Math.round(dist / SPEED))}s`,
+      } as React.CSSProperties);
+    };
+    measure();
+    let ro: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined' && firstRef.current) {
+      ro = new ResizeObserver(measure);
+      ro.observe(firstRef.current);
+    }
+    return () => ro?.disconnect();
+  }, [loop.length]);
+
+  return (
+    <div className="lost-marquee">
+      <div className="lost-marquee-track" style={vars}>
+        <div className="lost-marquee-copy" ref={firstRef}>
+          {loop.map(({ lf, key }) => (
+            <div className="lost-marquee-item" key={`a-${key}`}>
+              <LostFoundCard lf={lf} onClick={() => onOpen(lf)} />
+            </div>
+          ))}
+        </div>
+        <div className="lost-marquee-copy" ref={secondRef} aria-hidden="true">
+          {loop.map(({ lf, key }) => (
+            <div className="lost-marquee-item" key={`b-${key}`}>
+              <LostFoundCard lf={lf} onClick={() => onOpen(lf)} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Product card — the one uniform card, used in every rail and the grid ──
+   Image on top, then title, price, and location beneath on a solid card:
+   the e-commerce shape, not the Pinterest photo-with-overlay. Handles
+   items, requests and service opportunities (the price line + badge adapt). */
+function ProductCard({
+  item, isSaved, onToggleSave, onClick, hidePrice, badgeKind,
 }: {
   item: MarketplaceItem;
-  variant: FeedCardVariant;
   isSaved: boolean;
   onToggleSave: () => void;
   onClick: () => void;
-  /** Settings → Marketplace → "Hide prices on feed" — when true we still
-   *  show the listing type chip (Free / Borrow / Swap) but suppress numbers. */
   hidePrice: boolean;
-  /** When set, paints a coloured stroke around the card. Used on the
-   *  All-tab feed to colour-code listings + requests (green), opportunities
-   *  (violet), events (purple) and L&F (amber). Undefined on the dedicated
-   *  tabs so they're not redundantly stroked. */
-  strokeKind?: 'marketplace' | 'request' | 'opportunity';
+  /** Small corner badge, shown when the card sits in a mixed context (the
+   *  grid, or a rail whose theme isn't already the answer). */
+  badgeKind?: 'request' | 'opportunity' | 'free';
 }) {
-  /* Use the media (photo+video) gallery so cards autoplay videos inline
-     when the user swipes to a video slide. Real listings carry their own
-     uploaded URLs; mock items fall back to the hardcoded sets. */
-  const photos = resolveItemMedia(item);
-  const hasMedia = photos.length > 0;
+  const cover = coverImage(item);
   const isPriced = item.listingType === 'sell' && typeof item.price === 'number';
-  const ar = VARIANT_RATIOS[variant];
-
   const isOpportunity = item.kind === 'opportunity';
 
-  /* Build the price/status label once so both layouts (image + text-only)
-     stay in sync. Opportunities frame the slot as compensation: Volunteer /
-     Free / ₹rate / a price band / "Rate on ask". */
   const priceLabel = item.isRequest
     ? (item.urgent ? 'Urgent' : 'Wanted')
     : isOpportunity
@@ -790,282 +961,137 @@ function FeedCard({
     : item.listingType === 'free'                   ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
 
-  /* ── Text-only card ──
-     When a post has no media we render a plain card with a clear hierarchy
-     instead of stretching an empty image frame. The title is the biggest
-     element, followed by the author's name + small avatar, then the
-     description, and finally the location/price meta on the footer line.
-     This is what the user spec'd: "name biggest, then person, description
-     last; plain card if no image". */
-  if (!hasMedia) {
-    /* No aspect-ratio for text-only — the card sizes to its content
-       (with a small min-height so very short text still feels card-like).
-       This is what fixes the "huge empty space below the text" issue:
-       columns in the masonry pack tightly around shorter cards. */
-    return (
-      <article
-        className="feed-card feed-card--text"
-        data-stroke={strokeKind}
-        data-closed={item.isClosed || undefined}
-        style={{ padding: 0, position: 'relative', overflow: 'hidden' }}
-      >
-        {item.isClosed && (
-          <span className="feed-card-closed-ribbon" aria-hidden="true">{closedLabelFor(item)}</span>
-        )}
-        {strokeKind && (
-          <span
-            className="feed-card-type-chip"
-            data-kind={strokeKind}
-            aria-hidden="true"
-          >
-            {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? (item.comp === 'volunteer' ? 'Volunteer' : 'Service') : 'Shared'}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={onClick}
-          aria-label={`Open ${item.title}`}
-          className="feed-card-text-button"
-        >
-          <span className="feed-card-text-body">
-            <span className="feed-card-text-title">{item.title}</span>
-            <span className="feed-card-text-author">
-              <span
-                className="feed-card-text-avatar"
-                style={{ background: item.user.color }}
-                aria-hidden="true"
-              >
-                <img src={getAvatar(item.user.id)} alt="" width={22} height={22} draggable={false} />
-              </span>
-              <span className="feed-card-text-author-name">{item.user.name}</span>
-            </span>
-            {item.description && (
-              <span className="feed-card-text-desc">{item.description}</span>
-            )}
-          </span>
-          <span className="feed-card-text-meta">
-            <span className="feed-card-loc">
-              {item.isRequest ? null : (
-                <>
-                  <MapPin size={10} strokeWidth={2} />
-                  <span className="feed-card-loc-text">{item.location}</span>
-                </>
-              )}
-            </span>
-            <span
-              className="feed-card-text-price"
-              style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
-            >
-              {priceLabel}
-            </span>
-          </span>
-        </button>
-        {/* Save heart stays in the top-right corner, same affordance as
-           image cards. */}
-        <span
-          onClick={e => { e.stopPropagation(); onToggleSave(); }}
-          role="button"
-          tabIndex={0}
-          aria-label={isSaved ? 'Unsave' : 'Save'}
-          aria-pressed={isSaved}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSave(); } }}
-          className="feed-card-save"
-          data-saved={isSaved || undefined}
-          style={{ zIndex: 3 }}
-        >
-          <Heart size={14} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
-        </span>
-      </article>
-    );
-  }
+  const priceTone = item.isRequest ? 'wanted'
+    : (!isOpportunity && item.listingType === 'free') ? 'free'
+    : undefined;
+
+  const badgeLabel = badgeKind === 'request' ? 'Wanted'
+    : badgeKind === 'opportunity' ? (item.comp === 'volunteer' ? 'Volunteer' : 'Service')
+    : badgeKind === 'free' ? 'Free'
+    : null;
 
   const closedLabel = item.isClosed ? closedLabelFor(item) : null;
+  const cut = cover.url ? isCutoutUrl(cover.url) : false;
 
   return (
-    <div
-      className="feed-card"
-      data-stroke={strokeKind}
-      data-closed={item.isClosed || undefined}
-      style={{ aspectRatio: ar, padding: 0 }}
-      aria-label={closedLabel ? `${item.title} — ${closedLabel}` : `Open ${item.title}`}
-    >
-      {closedLabel && (
-        <span className="feed-card-closed-ribbon" aria-hidden="true">{closedLabel}</span>
-      )}
-      <PhotoCarousel
-        photos={photos}
-        aspectRatio={ar}
-        showArrows={false}
-        dotsPosition="top"
-        onClick={onClick}
-        overlay={
-          <>
-            {/* Top-left type sticker — matches the LOST/FOUND badge on
-                L&F cards + the calendar chip on event cards so users can
-                scan the masonry without having to read each card. Only
-                paints when strokeKind is set (i.e. on the All tab); the
-                dedicated Shared/Requests tabs don't need redundant
-                labels because the tab itself answers the question. */}
-            {strokeKind && (
-              <span
-                className="feed-card-type-chip"
-                data-kind={strokeKind}
-                aria-hidden="true"
-              >
-                {strokeKind === 'request' ? 'Request' : strokeKind === 'opportunity' ? (item.comp === 'volunteer' ? 'Volunteer' : 'Service') : 'Shared'}
-              </span>
-            )}
-            <span
-              onClick={e => { e.stopPropagation(); onToggleSave(); }}
-              role="button"
-              tabIndex={0}
-              aria-label={isSaved ? 'Unsave' : 'Save'}
-              aria-pressed={isSaved}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSave(); }}}
-              className="feed-card-save"
-              data-saved={isSaved || undefined}
-              style={{ zIndex: 3 }}
-            >
-              <Heart size={14} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+    <article className="pcard" data-closed={item.isClosed || undefined}>
+      <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open ${item.title}`}>
+        <span className="pcard-media">
+          {cover.url
+            ? <img src={cover.url} alt="" loading="lazy" style={cut ? { background: '#fff', objectFit: 'contain' } : undefined} />
+            : <span className="pcard-ph" style={{ background: tintFor(item.photoColor) }} aria-hidden="true">{item.photoIcon || '📦'}</span>}
+        </span>
+        <span className="pcard-body">
+          <span className="pcard-title">{item.title}</span>
+          <span className="pcard-price" data-tone={priceTone}>{priceLabel}</span>
+          {!item.isRequest && item.location && (
+            <span className="pcard-meta">
+              <MapPin size={10} strokeWidth={2} />
+              <span className="pcard-meta-text">{item.location}</span>
             </span>
+          )}
+        </span>
+      </button>
 
-            <div className="feed-card-overlay" data-cut={isCutoutUrl(coverUrl(photos[0])) || undefined}>
-              <p className="feed-card-title">{item.title}</p>
-              <div className="feed-card-meta">
-                <span className="feed-card-loc">
-                  <MapPin size={10} strokeWidth={2} />
-                  <span className="feed-card-loc-text">{item.location}</span>
-                </span>
-                <span
-                  className="feed-card-price"
-                  style={item.isRequest && item.urgent ? { color: '#F58400' } : undefined}
-                >
-                  {priceLabel}
-                </span>
-              </div>
-            </div>
-          </>
-        }
-      />
-    </div>
+      {badgeLabel && <span className="pcard-badge" data-kind={badgeKind}>{badgeLabel}</span>}
+
+      <button
+        type="button"
+        className="pcard-save"
+        data-saved={isSaved || undefined}
+        aria-label={isSaved ? 'Unsave' : 'Save'}
+        aria-pressed={isSaved}
+        onClick={e => { e.stopPropagation(); onToggleSave(); }}
+      >
+        <Heart size={14} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+      </button>
+
+      {closedLabel && <span className="pcard-closed"><span>{closedLabel}</span></span>}
+    </article>
   );
 }
 
-/** A bg-removed photo is stored as a transparent .png — only those cards get
- *  the frosted bottom blur behind the title (ordinary photos just get a soft
- *  gradient scrim). */
-const isCutoutUrl = (u: unknown): boolean => typeof u === 'string' && /\.png(\?|$)/i.test(u);
-const coverUrl = (p: unknown): string | undefined =>
-  typeof p === 'string' ? p : ((p as { poster?: string; src?: string } | null)?.poster ?? (p as { src?: string } | null)?.src);
+/* ── Lost & Found card ─────────────────────────────────
+   Same shell as ProductCard, with a status badge (rose = lost, green =
+   found) and last-seen / time meta instead of a price. */
+function LostFoundCard({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
+  const photo = getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls);
+  const isLost = lf.status === 'lost';
+  const cut = isCutoutUrl(photo);
+  return (
+    <article className="pcard">
+      <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open ${lf.title}`}>
+        <span className="pcard-media">
+          <img src={photo} alt="" loading="lazy" style={cut ? { background: '#fff', objectFit: 'contain' } : undefined} />
+        </span>
+        <span className="pcard-body">
+          <span className="pcard-title">{lf.title}</span>
+          <span className="pcard-meta">
+            <MapPin size={10} strokeWidth={2} />
+            <span className="pcard-meta-text">{lf.lastSeen}</span>
+          </span>
+          <span className="pcard-meta pcard-meta--dim">{lf.timeAgo}</span>
+        </span>
+      </button>
+      <span className="pcard-badge" data-kind={isLost ? 'lost' : 'found'}>{lf.status}</span>
+    </article>
+  );
+}
 
-/* ── Event tile (All-tab variant) ──────────────────
-   Mirrors the inventory event card shape but uses the public organizer
-   info + RSVP/attendee snippet. Purple data-stroke so the All tab still
-   colour-codes by post type. */
-function EventFeedCard({
-  event, variant, onClick,
-}: { event: CommunityEvent; variant: FeedCardVariant; onClick: () => void }) {
-  const ar = VARIANT_RATIOS[variant];
+/* ── Event card ────────────────────────────────────────
+   Same shell, purple Event badge, date as the "price" line, and a small
+   RSVP / views meta row. */
+function EventCard({ event, onClick }: { event: CommunityEvent; onClick: () => void }) {
   const uploaded = (event as { photoUrls?: string[] }).photoUrls;
-  const photo = uploaded && uploaded.length > 0
-    ? uploaded[0]
-    : getEventPhoto(event.id, event.eventType);
+  const photo = uploaded && uploaded.length > 0 ? uploaded[0] : getEventPhoto(event.id, event.eventType);
   /* Live events show REAL counts only — the hash-fake fallback is for demo
      fixtures, never for a live event that simply has zero views yet. */
   const demo = isDemoMode();
   const metrics = demo ? getEventMetrics(event.id) : null;
   const rsvps = demo ? (event.attendees || metrics!.rsvps) : event.attendees;
   const views = demo ? (event.viewCount ?? metrics!.views) : (event.viewCount ?? 0);
+  const cut = isCutoutUrl(photo);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="feed-card feed-card--event"
-      data-stroke="event"
-      style={{ aspectRatio: ar, padding: 0 }}
-      aria-label={`Open event ${event.title}`}
-    >
-      <img src={photo} alt="" className="feed-card-img" loading="lazy" style={{ background: isCutoutUrl(photo) ? '#fff' : undefined }} />
-      <span style={{
-        position: 'absolute', top: 10, left: 10,
-        display: 'inline-flex', alignItems: 'center', gap: 5, zIndex: 3,
-      }}>
-        <span style={{
-          background: 'rgba(168,85,247,0.92)', color: '#fff',
-          backdropFilter: 'blur(8px)', borderRadius: 999,
-          padding: '4px 10px',
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-        }}>
-          <CalendarDays size={10} strokeWidth={2} /> Event
+    <article className="pcard">
+      <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open event ${event.title}`}>
+        <span className="pcard-media">
+          <img src={photo} alt="" loading="lazy" style={cut ? { background: '#fff', objectFit: 'contain' } : undefined} />
         </span>
-        {event.hasForm && (
-          <span style={{
-            background: 'rgba(139,92,246,0.92)', color: '#fff',
-            backdropFilter: 'blur(8px)', borderRadius: 999,
-            padding: '4px 8px',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}>
-            📋 Register
-          </span>
-        )}
-      </span>
-      <div className="feed-card-overlay" data-cut={isCutoutUrl(photo) || undefined}>
-        <p className="feed-card-title">{event.title}</p>
-        <div className="feed-card-meta" style={{ gap: 10 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+        <span className="pcard-body">
+          <span className="pcard-title">{event.title}</span>
+          <span className="pcard-price pcard-price--soft">{event.date.split(' ').slice(0, 3).join(' ')}</span>
+          <span className="pcard-meta">
             <UsersIcon size={10} strokeWidth={2} /> {rsvps}
+            <Eye size={10} strokeWidth={2} style={{ marginLeft: 8 }} /> {views}
           </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Eye size={10} strokeWidth={2} /> {views}
-          </span>
-          <span className="feed-card-price">{event.date.split(' ').slice(0, 3).join(' ')}</span>
-        </div>
-      </div>
-    </button>
+        </span>
+      </button>
+      <span className="pcard-badge" data-kind="event">
+        <CalendarDays size={9} strokeWidth={2.4} style={{ marginRight: 3, verticalAlign: '-1px' }} />Event
+      </span>
+      {event.hasForm && <span className="pcard-badge pcard-badge--second" data-kind="opportunity">Register</span>}
+    </article>
   );
 }
 
-/* ── Lost & Found tile (All-tab variant) ──────────────
-   Orange-stroked card mirroring the inventory L&F tile but rendered in the
-   public feed flow. Status badge top-left (rose for Lost, green for Found). */
-function LostFoundFeedCard({
-  lf, variant, onClick,
-}: { lf: LostItem; variant: FeedCardVariant; onClick: () => void }) {
-  const ar = VARIANT_RATIOS[variant];
-  const photo = getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls);
-  const isLost = lf.status === 'lost';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="feed-card feed-card--lostfound"
-      data-stroke="lostfound"
-      style={{ aspectRatio: ar, padding: 0 }}
-      aria-label={`Open ${lf.title}`}
-    >
-      <img src={photo} alt="" className="feed-card-img" loading="lazy" style={{ background: isCutoutUrl(photo) ? '#fff' : undefined }} />
-      <span style={{
-        position: 'absolute', top: 10, left: 10,
-        background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
-        color: '#fff', borderRadius: 999,
-        padding: '4px 10px',
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-        textTransform: 'uppercase', zIndex: 3,
-      }}>
-        {lf.status}
-      </span>
-      <div className="feed-card-overlay" data-cut={isCutoutUrl(photo) || undefined}>
-        <p className="feed-card-title">{lf.title}</p>
-        <div className="feed-card-meta">
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <MapPin size={10} strokeWidth={2} /> {lf.lastSeen}
-          </span>
-          <span className="feed-card-price">{lf.timeAgo}</span>
-        </div>
-      </div>
-    </button>
-  );
+/* ── Media + colour helpers ───────────────────────────── */
+
+/** First usable cover image for a listing (uploaded media → hardcoded demo
+ *  set), or nothing so the card falls back to its emoji-on-tint placeholder. */
+function coverImage(item: MarketplaceItem): { url?: string } {
+  const media = resolveItemMedia(item);
+  return { url: coverUrl(media[0]) };
 }
+
+/** A hex photoColor becomes a soft tint for the placeholder tile; a named
+ *  colour or nothing falls back to the inset surface. */
+function tintFor(color?: string): string {
+  if (!color) return 'var(--bg-inset)';
+  return color.startsWith('#') ? `${color}22` : color;
+}
+
+/** A bg-removed photo is stored as a transparent .png — those get a white
+ *  fill + contain fit so the cut-out doesn't sit on a dark void. */
+const isCutoutUrl = (u: unknown): boolean => typeof u === 'string' && /\.png(\?|$)/i.test(u);
+const coverUrl = (p: unknown): string | undefined =>
+  typeof p === 'string' ? p : ((p as { poster?: string; src?: string } | null)?.poster ?? (p as { src?: string } | null)?.src);
