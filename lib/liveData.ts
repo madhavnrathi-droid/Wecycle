@@ -50,6 +50,7 @@ interface ListingRow {
   /* Opportunity compensation (add_opportunity_compensation migration): 'volunteer'
      | 'free' | 'paid', with an optional price_band when paid. Null for items. */
   comp: string | null;
+  opp_role: string | null;
   price_band: string | null;
   /* Opportunity rate period (optional_price_and_rate_period_for_opportunities
      migration). Null on items and on opportunities that didn't say. */
@@ -187,6 +188,7 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     comp: row.comp
       ? (row.comp as MarketplaceItem['comp'])
       : (row.kind === 'opportunity' ? listingToComp(row.listing_type) : undefined),
+    oppRole: (row.opp_role as MarketplaceItem['oppRole']) ?? undefined,
     priceBand: (row.price_band as MarketplaceItem['priceBand']) ?? undefined,
     ratePeriod: (row.rate_period as MarketplaceItem['ratePeriod']) ?? undefined,
     priceMax: row.price_max ?? undefined,
@@ -366,6 +368,7 @@ export interface NewListingInput {
   kind?: 'item' | 'opportunity';
   /* Opportunity-only: compensation + optional paid price band. */
   comp?: 'volunteer' | 'free' | 'paid';
+  oppRole?: 'offering' | 'hiring';
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000';
   /* Optional, like every other part of a paid rate. */
   ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project';
@@ -406,6 +409,7 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       category_id: categoryId,
       kind: input.kind ?? 'item',
       comp: input.kind === 'opportunity' ? (input.comp ?? 'free') : null,
+      opp_role: input.kind === 'opportunity' ? (input.oppRole ?? 'offering') : null,
       price_band: input.kind === 'opportunity' ? (input.priceBand ?? null) : null,
       rate_period: input.kind === 'opportunity' ? (input.ratePeriod ?? null) : null,
       price_max:   input.kind === 'opportunity' ? (input.priceMax   ?? null) : null,
@@ -1153,6 +1157,7 @@ export interface EditListingPatch {
   isHidden?: boolean;
   /* Opportunity-only compensation edits. */
   comp?: 'volunteer' | 'free' | 'paid';
+  oppRole?: 'offering' | 'hiring' | null;
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000' | null;
   ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project' | null;
   priceMax?: number | null;
@@ -1175,6 +1180,7 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
     update.price = patch.price;
   }
   if (patch.comp !== undefined)        (update as { comp?: string }).comp = patch.comp;
+  if (patch.oppRole !== undefined)     (update as { opp_role?: string | null }).opp_role = patch.oppRole;
   if (patch.priceBand !== undefined)   (update as { price_band?: string | null }).price_band = patch.priceBand;
   if (patch.ratePeriod !== undefined)  (update as { rate_period?: string | null }).rate_period = patch.ratePeriod;
   if (patch.priceMax !== undefined)    (update as { price_max?: number | null }).price_max = patch.priceMax;

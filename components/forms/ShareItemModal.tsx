@@ -7,8 +7,9 @@ import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
 import {
   COMP_META, COMP_OPTIONS, RATE_PERIODS, RATE_BASIS_OPTIONS,
+  OPP_ROLE_META, OPP_ROLE_OPTIONS,
   compToListing, opportunityCompLabel,
-  type Comp, type RatePeriod,
+  type Comp, type RatePeriod, type OppRole,
 } from '../../lib/opportunity';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
@@ -55,6 +56,9 @@ export interface ShareItemForm {
      Every field below `comp` is optional: a paid gig can be posted with no
      amount, no range and no period, and reads as "Rate on ask". */
   comp: Comp;
+  /* Which way round the post points — hiring someone, or offering yourself.
+     Asked first, because it changes what everything below it means. */
+  oppRole: OppRole;
   ratePeriod?: RatePeriod;
   /* Upper end of the rate range; `price` is the lower end. Both optional, and
      either alone is meaningful. The old four-bucket priceBand is retired —
@@ -68,7 +72,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
   const isService = mode === 'service';
   const [form, setForm] = useState<ShareItemForm>({
     title: '', category: isService ? 'Services' : '', condition: '', description: '',
-    location: '', pricing: 'free', photos: [], comp: 'free',
+    location: '', pricing: 'free', photos: [], comp: 'free', oppRole: 'offering',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ShareItemForm, string>>>({});
   const [notifyOnEngagement, setNotifyOnEngagement] = useState(true);
@@ -101,7 +105,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
 
   const reset = () => {
     setForm({
-      title: '', category: isService ? 'Services' : '', condition: '', description: '', location: '', pricing: 'free', photos: [], comp: 'free',
+      title: '', category: isService ? 'Services' : '', condition: '', description: '', location: '', pricing: 'free', photos: [], comp: 'free', oppRole: 'offering',
     });
     setNotifyOnEngagement(true);
   };
@@ -131,6 +135,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           kind: isService ? 'opportunity' : 'item',
           ...(isService ? {
             comp: form.comp,
+            oppRole: form.oppRole,
             ratePeriod: form.comp === 'paid' ? form.ratePeriod : undefined,
             priceMax:   form.comp === 'paid' ? form.priceMax   : undefined,
           } : {}),
@@ -145,6 +150,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
         listing_type: isService ? (form.comp === 'paid' ? 'sell' : 'free') : (form.pricing === 'sell' ? 'sell' : 'free'),
         ...(isService ? {
           comp: form.comp,
+          opp_role: form.oppRole,
           rate_period: form.comp === 'paid' ? (form.ratePeriod ?? null) : null,
           has_rate_range: form.comp === 'paid' && typeof form.priceMax === 'number',
         } : {}),
@@ -174,7 +180,13 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
     <Modal
       open={open}
       onClose={onClose}
-      title={isService ? 'Offer a service' : 'Share an item'}
+      title={
+        isService
+          /* The heading has to follow the fork: calling a job ad "Offer a
+             service" contradicts what the user just told us. */
+          ? (form.oppRole === 'hiring' ? 'Post a job or gig' : 'Offer a service')
+          : 'Share an item'
+      }
       footer={
         <>
           <button type="button" onClick={onClose} className="btn btn-secondary" style={{ flex: 1 }}>
@@ -188,7 +200,9 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           >
             {submitting
               ? (isService ? 'Posting…' : 'Sharing…')
-              : (isService ? 'Post opportunity' : 'Share with community')}
+              : isService
+                ? (form.oppRole === 'hiring' ? 'Post the job' : 'Post opportunity')
+                : 'Share with community'}
           </button>
         </>
       }
@@ -298,8 +312,38 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
 
         {isService ? (
           /* ── Compensation: Volunteer / Free / Paid (+ price bands) ── */
+          <>
+          {/* ── Hiring, or offering? ──
+              The board carries both directions and, until this existed, had no
+              way to tell them apart — a post titled "Marketing Specialist
+              Needed" was badged SERVICE because "service offered" was the only
+              thing the data could express. Asked first because it reframes
+              everything under it. */}
           <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
-            <legend className="field-label" style={{ marginBottom: 8 }}>Compensation</legend>
+            <legend className="field-label" style={{ marginBottom: 8 }}>What kind of post is this?</legend>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {OPP_ROLE_OPTIONS.map(r => (
+                <button
+                  key={r}
+                  type="button"
+                  className="option-card"
+                  aria-pressed={form.oppRole === r}
+                  onClick={() => update('oppRole', r)}
+                >
+                  <span style={{ fontSize: 20 }} aria-hidden="true">{OPP_ROLE_META[r].emoji}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{OPP_ROLE_META[r].label}</span>
+                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
+                    {OPP_ROLE_META[r].blurb}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
+            <legend className="field-label" style={{ marginBottom: 8 }}>
+              {form.oppRole === 'hiring' ? 'What you’re paying' : 'Compensation'}
+            </legend>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               {COMP_OPTIONS.map(c => (
                 <button
@@ -422,6 +466,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
               </div>
             )}
           </fieldset>
+          </>
         ) : (
           <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
             <legend className="field-label" style={{ marginBottom: 8 }}>Pricing</legend>

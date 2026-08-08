@@ -8,7 +8,7 @@ import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchEvents, onPostsChanged } from '../lib/liveData';
 import EmptyState from './EmptyState';
-import { getEventPhoto, getAvatar } from '../lib/photos';
+import { resolveEventPhoto, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 
 interface EventsScreenProps {
@@ -272,17 +272,26 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
          only shows a handful of events. Add the section back once there are
          enough events to meaningfully filter by category. */}
 
-      {/* ── YOUR UPCOMING (RSVP'd events carousel) ── */}
-      <section style={{ padding: '8px 20px 8px' }}>
-        <h3 style={{
-          margin: 0, fontSize: 13, fontWeight: 600,
-          letterSpacing: '0.04em', textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-        }}>
-          Your upcoming
-        </h3>
-      </section>
-      {upcomingRsvps.length > 0 ? (
+      {/* ── YOUR UPCOMING (RSVP'd events carousel) ──
+         Heading and empty panel BOTH render only when there's something to
+         show. Every new visitor has zero RSVPs, so the old always-on
+         "You haven't RSVP'd to anything yet" panel pushed the actual events
+         most of a screen down — a big empty box above the content on the very
+         first visit. Ticketing apps put your tickets behind their own tab for
+         exactly this reason; here the section simply stays out of the way
+         until it has content. */}
+      {upcomingRsvps.length > 0 && (
+        <section style={{ padding: '8px 20px 8px' }}>
+          <h3 style={{
+            margin: 0, fontSize: 13, fontWeight: 600,
+            letterSpacing: '0.04em', textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+          }}>
+            Your upcoming
+          </h3>
+        </section>
+      )}
+      {upcomingRsvps.length > 0 && (
         <section
           className="rsvp-carousel"
           aria-label="Events you're attending"
@@ -296,22 +305,6 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
               onOpen={() => onOpenEvent(event)}
             />
           ))}
-        </section>
-      ) : (
-        <section style={{ padding: '4px 20px 20px' }}>
-          <div style={{
-            padding: '22px 18px',
-            background: 'var(--bg-inset)',
-            borderRadius: 18,
-            textAlign: 'center',
-          }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-              You haven't RSVP'd to anything yet
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-              Tap RSVP on any event below to add it here.
-            </p>
-          </div>
         </section>
       )}
 
@@ -368,7 +361,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
 /* ══ UPCOMING RSVP CARD (horizontal carousel) ════════ */
 
 function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; onCancel: () => void; onOpen?: () => void }) {
-  const photo = getEventPhoto(event.id, event.eventType);
+  const photo = resolveEventPhoto(event);
   return (
     <article className="rsvp-card">
       <button
@@ -419,7 +412,7 @@ function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; 
 /* ══ FEATURED EVENT CARD ═════════════════════════ */
 
 function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; isRsvpd: boolean; onRsvp: () => void }) {
-  const photo = getEventPhoto(event.id, event.eventType);
+  const photo = resolveEventPhoto(event);
   const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
 
   return (
@@ -534,105 +527,91 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
 
 /* ══ EVENT LIST CARD (compact) ═══════════════════ */
 
+/* ══ EVENT LIST CARD ══════════════════════════════
+   Poster-led, following the ticketing apps (BookMyShow / District): the
+   artwork is a PORTRAIT 2:3 poster, because that's the shape event posters are
+   actually designed in — the old 88×88 square centre-cropped a poster and threw
+   away most of the design. Then title, then when, then where, then who's going.
+
+   Every meta line is single-line with an ellipsis. Previously date and venue
+   shared one flex row with no wrap control, so in a narrow column
+   "Fri, Sep 25, 2026" and "SMI Campus" each broke onto two lines and the card
+   turned into a ragged block of text. */
 function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEvent; isRsvpd: boolean; onRsvp: () => void; onOpen?: () => void }) {
-  const photo = getEventPhoto(event.id, event.eventType);
+  const photo = resolveEventPhoto(event);
+  const when = eventWhenLabel(event);
 
   return (
-    <article style={{
-      display: 'flex', gap: 12,
-      padding: 10,
-      background: 'var(--bg-card)',
-      borderRadius: 18,
-      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
-    }}>
+    <article className="ev-row">
       <button
         type="button"
         onClick={onOpen}
         aria-label={`Open ${event.title}`}
-        style={{
-          flex: 1, minWidth: 0, display: 'flex', gap: 12, alignItems: 'center',
-          background: 'transparent', border: 'none', padding: 0, cursor: onOpen ? 'pointer' : 'default',
-          textAlign: 'left', font: 'inherit', color: 'inherit',
-        }}
+        className="ev-row-open"
       >
-        <div style={{
-          width: 88, height: 88, borderRadius: 12,
-          overflow: 'hidden', flexShrink: 0,
-          background: 'var(--bg-inset)',
-        }}>
-          <img
-            src={photo}
-            alt=""
-            loading="lazy"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        </div>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
-              textTransform: 'uppercase', color: 'var(--text-muted)',
-              marginBottom: 3,
-            }}>
-              {labelForType(event.eventType)}
-              {event.hasForm && (
-                <span style={{
-                  color: '#8B5CF6', background: 'rgba(139,92,246,0.12)',
-                  padding: '1px 6px', borderRadius: 999,
-                  fontSize: 9, fontWeight: 700,
-                }}>
-                  📋 Register
-                </span>
-              )}
-            </div>
-            <h3 style={{
-              margin: 0, fontSize: 14, fontWeight: 600,
-              letterSpacing: '-0.015em', color: 'var(--text-primary)',
-              lineHeight: 1.25,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}>
-              {event.title}
-            </h3>
-          </div>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10, marginTop: 6,
-            fontSize: 11, color: 'var(--text-muted)',
-          }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <CalendarDays size={10} strokeWidth={1.8} />
-              {event.date}
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <MapPin size={10} strokeWidth={1.8} />
-              {event.location}
-            </span>
-          </div>
-        </div>
+        <span className="ev-row-poster">
+          <img src={photo} alt="" loading="lazy" />
+        </span>
+
+        <span className="ev-row-body">
+          <span className="ev-row-kicker">
+            {labelForType(event.eventType)}
+            {event.hasForm && <span className="ev-row-register">Register</span>}
+            {isRsvpd && (
+              <span className="ev-row-going">
+                <Check size={9} strokeWidth={3} /> Going
+              </span>
+            )}
+          </span>
+
+          <span className="ev-row-title">{event.title}</span>
+
+          <span className="ev-row-meta">
+            <CalendarDays size={11} strokeWidth={1.9} />
+            <span className="ev-row-meta-text">{when}</span>
+          </span>
+          <span className="ev-row-meta">
+            <MapPin size={11} strokeWidth={1.9} />
+            <span className="ev-row-meta-text">{event.location}</span>
+          </span>
+          {event.attendees > 0 && (
+            <span className="ev-row-going-count">{event.attendees} going</span>
+          )}
+        </span>
       </button>
+
       <button
         onClick={e => { e.stopPropagation(); onRsvp(); }}
         aria-label={isRsvpd ? 'Cancel RSVP' : 'RSVP'}
-        style={{
-          alignSelf: 'center',
-          background: isRsvpd ? '#22C55E' : 'var(--bg-inset)',
-          color: isRsvpd ? '#fff' : 'var(--text-primary)',
-          border: isRsvpd ? 'none' : '1px solid var(--border-subtle)',
-          borderRadius: 999,
-          padding: '7px 12px',
-          fontSize: 11, fontWeight: 600, cursor: 'pointer',
-          flexShrink: 0,
-        }}
+        className="ev-row-cta"
+        data-going={isRsvpd || undefined}
       >
         {isRsvpd
-          ? <><Check size={11} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-1px' }} /> Going</>
+          ? <><Check size={12} strokeWidth={2.6} style={{ display: 'inline', verticalAlign: '-2px' }} /> Going</>
           : event.hasForm ? 'Register' : 'RSVP'}
       </button>
     </article>
   );
+}
+
+/* "Fri, 25 Sep · 10:00 AM". Prefers the raw ISO `startsAt` when the row came
+   from Supabase; otherwise reuses the already-formatted display strings and
+   just drops a redundant current-year suffix. Deliberately does NOT re-parse
+   the formatted date into a Date — doing that is what once rescheduled events
+   to 1970 (see parseEventDateTime in EventDetailScreen). */
+function eventWhenLabel(event: CommunityEvent): string {
+  const iso = (event as { startsAt?: string }).startsAt;
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
+      const date = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+      return `${date} · ${time}`;
+    }
+  }
+  const thisYear = new Date().getFullYear();
+  const date = event.date.replace(new RegExp(`,?\\s*${thisYear}$`), '');
+  return event.time ? `${date} · ${event.time}` : date;
 }
 
 function labelForType(t: CommunityEvent['eventType']): string {

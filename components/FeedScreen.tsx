@@ -7,8 +7,8 @@ import {
   MARKETPLACE_ITEMS, OPPORTUNITIES, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
   type MarketplaceItem, type CommunityEvent, type LostItem,
 } from '../lib/mockData';
-import { resolveItemMedia, getAvatar, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
-import { opportunityCompLabel } from '../lib/opportunity';
+import { resolveItemMedia, getAvatar, resolveEventPhoto, getLostFoundPhoto } from '../lib/photos';
+import { opportunityCompLabel, oppRoleBadge } from '../lib/opportunity';
 import SavedSearchBar from './SavedSearchBar';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
@@ -71,6 +71,10 @@ export default function FeedScreen({
      on the storefront" behaviour. */
   const [activeType, setActiveType] = useState<'all' | 'requests' | 'shared' | 'services'>('all');
   const [query, setQuery] = useState('');
+  /* Faceted sub-filter for the Jobs & gigs tab only. Keeping the direction
+     filter here — rather than as a second homepage rail — is what lets one
+     board carry both jobs and services without crowding the home screen. */
+  const [workFilter, setWorkFilter] = useState<'all' | 'hiring' | 'offering'>('all');
   /* Saved-listing IDs for the heart icon's filled state. Hydrated from
      Supabase on mount + after every post-change event (a delete drops
      stale saves from the server side, this resync keeps the heart in
@@ -239,7 +243,12 @@ export default function FeedScreen({
        - 'services' → service opportunities only */
   const pool =
     activeType === 'requests' ? requests
-    : activeType === 'services' ? opportunities
+    : activeType === 'services'
+      ? (workFilter === 'all'
+          ? opportunities
+          /* Legacy rows carry no direction; group them with offers so they stay
+             reachable instead of disappearing from both facets. */
+          : opportunities.filter(o => (o.oppRole ?? 'offering') === workFilter))
     : items;
   const source = pool.filter(item => !blocked.has(item.user.id));
   const filtered = source.filter(item => {
@@ -643,10 +652,36 @@ export default function FeedScreen({
             aria-pressed={activeType === 'services'}
             data-active={activeType === 'services' || undefined}
           >
-            Services &amp; Opportunities
+            Jobs &amp; gigs
           </button>
         </div>
       </section>
+
+      {/* ── HIRING / OFFERING FACETS (Jobs & gigs tab only) ──
+         The board holds two opposite things; this is where you narrow to one.
+         It lives on the dedicated tab rather than the homepage precisely so the
+         storefront doesn't sprout another row of chips. */}
+      {activeType === 'services' && (
+        <section style={{ padding: '0 16px 14px' }}>
+          <div style={{ display: 'flex', gap: 7 }}>
+            {([
+              ['all', 'Everything'],
+              ['hiring', 'Hiring'],
+              ['offering', 'Offering'],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`pill ${workFilter === id ? 'pill-active' : ''}`}
+                aria-pressed={workFilter === id}
+                onClick={() => setWorkFilter(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── SAVED SEARCH / NOTIFY-ME (Requests tab only) ── */}
       {activeType === 'requests' && (
@@ -751,11 +786,18 @@ export default function FeedScreen({
             </Rail>
           )}
 
-          {/* SERVICES — landscape cards. Service posts often have no photo of
-              a "thing", so a wide frame carries a banner/person shot better
-              than a portrait crop, and it breaks the portrait rhythm. */}
+          {/* WORK — jobs AND services in ONE rail.
+              Two rails ("Jobs" + "Services") would crowd the homepage and, at
+              today's volume, leave both nearly empty. Information-dense apps
+              solve this with one entry point on home and faceted filtering on
+              the dedicated screen — so the badges (Hiring / Offering) separate
+              the two directions here, and the Jobs & gigs tab carries the
+              Hiring / Offering filter for the full board.
+              Landscape cards: work posts rarely have a photo of a "thing", so a
+              wide frame carries a banner or a person better than a portrait
+              crop, and it breaks the portrait rhythm. */}
           {services.length > 0 && (
-            <Rail title="Skills for hire 🛠️" sub="Tutors, fixers, photographers — your people" variant="wide" onSeeAll={() => setActiveType('services')}>
+            <Rail title="Work on campus 💼" sub="Jobs, gigs and skills for hire" variant="wide" onSeeAll={() => setActiveType('services')}>
               {services.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_services', 'opportunity')}</div>)}
             </Rail>
           )}
@@ -1009,10 +1051,20 @@ function ProductCard({
     : (!isOpportunity && item.listingType === 'free') ? 'free'
     : undefined;
 
+  /* An opportunity's badge comes from its DIRECTION, not its compensation.
+     "Marketing Specialist Needed" is a job ad; badging it "Service" (which is
+     what happened when comp was the only signal) told the reader the opposite
+     of the truth. Volunteer still wins as a label when nobody's being paid,
+     since that's the more useful thing to know at a glance. */
   const badgeLabel = badgeKind === 'request' ? 'Wanted'
-    : badgeKind === 'opportunity' ? (item.comp === 'volunteer' ? 'Volunteer' : 'Service')
+    : badgeKind === 'opportunity'
+      ? (item.comp === 'volunteer' ? 'Volunteer' : oppRoleBadge(item.oppRole))
     : badgeKind === 'free' ? 'Free'
     : null;
+  /* Hiring posts get their own badge colour so the two directions are
+     separable at a glance inside one shared rail. */
+  const badgeTone = badgeKind === 'opportunity' && item.oppRole === 'hiring'
+    ? 'hiring' : badgeKind;
 
   const closedLabel = item.isClosed ? closedLabelFor(item) : null;
   const cut = cover.url ? isCutoutUrl(cover.url) : false;
@@ -1037,7 +1089,7 @@ function ProductCard({
         </span>
       </button>
 
-      {badgeLabel && <span className="pcard-badge" data-kind={badgeKind}>{badgeLabel}</span>}
+      {badgeLabel && <span className="pcard-badge" data-kind={badgeTone}>{badgeLabel}</span>}
 
       <button
         type="button"
@@ -1089,8 +1141,7 @@ function LostFoundCard({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
    Same shell, purple Event badge, date as the "price" line, and a small
    RSVP / views meta row. */
 function EventCard({ event, onClick }: { event: CommunityEvent; onClick: () => void }) {
-  const uploaded = (event as { photoUrls?: string[] }).photoUrls;
-  const photo = uploaded && uploaded.length > 0 ? uploaded[0] : getEventPhoto(event.id, event.eventType);
+  const photo = resolveEventPhoto(event);
   /* Live events show REAL counts only — the hash-fake fallback is for demo
      fixtures, never for a live event that simply has zero views yet. */
   const demo = isDemoMode();

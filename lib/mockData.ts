@@ -142,6 +142,9 @@ export interface MarketplaceItem {
   /* Compensation for an opportunity (kind='opportunity'): 'volunteer' (unpaid,
      cause-oriented), 'free' (free help), or 'paid'. Absent for items. */
   comp?: 'volunteer' | 'free' | 'paid';
+  /* Direction of an opportunity: 'hiring' (I need someone) vs 'offering'
+     (I'll do it). Absent = unknown/legacy; the UI stays neutral. */
+  oppRole?: 'offering' | 'hiring';
   /* Optional price band for a PAID opportunity when no exact rate is given. */
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000';
   /* What a paid opportunity's rate is charged against — ₹300 an hour vs ₹300

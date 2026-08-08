@@ -7,7 +7,7 @@ import {
   BarChart3, ClipboardList,
 } from 'lucide-react';
 import type { CommunityEvent, User } from '../lib/mockData';
-import { getEventPhotos, getAvatar } from '../lib/photos';
+import { resolveEventPhotos, getAvatar } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
@@ -123,7 +123,7 @@ export default function EventDetailScreen({
   const uploadedPhotos = (event as { photoUrls?: string[] }).photoUrls;
   const photos: string[] = uploadedPhotos && uploadedPhotos.length > 0
     ? uploadedPhotos
-    : (Array.isArray(uploadedPhotos) ? [] : getEventPhotos(event.id, event.eventType));
+    : (Array.isArray(uploadedPhotos) ? [] : resolveEventPhotos(event));
   /* Photo editing — owner can add/replace photos. */
   const [photoEditOpen, setPhotoEditOpen] = useState(false);
   const [localPhotoUrls, setLocalPhotoUrls] = useState<string[] | null>(null);

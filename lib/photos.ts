@@ -264,6 +264,41 @@ export function getEventPhotos(id: string, type?: string): string[] {
   return [EVENT_COVERS[type ?? ''] ?? EVENT_COVERS.workshop];
 }
 
+/* ── The one way to get an event's artwork ──────────────────────────────────
+ * ALWAYS use this instead of calling getEventPhoto(event.id, …) directly.
+ *
+ * getEventPhoto only knows the hardcoded demo maps, so for a real event — whose
+ * id is a UUID that appears in none of them — it silently returned a stock
+ * cover keyed off eventType. An organiser who uploaded a poster saw a stranger's
+ * stock photo on the Events list, the activity feed, their storefront and their
+ * inventory, while the home feed (the one place that checked photoUrls) showed
+ * the real thing. Same event, two different images.
+ *
+ * Uploaded art wins. A real event that uploaded nothing gets the type cover as
+ * a last resort, because unlike a listing an event tile is never text-only.
+ */
+export function resolveEventPhoto(event: {
+  id: string;
+  eventType?: string;
+  photoUrls?: string[] | null;
+}): string {
+  const uploaded = event.photoUrls?.[0];
+  if (uploaded) return uploaded;
+  return getEventPhoto(event.id, event.eventType);
+}
+
+/** Gallery variant of resolveEventPhoto — every uploaded photo, else the
+ *  demo set / type cover. */
+export function resolveEventPhotos(event: {
+  id: string;
+  eventType?: string;
+  photoUrls?: string[] | null;
+}): string[] {
+  const uploaded = event.photoUrls ?? [];
+  if (uploaded.length) return uploaded;
+  return getEventPhotos(event.id, event.eventType);
+}
+
 /* Stable avatar URLs (DiceBear) — deterministic from a seed */
 export function getAvatar(seed: string, size = 96): string {
   return `https://api.dicebear.com/9.x/notionists-neutral/png?seed=${encodeURIComponent(seed)}&size=${size}&backgroundColor=eaedf1,d1d4f9,c0aede,b6e3f4,ffd5dc&radius=50`;

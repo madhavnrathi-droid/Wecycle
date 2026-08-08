@@ -10,7 +10,7 @@ import {
   MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS,
   type MarketplaceItem, type CommunityEvent,
 } from '../lib/mockData';
-import { getItemPhoto, getEventPhoto, getCategoryPhoto, getAvatar } from '../lib/photos';
+import { getItemPhoto, resolveEventPhoto, getCategoryPhoto, getAvatar } from '../lib/photos';
 import { useAuth } from '../lib/AuthContext';
 import {
   listAlerts, subscribeAlerts, timeRemaining,
@@ -353,7 +353,7 @@ function PostMetricsRow({ item }: { item: MarketplaceItem }) {
 
 function EventMetricsRow({ event }: { event: CommunityEvent }) {
   const m = getEventMetrics(event.id);
-  const photo = getEventPhoto(event.id, event.eventType);
+  const photo = resolveEventPhoto(event);
   return (
     <div style={{
       display: 'flex', gap: 12,

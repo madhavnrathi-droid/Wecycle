@@ -28,7 +28,7 @@ import type {
 import {
   MARKETPLACE_ITEMS, EVENTS, FEED_ITEMS, CATEGORIES, MY_EVENT_IDS,
 } from '../lib/mockData';
-import { getAvatar, resolveItemMedia, getEventPhoto, getLostFoundPhoto } from '../lib/photos';
+import { getAvatar, resolveItemMedia, resolveEventPhoto, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
@@ -687,7 +687,7 @@ function RequestRow({ feed }: { feed: FeedItem }) {
 }
 
 function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => void }) {
-  const photo = getEventPhoto(event.id, event.eventType);
+  const photo = resolveEventPhoto(event);
   return (
     <li>
       <button

@@ -12,6 +12,30 @@
  */
 
 export type Comp = 'volunteer' | 'free' | 'paid';
+
+/* Which direction an opportunity points. The single most important thing about
+   a work post and, until now, the one thing the data couldn't say:
+     offering — I'll do the work for you   (a service)
+     hiring   — I need someone to do this  (a job / gig)
+   Undefined means the row predates the column; the UI stays neutral rather
+   than asserting a direction it doesn't know. */
+export type OppRole = 'offering' | 'hiring';
+
+export const OPP_ROLE_META: Record<OppRole, {
+  label: string; badge: string; emoji: string; blurb: string;
+}> = {
+  hiring:   { label: 'I need someone', badge: 'Hiring',  emoji: '🧑‍💼', blurb: 'Post a job or gig — someone else does the work' },
+  offering: { label: 'I can do it',    badge: 'Offering', emoji: '🛠️',  blurb: 'Offer your own skill, time or service' },
+};
+
+export const OPP_ROLE_OPTIONS: OppRole[] = ['hiring', 'offering'];
+
+/** Badge text for an opportunity card. Neutral when the direction is unknown
+ *  (pre-column rows) — better than confidently mislabelling someone's job ad
+ *  as a service, which is exactly what happened before. */
+export function oppRoleBadge(role?: OppRole | null): string {
+  return role ? OPP_ROLE_META[role].badge : 'Opportunity';
+}
 export type PriceBand = 'under_200' | '200_500' | '500_1000' | 'over_1000';
 /** What a rate is charged against. ₹300 an hour and ₹300 a month are wildly
  *  different offers, so a bare number is close to meaningless on its own. */
@@ -21,6 +45,7 @@ export type RatePeriod = 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' 
  *  `price` is the FROM end of a range and `priceMax` the optional TO end. */
 export interface CompShape {
   comp?: Comp | null;
+  oppRole?: OppRole | null;
   price?: number | null;
   priceMax?: number | null;
   priceBand?: PriceBand | null;
