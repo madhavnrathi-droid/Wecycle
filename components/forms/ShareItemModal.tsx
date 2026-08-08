@@ -5,7 +5,10 @@ import { Gift, Tag, MapPin, Bell } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
-import { COMP_META, COMP_OPTIONS, PRICE_BANDS, compToListing, type Comp, type PriceBand } from '../../lib/opportunity';
+import {
+  COMP_META, COMP_OPTIONS, PRICE_BANDS, RATE_PERIODS, compToListing,
+  type Comp, type PriceBand, type RatePeriod,
+} from '../../lib/opportunity';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
@@ -47,9 +50,12 @@ export interface ShareItemForm {
   pricing: 'free' | 'sell';
   price?: number;
   photos: string[];
-  /* Service (opportunity) compensation — only used in mode="service". */
+  /* Service (opportunity) compensation — only used in mode="service".
+     Every field below `comp` is optional: a paid gig can be posted with no
+     amount, no range and no period, and reads as "Rate on ask". */
   comp: Comp;
   priceBand?: PriceBand;
+  ratePeriod?: RatePeriod;
 }
 
 const MAX_PHOTOS = 3;
@@ -112,7 +118,11 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           media: pickerRef.current?.getMedia() ?? [],
           notifyOnEngagement,
           kind: isService ? 'opportunity' : 'item',
-          ...(isService ? { comp: form.comp, priceBand: form.comp === 'paid' ? form.priceBand : undefined } : {}),
+          ...(isService ? {
+            comp: form.comp,
+            priceBand:  form.comp === 'paid' ? form.priceBand  : undefined,
+            ratePeriod: form.comp === 'paid' ? form.ratePeriod : undefined,
+          } : {}),
         });
       } else {
         /* Demo path — no backend; just simulate latency. */
@@ -122,7 +132,11 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
       track(EVT.post_form_submitted, {
         post_kind: isService ? 'service' : 'share',
         listing_type: isService ? (form.comp === 'paid' ? 'sell' : 'free') : (form.pricing === 'sell' ? 'sell' : 'free'),
-        ...(isService ? { comp: form.comp, price_band: form.comp === 'paid' ? (form.priceBand ?? null) : null } : {}),
+        ...(isService ? {
+          comp: form.comp,
+          price_band:  form.comp === 'paid' ? (form.priceBand  ?? null) : null,
+          rate_period: form.comp === 'paid' ? (form.ratePeriod ?? null) : null,
+        } : {}),
         has_photos: form.photos.length > 0,
         photo_count: form.photos.length,
         has_price: isService ? (form.comp === 'paid' && typeof form.price === 'number') : (form.pricing === 'sell' && typeof form.price === 'number'),
@@ -290,41 +304,81 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                 </button>
               ))}
             </div>
+            {/* ── Rate — every part optional ──
+                The old version led with a "Price band" label that read as a
+                required field, then an "Exact rate" input, and picking Paid
+                without filling either made the insert fail outright. Now the
+                whole block states up front that it can be skipped, an amount
+                is paired with a period so a number actually means something,
+                and every control toggles off when tapped again. */}
             {form.comp === 'paid' && (
-              <div style={{ marginTop: 12 }}>
-                <div className="field-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                  <span>Price band</span>
-                  <span className="field-hint" style={{ fontWeight: 400 }}>Pick a range — or set an exact rate below</span>
+              <div style={{
+                marginTop: 12, padding: '14px 14px 16px',
+                background: 'var(--bg-inset)', borderRadius: 16,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                  <span className="field-label" style={{ margin: 0 }}>Rate</span>
+                  <span className="field-hint" style={{ fontWeight: 400, textAlign: 'right' }}>
+                    All optional — you can agree it in the comments
+                  </span>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+
+                {/* Amount + what it's per. Neither implies the other. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span aria-hidden="true" style={{
+                    fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0,
+                  }}>₹</span>
+                  <input
+                    id="si-price"
+                    type="number" inputMode="numeric" min="0"
+                    className="form-input"
+                    style={{ flex: 1, minWidth: 0 }}
+                    placeholder="Amount (skip if you'd rather not say)"
+                    aria-label="Rate amount (optional)"
+                    value={form.price ?? ''}
+                    onChange={e => {
+                      const n = Number(e.target.value) || undefined;
+                      /* An amount and a range are two ways of saying the same
+                         thing, so entering one clears the other. */
+                      setForm(f => ({ ...f, price: n, priceBand: n !== undefined ? undefined : f.priceBand }));
+                    }}
+                  />
+                </div>
+
+                <div className="field-hint" style={{ fontWeight: 400, marginBottom: 6 }}>Charged per</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+                  {RATE_PERIODS.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`pill ${form.ratePeriod === p.id ? 'pill-active' : ''}`}
+                      aria-pressed={form.ratePeriod === p.id}
+                      /* Tapping the selected one clears it — nothing here is a
+                         one-way door. */
+                      onClick={() => setForm(f => ({ ...f, ratePeriod: f.ratePeriod === p.id ? undefined : p.id }))}
+                    >
+                      {p.label.replace('Per ', '')}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="field-hint" style={{ fontWeight: 400, marginBottom: 6 }}>Or give a rough range</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                   {PRICE_BANDS.map(b => (
                     <button
                       key={b.id}
                       type="button"
                       className={`pill ${form.priceBand === b.id ? 'pill-active' : ''}`}
                       aria-pressed={form.priceBand === b.id}
-                      onClick={() => setForm(f => ({ ...f, priceBand: b.id, price: undefined }))}
+                      onClick={() => setForm(f => (
+                        f.priceBand === b.id
+                          ? { ...f, priceBand: undefined }
+                          : { ...f, priceBand: b.id, price: undefined }
+                      ))}
                     >
                       {b.label}
                     </button>
                   ))}
-                </div>
-                <div className="field" style={{ marginTop: 10 }}>
-                  <label htmlFor="si-price" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                    <span>Exact rate (₹)</span>
-                    <span className="field-hint" style={{ fontWeight: 400 }}>Optional — overrides the band</span>
-                  </label>
-                  <input
-                    id="si-price"
-                    type="number" inputMode="numeric" min="1"
-                    className="form-input"
-                    placeholder="e.g. 300 / hr"
-                    value={form.price ?? ''}
-                    onChange={e => {
-                      const n = Number(e.target.value) || undefined;
-                      setForm(f => ({ ...f, price: n, priceBand: n !== undefined ? undefined : f.priceBand }));
-                    }}
-                  />
                 </div>
               </div>
             )}

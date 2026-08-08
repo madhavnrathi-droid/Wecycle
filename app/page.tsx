@@ -682,6 +682,9 @@ export default function WecycleApp() {
             <FeedScreen
               onRequireAuth={() => setModal('auth')}
               onPost={() => requireAuth('post-picker')}
+              /* The storefront's "Post a job" CTA already knows the post type,
+                 so it skips the picker and opens the service composer. */
+              onPostService={openOfferService}
               onOpenMenu={() => setDrawerOpen(true)}
               onOpenAccount={goToAccount}
               onOpenItem={setOpenItem}

@@ -4593,11 +4593,41 @@ textarea:focus-visible {
 .rail-track::-webkit-scrollbar { display: none; }
 .rail-item {
   flex: 0 0 auto;
-  width: 150px;
+  /* One knob for card size, overridden per rail variant below. The image is
+     the point of these cards, so "bigger card" means "bigger photo" — the
+     caption height barely moves. */
+  width: var(--card-w, 190px);
   scroll-snap-align: start;
 }
-@media (min-width: 700px)  { .rail-item { width: 172px; } }
-@media (min-width: 1280px) { .rail-item { width: 188px; } }
+@media (min-width: 700px)  { .rail-item { width: var(--card-w-md, 210px); } }
+@media (min-width: 1280px) { .rail-item { width: var(--card-w-lg, 232px); } }
+
+/* ── Rail variants — the rhythm ──────────────────────
+   Rails alternate card shape so the page doesn't read as one template
+   repeated nine times. Set only the size/aspect knobs; everything else is
+   inherited, so all variants stay the same card language. */
+
+/* Featured: the hero row. Biggest cards, tallest photo. */
+.rail--featured {
+  --card-w: 240px;
+  --card-w-md: 268px;
+  --card-w-lg: 300px;
+  --pcard-ar: 4 / 5;
+}
+
+/* Wide: landscape art (event posters, service banners) gets a landscape
+   frame instead of being cropped to a portrait. 3:2 rather than 16:10 — at
+   this width 16:10 left the photo only ~68% of the card, and the photo is
+   supposed to dominate in every variant, landscape included. */
+.rail--wide {
+  --card-w: 268px;
+  --card-w-md: 300px;
+  --card-w-lg: 324px;
+  --pcard-ar: 3 / 2;
+}
+/* Wide cards fit most titles on one line, so they don't need the two-line
+   slot the narrow cards reserve. */
+.rail--wide .pcard-body { min-height: 64px; }
 
 /* ── Product card ───────────────────────────────────── */
 .pcard {
@@ -4628,7 +4658,9 @@ textarea:focus-visible {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  /* Portrait by default: the photo is the product, so it gets the room. At
+     4:5 with a ~52px caption the image is roughly 82% of the card. */
+  aspect-ratio: var(--pcard-ar, 4 / 5);
   background: var(--bg-inset);
   overflow: hidden;
 }
@@ -4648,11 +4680,15 @@ textarea:focus-visible {
   height: 100%;
   font-size: 38px;
 }
+/* The caption is deliberately the small half of the card. A fixed min-height
+   keeps every card in a rail the same height (ragged card bottoms are the
+   giveaway of a hand-rolled rail) without truncating two-line titles. */
 .pcard-body {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 9px 11px 11px;
+  gap: 2px;
+  padding: 8px 10px 10px;
+  min-height: 72px;
 }
 .pcard-title {
   margin: 0;
@@ -4667,7 +4703,6 @@ textarea:focus-visible {
   overflow: hidden;
 }
 .pcard-price {
-  margin-top: 1px;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -4685,7 +4720,8 @@ textarea:focus-visible {
   align-items: center;
   gap: 4px;
   min-width: 0;
-  font-size: 11px;
+  margin-top: auto;      /* pinned to the caption's baseline row */
+  font-size: 10.5px;
   color: var(--text-muted);
 }
 .pcard-meta-text {
@@ -4773,10 +4809,11 @@ textarea:focus-visible {
   padding: 0 16px;
   grid-template-columns: repeat(2, 1fr);
 }
-@media (min-width: 560px)  { .pgrid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 820px)  { .pgrid { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 1120px) { .pgrid { grid-template-columns: repeat(5, 1fr); } }
-@media (min-width: 1440px) { .pgrid { grid-template-columns: repeat(6, 1fr); } }
+/* One column fewer at each step than the first pass — the owner asked for
+   bigger cards, which on a grid means fewer columns, not wider gaps. */
+@media (min-width: 620px)  { .pgrid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px)  { .pgrid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1240px) { .pgrid { grid-template-columns: repeat(5, 1fr); } }
 
 /* ── Lost marquee — slow, seamless auto-scroll loop ─── */
 .lost-marquee {
@@ -4809,10 +4846,10 @@ textarea:focus-visible {
 .lost-marquee-copy { display: flex; }
 .lost-marquee-item {
   flex: 0 0 auto;
-  width: 150px;
+  width: 190px;
   margin-right: 12px;   /* margin (not gap) so translateX(one-copy) is seamless */
 }
-@media (min-width: 700px) { .lost-marquee-item { width: 172px; } }
+@media (min-width: 700px) { .lost-marquee-item { width: 210px; } }
 
 @keyframes lost-scroll {
   from { transform: translateX(0); }
@@ -4823,3 +4860,84 @@ textarea:focus-visible {
   .lost-marquee::-webkit-scrollbar { display: none; }
   .lost-marquee-track { animation: none; }
 }
+
+/* ── Mid-storefront CTA band ─────────────────────────
+   Breaks the run of identical rails in the middle of the page and gives the
+   Services board a doorway (services are the thinnest board, so it needs the
+   invitation most). Deliberately NOT a card and NOT a bordered box: one soft
+   tinted fill, a floating pill button, no stroke. */
+.sf-cta {
+  position: relative;
+  overflow: hidden;
+  margin: 4px 16px 26px;
+  padding: 20px 18px;
+  border-radius: 22px;
+  /* Soft two-stop tint in the brand's exchange violet → cyan. Low alpha so it
+     reads as a wash on the cream base, not a coloured slab. */
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(0, 184, 218, 0.16) 0%, rgba(0, 184, 218, 0) 60%),
+    linear-gradient(135deg, rgba(108, 99, 255, 0.13) 0%, rgba(168, 85, 247, 0.09) 100%),
+    var(--bg-card);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sf-cta-emoji {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-sm);
+}
+.sf-cta-copy { flex: 1 1 auto; min-width: 0; }
+.sf-cta-title {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+.sf-cta-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.sf-cta-btn {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 11px 20px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--bg-base);
+  background: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  transition: transform 0.14s var(--ease-spring), box-shadow 0.14s;
+}
+.sf-cta-btn:hover  { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.sf-cta-btn:active { transform: scale(0.96); }
+
+/* Narrow phones: the button drops under the copy and goes full-width so it
+   never gets squeezed to two lines beside the text. */
+@media (max-width: 460px) {
+  .sf-cta { flex-wrap: wrap; gap: 13px; padding: 18px 16px; }
+  .sf-cta-emoji { width: 44px; height: 44px; border-radius: 14px; font-size: 22px; }
+  .sf-cta-copy { flex: 1 1 140px; }
+  .sf-cta-btn  { flex: 1 1 100%; width: 100%; }
+}
+
+/* Theme is a `.dark` class on the root, not a media query. */
+.dark .sf-cta-emoji { background: rgba(255, 255, 255, 0.10); }

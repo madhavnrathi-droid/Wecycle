@@ -45,11 +45,14 @@ interface FeedScreenProps {
   onOpenUser?: (userId: string) => void;
   /** Opens the sign-in dialog. Needed because saving is account-bound. */
   onRequireAuth?: () => void;
+  /** Straight into the "offer a service" composer, skipping the post-type
+   *  picker — the mid-storefront job CTA already answered which type. */
+  onPostService?: () => void;
 }
 
 export default function FeedScreen({
   onPost, onOpenMenu, onOpenAccount, onOpenItem, onOpenEvent, onOpenLF,
-  onBannerAction, onOpenUser, onRequireAuth,
+  onBannerAction, onOpenUser, onRequireAuth, onPostService,
 }: FeedScreenProps) {
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -714,9 +717,9 @@ export default function FeedScreen({
             </Rail>
           )}
 
-          {/* JUST DROPPED — newest shared items */}
+          {/* JUST DROPPED — the hero shelf, so it gets the biggest cards */}
           {freshItems.length >= 3 && (
-            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" onSeeAll={() => setActiveType('shared')}>
+            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" variant="featured" onSeeAll={() => setActiveType('shared')}>
               {freshItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_fresh')}</div>)}
             </Rail>
           )}
@@ -727,6 +730,12 @@ export default function FeedScreen({
               {freeItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_free', 'free')}</div>)}
             </Rail>
           )}
+
+          {/* ── MID-PAGE CTA ──
+             Sits here on purpose: it interrupts the longest stretch of
+             identical rails, and the board it points at (Services) is the
+             thinnest one, so it's the board that most needs a doorway. */}
+          <StorefrontCTA onPostJob={() => { track(EVT.marketing_banner_tapped, { slide: 'post_job_cta' }); (onPostService ?? onPost)(); }} />
 
           {/* CATEGORY RAILS */}
           {categoryRails.map(r => (
@@ -742,16 +751,18 @@ export default function FeedScreen({
             </Rail>
           )}
 
-          {/* SERVICES */}
+          {/* SERVICES — landscape cards. Service posts often have no photo of
+              a "thing", so a wide frame carries a banner/person shot better
+              than a portrait crop, and it breaks the portrait rhythm. */}
           {services.length > 0 && (
-            <Rail title="Skills for hire 🛠️" sub="Tutors, fixers, photographers — your people" onSeeAll={() => setActiveType('services')}>
+            <Rail title="Skills for hire 🛠️" sub="Tutors, fixers, photographers — your people" variant="wide" onSeeAll={() => setActiveType('services')}>
               {services.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_services', 'opportunity')}</div>)}
             </Rail>
           )}
 
-          {/* EVENTS */}
+          {/* EVENTS — poster art is landscape, so give it a landscape frame */}
           {upcoming.length > 0 && (
-            <Rail title="Happening soon 📅" sub="RSVP in a tap" onSeeAll={() => onBannerAction?.('events')}>
+            <Rail title="Happening soon 📅" sub="RSVP in a tap" variant="wide" onSeeAll={() => onBannerAction?.('events')}>
               {upcoming.map(ev => (
                 <div className="rail-item" key={ev.id}>
                   <EventCard event={ev} onClick={() => { trackPostOpened('event', ev.id, { source: 'feed_events_rail' }); onOpenEvent?.(ev); }} />
@@ -844,12 +855,24 @@ export default function FeedScreen({
   );
 }
 
-/* ── Layout: a themed horizontal rail ─────────────────── */
+/* ── Layout: a themed horizontal rail ───────────────────
+   `variant` only changes the card size/aspect (via CSS custom properties on
+   the rail), so neighbouring rails read as different shelves of one shop
+   rather than the same template nine times over:
+     'featured' — hero row, biggest cards
+     'wide'     — landscape frame for poster/banner art
+     undefined  — the standard portrait product card */
 function Rail({
-  title, sub, onSeeAll, children,
-}: { title: string; sub: string; onSeeAll?: () => void; children: React.ReactNode }) {
+  title, sub, onSeeAll, variant, children,
+}: {
+  title: string;
+  sub: string;
+  onSeeAll?: () => void;
+  variant?: 'featured' | 'wide';
+  children: React.ReactNode;
+}) {
   return (
-    <section className="rail">
+    <section className={`rail${variant ? ` rail--${variant}` : ''}`}>
       <div className="rail-head">
         <div style={{ minWidth: 0 }}>
           <h2 className="rail-title">{title}</h2>
@@ -862,6 +885,27 @@ function Rail({
         )}
       </div>
       <div className="rail-track">{children}</div>
+    </section>
+  );
+}
+
+/* ── Mid-storefront CTA ────────────────────────────────
+   A promo strip, the way a shop interrupts its category rows. Not a card and
+   not a bordered box — one soft tint, one floating pill — so it reads as a
+   different kind of thing from everything around it. */
+function StorefrontCTA({ onPostJob }: { onPostJob: () => void }) {
+  return (
+    <section className="sf-cta">
+      <span className="sf-cta-emoji" aria-hidden="true">🧑‍🔧</span>
+      <div className="sf-cta-copy">
+        <h2 className="sf-cta-title">Got a skill? Put it up.</h2>
+        <p className="sf-cta-sub">
+          Tutoring, repairs, design, photography — paid or volunteer. Campus is already looking.
+        </p>
+      </div>
+      <button type="button" className="sf-cta-btn" onClick={onPostJob}>
+        Post a job
+      </button>
     </section>
   );
 }
@@ -1026,11 +1070,14 @@ function LostFoundCard({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
         </span>
         <span className="pcard-body">
           <span className="pcard-title">{lf.title}</span>
+          {/* Where and when on ONE line — a second meta row would grow the
+              caption at the photo's expense. */}
           <span className="pcard-meta">
             <MapPin size={10} strokeWidth={2} />
             <span className="pcard-meta-text">{lf.lastSeen}</span>
+            <span aria-hidden="true">·</span>
+            <span style={{ flexShrink: 0 }}>{lf.timeAgo}</span>
           </span>
-          <span className="pcard-meta pcard-meta--dim">{lf.timeAgo}</span>
         </span>
       </button>
       <span className="pcard-badge" data-kind={isLost ? 'lost' : 'found'}>{lf.status}</span>

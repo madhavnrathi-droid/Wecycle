@@ -15,7 +15,7 @@ import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, contactGate, itemAction, opportunityAction, actionLabel, type ContactLink, type ContactGate } from '../lib/contactUser';
 import {
   opportunityCompLabel, compToListing,
-  COMP_META, COMP_OPTIONS, PRICE_BANDS, type Comp, type PriceBand,
+  COMP_META, COMP_OPTIONS, PRICE_BANDS, RATE_PERIODS, type Comp, type PriceBand, type RatePeriod,
 } from '../lib/opportunity';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import {
@@ -177,6 +177,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   /* Opportunity compensation edit state (services only). */
   const [eComp, setEComp]               = useState<Comp>(item.comp ?? 'free');
   const [ePriceBand, setEPriceBand]     = useState<PriceBand | undefined>(item.priceBand);
+  const [eRatePeriod, setERatePeriod]   = useState<RatePeriod | undefined>(item.ratePeriod);
   const [eCategory, setECategory]       = useState((item.category || '').toLowerCase());
   const [eUrgent, setEUrgent]           = useState(!!item.urgent);
 
@@ -191,9 +192,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setEListingType(item.listingType ?? 'free');
     setEComp(item.comp ?? 'free');
     setEPriceBand(item.priceBand);
+    setERatePeriod(item.ratePeriod);
     setECategory((item.category || '').toLowerCase());
     setEUrgent(!!item.urgent);
-  }, [item.id, item.title, item.description, item.location, item.price, item.listingType, item.comp, item.priceBand, item.category, item.urgent]);
+  }, [item.id, item.title, item.description, item.location, item.price, item.listingType, item.comp, item.priceBand, item.ratePeriod, item.category, item.urgent]);
 
   const isRequestPost = !!item.isRequest;
   const isDirty = useMemo(() => {
@@ -208,11 +210,12 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     if (item.kind === 'opportunity') {
       if (eComp !== (item.comp ?? 'free')) return true;
       if ((ePriceBand ?? null) !== (item.priceBand ?? null)) return true;
+      if ((eRatePeriod ?? null) !== (item.ratePeriod ?? null)) return true;
     }
     if (eCategory !== (item.category || '').toLowerCase()) return true;
     if (isRequestPost && eUrgent !== !!item.urgent) return true;
     return false;
-  }, [eTitle, eDescription, eLocation, ePriceStr, eListingType, eComp, ePriceBand, eCategory, eUrgent, item, isRequestPost]);
+  }, [eTitle, eDescription, eLocation, ePriceStr, eListingType, eComp, ePriceBand, eRatePeriod, eCategory, eUrgent, item, isRequestPost]);
 
   const [saving, setSaving] = useState<null | 'save' | 'repost'>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -233,7 +236,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           ...(isRequestPost
             ? { urgent: eUrgent }
             : isOpp
-              ? { location: eLocation, comp: eComp, priceBand: eComp === 'paid' ? ePriceBand : undefined, listingType: svc!.listingType, price: svc!.price }
+              ? { location: eLocation, comp: eComp, priceBand: eComp === 'paid' ? ePriceBand : undefined, ratePeriod: eComp === 'paid' ? eRatePeriod : undefined, listingType: svc!.listingType, price: svc!.price }
               : { location: eLocation, listingType: eListingType, price: priceNum }),
         });
       } else if (isRequestPost) {
@@ -246,7 +249,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           title: eTitle, category: eCategory, description: eDescription,
           location: eLocation,
           ...(isOpp
-            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, priceBand: eComp === 'paid' ? (ePriceBand ?? null) : null }
+            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, priceBand: eComp === 'paid' ? (ePriceBand ?? null) : null, ratePeriod: eComp === 'paid' ? (eRatePeriod ?? null) : null }
             : { listingType: eListingType, price: priceNum }),
         });
       }
@@ -255,7 +258,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     } finally {
       setSaving(null);
     }
-  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, ePriceBand, ePriceStr]);
+  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, ePriceBand, eRatePeriod, ePriceStr]);
 
   const handleSaveAndRepost = useCallback(async () => {
     if (!isDirty || saving) return;
@@ -271,7 +274,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           ...(isRequestPost
             ? { urgent: eUrgent }
             : isOpp
-              ? { location: eLocation, comp: eComp, priceBand: eComp === 'paid' ? ePriceBand : undefined, listingType: svc!.listingType, price: svc!.price }
+              ? { location: eLocation, comp: eComp, priceBand: eComp === 'paid' ? ePriceBand : undefined, ratePeriod: eComp === 'paid' ? eRatePeriod : undefined, listingType: svc!.listingType, price: svc!.price }
               : { location: eLocation, listingType: eListingType, price: priceNum }),
         });
       } else if (isRequestPost) {
@@ -284,7 +287,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           title: eTitle, category: eCategory, description: eDescription,
           location: eLocation,
           ...(isOpp
-            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, priceBand: eComp === 'paid' ? (ePriceBand ?? null) : null }
+            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, priceBand: eComp === 'paid' ? (ePriceBand ?? null) : null, ratePeriod: eComp === 'paid' ? (eRatePeriod ?? null) : null }
             : { listingType: eListingType, price: priceNum }),
         });
       }
@@ -293,7 +296,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     } finally {
       setSaving(null);
     }
-  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, ePriceBand, ePriceStr]);
+  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, ePriceBand, eRatePeriod, ePriceStr]);
 
   const handleDiscard = useCallback(() => {
     setETitle(item.title);
@@ -303,6 +306,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setEListingType(item.listingType ?? 'free');
     setEComp(item.comp ?? 'free');
     setEPriceBand(item.priceBand);
+    setERatePeriod(item.ratePeriod);
     setECategory((item.category || '').toLowerCase());
     setEUrgent(!!item.urgent);
   }, [item]);
@@ -516,6 +520,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           eListingType, setEListingType,
           eComp, setEComp,
           ePriceBand, setEPriceBand,
+          eRatePeriod, setERatePeriod,
           eCategory, setECategory,
           eUrgent, setEUrgent,
           isRequestPost,
@@ -758,6 +763,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 <OwnerCompEditor
                   comp={eComp}
                   priceBand={ePriceBand}
+                  ratePeriod={eRatePeriod}
+                  onRatePeriod={setERatePeriod}
                   priceStr={ePriceStr}
                   onComp={setEComp}
                   onPriceBand={setEPriceBand}
@@ -1263,6 +1270,7 @@ interface EditState {
   setEListingType: (v: 'free' | 'sell' | 'borrow' | 'swap') => void;
   eComp: Comp;              setEComp: (v: Comp) => void;
   ePriceBand?: PriceBand;   setEPriceBand: (v: PriceBand | undefined) => void;
+  eRatePeriod?: RatePeriod; setERatePeriod: (v: RatePeriod | undefined) => void;
   eCategory: string;        setECategory: (v: string) => void;
   eUrgent: boolean;         setEUrgent: (v: boolean) => void;
   isRequestPost: boolean;
@@ -1351,7 +1359,7 @@ function DesktopLayout({
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType,
-    eComp, setEComp, ePriceBand, setEPriceBand, eCategory, setECategory,
+    eComp, setEComp, ePriceBand, setEPriceBand, eRatePeriod, setERatePeriod, eCategory, setECategory,
     eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError,
     handleSaveChanges, handleSaveAndRepost, handleDiscard,
     photoEditOpen, setPhotoEditOpen, currentPhotoUrlsForPicker, handleSavePhotos,
@@ -1659,6 +1667,8 @@ function DesktopLayout({
                 <OwnerCompEditor
                   comp={eComp}
                   priceBand={ePriceBand}
+                  ratePeriod={eRatePeriod}
+                  onRatePeriod={setERatePeriod}
                   priceStr={ePriceStr}
                   onComp={setEComp}
                   onPriceBand={setEPriceBand}
@@ -2063,14 +2073,16 @@ function EditFieldRow({
  * with price-band chips + an optional exact rate when Paid. Mirrors the create
  * form so the edit path can't put a service into a nonsensical borrow/swap. */
 function OwnerCompEditor({
-  comp, priceBand, priceStr, onComp, onPriceBand, onPriceStr,
+  comp, priceBand, priceStr, ratePeriod, onComp, onPriceBand, onPriceStr, onRatePeriod,
 }: {
   comp: Comp;
   priceBand?: PriceBand;
   priceStr: string;
+  ratePeriod?: RatePeriod;
   onComp: (v: Comp) => void;
   onPriceBand: (v: PriceBand | undefined) => void;
   onPriceStr: (v: string) => void;
+  onRatePeriod: (v: RatePeriod | undefined) => void;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2091,27 +2103,45 @@ function OwnerCompEditor({
       </div>
       {comp === 'paid' && (
         <>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <input
+            type="number" inputMode="numeric" min="0"
+            className="inline-edit inline-edit--input"
+            placeholder="Amount ₹ — optional"
+            value={priceStr}
+            onChange={e => { onPriceStr(e.target.value); if (e.target.value) onPriceBand(undefined); }}
+            aria-label="Rate amount (optional)"
+          />
+          {/* Charged per — every pill toggles off, and none of this is
+              required (matching the create form). */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {RATE_PERIODS.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                className={`pill ${ratePeriod === p.id ? 'pill-active' : ''}`}
+                aria-pressed={ratePeriod === p.id}
+                onClick={() => onRatePeriod(ratePeriod === p.id ? undefined : p.id)}
+              >
+                {p.label.replace('Per ', '')}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {PRICE_BANDS.map(b => (
               <button
                 key={b.id}
                 type="button"
                 className={`pill ${priceBand === b.id ? 'pill-active' : ''}`}
                 aria-pressed={priceBand === b.id}
-                onClick={() => { onPriceBand(b.id); onPriceStr(''); }}
+                onClick={() => {
+                  if (priceBand === b.id) { onPriceBand(undefined); return; }
+                  onPriceBand(b.id); onPriceStr('');
+                }}
               >
                 {b.label}
               </button>
             ))}
           </div>
-          <input
-            type="number" inputMode="numeric" min="1"
-            className="inline-edit inline-edit--input"
-            placeholder="Exact rate ₹ (optional — overrides the band)"
-            value={priceStr}
-            onChange={e => { onPriceStr(e.target.value); if (e.target.value) onPriceBand(undefined); }}
-            aria-label="Exact rate"
-          />
         </>
       )}
     </div>

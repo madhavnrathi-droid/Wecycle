@@ -144,6 +144,10 @@ export interface MarketplaceItem {
   comp?: 'volunteer' | 'free' | 'paid';
   /* Optional price band for a PAID opportunity when no exact rate is given. */
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000';
+  /* What a paid opportunity's rate is charged against — ₹300 an hour vs ₹300
+     a month. Always optional: NULL/absent means the poster didn't say, which
+     is a legitimate answer and never blocks posting. */
+  ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project';
   /* True when this card is a community *request* (someone wanting something)
      rather than a listing (someone offering). Drives the "Wanted" chip +
      "Respond / I can help" action instead of a price + listing-type verb. */

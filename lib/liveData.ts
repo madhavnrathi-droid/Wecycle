@@ -51,6 +51,9 @@ interface ListingRow {
      | 'free' | 'paid', with an optional price_band when paid. Null for items. */
   comp: string | null;
   price_band: string | null;
+  /* Opportunity rate period (optional_price_and_rate_period_for_opportunities
+     migration). Null on items and on opportunities that didn't say. */
+  rate_period: string | null;
   listing_type: MarketplaceItem['listingType'];
   condition: MarketplaceItem['condition'];
   price: number | null;
@@ -183,6 +186,7 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
       ? (row.comp as MarketplaceItem['comp'])
       : (row.kind === 'opportunity' ? listingToComp(row.listing_type) : undefined),
     priceBand: (row.price_band as MarketplaceItem['priceBand']) ?? undefined,
+    ratePeriod: (row.rate_period as MarketplaceItem['ratePeriod']) ?? undefined,
     listingType: row.listing_type,
     price: row.price ?? undefined,
     condition: row.condition,
@@ -360,6 +364,8 @@ export interface NewListingInput {
   /* Opportunity-only: compensation + optional paid price band. */
   comp?: 'volunteer' | 'free' | 'paid';
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000';
+  /* Optional, like every other part of a paid rate. */
+  ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project';
 }
 
 export async function createListingWithMedia(input: NewListingInput): Promise<MarketplaceItem> {
@@ -396,8 +402,11 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       kind: input.kind ?? 'item',
       comp: input.kind === 'opportunity' ? (input.comp ?? 'free') : null,
       price_band: input.kind === 'opportunity' ? (input.priceBand ?? null) : null,
+      rate_period: input.kind === 'opportunity' ? (input.ratePeriod ?? null) : null,
       listing_type: input.listingType,
       condition: input.condition,
+      /* A null price on a 'sell' row is allowed and means "no number given" —
+         the card then reads "Selling" / "Rate on ask". */
       price: input.listingType === 'sell' ? (input.price ?? null) : null,
       location: input.location?.trim() || null,
       photo_urls: photoUrls,
@@ -1139,6 +1148,7 @@ export interface EditListingPatch {
   /* Opportunity-only compensation edits. */
   comp?: 'volunteer' | 'free' | 'paid';
   priceBand?: 'under_200' | '200_500' | '500_1000' | 'over_1000' | null;
+  ratePeriod?: 'hour' | 'session' | 'day' | 'week' | 'month' | 'year' | 'project' | null;
 }
 
 type ListingUpdate = Database['public']['Tables']['listings']['Update'];
@@ -1159,6 +1169,7 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
   }
   if (patch.comp !== undefined)        (update as { comp?: string }).comp = patch.comp;
   if (patch.priceBand !== undefined)   (update as { price_band?: string | null }).price_band = patch.priceBand;
+  if (patch.ratePeriod !== undefined)  (update as { rate_period?: string | null }).rate_period = patch.ratePeriod;
   if (patch.isHidden !== undefined)    update.status = patch.isHidden ? 'hidden' : 'active';
 
   const { error } = await supabase.from('listings').update(update).eq('id', id);
