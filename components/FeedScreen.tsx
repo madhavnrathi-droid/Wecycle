@@ -865,10 +865,10 @@ export default function FeedScreen({
               if (activeType === 'services') {
                 return (
                   <EmptyState
-                    icon="🛠️"
-                    prompt="Nothing here yet. Got a skill or some time to give?"
-                    sub="Tutoring, repairs, photography, or rallying volunteers — paid or free, offer it to your community."
-                    cta={{ label: 'Offer a service', onClick: onPost }}
+                    icon="🤝"
+                    prompt="Nothing on the board yet."
+                    sub="Hire someone for a job, or put your own skill up. Paid, unpaid or volunteer."
+                    cta={{ label: 'Post a job or a skill', onClick: onPost }}
                   />
                 );
               }
@@ -938,15 +938,21 @@ function Rail({
 function StorefrontCTA({ onPostJob }: { onPostJob: () => void }) {
   return (
     <section className="sf-cta">
-      <span className="sf-cta-emoji" aria-hidden="true">🧑‍🔧</span>
+      <span className="sf-cta-emoji" aria-hidden="true">🤝</span>
       <div className="sf-cta-copy">
-        <h2 className="sf-cta-title">Got a skill? Put it up.</h2>
+        {/* One positioning, stated symmetrically, because the board holds both
+            directions and the composer's first question is which one you are.
+            The previous copy picked a side ("Got a skill? Put it up") and then
+            contradicted itself with a "Post a job" button. Examples are
+            deliberately not the four safe ones — tattoos and crochet say
+            "anything you can actually do" in a way tutoring and design don't. */}
+        <h2 className="sf-cta-title">Hire someone, or get hired</h2>
         <p className="sf-cta-sub">
-          Tutoring, repairs, design, photography — paid or volunteer. Campus is already looking.
+          Tattoos, crochet, gym training, tutoring. Paid, unpaid or volunteer.
         </p>
       </div>
       <button type="button" className="sf-cta-btn" onClick={onPostJob}>
-        Post a job
+        Post a job or a skill
       </button>
     </section>
   );
