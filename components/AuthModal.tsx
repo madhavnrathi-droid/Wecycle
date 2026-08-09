@@ -53,6 +53,7 @@ import {
 } from '../lib/password';
 import { emailGateProblem, isManipalEmail } from '../lib/emailDomain';
 import { REQUIRE_EMAIL_CONFIRMATION } from '../lib/authConfig';
+import { COLLEGES } from '../lib/colleges';
 
 type Step = 'credentials' | 'confirm' | 'newpassword';
 type AuthMode = 'signin' | 'signup';
@@ -69,10 +70,6 @@ interface AuthModalProps {
   /** Pre-fill the email — saves retyping it after that hand-off. */
   initialEmail?: string;
 }
-
-/* MAHE school codes, exactly as the institution uses them — students know
-   their own code (it's in their email: …smiblr2026@learner.manipal.edu). */
-const COLLEGES = ['SMI', 'MIT', 'TAPMI', 'MLHS', 'MIRM', 'MLS', 'DOC'] as const;
 
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /* Phone: optional leading +, then digits/spaces/dashes/parens, 7–20 chars */
@@ -890,7 +887,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   required
                 >
                   <option value="">Choose your college</option>
-                  {COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {COLLEGES.map(c => <option key={c.id} value={c.id}>{c.id} — {c.name}</option>)}
                 </select>
               </div>
             )}

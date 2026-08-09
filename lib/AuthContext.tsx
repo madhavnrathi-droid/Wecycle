@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       'id, username, full_name, avatar_url, avatar_color, initials, bio, role, ' +
       'community_id, badges, impact_score, items_shared_count, items_received_count, ' +
       'repairs_helped_count, co2_saved_kg, money_saved, is_online, last_active_at, ' +
-      'joined_at, updated_at, college_id, graduating_year, course, department, residence, ' +
+      'joined_at, updated_at, college_id, college, graduating_year, course, department, residence, ' +
       'contact_email_enabled, contact_whatsapp_enabled, show_online_status, allow_dms, ' +
       'show_phone_on_profile, hide_listings_from_search, notification_prefs, theme, ' +
       'larger_text, hide_prices_on_feed';

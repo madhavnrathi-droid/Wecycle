@@ -29,6 +29,7 @@ import {
   MARKETPLACE_ITEMS, EVENTS, FEED_ITEMS, CATEGORIES, MY_EVENT_IDS,
 } from '../lib/mockData';
 import { getAvatar, resolveItemMedia, resolveEventPhoto, getLostFoundPhoto } from '../lib/photos';
+import { normalizeCollege, collegeName } from '../lib/colleges';
 import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
@@ -58,6 +59,7 @@ interface PublicProfile {
   graduatingYear?: number;
   course?: string;
   department?: string;
+  college?: string;
   residence?: 'day_scholar' | 'hosteler';
   showPhone?: boolean;
 }
@@ -134,7 +136,7 @@ export default function StorefrontScreen({
          object joined onto listing rows doesn't carry the academic info. */
       supabase
         .from('profiles')
-        .select('college_id, graduating_year, course, department, residence, show_phone_on_profile')
+        .select('college_id, college, graduating_year, course, department, residence, show_phone_on_profile')
         .eq('id', user.id)
         .single()
         .then(async ({ data }) => {
@@ -144,6 +146,7 @@ export default function StorefrontScreen({
             graduating_year: number | null;
             course: string | null;
             department: string | null;
+            college: string | null;
             residence: 'day_scholar' | 'hosteler' | null;
             show_phone_on_profile: boolean | null;
           };
@@ -159,6 +162,7 @@ export default function StorefrontScreen({
             graduatingYear: d.graduating_year ?? undefined,
             course: d.course ?? undefined,
             department: d.department ?? undefined,
+            college: d.college ?? undefined,
             residence: d.residence ?? undefined,
             showPhone: d.show_phone_on_profile ?? false,
           });
@@ -466,8 +470,16 @@ function PublicInfoSection({
   if (profile?.collegeId) {
     rows.push({ icon: <IdCard size={13} strokeWidth={1.8} />, label: 'College ID', value: profile.collegeId });
   }
-  if (profile?.department) {
-    rows.push({ icon: <Building2 size={13} strokeWidth={1.8} />, label: 'Department', value: profile.department.toUpperCase() });
+  /* College, not Department: `college` is the canonical school field now. Fall
+     back to a legacy `department` value so members who only ever set the old
+     field still show a school. See lib/colleges.ts for why both exist. */
+  const collegeCode = normalizeCollege(profile?.college) || normalizeCollege(profile?.department);
+  if (collegeCode) {
+    rows.push({
+      icon: <Building2 size={13} strokeWidth={1.8} />,
+      label: 'College',
+      value: collegeName(collegeCode) ? `${collegeCode} — ${collegeName(collegeCode)}` : collegeCode,
+    });
   }
   if (profile?.course) {
     rows.push({ icon: <GraduationCap size={13} strokeWidth={1.8} />, label: 'Course', value: profile.course });

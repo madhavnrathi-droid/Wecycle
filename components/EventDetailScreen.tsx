@@ -436,18 +436,9 @@ export default function EventDetailScreen({
         }}>
           {TYPE_LABEL[event.eventType]}
         </span>
-        {/* Header right-side: everyone (incl. owners) can share; the calendar
-           add is guest-only since owners already know their own event. */}
+        {/* Header right-side is share only now — "add to calendar" moved down
+           beside RSVP, where the other event actions live. */}
         <div style={{ display: 'flex', gap: 4 }}>
-          {!isOwner && (
-            <button
-              aria-label="Add to calendar"
-              className="theme-toggle"
-              onClick={handleAddToCalendar}
-            >
-              <CalendarDays size={17} strokeWidth={1.8} />
-            </button>
-          )}
           {isOwner && onOpenInsights && (
             <button
               aria-label="View insights"
@@ -702,21 +693,6 @@ export default function EventDetailScreen({
           ) : (
           <>
           <button
-            aria-label={saved ? 'Unsave event' : 'Save event'}
-            aria-pressed={saved}
-            onClick={handleToggleSave}
-            style={{
-              width: 52, height: 52, borderRadius: 999,
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: saved ? '#ED2E50' : 'var(--text-secondary)',
-              cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
-          </button>
-          <button
             onClick={handleRsvpClick}
             style={{
               flex: 1, minWidth: 120, height: 52, borderRadius: 999,
@@ -736,6 +712,40 @@ export default function EventDetailScreen({
             {isRsvpd
               ? <><Check size={14} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 5 }} />You're going</>
               : 'RSVP'}
+          </button>
+
+          {/* Icon actions sit to the RIGHT of RSVP, so RSVP starts flush with the
+              poster's left edge and these end flush with its right — the row spans
+              exactly the image's width (max-width 560px, see .ev-cta). */}
+          <button
+            aria-label="Add to calendar"
+            title="Add to calendar"
+            onClick={handleAddToCalendar}
+            style={{
+              width: 52, height: 52, borderRadius: 999,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <CalendarDays size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label={saved ? 'Unsave event' : 'Save event'}
+            aria-pressed={saved}
+            onClick={handleToggleSave}
+            style={{
+              width: 52, height: 52, borderRadius: 999,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: saved ? '#ED2E50' : 'var(--text-secondary)',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
           </button>
 
           {/* Message organizer — one button per accepted channel. */}

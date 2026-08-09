@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { updateDemoSession, DEPARTMENTS, type Residence } from '../lib/demoAuth';
+import { updateDemoSession, type Residence } from '../lib/demoAuth';
+import { COLLEGES, normalizeCollege } from '../lib/colleges';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
 
@@ -33,7 +34,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
   const [collegeId, setCollegeId] = useState('');
   const [graduatingYear, setGraduatingYear] = useState<string>('');
   const [course, setCourse] = useState('');
-  const [department, setDepartment] = useState<string>('');
+  const [college, setCollege] = useState<string>('');
   const [residence, setResidence] = useState<Residence | ''>('');
 
   /* Auto-save status — drives the tiny indicator in the header. We replaced
@@ -64,7 +65,14 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     const gy = (profile as { graduating_year?: number | null }).graduating_year;
     setGraduatingYear(gy ? String(gy) : '');
     setCourse((profile as { course?: string | null }).course ?? '');
-    setDepartment((profile as { department?: string | null }).department ?? '');
+    /* Prefer the canonical column; fall back to salvaging a legacy
+       `department` value ('smi', 'SMI - BSSD') so a member who set their school
+       under the old field still sees it selected instead of an empty dropdown
+       that the next auto-save would then blank. */
+    setCollege(
+      normalizeCollege((profile as { college?: string | null }).college)
+      || normalizeCollege((profile as { department?: string | null }).department),
+    );
     setResidence(((profile as { residence?: Residence | null }).residence ?? '') as Residence | '');
   }, [profile, authEmail]);
 
@@ -122,7 +130,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           phone: storedPhone ?? undefined,
           graduatingYear: graduatingYear ? Number(graduatingYear) : undefined,
           course: course.trim() || undefined,
-          department: department || undefined,
+          department: college || undefined,   /* demo session has no college field yet */
           residence: residence || undefined,
         });
       } else if (hasSupabaseEnv && user) {
@@ -136,7 +144,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           college_id: collegeId.trim() || null,
           graduating_year: graduatingYear ? Number(graduatingYear) : null,
           course: course.trim() || null,
-          department: department || null,
+          college: college || null,
           residence: residence || null,
         };
         const trimmedEmail = currentEmail.trim();
@@ -154,7 +162,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         has_college_id: collegeId.trim().length > 0,
         has_year: !!graduatingYear,
         has_course: !!course.trim(),
-        has_department: !!department,
+        college: college || null,
       });
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(s => (s === 'saved' ? 'idle' : s)), 1600);
@@ -162,7 +170,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
       setError((e as Error).message ?? 'Could not save');
       setSaveStatus('error');
     }
-  }, [canSave, phone, isDemo, name, collegeId, currentEmail, graduatingYear, course, department, residence, user, refreshProfile]);
+  }, [canSave, phone, isDemo, name, collegeId, currentEmail, graduatingYear, course, college, residence, user, refreshProfile]);
 
   /* Debounced auto-save — fires 700ms after the last edit. We re-derive the
      timer on every field change so rapid typing collapses into a single
@@ -173,7 +181,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     if (!canSave) return;
     const t = setTimeout(() => { void persist(); }, 700);
     return () => clearTimeout(t);
-  }, [name, phone, collegeId, currentEmail, graduatingYear, course, department, residence, canSave, persist]);
+  }, [name, phone, collegeId, currentEmail, graduatingYear, course, college, residence, canSave, persist]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -274,7 +282,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 margin: '2px 0 0', fontSize: 13, color: 'var(--text-muted)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
-                {department ? `${department.toUpperCase()} · ` : ''}{collegeId || 'No college ID set'}
+                {college || 'No college set'}{collegeId ? ` · ${collegeId}` : ''}
               </p>
             </div>
           </div>
@@ -410,21 +418,24 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
             </div>
           </div>
 
+          {/* College — the same required field as sign-up, editable here.
+              Replaces the old "Department" select, which pointed at a column
+              sign-up was writing free text into; see lib/colleges.ts. */}
           <div className="field">
-            <label htmlFor="acc-dept" className="field-label">
+            <label htmlFor="acc-college" className="field-label">
               <Building2 size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-              Department
+              College
             </label>
             <select
-              id="acc-dept"
+              id="acc-college"
               className="form-select"
-              value={department}
-              onChange={e => { setDepartment(e.target.value); markInteracted(); }}
+              value={college}
+              onChange={e => { setCollege(e.target.value); markInteracted(); }}
             >
-              <option value="">Pick your school</option>
-              {DEPARTMENTS.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.label} — {d.description}
+              <option value="">Pick your college</option>
+              {COLLEGES.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.id} — {c.name}
                 </option>
               ))}
             </select>
