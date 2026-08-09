@@ -39,7 +39,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  Mail, User, ArrowLeft, IdCard, KeyRound, Loader2, Phone, BookOpen, Lock, Eye, EyeOff,
+  Mail, User, ArrowLeft, KeyRound, Loader2, Phone, Lock, Eye, EyeOff,
   GraduationCap, LifeBuoy, MailWarning,
 } from 'lucide-react';
 import Modal from './Modal';
@@ -69,6 +69,10 @@ interface AuthModalProps {
   /** Pre-fill the email — saves retyping it after that hand-off. */
   initialEmail?: string;
 }
+
+/* MAHE school codes, exactly as the institution uses them — students know
+   their own code (it's in their email: …smiblr2026@learner.manipal.edu). */
+const COLLEGES = ['SMI', 'MIT', 'TAPMI', 'MLHS', 'MIRM', 'MLS', 'DOC'] as const;
 
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /* Phone: optional leading +, then digits/spaces/dashes/parens, 7–20 chars */
@@ -163,10 +167,10 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const [pending, setPending] = useState<Pending>(null);
 
   const [name, setName] = useState('');
-  const [collegeId, setCollegeId] = useState('');
+  const [college, setCollege] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [department, setDepartment] = useState('');
+
   const [termsAgreed, setTermsAgreed] = useState(false);
   /* Only asked when sign-up sends no code (REQUIRE_EMAIL_CONFIRMATION off).
      Cleared whenever the address changes — a tick against the old spelling
@@ -242,8 +246,8 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     setStep('credentials');
     setResetting(false);
     setPending(null);
-    setName(''); setCollegeId(''); setEmail('');
-    setPhone(''); setDepartment(''); setTermsAgreed(false); setEmailChecked(false);
+    setName(''); setCollege(''); setEmail('');
+    setPhone(''); setTermsAgreed(false); setEmailChecked(false);
     setPassword(''); setPassword2(''); setShowPassword(false); setCode('');
     pendingPassword.current = '';
     setSubmitting(false); setError(null); setInfo(null); setResendSecs(0);
@@ -288,7 +292,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const credentialsReady =
     resetting ? emailOk && domainOk
     : mode === 'signup'
-      ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk
+      ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk && !!college
         && emailCheckSatisfied && !passwordProblem && passwordsMatch
       /* Sign-in: don't judge the password, just require something typed —
          the server is the authority on whether it's right. */
@@ -311,9 +315,9 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const signupMetadata = () => ({
     full_name: name.trim() || undefined,
     initials: name.trim() ? initialsOf(name) : undefined,
-    college_id: collegeId.trim() || undefined,
+    college: college || undefined,
     ...(phone.trim() ? { phone: phone.trim() } : {}),
-    ...(department.trim() ? { department: department.trim() } : {}),
+
   });
 
   /* ── Create the account outright, no email ──────────────
@@ -441,7 +445,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
         createDemoSession({
           name: name.trim() || email.split('@')[0],
           email: email.trim(),
-          collegeId: collegeId.trim(),
+          collegeId: '',
         });
         track(EVT.login, { method: 'demo' });
         handleClose();
@@ -458,9 +462,8 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
         track(EVT.sign_up_email_submitted, {
           mode,
           has_name: !!name.trim(),
-          has_college_id: !!collegeId.trim(),
+          college,
           has_phone: !!phone.trim(),
-          has_department: !!department.trim(),
         });
         if (!REQUIRE_EMAIL_CONFIRMATION) {
           await createAccountWithPassword();
@@ -866,23 +869,29 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
               />
             )}
 
-            {/* Sign-up only: college ID (optional) */}
+            {/* Sign-up only: college (required).
+                Replaces the old "College ID" (a roll number) and free-text
+                "Department / course". Neither answered the question that
+                actually matters here — which MAHE school you're at — and both
+                were optional, so most profiles carried nothing usable. A fixed
+                list can be filtered and grouped; free text can't. */}
             {mode === 'signup' && !resetting && (
               <div className="field">
-                <label htmlFor="auth-collegeid" className="field-label">
-                  <IdCard size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                  College ID <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
+                <label htmlFor="auth-college" className="field-label">
+                  <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                  College <span className="required" aria-hidden="true">*</span>
                 </label>
-                <input
-                  id="auth-collegeid"
+                <select
+                  id="auth-college"
                   className="form-input"
-                  placeholder="e.g. 230905123"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={collegeId}
-                  onChange={e => setCollegeId(e.target.value.replace(/\D+/g, ''))}
-                  autoComplete="off"
-                />
+                  value={college}
+                  onChange={e => setCollege(e.target.value)}
+                  aria-invalid={!college}
+                  required
+                >
+                  <option value="">Choose your college</option>
+                  {COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
             )}
 
@@ -912,24 +921,6 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
               </div>
             )}
 
-            {/* Sign-up only: department / course (optional) */}
-            {mode === 'signup' && !resetting && (
-              <div className="field">
-                <label htmlFor="auth-department" className="field-label">
-                  <BookOpen size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                  Department / course <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input
-                  id="auth-department"
-                  className="form-input"
-                  placeholder="e.g. Computer Science"
-                  value={department}
-                  onChange={e => setDepartment(e.target.value.slice(0, 60))}
-                  autoComplete="off"
-                  maxLength={60}
-                />
-              </div>
-            )}
 
             {/* Sign-up only: read the address back (required).
                 Nothing verifies the address on this path, so a typo is silent

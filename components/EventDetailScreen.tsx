@@ -481,6 +481,14 @@ export default function EventDetailScreen({
           alignItems: 'start',
         } : undefined}
       >
+        {/* ── LEFT COLUMN (desktop) ──
+            The hero poster and the RSVP bar share this column, so the bar sits
+            directly under the image and lands level with the comment box on the
+            right. It used to be a position:fixed 430px-wide mobile bar rendered
+            outside the grid entirely, which on a wide screen centred itself on
+            the VIEWPORT — floating mid-page, detached from both columns. On
+            mobile .ev-cta is still that fixed bottom bar; see globals.css. */}
+        <div style={isDesktop ? { minWidth: 0 } : undefined}>
         {/* ── HERO PHOTO CAROUSEL ── */}
         {displayPhotos.length > 0 ? (
           <section style={{ padding: isDesktop ? 0 : '12px 16px 0' }}>
@@ -584,6 +592,228 @@ export default function EventDetailScreen({
             </button>
           </section>
         ) : null}
+      {/* ── BOTTOM CTA ── */}
+      <section className="ev-cta">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
+          {isOwner && saveError && (
+            <div role="alert" style={{
+              padding: '6px 10px',
+              background: 'rgba(237,46,80,0.1)',
+              border: '1px solid rgba(237,46,80,0.25)',
+              borderRadius: 8,
+              color: 'var(--accent-rose)',
+              fontSize: 11, fontWeight: 500, textAlign: 'center',
+            }}>{saveError}</div>
+          )}
+        <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto', flexWrap: 'wrap' }}>
+          {/* OWNER:
+             Clean → Delete full-width
+             Dirty → [Discard] [Save changes]  (no repost concept for events) */}
+          {isOwner ? (
+            isDirty ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleDiscard}
+                  disabled={saving}
+                  aria-label="Discard changes"
+                  style={{
+                    width: 52, height: 52, borderRadius: 999,
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <RotateCcw size={16} strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveChanges}
+                  disabled={saving}
+                  style={{
+                    flex: 1, minWidth: 140, height: 52, borderRadius: 999,
+                    background: 'var(--text-primary)', color: 'var(--bg-base)',
+                    border: 'none',
+                    cursor: saving ? 'wait' : 'pointer',
+                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  {saving
+                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Saving…</>
+                    : <><Save size={15} strokeWidth={2} /> Save changes</>}
+                </button>
+              </>
+            ) : (
+              <>
+                {onOpenInsights && (
+                  <button
+                    onClick={() => { haptics.selection(); onOpenInsights(); }}
+                    style={{
+                      flex: 1, minWidth: 130, height: 52, padding: '0 16px', borderRadius: 999,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <BarChart3 size={16} strokeWidth={2} /> Insights
+                  </button>
+                )}
+                <button
+                  onClick={openManageForm}
+                  aria-label={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
+                  title={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
+                  style={{
+                    width: 52, height: 52, borderRadius: 999,
+                    background: effectiveHasForm ? 'rgba(139,92,246,0.12)' : 'var(--bg-surface)',
+                    border: `1px solid ${effectiveHasForm ? 'rgba(139,92,246,0.4)' : 'var(--border-subtle)'}`,
+                    color: effectiveHasForm ? '#8B5CF6' : 'var(--text-secondary)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <ClipboardList size={17} strokeWidth={1.8} />
+                </button>
+                {onDelete && (
+                  <button
+                    onClick={async () => {
+                      if (typeof window !== 'undefined' && !window.confirm('Delete this event permanently?')) return;
+                      await onDelete();
+                      onBack();
+                    }}
+                    aria-label="Delete event"
+                    title="Delete event"
+                    style={{
+                      width: 52, height: 52, borderRadius: 999,
+                      background: 'transparent', color: 'var(--accent-rose)',
+                      border: '1px solid var(--accent-rose)', cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}
+                  >
+                    <Trash2 size={16} strokeWidth={2} />
+                  </button>
+                )}
+              </>
+            )
+          ) : (
+          <>
+          <button
+            aria-label={saved ? 'Unsave event' : 'Save event'}
+            aria-pressed={saved}
+            onClick={handleToggleSave}
+            style={{
+              width: 52, height: 52, borderRadius: 999,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: saved ? '#ED2E50' : 'var(--text-secondary)',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
+          </button>
+          <button
+            onClick={handleRsvpClick}
+            style={{
+              flex: 1, minWidth: 120, height: 52, borderRadius: 999,
+              /* Purple, not black: events are purple everywhere else in the app
+                 (the EVENT badge, the calendar chip, --color-repair), so the
+                 primary action on an event should read as an event action.
+                 Going = the confirmed/quiet state, so it drops to a surface. */
+              background: isRsvpd ? 'var(--bg-surface)' : '#8B5CF6',
+              color: isRsvpd ? 'var(--text-primary)' : '#FFFFFF',
+              border: isRsvpd ? '1px solid var(--border-default)' : 'none',
+              boxShadow: isRsvpd ? 'none' : '0 6px 20px rgba(139, 92, 246, 0.34)',
+              cursor: 'pointer',
+              fontSize: 14, fontWeight: 600,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {isRsvpd
+              ? <><Check size={14} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 5 }} />You're going</>
+              : 'RSVP'}
+          </button>
+
+          {/* Message organizer — one button per accepted channel. */}
+          {(
+            hasBoth ? (
+              contactLinks.map(link => (
+                <button
+                  key={link.channel}
+                  onClick={() => handleContact(link)}
+                  aria-label={link.ariaLabel}
+                  style={{
+                    width: 52, height: 52, borderRadius: 999,
+                    background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
+                    color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
+                    border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  {link.channel === 'whatsapp' ? <WhatsAppGlyph /> : <Mail size={16} strokeWidth={1.8} />}
+                </button>
+              ))
+            ) : contactLinks.length === 1 ? (
+              <button
+                onClick={() => handleContact(contactLinks[0])}
+                aria-label={contactLinks[0].ariaLabel}
+                style={{
+                  width: 52, height: 52, borderRadius: 999,
+                  background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
+                  color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
+                  border: contactLinks[0].channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                {contactLinks[0].channel === 'whatsapp'
+                  ? <WhatsAppGlyph />
+                  : <Mail size={16} strokeWidth={1.8} />}
+              </button>
+            ) : gate === 'sign-in' ? (
+              <button
+                onClick={onRequireAuth}
+                aria-label={`Sign in to message ${event.organizer?.name ?? 'the organizer'}`}
+                style={{
+                  width: 52, height: 52, borderRadius: 999,
+                  background: 'var(--bg-surface)', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <Mail size={16} strokeWidth={1.8} />
+              </button>
+            ) : null
+          )}
+          </>
+          )}
+        </div>
+        {/* Going + form → quick access to their own submission. */}
+        {!isOwner && isRsvpd && !!event.hasForm && onEditRegistration && (
+          <button
+            type="button"
+            onClick={() => { haptics.selection(); onEditRegistration(); }}
+            style={{
+              alignSelf: 'center',
+              background: 'none', border: 'none', padding: '2px 4px',
+              cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              color: 'var(--text-secondary)', fontFamily: 'inherit',
+              textDecoration: 'underline', textDecorationStyle: 'dotted',
+              pointerEvents: 'auto',
+            }}
+          >
+            View / edit your registration
+          </button>
+        )}
+        </div>
+      </section>
+        </div>{/* /left column */}
         {/* RIGHT COLUMN starts here — wrapped on desktop for the side-by-side
             layout. Closing tag is right before the bottom CTA. */}
         <div style={isDesktop ? { minWidth: 0 } : { display: 'contents' }}>
@@ -865,229 +1095,6 @@ export default function EventDetailScreen({
         </div>{/* /right column */}
       </div>{/* /desktop grid wrapper */}
 
-      {/* ── BOTTOM CTA ── */}
-      <section style={{
-        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 430,
-        padding: '12px 16px calc(80px + env(safe-area-inset-bottom, 0px))',
-        background: 'linear-gradient(to bottom, transparent, var(--bg-base) 35%, var(--bg-base) 100%)',
-        pointerEvents: 'none',
-        zIndex: 30,
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
-          {isOwner && saveError && (
-            <div role="alert" style={{
-              padding: '6px 10px',
-              background: 'rgba(237,46,80,0.1)',
-              border: '1px solid rgba(237,46,80,0.25)',
-              borderRadius: 8,
-              color: 'var(--accent-rose)',
-              fontSize: 11, fontWeight: 500, textAlign: 'center',
-            }}>{saveError}</div>
-          )}
-        <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto', flexWrap: 'wrap' }}>
-          {/* OWNER:
-             Clean → Delete full-width
-             Dirty → [Discard] [Save changes]  (no repost concept for events) */}
-          {isOwner ? (
-            isDirty ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleDiscard}
-                  disabled={saving}
-                  aria-label="Discard changes"
-                  style={{
-                    width: 52, height: 52, borderRadius: 999,
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  <RotateCcw size={16} strokeWidth={1.8} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveChanges}
-                  disabled={saving}
-                  style={{
-                    flex: 1, minWidth: 140, height: 52, borderRadius: 999,
-                    background: 'var(--text-primary)', color: 'var(--bg-base)',
-                    border: 'none',
-                    cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}
-                >
-                  {saving
-                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Saving…</>
-                    : <><Save size={15} strokeWidth={2} /> Save changes</>}
-                </button>
-              </>
-            ) : (
-              <>
-                {onOpenInsights && (
-                  <button
-                    onClick={() => { haptics.selection(); onOpenInsights(); }}
-                    style={{
-                      flex: 1, minWidth: 130, height: 52, padding: '0 16px', borderRadius: 999,
-                      background: 'var(--text-primary)', color: 'var(--bg-base)',
-                      border: 'none', cursor: 'pointer',
-                      fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    }}
-                  >
-                    <BarChart3 size={16} strokeWidth={2} /> Insights
-                  </button>
-                )}
-                <button
-                  onClick={openManageForm}
-                  aria-label={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
-                  title={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
-                  style={{
-                    width: 52, height: 52, borderRadius: 999,
-                    background: effectiveHasForm ? 'rgba(139,92,246,0.12)' : 'var(--bg-surface)',
-                    border: `1px solid ${effectiveHasForm ? 'rgba(139,92,246,0.4)' : 'var(--border-subtle)'}`,
-                    color: effectiveHasForm ? '#8B5CF6' : 'var(--text-secondary)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', flexShrink: 0,
-                  }}
-                >
-                  <ClipboardList size={17} strokeWidth={1.8} />
-                </button>
-                {onDelete && (
-                  <button
-                    onClick={async () => {
-                      if (typeof window !== 'undefined' && !window.confirm('Delete this event permanently?')) return;
-                      await onDelete();
-                      onBack();
-                    }}
-                    aria-label="Delete event"
-                    title="Delete event"
-                    style={{
-                      width: 52, height: 52, borderRadius: 999,
-                      background: 'transparent', color: 'var(--accent-rose)',
-                      border: '1px solid var(--accent-rose)', cursor: 'pointer',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}
-                  >
-                    <Trash2 size={16} strokeWidth={2} />
-                  </button>
-                )}
-              </>
-            )
-          ) : (
-          <>
-          <button
-            aria-label={saved ? 'Unsave event' : 'Save event'}
-            aria-pressed={saved}
-            onClick={handleToggleSave}
-            style={{
-              width: 52, height: 52, borderRadius: 999,
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: saved ? '#ED2E50' : 'var(--text-secondary)',
-              cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
-          </button>
-          <button
-            onClick={handleRsvpClick}
-            style={{
-              flex: 1, minWidth: 120, height: 52, borderRadius: 999,
-              background: isRsvpd ? 'var(--bg-surface)' : 'var(--text-primary)',
-              color: isRsvpd ? 'var(--text-primary)' : 'var(--bg-base)',
-              border: isRsvpd ? '1px solid var(--border-default)' : 'none',
-              cursor: 'pointer',
-              fontSize: 14, fontWeight: 600,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {isRsvpd
-              ? <><Check size={14} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 5 }} />You're going</>
-              : 'RSVP'}
-          </button>
-
-          {/* Message organizer — one button per accepted channel. */}
-          {(
-            hasBoth ? (
-              contactLinks.map(link => (
-                <button
-                  key={link.channel}
-                  onClick={() => handleContact(link)}
-                  aria-label={link.ariaLabel}
-                  style={{
-                    width: 52, height: 52, borderRadius: 999,
-                    background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
-                    color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
-                    border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', flexShrink: 0,
-                  }}
-                >
-                  {link.channel === 'whatsapp' ? <WhatsAppGlyph /> : <Mail size={16} strokeWidth={1.8} />}
-                </button>
-              ))
-            ) : contactLinks.length === 1 ? (
-              <button
-                onClick={() => handleContact(contactLinks[0])}
-                aria-label={contactLinks[0].ariaLabel}
-                style={{
-                  width: 52, height: 52, borderRadius: 999,
-                  background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
-                  color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
-                  border: contactLinks[0].channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', flexShrink: 0,
-                }}
-              >
-                {contactLinks[0].channel === 'whatsapp'
-                  ? <WhatsAppGlyph />
-                  : <Mail size={16} strokeWidth={1.8} />}
-              </button>
-            ) : gate === 'sign-in' ? (
-              <button
-                onClick={onRequireAuth}
-                aria-label={`Sign in to message ${event.organizer?.name ?? 'the organizer'}`}
-                style={{
-                  width: 52, height: 52, borderRadius: 999,
-                  background: 'var(--bg-surface)', color: 'var(--text-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', flexShrink: 0,
-                }}
-              >
-                <Mail size={16} strokeWidth={1.8} />
-              </button>
-            ) : null
-          )}
-          </>
-          )}
-        </div>
-        {/* Going + form → quick access to their own submission. */}
-        {!isOwner && isRsvpd && !!event.hasForm && onEditRegistration && (
-          <button
-            type="button"
-            onClick={() => { haptics.selection(); onEditRegistration(); }}
-            style={{
-              alignSelf: 'center',
-              background: 'none', border: 'none', padding: '2px 4px',
-              cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              color: 'var(--text-secondary)', fontFamily: 'inherit',
-              textDecoration: 'underline', textDecorationStyle: 'dotted',
-              pointerEvents: 'auto',
-            }}
-          >
-            View / edit your registration
-          </button>
-        )}
-        </div>
-      </section>
       {isOwner && (
         <PhotoEditDialog
           open={photoEditOpen}
