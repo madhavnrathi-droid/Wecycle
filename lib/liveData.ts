@@ -521,8 +521,11 @@ export async function createEvent(input: NewEventInput): Promise<string> {
     ? await uploadMedia('events', input.media)
     : { photoUrls: [], videoUrls: [] };
 
-  /* Combine date + time into a timestamptz. Falls back to midnight when the
-     time is blank. */
+  /* Combine date + time into a timestamptz. A blank time is legitimate — the
+     organiser has a date but not an hour yet — so starts_at holds midnight and
+     `time_unspecified` records WHY, since midnight is otherwise a real time and
+     would read back as "12:00 am" as though they'd chosen it. */
+  const timeUnspecified = !input.time;
   const startsAt = new Date(`${input.date}T${input.time || '00:00'}:00`).toISOString();
 
   const { data, error } = await supabase.from('events').insert({
@@ -532,13 +535,17 @@ export async function createEvent(input: NewEventInput): Promise<string> {
     description: input.description?.trim() || null,
     event_type: input.eventType,
     starts_at: startsAt,
+    time_unspecified: timeUnspecified,
     location: input.location.trim(),
     max_attendees: input.maxAttendees ?? null,
     status: 'published',
     cover_url: photoUrls[0] ?? null,
     photo_urls: photoUrls,
     video_urls: videoUrls,
-  }).select('id').single();
+    /* `as never`: lib/database.types.ts is generated and predates
+       time_unspecified, so the typed Insert treats any newer column as never.
+       Same cast the listings insert uses for the columns added since. */
+  } as never).select('id').single();
   if (error) throw error;
   notifyPostsChanged();
   return (data as { id: string }).id;
@@ -712,6 +719,8 @@ interface EventRowLite {
   event_type: CommunityEvent['eventType'];
   color_accent: string | null;
   starts_at: string;
+  /* True when the organiser gave a date but no start time. */
+  time_unspecified?: boolean | null;
   location: string;
   max_attendees: number | null;
   attendee_count: number | null;
@@ -742,7 +751,9 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
     description: row.description ?? '',
     eventType: row.event_type,
     date: fmtDate(row.starts_at),
-    time: fmtTime(row.starts_at),
+    /* Empty string when the organiser never gave a time; every display site
+       treats a falsy time as "date only". */
+    time: row.time_unspecified ? '' : fmtTime(row.starts_at),
     /* Carry the raw timestamp so the organizer's edit form never has to
        re-parse the formatted strings above. */
     startsAt: row.starts_at,
@@ -940,16 +951,26 @@ export async function updateEvent(id: string, patch: EditEventPatch) {
     const two = (n: number) => String(n).padStart(2, '0');
     const datePart = patch.date
       || (baseValid ? `${base!.getFullYear()}-${two(base!.getMonth() + 1)}-${two(base!.getDate())}` : '');
-    const timePart = patch.time
-      || (baseValid ? `${two(base!.getHours())}:${two(base!.getMinutes())}` : '');
-    if (!datePart || !timePart) {
-      throw new Error('Add both a date and a start time before saving.');
+    /* An explicitly-cleared time is now legitimate (time is optional), so only
+       the DATE is mandatory. A blank time stores midnight and records
+       time_unspecified, exactly like create — never guessed from the old row,
+       which is what once moved events to 1970. */
+    const clearedTime = patch.time !== undefined && !patch.time;
+    const timePart = clearedTime
+      ? '00:00'
+      : (patch.time
+         || (baseValid ? `${two(base!.getHours())}:${two(base!.getMinutes())}` : ''));
+    if (!datePart) {
+      throw new Error('Add a date before saving.');
     }
-    const next = new Date(`${datePart}T${timePart}:00`);
+    const next = new Date(`${datePart}T${timePart || '00:00'}:00`);
     if (Number.isNaN(next.getTime())) {
-      throw new Error('That date and time didn’t make sense — please re-enter them.');
+      throw new Error('That date didn’t make sense — please re-enter it.');
     }
     update.starts_at = next.toISOString();
+    if (patch.time !== undefined) {
+      (update as { time_unspecified?: boolean }).time_unspecified = clearedTime;
+    }
   }
   const { error } = await supabase.from('events').update(update as never).eq('id', id);
   if (error) throw error;

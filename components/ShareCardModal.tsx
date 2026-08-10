@@ -23,7 +23,7 @@ import {
 import { shareLink } from '../lib/share';
 import { sfxOpen, sfxShare, sfxTap } from '../lib/sfx';
 import { haptics } from '../lib/haptics';
-import { Z_LAYER } from '../lib/zLayers';
+import { Z_LAYER, zPanel } from '../lib/zLayers';
 
 interface Props {
   open: boolean;
@@ -161,7 +161,12 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
             position: 'fixed', left: '50%', top: '50%',
             transform: 'translate(-50%, -50%)',
             width: 'min(420px, 94vw)',
-            zIndex: 301,
+            /* Must sit ABOVE its own overlay. This was a hardcoded 301 while the
+               overlay above uses Z_LAYER.shareCard (500), so the card rendered
+               BEHIND its own dark blur — the whole sheet appeared washed out and
+               unreadable. Derive it from the same constant so the two can never
+               invert again. */
+            zIndex: zPanel(Z_LAYER.shareCard),
           }}
         >
           <div ref={cardRef} style={{

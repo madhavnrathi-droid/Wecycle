@@ -11,6 +11,7 @@ import CommentsSection from './CommentsSection';
 import RelatedShelf from './RelatedShelf';
 import type { LostItem } from '../lib/mockData';
 import { useBreakpoint } from '../lib/useBreakpoint';
+import { useNaturalAspect } from '../lib/useNaturalAspect';
 import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, contactGate, itemAction, opportunityAction, actionLabel, type ContactLink, type ContactGate } from '../lib/contactUser';
 import {
@@ -432,6 +433,16 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setShareCardOpen(true);
   };
   /* The card shows every photo (cover full-bleed + the rest as a strip). */
+  /* Hero frame follows the cover's real shape instead of a hard 4:5, so a
+     landscape or 9:16 upload isn't cropped. */
+  const coverForAspect = (() => {
+    const p = displayPhotos[0] as unknown;
+    if (typeof p === 'string') return p;
+    const o = p as { poster?: string; src?: string } | undefined;
+    return o?.poster ?? o?.src;
+  })();
+  const heroAspect = useNaturalAspect(coverForAspect);
+
   const shareImages = displayPhotos
     .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
     .filter((u): u is string => !!u && /^https?:|^\//.test(u));
@@ -510,6 +521,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         isOwner={isOwner}
         heroSentinelRef={heroSentinelRef}
         heroVisible={heroVisible}
+        heroAspect={heroAspect}
         /* Inline-edit state, threaded down so the desktop layout's title /
            description / price etc. become editable in the same way. */
         editState={{
@@ -669,14 +681,15 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           <div style={{
             position: 'relative',
             width: '100%',
-            aspectRatio: '4 / 5',
+            aspectRatio: heroAspect,
             borderRadius: 24,
             overflow: 'hidden',
             background: 'var(--bg-inset)',
           }}>
             <PhotoCarousel
               photos={displayPhotos}
-              aspectRatio="4 / 5"
+              aspectRatio={heroAspect}
+              objectFit="contain"
               dotsPosition="bottom"
               radius={24}
             />
@@ -712,7 +725,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             aria-label="Add photos"
             style={{
               width: '100%',
-              aspectRatio: '4 / 5',
+              aspectRatio: heroAspect,
               borderRadius: 24,
               background: 'var(--bg-inset)',
               border: '2px dashed var(--border-default)',
@@ -1289,6 +1302,8 @@ interface EditState {
 
 interface DesktopLayoutProps {
   item: MarketplaceItem;
+  /** Hero frame ratio measured from the cover image — see useNaturalAspect. */
+  heroAspect: string;
   /* Mixed media slides — photo URL strings or video records. */
   photos: import('../lib/photos').MediaEntry[];
   saved: boolean;
@@ -1321,6 +1336,7 @@ interface DesktopLayoutProps {
 }
 
 function DesktopLayout({
+  heroAspect,
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   onOpenItem, onOpenLF,
@@ -1474,14 +1490,15 @@ function DesktopLayout({
             width: '100%',
             maxWidth: 560,
             margin: '0 auto',
-            aspectRatio: '4 / 5',
+            aspectRatio: heroAspect,
             borderRadius: 20,
             overflow: 'hidden',
             background: 'var(--bg-inset)',
           }}>
             <PhotoCarousel
               photos={photos}
-              aspectRatio="4 / 5"
+              aspectRatio={heroAspect}
+              objectFit="contain"
               dotsPosition="bottom"
               radius={20}
             />
@@ -1556,7 +1573,7 @@ function DesktopLayout({
                 maxWidth: 560,
                 margin: '0 auto',
                 display: 'flex',
-                aspectRatio: '4 / 5',
+                aspectRatio: heroAspect,
                 borderRadius: 20,
                 background: 'var(--bg-inset)',
                 border: '2px dashed var(--border-default)',

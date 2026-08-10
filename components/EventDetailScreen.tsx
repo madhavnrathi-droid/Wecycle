@@ -15,6 +15,7 @@ import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import { useBreakpoint } from '../lib/useBreakpoint';
+import { useNaturalAspect } from '../lib/useNaturalAspect';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { shareLink, addEventToCalendar } from '../lib/share';
@@ -138,6 +139,9 @@ export default function EventDetailScreen({
   const shouldClamp = desc.length > 220;
   const { user, profile } = useAuth();
   const { isDesktop } = useBreakpoint();
+  /* The hero frame follows the poster's real shape rather than forcing 4:5,
+     so a landscape banner or a 9:16 phone shot isn't cropped. */
+  const heroAspect = useNaturalAspect(displayPhotos[0]);
 
   const pct = event.maxAttendees ? Math.min(100, (event.attendees / event.maxAttendees) * 100) : 60;
 
@@ -487,14 +491,15 @@ export default function EventDetailScreen({
               position: 'relative',
               width: '100%',
               maxWidth: isDesktop ? 560 : undefined,
-              aspectRatio: '4 / 5',
+              aspectRatio: heroAspect,
               borderRadius: 24,
               overflow: 'hidden',
               background: 'var(--bg-inset)',
             }}>
               <PhotoCarousel
                 photos={displayPhotos}
-                aspectRatio="4 / 5"
+                aspectRatio={heroAspect}
+                objectFit="contain"
                 dotsPosition="bottom"
                 radius={24}
                 overlay={
@@ -568,7 +573,7 @@ export default function EventDetailScreen({
               style={{
                 width: '100%',
                 maxWidth: isDesktop ? 560 : undefined,
-                aspectRatio: '4 / 5',
+                aspectRatio: heroAspect,
                 borderRadius: 24,
                 background: 'var(--bg-inset)',
                 border: '2px dashed var(--border-default)',
@@ -915,11 +920,15 @@ export default function EventDetailScreen({
                 label="Date"
                 value={event.date}
               />
-              <FactRow
-                icon={<Clock size={14} strokeWidth={1.8} />}
-                label="Time"
-                value={event.time}
-              />
+              {/* Omitted rather than shown blank when the organiser gave a
+                  date but no start time. */}
+              {event.time && (
+                <FactRow
+                  icon={<Clock size={14} strokeWidth={1.8} />}
+                  label="Time"
+                  value={event.time}
+                />
+              )}
               <FactRow
                 icon={<MapPin size={14} strokeWidth={1.8} />}
                 label="Location"

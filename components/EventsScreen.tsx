@@ -9,6 +9,7 @@ import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchEvents, onPostsChanged } from '../lib/liveData';
 import EmptyState from './EmptyState';
 import { resolveEventPhoto, getAvatar } from '../lib/photos';
+import FitImage from './FitImage';
 import { useAuth } from '../lib/AuthContext';
 
 interface EventsScreenProps {
@@ -382,7 +383,7 @@ function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; 
           <p className="rsvp-card-title">{event.title}</p>
           <p className="rsvp-card-when">
             <CalendarDays size={11} strokeWidth={1.8} />
-            {event.date} · {event.time}
+            {[event.date, event.time].filter(Boolean).join(' · ')}
           </p>
         </div>
       </button>
@@ -473,7 +474,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <CalendarDays size={12} strokeWidth={1.8} />
-            {event.date} · {event.time}
+            {[event.date, event.time].filter(Boolean).join(' · ')}
           </span>
         </div>
         <div style={{
@@ -550,7 +551,7 @@ function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEve
         className="ev-row-open"
       >
         <span className="ev-row-poster">
-          <img src={photo} alt="" loading="lazy" />
+          <FitImage src={photo} />
         </span>
 
         <span className="ev-row-body">

@@ -2867,7 +2867,11 @@ img[src*="/storage/v1/object/public/"] {
   background: var(--bg-inset);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; cursor: pointer; color: var(--text-secondary);
-  font-family: inherit; transition: border-color 0.15s var(--ease-smooth), color 0.15s;
+  font-family: inherit;
+  /* background + transform included so the drag-over state eases in rather
+     than snapping — see .photo-empty[data-dropping]. */
+  transition: border-color 0.15s var(--ease-smooth), color 0.15s,
+              background 0.15s var(--ease-smooth), transform 0.15s var(--ease-smooth);
 }
 .photo-empty:hover { border-color: var(--text-primary); color: var(--text-primary); }
 .photo-empty-title { font-size: 15px; font-weight: 600; }
@@ -4664,14 +4668,9 @@ textarea:focus-visible {
   background: var(--bg-inset);
   overflow: hidden;
 }
-.pcard-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.35s var(--ease-smooth);
-}
-.pcard:hover .pcard-media img { transform: scale(1.04); }
+/* Media inside a card is a FitImage (two layers, contained). Hover zooms only
+   the real image; the blurred bed stays put so the seam can't show. */
+.pcard:hover .pcard-media .fit-img-fg { transform: scale(1.04); }
 .pcard-ph {
   display: flex;
   align-items: center;
@@ -4782,7 +4781,8 @@ textarea:focus-visible {
 .pcard-badge[data-kind="hiring"]       { background: rgba(37, 99, 235, 0.95); }
 .pcard-badge[data-kind="free"]        { background: rgba(22, 163, 74, 0.95); }
 
-.pcard[data-closed] .pcard-media img { filter: grayscale(0.7); opacity: 0.7; }
+.pcard[data-closed] .pcard-media .fit-img-fg { filter: grayscale(0.7); opacity: 0.7; }
+.pcard[data-closed] .pcard-media .fit-img-bg { filter: blur(16px) grayscale(0.8); opacity: 0.35; }
 .pcard-closed {
   position: absolute;
   inset: 0 0 auto 0;
@@ -4983,12 +4983,9 @@ textarea:focus-visible {
   background: var(--bg-inset);
   display: block;
 }
-.ev-row-poster img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+/* Poster is a FitImage — a square or landscape poster is shown whole rather
+   than centre-cropped into the 2:3 frame. */
+.ev-row-poster { position: relative; }
 
 .ev-row-body {
   flex: 1;
@@ -5101,7 +5098,12 @@ textarea:focus-visible {
   transform: translateX(-50%);
   width: 100%;
   max-width: 430px;
-  padding: 12px 16px calc(80px + env(safe-area-inset-bottom, 0px));
+  /* Only the device's safe area plus a small gap. This used to add 80px to
+     clear the bottom nav dock — but the event detail is a full-page view and
+     the dock isn't rendered here at all (verified: no .bottom-nav in the tree),
+     so that 80px was pure dead space and pushed the buttons visibly high up the
+     screen with an empty band underneath. */
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to bottom, transparent, var(--bg-base) 35%, var(--bg-base) 100%);
   pointer-events: none;
   z-index: 30;
@@ -5121,4 +5123,61 @@ textarea:focus-visible {
     pointer-events: auto;
     z-index: auto;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FIT-IMAGE — whole image, never cropped, blurred fill behind
+   See components/FitImage.tsx for why. Replaces object-fit: cover on
+   every fixed-ratio tile so any upload ratio displays in full.
+   ═══════════════════════════════════════════════════════════════════ */
+.fit-img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  background: var(--bg-inset);
+}
+/* Blurred, over-scaled copy of the same image fills whatever `contain` leaves
+   over. Scaled past the edges so the blur has no visible seam. */
+.fit-img-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.15);
+  filter: blur(16px) saturate(1.15);
+  opacity: 0.6;
+  pointer-events: none;
+}
+/* The real image — always complete. */
+.fit-img-fg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.35s var(--ease-smooth);
+}
+/* Background-removed products are transparent: a blurred copy of transparency
+   is nothing, so give them the clean white bed they were designed against. */
+.fit-img--cutout { background: #fff; }
+
+.dark .fit-img-bg { opacity: 0.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fit-img-fg { transition: none; }
+}
+
+/* Drag-and-drop target state for the photo picker (desktop). The box already
+   looks droppable; this confirms the drop will land. */
+.photo-empty[data-dropping] {
+  border-color: var(--accent-lime-dim);
+  background: var(--accent-lime-surface);
+  color: var(--text-primary);
+  transform: scale(1.01);
+}
+.photo-empty[data-dropping] .photo-empty-title { color: var(--text-primary); }
+@media (prefers-reduced-motion: reduce) {
+  .photo-empty[data-dropping] { transform: none; }
 }

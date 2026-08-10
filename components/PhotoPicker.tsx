@@ -57,6 +57,13 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   const mediaRef = useRef<Map<string, CompressedMedia>>(new Map());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(0);            /* files compressing */
+  /* Desktop drag-and-drop. Dropping goes through the SAME addFiles() path as the
+     file dialog, so compression, HEIC handling, the max-count cap and the video
+     size limit all apply identically — a dropped file is not a second code path.
+     Depth-counted because dragenter/dragleave also fire for child elements, and
+     a naive boolean flickers the highlight off as the pointer crosses them. */
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
   const [processingCount, setProcessingCount] = useState(0); /* bg-removals left */
   const [cuttingIdx, setCuttingIdx] = useState<number | null>(null); /* single cut */
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -230,6 +237,36 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
 
   const remaining = Math.max(0, max - photos.length);
 
+  /* Only react to an actual file drag — ignore text/link drags so dragging a
+     selection across the form doesn't light up a photo drop target. */
+  const isFileDrag = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer?.types ?? []).includes('Files');
+
+  const onDragEnter = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDropping(true);
+  };
+  const onDragOver = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    /* Required, or the browser navigates to the dropped file instead. */
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDropping(false);
+  };
+  const onDrop = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDropping(false);
+    void addFiles(e.dataTransfer.files);
+  };
+
   const addFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const toProcess = Array.from(files).slice(0, remaining);
@@ -360,10 +397,26 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
           )}
         </div>
       ) : (
-        <button type="button" className="photo-empty" onClick={onAddClick} disabled={busy > 0}>
+        <button
+          type="button"
+          className="photo-empty"
+          data-dropping={dropping || undefined}
+          onClick={onAddClick}
+          disabled={busy > 0}
+          onDragEnter={onDragEnter}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+        >
           <ImagePlus size={32} strokeWidth={1.5} />
-          <span className="photo-empty-title">Add photos</span>
-          <span className="photo-empty-hint">Up to {max} · the first one is your cover</span>
+          <span className="photo-empty-title">
+            {dropping ? 'Drop to upload' : 'Add photos'}
+          </span>
+          <span className="photo-empty-hint">
+            {dropping
+              ? 'Release and we’ll handle the rest'
+              : `Up to ${max} · the first one is your cover`}
+          </span>
         </button>
       )}
 

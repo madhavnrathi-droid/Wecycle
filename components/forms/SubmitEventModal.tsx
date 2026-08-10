@@ -78,7 +78,6 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
     if (!form.title.trim()) e.title = 'Required';
     if (!form.eventType) e.eventType = 'Pick a type';
     if (!form.date) e.date = 'Required';
-    if (!form.time) e.time = 'Required';
     if (!form.location.trim()) e.location = 'Required';
     if (!form.description.trim()) e.description = 'Tell people what to expect';
     setErrors(e);
@@ -168,7 +167,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
             className="btn btn-gradient"
             style={{ flex: 2 }}
           >
-            {submitting ? 'Submitting…' : 'Submit for review'}
+            {submitting ? 'Posting…' : 'Post'}
           </button>
         </>
       }
@@ -231,7 +230,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           </div>
           <div className="field">
             <label htmlFor="ev-time" className="field-label">
-              Time <span className="required" aria-hidden="true">*</span>
+              Time <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
             </label>
             <input
               id="ev-time"
@@ -239,10 +238,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
               className="form-input"
               value={form.time}
               onChange={e => update('time', e.target.value)}
-              aria-required="true"
-              aria-invalid={!!errors.time}
             />
-            {errors.time && <span className="field-error">{errors.time}</span>}
           </div>
         </div>
 

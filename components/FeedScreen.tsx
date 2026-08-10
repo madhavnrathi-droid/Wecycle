@@ -27,6 +27,7 @@ import { haptics } from '../lib/haptics';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
+import FitImage from './FitImage';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -1080,7 +1081,7 @@ function ProductCard({
       <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open ${item.title}`}>
         <span className="pcard-media">
           {cover.url
-            ? <img src={cover.url} alt="" loading="lazy" style={cut ? { background: '#fff', objectFit: 'contain' } : undefined} />
+            ? <FitImage src={cover.url} cutout={cut} />
             : <span className="pcard-ph" style={{ background: tintFor(item.photoColor) }} aria-hidden="true">{item.photoIcon || '📦'}</span>}
         </span>
         <span className="pcard-body">
@@ -1124,7 +1125,7 @@ function LostFoundCard({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
     <article className="pcard">
       <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open ${lf.title}`}>
         <span className="pcard-media">
-          <img src={photo} alt="" loading="lazy" style={cut ? { background: '#fff', objectFit: 'contain' } : undefined} />
+          <FitImage src={photo} cutout={cut} />
         </span>
         <span className="pcard-body">
           <span className="pcard-title">{lf.title}</span>
@@ -1159,7 +1160,7 @@ function EventCard({ event, onClick }: { event: CommunityEvent; onClick: () => v
     <article className="pcard">
       <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open event ${event.title}`}>
         <span className="pcard-media">
-          <img src={photo} alt="" loading="lazy" style={cut ? { background: '#fff', objectFit: 'contain' } : undefined} />
+          <FitImage src={photo} cutout={cut} />
         </span>
         <span className="pcard-body">
           <span className="pcard-title">{event.title}</span>
