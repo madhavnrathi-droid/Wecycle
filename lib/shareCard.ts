@@ -453,22 +453,6 @@ function arrowButton(
   ctx.stroke();
 }
 
-/** Decorative barcode, deterministic from the post URL so a card is stable. */
-function barcode(
-  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, ink: string, seed: string,
-) {
-  let s = 0;
-  for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) & 0x7fffffff;
-  const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-  ctx.fillStyle = ink;
-  let cx = x;
-  while (cx < x + w - 2) {
-    const bw = 2 + Math.floor(rnd() * 5);
-    if (rnd() > 0.34) ctx.fillRect(cx, y, bw, h);
-    cx += bw + 1 + Math.floor(rnd() * 3);
-  }
-}
-
 /** `rgba()` from either a hex or an existing rgba string. */
 function withAlphaCss(color: string, a: number): string {
   return color.startsWith('#') ? withAlpha(color, a) : color;
@@ -493,25 +477,52 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const ctx = canvas.getContext('2d')!;
 
   const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
-  const [wordmark, logo, hero] = await Promise.all([
+  const [wordmark, logo, avatar, hero] = await Promise.all([
     loadImage('/brand/wordmark.png', false),
     loadImage('/brand/logomark.png', false),
+    spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
     urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
   ]);
 
   /* ── Panel A height, measured ── */
-  ctx.font = `800 92px ${FONT}`;
-  const titleLines = wrapText(ctx, spec.title, W - FX * 2 - 40, 2);
+  /* Title auto-fit.
+   *
+   * The title is the one element on the card that must never be cut: a share
+   * card whose headline reads "Lost black Casio watch near the libr…" has
+   * failed at the only job it has. Fixed 92px/2-line wrapping ellipsised any
+   * title past ~38 characters, so instead step down through size/line-count
+   * pairs and take the first that fits whole. Big titles stay big; long ones
+   * get smaller rather than truncated — the trade every editorial layout makes.
+   *
+   * Leading tracks the size (1.09×) so the block stays optically even at any
+   * step, rather than the old hard-coded 100px that only suited 92px type. */
+  const TITLE_MAXW = W - FX * 2 - 40;
+  /* Ladder verified against real titles from 5 to 121 characters: nothing
+     truncates. Order matters — hold 92px and spend a line first (a 39-char
+     title stays big and goes to three lines), only then start shrinking.
+     Shrinking before wrapping made short titles needlessly small. */
+  const STEPS: [number, number][] = [
+    [92, 2], [92, 3], [80, 3], [80, 4], [70, 4], [62, 4], [56, 4],
+  ];
+  let titleSize = 56;
+  let titleLines = [spec.title];
+  for (const [size, maxLines] of STEPS) {
+    ctx.font = `800 ${size}px ${FONT}`;
+    const lines = wrapText(ctx, spec.title, TITLE_MAXW, maxLines);
+    titleSize = size; titleLines = lines;
+    if (!lines[lines.length - 1].endsWith('…')) break;
+  }
+  const TITLE_LH = Math.round(titleSize * 1.09);
   const subtitle = (spec.description ?? '').trim();
   ctx.font = `400 38px ${FONT}`;
   const subLines = subtitle ? wrapText(ctx, subtitle, W - FX * 2 - 120, 2) : [];
 
   const TOP_ROW = 56 + 62;                       // pill row
   const TITLE_TOP = TOP_ROW + 66;
-  const TITLE_H = titleLines.length * 100;
+  const TITLE_H = titleLines.length * TITLE_LH;
   const SUB_H = subLines.length ? 20 + subLines.length * 50 : 0;
-  const META_H = 190;                            // date box / columns + arrow
-  const FOOT_H = 138;                            // barcode + tagline
+  const META_H = 200;                            // date box / columns + arrow
+  const FOOT_H = 112;                            // attribution + tagline
   const panelA = Math.round(TITLE_TOP + TITLE_H + SUB_H + 46 + META_H + 34 + FOOT_H);
 
   /* ── Panel B: the photo, uncropped ──
@@ -564,12 +575,13 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     }
 
     /* Title — the largest thing on the card, as in every reference. */
-    ctx.font = `800 92px ${FONT}`;
+    ctx.font = `800 ${titleSize}px ${FONT}`;
     ctx.fillStyle = ink.primary;
     ctx.textBaseline = 'alphabetic';
-    titleLines.forEach((ln, i) => ctx.fillText(ln, FX, TITLE_TOP + 74 + i * 100));
+    const capTop = Math.round(titleSize * 0.8);   // first baseline
+    titleLines.forEach((ln, i) => ctx.fillText(ln, FX, TITLE_TOP + capTop + i * TITLE_LH));
 
-    let y = TITLE_TOP + 74 + (titleLines.length - 1) * 100;
+    let y = TITLE_TOP + capTop + (titleLines.length - 1) * TITLE_LH;
 
     /* Subtitle */
     if (subLines.length) {
@@ -598,16 +610,58 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     y = metaTop + META_H - 34;
     hair(y);
 
-    /* Barcode + tagline — the reference's closing line. */
-    const bcY = y + 36;
-    barcode(ctx, FX, bcY, 300, 62, withAlphaCss(ink.primary, 0.85), spec.url ?? spec.title);
+    /* Closing row: who posted it (left) against the tagline (right).
+     *
+     * This slot held a decorative barcode, copied from the reference labels. It
+     * looked the part but carried nothing — a share card has one job, and a fake
+     * barcode does not help anyone decide to tap. The poster's name and verified
+     * tick do: "a real classmate listed this" is the single most persuasive thing
+     * left to say once the price and the photo have been seen.
+     *
+     * Left-aligned attribution keeps the card's one alignment spine (pill,
+     * title, subtitle, meta labels all start at FX); the tagline is the only
+     * right-aligned element, so it reads as a sign-off rather than a stray. */
+    const fy = y + 26;
+    /* Both halves hang off two shared centrelines (ROW1/ROW2) and both are drawn
+     * with textBaseline 'middle'. Mixing 'middle' on one side with 'alphabetic'
+     * on the other is what makes a row like this look subtly broken — the two
+     * halves land on different optical lines even though the numbers look
+     * deliberate. One baseline system for the row, always. */
+    const ROW1 = fy + 14;
+    const ROW2 = fy + 46;
+    ctx.textBaseline = 'middle';
+
+    if (spec.byName) {
+      const ar2 = 26;
+      /* Avatar centres between the two rows, not on the first — an avatar
+       * optically anchors the whole block it labels. */
+      drawAvatar(ctx, FX + ar2, (ROW1 + ROW2) / 2, ar2, avatar, spec.byInitials, spec.byColor);
+      const nx = FX + ar2 * 2 + 18;
+      ctx.font = `700 30px ${FONT}`;
+      ctx.fillStyle = ink.primary;
+      const nm = wrapText(ctx, spec.byName, 360, 1)[0];
+      ctx.fillText(nm, nx, ROW1);
+      if (spec.verified) {
+        checkBadge(ctx, nx + ctx.measureText(nm).width + 22, ROW1, 14, t.accent, '#ffffff');
+      }
+      ctx.font = `600 22px ${FONT}`;
+      ctx.fillStyle = ink.muted;
+      ctx.fillText(t.person.toUpperCase(), nx, ROW2);
+    }
+
+    /* Tagline sits a step below the name in size: the poster is the fact, the
+     * tagline is only the sign-off, so it must not out-weigh a person's name. */
     ctx.textAlign = 'right';
-    ctx.font = `600 32px ${FONT}`;
-    ctx.fillStyle = ink.primary;
+    ctx.font = `600 28px ${FONT}`;
+    /* Two lines of near-black bold out-shouted the name sitting opposite it.
+       Dropping to ~70% keeps the line legible while letting the eye land on
+       the person first — which is the half of this row that carries a fact. */
+    ctx.fillStyle = withAlphaCss(ink.primary, 0.72);
     const tag = taglineFor(spec.kind);
-    ctx.fillText(tag[0], W - FX, bcY + 26);
-    ctx.fillText(tag[1], W - FX, bcY + 66);
+    ctx.fillText(tag[0], W - FX, ROW1);
+    ctx.fillText(tag[1], W - FX, ROW2);
     ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
 
     /* ══ PANEL B — the photo + the call to action ══ */
     if (hasPhoto) {
@@ -718,7 +772,11 @@ function drawMeta(
     ctx.fillText(c.label.toUpperCase(), cx, top + 36);
     ctx.font = `700 38px ${FONT}`;
     ctx.fillStyle = ink.primary;
-    wrapText(ctx, c.value, colW - 24, 2).forEach((ln, j) => ctx.fillText(ln, cx, top + 86 + j * 42));
+    /* Three lines, not two. "MIT Academic Block 2" in a third-of-the-width
+       column needs the third line, and a half-printed location ("MIT Academic
+       B…") is useless to someone trying to find the item. Fits inside META_H
+       with room to spare: last baseline lands at top+170 of 200. */
+    wrapText(ctx, c.value, colW - 24, 3).forEach((ln, j) => ctx.fillText(ln, cx, top + 86 + j * 42));
   });
 }
 
@@ -735,9 +793,12 @@ function metaColumns(spec: ShareCardSpec): { label: string; value: string }[] {
     push('Type', spec.roleLabel);
     push('Where', spec.location);
   } else if (spec.kind === 'lost' || spec.kind === 'found') {
+    /* No 'Posted by' column here: the footer attribution row already carries
+       the name, avatar, and verified tick. Printing it in both places read as
+       a bug ("Arjun Rao" twice, 200px apart) and spent a whole column on a
+       fact the reader had already been given. */
     push(spec.kind === 'lost' ? 'Last seen' : 'Found at', spec.location);
     push('Reward', spec.reward);
-    push('Posted by', spec.byName);
   } else {
     push('Price', price);
     push('Condition', spec.conditionLabel);

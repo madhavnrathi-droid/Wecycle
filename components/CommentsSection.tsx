@@ -25,6 +25,7 @@ import { track, EVT } from '../lib/analytics';
 import { USERS, type User } from '../lib/mockData';
 import { getAvatar } from '../lib/photos';
 import ReportSheet from './ReportSheet';
+import { getBlockedUserIds, onBlocksChange } from '../lib/moderation';
 
 interface CommentsSectionProps {
   postId: string;
@@ -39,6 +40,16 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
   const { user, profile, isAdmin, isDemo } = useAuth();
   const [reportTarget, setReportTarget] = useState<{ commentId: string; commentAuthorId: string; preview: string } | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  /* Blocking has to reach comments, not just the feed. A block that still lets
+     the blocked person's replies show up under a post isn't a block — and
+     comments are the closest thing this app has to a direct message, so it's
+     the one surface where it matters most. Subscribed rather than read once so
+     blocking from the report sheet takes effect without a remount. */
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    getBlockedUserIds().then(setBlocked);
+    return onBlocksChange(() => getBlockedUserIds().then(setBlocked));
+  }, []);
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -64,7 +75,12 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
   const { tops, repliesByParent } = useMemo(() => {
     const tops: Comment[] = [];
     const repliesByParent = new Map<string, Comment[]>();
-    for (const c of comments) {
+    /* Filtering here rather than at render means a blocked author's top-level
+       comment takes its whole reply thread with it: replies keyed to a parent
+       that no longer exists are never looked up. That is the behaviour we want
+       — you should not have to read a conversation rooted in someone you
+       blocked. */
+    for (const c of comments.filter(c => !blocked.has(c.author.id))) {
       if (c.parentId) {
         const arr = repliesByParent.get(c.parentId) ?? [];
         arr.push(c);
@@ -77,7 +93,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
     tops.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     repliesByParent.forEach(arr => arr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
     return { tops, repliesByParent };
-  }, [comments]);
+  }, [comments, blocked]);
 
   /* The author object we attach to new comments. For demo sessions we forge a
      User-shaped record from the demo profile so the row renders properly. */
@@ -158,7 +174,9 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
     if (e.key === 'Escape' && replyTo) cancelReply();
   };
 
-  const total = comments.length;
+  /* Count what's actually shown — a "12 comments" header over 9 visible ones
+     silently tells the user their block didn't work. */
+  const total = tops.length + [...repliesByParent.values()].reduce((n, a) => n + a.length, 0);
 
   return (
     <section aria-label="Comments" style={{
