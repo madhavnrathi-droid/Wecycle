@@ -83,18 +83,49 @@ interface Theme {
  * with yellow only arriving in the last third. Lost & Found = white → orange →
  * pinkish red.
  */
-const MARKET: Stops = ['#FFFFFF', '#F4FBF6', '#A7E4BC', '#2C9A58'];
-const WORK:   Stops = ['#F6FCE2', '#CDEE93', '#55B863', '#F3C63F'];
-const EVENTS: Stops = ['#4C1D95', '#6D28D9', '#B0389A', '#F5B331'];
-const FINDS:  Stops = ['#FFF7F0', '#FFCAA3', '#FF7A18', '#EC3A63'];
+/* Every stop is dark enough for white text. Measured, not eyeballed — white on
+ * each stop, and the 74%-white muted ink on each stop:
+ *
+ *              white   muted            white   muted
+ *   MARKET  #04301B 14.55  8.55   #0A5C36  8.09  5.23
+ *           #0E7A47  5.39  3.69   #128850  4.50  3.19
+ *   WORK    #14330E 13.91  8.28   #1E4A12 10.28  6.43
+ *           #356B14  6.43  4.35   #867710  4.51  3.26
+ *   EVENTS  #2E1065 15.24  8.77   #5B21B6  8.98  5.56
+ *           #9D2B8A  6.67  4.36   #996F1F  4.52  3.26
+ *   FINDS   #4A1505 14.99  8.67   #7E2609  9.68  5.99
+ *           #B83C10  5.69  3.79   #C42340  5.74  3.73
+ *
+ * Worst case across all sixteen stops is 4.50:1 for white and 3.19:1 for the
+ * muted ink, so the whole surface clears WCAG AA for body text — not just the
+ * 2.5:1 that was asked for.
+ *
+ * The events palette used to end on #F5B331, a bright amber that gave white
+ * only 1.85:1: the one card already using white ink had a region that failed
+ * the brief it was the model for. Its amber is now a deep gold. That is the
+ * unavoidable cost of white-on-amber — amber has to be dark to carry white,
+ * and there is no clever way around the physics.
+ *
+ * Each ramp keeps a luminance spread of 0.115–0.163, so the gradients still
+ * visibly travel rather than reading as one flat dark field. */
+const MARKET: Stops = ['#04301B', '#0A5C36', '#0E7A47', '#128850'];
+const WORK:   Stops = ['#14330E', '#1E4A12', '#356B14', '#867710'];
+const EVENTS: Stops = ['#2E1065', '#5B21B6', '#9D2B8A', '#996F1F'];
+const FINDS:  Stops = ['#4A1505', '#7E2609', '#B83C10', '#C42340'];
 
 const THEME: Record<ShareCardKind, Theme> = {
-  item:    { label: 'For sale',  colors: MARKET, light: true,  glyph: '📦', person: 'Verified member', accent: '#0B7A46' },
-  request: { label: 'Wanted',    colors: MARKET, light: true,  glyph: '🙌', person: 'Verified member', accent: '#0B7A46' },
-  job:     { label: 'Hiring',    colors: WORK,   light: true,  glyph: '💼', person: 'Posted by',       accent: '#1F7A3D' },
+  /* `light: false` throughout now — every board carries white ink, which is
+     what the events card was already doing and the look to match. The accents
+     are the dot in the pill and the verified tick, so they moved up-key to stay
+     visible on a dark wash; the old #0B7A46 green would have disappeared into
+     its own background. Each clears 2.58:1 or better against the lightest stop
+     of its own palette. */
+  item:    { label: 'For sale',  colors: MARKET, light: false, glyph: '📦', person: 'Verified member', accent: '#4ADE80' },
+  request: { label: 'Wanted',    colors: MARKET, light: false, glyph: '🙌', person: 'Verified member', accent: '#4ADE80' },
+  job:     { label: 'Hiring',    colors: WORK,   light: false, glyph: '💼', person: 'Posted by',       accent: '#BEF264' },
   event:   { label: 'Event',     colors: EVENTS, light: false, glyph: '🎉', person: 'Organiser',       accent: '#FFD84D' },
-  lost:    { label: 'Lost',      colors: FINDS,  light: true,  glyph: '🔎', person: 'Reported by',     accent: '#D62E52' },
-  found:   { label: 'Found',     colors: FINDS,  light: true,  glyph: '✅', person: 'Found by',        accent: '#D62E52' },
+  lost:    { label: 'Lost',      colors: FINDS,  light: false, glyph: '🔎', person: 'Reported by',     accent: '#FF9A6B' },
+  found:   { label: 'Found',     colors: FINDS,  light: false, glyph: '✅', person: 'Found by',        accent: '#FF9A6B' },
 };
 
 /** Ink tokens derived from the wash's lightness — one place, so every text
@@ -560,12 +591,12 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const subLines = subtitle ? wrapText(ctx, subtitle, W - FX * 2 - 120, 2) : [];
 
   const TOP_ROW = 56 + 62;                       // pill row
-  const TITLE_TOP = TOP_ROW + 66;
+  const TITLE_TOP = TOP_ROW + 50;
   const TITLE_H = titleLines.length * TITLE_LH;
   const SUB_H = subLines.length ? 20 + subLines.length * 50 : 0;
-  const META_H = 200;                            // date box / columns + arrow
-  const FOOT_H = 112;                            // attribution + tagline
-  const panelA = Math.round(TITLE_TOP + TITLE_H + SUB_H + 46 + META_H + 34 + FOOT_H);
+  const META_H = 188;                            // date box / columns + arrow
+  const FOOT_H = 102;                            // attribution + tagline
+  const panelA = Math.round(TITLE_TOP + TITLE_H + SUB_H + 38 + META_H + 28 + FOOT_H);
 
   /* ── The photo panel, which now leads the card ──
    *
@@ -593,8 +624,17 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const STRIP = 96;                              // CTA strip, now the card's foot
   const natural = hero ? hero.width / hero.height : 1.6;
 
-  const TARGET_RATIO = 0.8;                      // 4:5 — safe in WhatsApp and IG
-  const PHOTO_FLOOR = 420;
+  const TARGET_RATIO = 0.75;
+  /* The photo is the point of the card. At 420 it was 27% of the height and
+     read as a thumbnail sitting above the real content; at 640 it is the
+     subject, which is what a share card in a chat list needs — the picture is
+     the only part that survives being shrunk to a preview.
+     Note the trade-off this makes: a taller photo means a taller card, and past
+     roughly 0.75 WhatsApp starts clipping the bottom of the bubble again. The
+     space came out of the info panel's gaps rather than the photo, and if a
+     card ever does clip, the lever is a shorter subtitle — not a smaller
+     image. */
+  const PHOTO_FLOOR = 640;
   const budget = Math.round((W + PAD * 2) / TARGET_RATIO) - PAD * 2 - panelA - STRIP;
   const photoNaturalH = W / natural;
   /* Three bounds, in priority order:
@@ -692,7 +732,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     }
 
     /* Hairline → meta row → hairline (reference's rhythm exactly) */
-    y += 52;
+    y += 44;
     const hair = (yy: number) => {
       ctx.strokeStyle = withAlphaCss(ink.primary, 0.18);
       ctx.lineWidth = 2;
@@ -700,14 +740,14 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     };
     hair(y);
 
-    const metaTop = y + 34;
+    const metaTop = y + 28;
     const arrowR = 48;
     const arrowCx = W - FX - arrowR;
     drawMeta(ctx, spec, t, ink, { fx: FX, top: metaTop, right: arrowCx - arrowR - 40 });
     arrowButton(ctx, arrowCx, metaTop + 56, arrowR,
       ink.arrowFill, ink.arrowInk);
 
-    y = metaTop + META_H - 34;
+    y = metaTop + META_H - 28;
     hair(y);
 
     /* Closing row: who posted it (left) against the tagline (right).
@@ -721,7 +761,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
      * Left-aligned attribution keeps the card's one alignment spine (pill,
      * title, subtitle, meta labels all start at FX); the tagline is the only
      * right-aligned element, so it reads as a sign-off rather than a stray. */
-    const fy = y + 26;
+    const fy = y + 22;
     /* Both halves hang off two shared centrelines (ROW1/ROW2) and both are drawn
      * with textBaseline 'middle'. Mixing 'middle' on one side with 'alphabetic'
      * on the other is what makes a row like this look subtly broken — the two
