@@ -624,33 +624,32 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const STRIP = 96;                              // CTA strip, now the card's foot
   const natural = hero ? hero.width / hero.height : 1.6;
 
-  const TARGET_RATIO = 0.75;
-  /* The photo is the point of the card. At 420 it was 27% of the height and
-     read as a thumbnail sitting above the real content; at 640 it is the
-     subject, which is what a share card in a chat list needs — the picture is
-     the only part that survives being shrunk to a preview.
-     Note the trade-off this makes: a taller photo means a taller card, and past
-     roughly 0.75 WhatsApp starts clipping the bottom of the bubble again. The
-     space came out of the info panel's gaps rather than the photo, and if a
-     card ever does clip, the lever is a shorter subtitle — not a smaller
-     image. */
-  const PHOTO_FLOOR = 640;
-  const budget = Math.round((W + PAD * 2) / TARGET_RATIO) - PAD * 2 - panelA - STRIP;
-  const photoNaturalH = W / natural;
-  /* Three bounds, in priority order:
-   *   - never exceed the photo's natural height at this width (a panorama gets
-   *     a short band; padding it would only add bed),
-   *   - otherwise take the 4:5 budget, which is generous when the info panel is
-   *     short (a one-line title with no subtitle leaves the photo ~610px), and
-   *   - never go below PHOTO_FLOOR, so the photo still reads as the card's
-   *     header even when a four-line title has eaten the budget.
+  /* The photo panel IS the photo — the frame takes the image's own ratio, so
+   * the uploaded picture fills it edge to edge with nothing beside it.
    *
-   * For a typical two-line title the floor is what binds, so most cards land
-   * near 0.76 rather than exactly 0.80. That is inside WhatsApp's safe range,
-   * which is the point — 0.80 is the aim, not a guarantee. */
-  const photoH = hasPhoto
-    ? Math.round(Math.min(photoNaturalH, Math.max(PHOTO_FLOOR, budget)))
-    : 0;
+   * This replaces a fixed band sized from a 4:5 card budget. That band forced
+   * every photo into the same shape, and anything that didn't match got a
+   * blurred bed either side. It happened to look right on the event poster only
+   * because that poster has a white background, so its bed was invisible; on a
+   * photo of a wardrobe the panels were obvious and read as a border the poster
+   * never asked for.
+   *
+   * Bounds are the same 9:16–16:9 as lib/useNaturalAspect, so a share card
+   * frames a photo exactly the way the detail screen does. Inside the clamp the
+   * fit is exact and there is no bed at all; only a genuine panorama or a
+   * skyscraper-tall image falls outside, and those still get the bed rather than
+   * being cropped.
+   *
+   * This makes cards taller — a portrait poster produces a tall card, which is
+   * the shape the reference had. WhatsApp may clip the bottom of the bubble at
+   * these ratios; the image being the subject is the explicit priority. */
+  const NAT_MIN = 0.5625;                        // 9:16
+  const NAT_MAX = 1.7778;                        // 16:9
+  const framed = Math.min(NAT_MAX, Math.max(NAT_MIN, natural));
+  const photoH = hasPhoto ? Math.round(W / framed) : 0;
+  /* Exact fit whenever the ratio was inside the clamp — the bed is then dead
+     weight and, worse, visible. */
+  const photoFillsFrame = Math.abs(framed - natural) < 1e-6;
 
   const H = panelA + (hasPhoto ? photoH + STRIP : 0);
   canvas.height = H + PAD * 2;
@@ -691,7 +690,9 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
       ctx.fillRect(0, 0, W, photoH);
       const photo = useHero ? hero : null;
       if (photo) {
-        blurredBed(ctx, photo, 0, 0, W, photoH);
+        /* No bed for the common case: the frame already matches the photo, so
+           anything painted behind it would only show as side panels. */
+        if (!photoFillsFrame) blurredBed(ctx, photo, 0, 0, W, photoH);
         containDraw(ctx, photo, 0, 0, W, photoH);
       }
       ctx.restore();
