@@ -306,48 +306,6 @@ function coverDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
 }
 
 /** object-fit: contain (whole image, never cropped). */
-/** A blurred, scaled-up copy of the photo, drawn behind the contained one.
- *
- * The photo panel is a fixed height so the finished card keeps a shape WhatsApp
- * shows whole, but the photos are every ratio a phone camera produces. Contain
- * alone left dead white bars either side of anything portrait, which read as a
- * rendering bug rather than a design. This is the same treatment
- * components/FitImage gives uploads in the app: nothing is cropped, and the
- * leftover space looks deliberate.
- *
- * The blur comes from downscaling to a few dozen pixels and letting the canvas
- * smooth it back up, NOT from ctx.filter. Filter support in older iOS WebViews
- * is patchy, and a bed that silently fails to blur looks like the photo has
- * been printed twice — a worse failure than the bars it replaces.
- */
-function blurredBed(
-  ctx: CanvasRenderingContext2D, img: HTMLImageElement,
-  x: number, y: number, w: number, h: number,
-) {
-  const TINY = 28;
-  const tw = TINY;
-  const th = Math.max(2, Math.round(TINY * (img.height / img.width)));
-  let tiny: HTMLCanvasElement;
-  try { tiny = document.createElement('canvas'); } catch { return; }
-  tiny.width = tw; tiny.height = th;
-  const tctx = tiny.getContext('2d');
-  if (!tctx) return;
-  tctx.drawImage(img, 0, 0, tw, th);
-
-  ctx.save();
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  /* Cover, so no edge of the panel is left unpainted. */
-  const ir = tw / th, rr = w / h;
-  const dw = ir > rr ? h * ir : w;
-  const dh = ir > rr ? h : w / ir;
-  ctx.drawImage(tiny, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
-  /* Knock it back so the sharp photo stays unambiguously the subject. */
-  ctx.fillStyle = 'rgba(255,255,255,0.34)';
-  ctx.fillRect(x, y, w, h);
-  ctx.restore();
-}
-
 function containDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const ir = img.width / img.height;
   const rr = w / h;
@@ -540,7 +498,19 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const W = 1080;
   const PAD = 64;
   const R = 56;
-  const FX = 72;            // content gutter (reference is generous)
+  const FX = 72;            // content gutter, in the info panel's own space
+
+  /* Info panel scale.
+   *
+   * The panel is laid out at its original size in a wider virtual space (PW)
+   * and then drawn through ctx.scale(S), which shrinks the whole block —
+   * type, gutters and rhythm together — without touching a single literal.
+   * That is "make the card a bit smaller so it accommodates all the info":
+   * the panel drops from ~836px tall to ~600, which is what frees the height
+   * the photo needs while leaving room for the attribution row and the CTA
+   * strip that were being clipped off the bottom. */
+  const S = 0.72;
+  const PW = Math.round(W / S);   // layout width inside the scaled panel
 
   const t = THEME[spec.kind];
   const ink = inkFor(t);
@@ -569,7 +539,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
    *
    * Leading tracks the size (1.09×) so the block stays optically even at any
    * step, rather than the old hard-coded 100px that only suited 92px type. */
-  const TITLE_MAXW = W - FX * 2 - 40;
+  const TITLE_MAXW = PW - FX * 2 - 40;
   /* Ladder verified against real titles from 5 to 121 characters: nothing
      truncates. Order matters — hold 92px and spend a line first (a 39-char
      title stays big and goes to three lines), only then start shrinking.
@@ -588,68 +558,63 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const TITLE_LH = Math.round(titleSize * 1.09);
   const subtitle = (spec.description ?? '').trim();
   ctx.font = `400 38px ${FONT}`;
-  const subLines = subtitle ? wrapText(ctx, subtitle, W - FX * 2 - 120, 2) : [];
+  const subLines = subtitle ? wrapText(ctx, subtitle, PW - FX * 2 - 120, 2) : [];
 
   const TOP_ROW = 56 + 62;                       // pill row
   const TITLE_TOP = TOP_ROW + 50;
   const TITLE_H = titleLines.length * TITLE_LH;
   const SUB_H = subLines.length ? 20 + subLines.length * 50 : 0;
-  const META_H = 188;                            // date box / columns + arrow
+  /* The meta band reserved its full height even with nothing to put in it,
+     which left a visible dead zone between the hairline and the attribution row
+     on a post that has no price, condition or location. Collapse it to just
+     what the arrow needs in that case. */
+  const hasDateBox = spec.kind === 'event' && !!spec.dateBadge;
+  const META_H = (metaColumns(spec).length === 0 && !hasDateBox) ? 120 : 188;
   const FOOT_H = 102;                            // attribution + tagline
-  const panelA = Math.round(TITLE_TOP + TITLE_H + SUB_H + 38 + META_H + 28 + FOOT_H);
+  /* Layout height in the panel's own space, then the real height after scale. */
+  const panelLayoutH = TITLE_TOP + TITLE_H + SUB_H + 38 + META_H + 28 + FOOT_H;
+  const panelA = Math.round(panelLayoutH * S);
 
-  /* ── The photo panel, which now leads the card ──
+  /* ── The photo panel ──
    *
-   * Two constraints fight here and both are real.
+   * Sized so the WHOLE card fits inside a shape all three target platforms
+   * render without clipping, measured rather than assumed:
    *
-   * 1. The photo must never be cropped, at any source aspect ratio.
-   * 2. The finished card must be a shape WhatsApp renders WHOLE in a chat
-   *    bubble. Anything much taller than 4:5 gets clipped, and the recipient
-   *    has to tap the card open to read the title — which is exactly the
-   *    friction the card exists to remove.
+   *   LinkedIn   0.800 (4:5)  — crops anything taller, adds "see full image"
+   *   Instagram  0.750 (3:4)  — 4:5 standard, 3:4 newly allowed
+   *   WhatsApp   0.701        — measured off a real cropped card in a chat
    *
-   * Sizing the photo purely from its own ratio satisfied (1) and broke (2):
-   * a tall poster produced a ~0.62 card that arrived cut off. So the photo
-   * takes whatever height is left after the info panel, aiming at a 4:5
-   * canvas, then gets bounded:
+   * LinkedIn is the binding cap, so 4:5 is the only ratio safe on all three,
+   * and that is the target. The photo then gets every pixel left over after
+   * the (now scaled-down) info panel and the CTA strip — about half the card,
+   * which makes it the subject rather than a header.
    *
-   *   - never taller than the photo's own natural height at this width, since
-   *     past that point the extra pixels are just white bed, and
-   *   - never shorter than PHOTO_MIN, so the image still leads the card even
-   *     when a long title has eaten the budget.
+   * Two ways the frame is filled, and never a third:
+   *   - if the photo's natural height at this width is SHORTER than the
+   *     budget, the frame shrinks to the photo. Nothing is cropped and the
+   *     card just ends up wider than 4:5, which every platform is happy with.
+   *   - if it is TALLER, the frame keeps the budget and the photo is
+   *     centre-cropped to cover it.
    *
-   * The photo is still drawn with containDraw, so whatever height it lands on
-   * it is letterboxed, never cut. */
+   * That crop is a real cost and it is deliberate. Three things were asked for
+   * at once — a big photo, no bars beside it, and every line of info visible —
+   * and for a portrait photo those cannot all hold: a 4:5 photo alone is
+   * already taller than a 4:5 card, so something has to give before the info
+   * panel is even added. Cropping the long edge of a phone photo loses the
+   * least: bars were explicitly rejected, and clipping the card loses the
+   * price, the poster and the call to action. */
   const hasPhoto = !!hero;
-  const STRIP = 96;                              // CTA strip, now the card's foot
+  const STRIP = 96;                              // CTA strip, the card's foot
   const natural = hero ? hero.width / hero.height : 1.6;
 
-  /* The photo panel IS the photo — the frame takes the image's own ratio, so
-   * the uploaded picture fills it edge to edge with nothing beside it.
-   *
-   * This replaces a fixed band sized from a 4:5 card budget. That band forced
-   * every photo into the same shape, and anything that didn't match got a
-   * blurred bed either side. It happened to look right on the event poster only
-   * because that poster has a white background, so its bed was invisible; on a
-   * photo of a wardrobe the panels were obvious and read as a border the poster
-   * never asked for.
-   *
-   * Bounds are the same 9:16–16:9 as lib/useNaturalAspect, so a share card
-   * frames a photo exactly the way the detail screen does. Inside the clamp the
-   * fit is exact and there is no bed at all; only a genuine panorama or a
-   * skyscraper-tall image falls outside, and those still get the bed rather than
-   * being cropped.
-   *
-   * This makes cards taller — a portrait poster produces a tall card, which is
-   * the shape the reference had. WhatsApp may clip the bottom of the bubble at
-   * these ratios; the image being the subject is the explicit priority. */
-  const NAT_MIN = 0.5625;                        // 9:16
-  const NAT_MAX = 1.7778;                        // 16:9
-  const framed = Math.min(NAT_MAX, Math.max(NAT_MIN, natural));
-  const photoH = hasPhoto ? Math.round(W / framed) : 0;
-  /* Exact fit whenever the ratio was inside the clamp — the bed is then dead
-     weight and, worse, visible. */
-  const photoFillsFrame = Math.abs(framed - natural) < 1e-6;
+  const TARGET_RATIO = 0.80;                     // 4:5 — safe on all three
+  const CARD_H_TARGET = Math.round((W + PAD * 2) / TARGET_RATIO) - PAD * 2;
+  const photoBudget = CARD_H_TARGET - panelA - STRIP;
+  const photoNaturalH = W / natural;
+  const photoH = hasPhoto ? Math.round(Math.min(photoNaturalH, photoBudget)) : 0;
+  /* Cover only when the photo is taller than its frame; a landscape photo that
+     fits exactly must not be scaled up and cropped for no reason. */
+  const photoNeedsCover = hasPhoto && photoNaturalH > photoH + 0.5;
 
   const H = panelA + (hasPhoto ? photoH + STRIP : 0);
   canvas.height = H + PAD * 2;
@@ -690,10 +655,12 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
       ctx.fillRect(0, 0, W, photoH);
       const photo = useHero ? hero : null;
       if (photo) {
-        /* No bed for the common case: the frame already matches the photo, so
-           anything painted behind it would only show as side panels. */
-        if (!photoFillsFrame) blurredBed(ctx, photo, 0, 0, W, photoH);
-        containDraw(ctx, photo, 0, 0, W, photoH);
+        /* Fill the frame completely, always. coverDraw centre-crops the overflow
+           when the photo is taller than its frame; when it fits exactly, cover
+           and contain are the same draw, so there is one code path and never a
+           blurred bed or a bar. */
+        if (photoNeedsCover) coverDraw(ctx, photo, 0, 0, W, photoH);
+        else containDraw(ctx, photo, 0, 0, W, photoH);
       }
       ctx.restore();
     }
@@ -701,9 +668,12 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     /* ══ THE INFO PANEL — below the photo ══ */
     ctx.save();
     ctx.translate(0, AY);
-    paintWash(ctx, W, panelA, t.colors);
+    ctx.scale(S, S);
+    /* Everything below is laid out in the panel's own space: PW wide and
+       panelLayoutH tall, shrunk by the scale above. */
+    paintWash(ctx, PW, panelLayoutH, t.colors);
     /* With no photo the wash is the whole card. */
-    if (!hasPhoto) paintWash(ctx, W, H, t.colors);
+    if (!hasPhoto) paintWash(ctx, PW, Math.round(H / S), t.colors);
 
     /* Top row: outlined kind pill, and the wordmark opposite it. */
     outlinePill(ctx, {
@@ -712,7 +682,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     });
     if (wordmark) {
       const wmH = 40, wmW = wmH * WORDMARK_AR;
-      ctx.drawImage(tintImage(wordmark, wmW, wmH, ink.primary), W - FX - wmW, 56 + (62 - wmH) / 2, wmW, wmH);
+      ctx.drawImage(tintImage(wordmark, wmW, wmH, ink.primary), PW - FX - wmW, 56 + (62 - wmH) / 2, wmW, wmH);
     }
 
     /* Title — the largest thing on the card, as in every reference. */
@@ -737,13 +707,13 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     const hair = (yy: number) => {
       ctx.strokeStyle = withAlphaCss(ink.primary, 0.18);
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(FX, yy); ctx.lineTo(W - FX, yy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(FX, yy); ctx.lineTo(PW - FX, yy); ctx.stroke();
     };
     hair(y);
 
     const metaTop = y + 28;
     const arrowR = 48;
-    const arrowCx = W - FX - arrowR;
+    const arrowCx = PW - FX - arrowR;
     drawMeta(ctx, spec, t, ink, { fx: FX, top: metaTop, right: arrowCx - arrowR - 40 });
     arrowButton(ctx, arrowCx, metaTop + 56, arrowR,
       ink.arrowFill, ink.arrowInk);
@@ -799,8 +769,8 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
        the person first — which is the half of this row that carries a fact. */
     ctx.fillStyle = withAlphaCss(ink.primary, 0.72);
     const tag = taglineFor(spec.kind);
-    ctx.fillText(tag[0], W - FX, ROW1);
-    ctx.fillText(tag[1], W - FX, ROW2);
+    ctx.fillText(tag[0], PW - FX, ROW1);
+    ctx.fillText(tag[1], PW - FX, ROW2);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
 
