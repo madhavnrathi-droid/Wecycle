@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import type { Viewport } from "next/dist/lib/metadata/types/extra-types";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
@@ -73,13 +72,6 @@ export const metadata: Metadata = {
     /* DO NOT lock maximumScale — that blocks zoom and violates WCAG 1.4.4 */
     viewportFit: "cover",
   },
-};
-
-/* viewport export kept for forward-compat with Next 14+ */
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
 };
 
 export default function RootLayout({

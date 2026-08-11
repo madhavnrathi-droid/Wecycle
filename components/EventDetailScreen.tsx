@@ -32,6 +32,7 @@ import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
+import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
 
 interface EventDetailScreenProps {
@@ -396,7 +397,7 @@ export default function EventDetailScreen({
     verified: true,
     byEmail: ownerContact.email,
     byPhone: ownerContact.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${event.id}` : undefined,
+    url: shareUrl(event.id),
   };
   const handleShareEvent = () => {
     track(EVT.share_clicked, { post_id: event.id, post_kind: 'event' });

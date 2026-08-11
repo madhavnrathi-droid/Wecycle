@@ -275,6 +275,48 @@ function coverDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
 }
 
 /** object-fit: contain (whole image, never cropped). */
+/** A blurred, scaled-up copy of the photo, drawn behind the contained one.
+ *
+ * The photo panel is a fixed height so the finished card keeps a shape WhatsApp
+ * shows whole, but the photos are every ratio a phone camera produces. Contain
+ * alone left dead white bars either side of anything portrait, which read as a
+ * rendering bug rather than a design. This is the same treatment
+ * components/FitImage gives uploads in the app: nothing is cropped, and the
+ * leftover space looks deliberate.
+ *
+ * The blur comes from downscaling to a few dozen pixels and letting the canvas
+ * smooth it back up, NOT from ctx.filter. Filter support in older iOS WebViews
+ * is patchy, and a bed that silently fails to blur looks like the photo has
+ * been printed twice — a worse failure than the bars it replaces.
+ */
+function blurredBed(
+  ctx: CanvasRenderingContext2D, img: HTMLImageElement,
+  x: number, y: number, w: number, h: number,
+) {
+  const TINY = 28;
+  const tw = TINY;
+  const th = Math.max(2, Math.round(TINY * (img.height / img.width)));
+  let tiny: HTMLCanvasElement;
+  try { tiny = document.createElement('canvas'); } catch { return; }
+  tiny.width = tw; tiny.height = th;
+  const tctx = tiny.getContext('2d');
+  if (!tctx) return;
+  tctx.drawImage(img, 0, 0, tw, th);
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  /* Cover, so no edge of the panel is left unpainted. */
+  const ir = tw / th, rr = w / h;
+  const dw = ir > rr ? h * ir : w;
+  const dh = ir > rr ? h : w / ir;
+  ctx.drawImage(tiny, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  /* Knock it back so the sharp photo stays unambiguously the subject. */
+  ctx.fillStyle = 'rgba(255,255,255,0.34)';
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
 function containDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const ir = img.width / img.height;
   const rr = w / h;
@@ -465,7 +507,7 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
    * That split is the "two parter" in the brief, and it's why the text never has
    * to fight a photo for contrast: they live in separate panels. */
   const W = 1080;
-  const PAD = 48;
+  const PAD = 64;
   const R = 56;
   const FX = 72;            // content gutter (reference is generous)
 
@@ -525,20 +567,58 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const FOOT_H = 112;                            // attribution + tagline
   const panelA = Math.round(TITLE_TOP + TITLE_H + SUB_H + 46 + META_H + 34 + FOOT_H);
 
-  /* ── Panel B: the photo, uncropped ──
-   * Height follows the image's own ratio so an in-range photo fills the panel
-   * exactly. Clamped at both ends because the panels have to add up to a
-   * shareable shape: a square photo left unclamped made a 1:2.2 card, which
-   * WhatsApp crops and Instagram won't take. Past the clamp the image is
-   * letterboxed on the white bed rather than cut — never cropped, ever. */
+  /* ── The photo panel, which now leads the card ──
+   *
+   * Two constraints fight here and both are real.
+   *
+   * 1. The photo must never be cropped, at any source aspect ratio.
+   * 2. The finished card must be a shape WhatsApp renders WHOLE in a chat
+   *    bubble. Anything much taller than 4:5 gets clipped, and the recipient
+   *    has to tap the card open to read the title — which is exactly the
+   *    friction the card exists to remove.
+   *
+   * Sizing the photo purely from its own ratio satisfied (1) and broke (2):
+   * a tall poster produced a ~0.62 card that arrived cut off. So the photo
+   * takes whatever height is left after the info panel, aiming at a 4:5
+   * canvas, then gets bounded:
+   *
+   *   - never taller than the photo's own natural height at this width, since
+   *     past that point the extra pixels are just white bed, and
+   *   - never shorter than PHOTO_MIN, so the image still leads the card even
+   *     when a long title has eaten the budget.
+   *
+   * The photo is still drawn with containDraw, so whatever height it lands on
+   * it is letterboxed, never cut. */
   const hasPhoto = !!hero;
-  const STRIP = 96;                              // CTA strip over the photo
+  const STRIP = 96;                              // CTA strip, now the card's foot
   const natural = hero ? hero.width / hero.height : 1.6;
-  const photoH = Math.round(Math.min(820, Math.max(520, W / natural)));
-  const panelB = hasPhoto ? photoH + STRIP : 0;
 
-  const H = panelA + panelB;
+  const TARGET_RATIO = 0.8;                      // 4:5 — safe in WhatsApp and IG
+  const PHOTO_FLOOR = 420;
+  const budget = Math.round((W + PAD * 2) / TARGET_RATIO) - PAD * 2 - panelA - STRIP;
+  const photoNaturalH = W / natural;
+  /* Three bounds, in priority order:
+   *   - never exceed the photo's natural height at this width (a panorama gets
+   *     a short band; padding it would only add bed),
+   *   - otherwise take the 4:5 budget, which is generous when the info panel is
+   *     short (a one-line title with no subtitle leaves the photo ~610px), and
+   *   - never go below PHOTO_FLOOR, so the photo still reads as the card's
+   *     header even when a four-line title has eaten the budget.
+   *
+   * For a typical two-line title the floor is what binds, so most cards land
+   * near 0.76 rather than exactly 0.80. That is inside WhatsApp's safe range,
+   * which is the point — 0.80 is the aim, not a guarantee. */
+  const photoH = hasPhoto
+    ? Math.round(Math.min(photoNaturalH, Math.max(PHOTO_FLOOR, budget)))
+    : 0;
+
+  const H = panelA + (hasPhoto ? photoH + STRIP : 0);
   canvas.height = H + PAD * 2;
+
+  /* Panel A starts below the photo now. Every constant in the info panel is
+     measured from its own origin, so the whole block is drawn inside one
+     translate rather than having ~20 offsets rewritten. */
+  const AY = hasPhoto ? photoH : 0;
 
   const paint = (useHero: boolean) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -559,9 +639,29 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     roundRect(ctx, 0, 0, W, H, R);
     ctx.clip();
 
-    /* ══ PANEL A — the gradient ══ */
-    paintWash(ctx, W, panelA + (hasPhoto ? 0 : 0), t.colors);
-    /* The wash covers the whole card when there's no photo panel. */
+    /* ══ THE PHOTO — top of the card ══
+     * It leads because it is the only element that works at thumbnail size:
+     * in a chat list nobody reads a title, they recognise a picture. */
+    if (hasPhoto) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, W, photoH);
+      ctx.clip();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, photoH);
+      const photo = useHero ? hero : null;
+      if (photo) {
+        blurredBed(ctx, photo, 0, 0, W, photoH);
+        containDraw(ctx, photo, 0, 0, W, photoH);
+      }
+      ctx.restore();
+    }
+
+    /* ══ THE INFO PANEL — below the photo ══ */
+    ctx.save();
+    ctx.translate(0, AY);
+    paintWash(ctx, W, panelA, t.colors);
+    /* With no photo the wash is the whole card. */
     if (!hasPhoto) paintWash(ctx, W, H, t.colors);
 
     /* Top row: outlined kind pill, and the wordmark opposite it. */
@@ -663,20 +763,14 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
 
-    /* ══ PANEL B — the photo + the call to action ══ */
+    ctx.restore();                               // end of the info panel translate
+
+    /* ══ THE CTA STRIP — the card's foot ══
+     * Last thing read, and the only instruction on the card. It used to sit
+     * over the bottom of the photo; with the photo on top it belongs here, at
+     * the very bottom edge, where a footer goes. */
     if (hasPhoto) {
-      const py = panelA;
-      const ph = H - panelA;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, py, W, ph);
-      ctx.clip();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, py, W, ph);
-      const photo = useHero ? hero : null;
-      if (photo) containDraw(ctx, photo, 0, py, W, ph - STRIP);
-      /* CTA strip: logomark + the one instruction that makes someone tap. */
-      const sy = py + ph - STRIP;
+      const sy = H - STRIP;
       ctx.fillStyle = '#0E0E08';
       ctx.fillRect(0, sy, W, STRIP);
       if (logo) ctx.drawImage(logo, FX, sy + 22, 52, 52);
@@ -690,7 +784,6 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
       ctx.fillText('wecycle.page', W - FX, sy + 49);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      ctx.restore();
     }
 
     ctx.restore();
@@ -971,7 +1064,17 @@ export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Pro
       canShare?: (d: ShareData) => boolean;
       share?: (d: ShareData) => Promise<void>;
     };
-    const data: ShareData = { files: [file], title: spec.title, text: `${cardText(spec)}\n${url}`, url } as ShareData;
+    /* The link goes in `text` ONLY.
+     *
+     * Passing both `text` (ending in the url) and `url` made WhatsApp print the
+     * link twice — it appends `url` to whatever `text` already says, so the
+     * bubble carried the same 71-character link back to back. Dropping `url`
+     * instead of trimming it from `text` is deliberate: many share targets
+     * silently discard `url` when `files` is present, so keeping it there
+     * risked sharing a card with no link at all. One copy, guaranteed. */
+    const data: ShareData = {
+      files: [file], title: spec.title, text: `${cardText(spec)}\n${url}`,
+    } as ShareData;
     if (typeof nav.share === 'function' && nav.canShare?.(data)) {
       try {
         await nav.share(data);

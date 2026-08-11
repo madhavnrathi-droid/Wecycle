@@ -34,6 +34,7 @@ import { useOwnerContact } from '../lib/useOwnerContact';
 import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import { Z_LAYER, zPanel } from '../lib/zLayers';
+import { shareUrl } from '../lib/shareUrl';
 
 interface LostFoundScreenProps {
   onReport: (defaultStatus?: 'lost' | 'found') => void;
@@ -447,7 +448,7 @@ export function LostFoundDetailSheet({
     verified: item.verified,
     byEmail: ownerContact.email,
     byPhone: ownerContact.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
+    url: shareUrl(item.id),
   };
   const handleShareLF = () => {
     track(EVT.share_clicked, { post_id: item.id, post_kind: 'lostfound' });

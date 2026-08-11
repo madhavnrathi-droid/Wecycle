@@ -34,6 +34,7 @@ import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES, closedLabelFor } from '../lib/mockData';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
+import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
 
 /* Wecycle brand stamp pinned to the top-right corner of a detail hero photo.
@@ -470,7 +471,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     verified: true,
     byEmail: ownerContact.email,
     byPhone: ownerContact.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
+    url: shareUrl(item.id),
   };
 
   /* Convenience: when only one channel is on, the primary CTA carries the
@@ -1389,7 +1390,7 @@ function DesktopLayout({
     verified: true,
     byEmail: ownerContact.email,
     byPhone: ownerContact.phone,
-    url: typeof window !== 'undefined' ? `${window.location.origin}/s/${item.id}` : undefined,
+    url: shareUrl(item.id),
   };
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
