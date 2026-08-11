@@ -94,9 +94,13 @@ export default function Drawer({
         aria-modal="true"
         aria-label="Menu"
       >
-        {/* Header */}
+        {/* Header
+            The drawer is a full-height overlay sitting above the app's
+            status-bar cap (.app-container::before), so it has to clear the
+            notch itself. Without the inset, the name and the close button sit
+            underneath the clock and the Dynamic Island on an iPhone. */}
         <div style={{
-          padding: '16px 18px 14px',
+          padding: 'calc(16px + env(safe-area-inset-top, 0px)) 18px 14px',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', gap: 12,
         }}>

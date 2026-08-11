@@ -16,7 +16,8 @@ import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, contactGate, itemAction, opportunityAction, actionLabel, type ContactLink, type ContactGate } from '../lib/contactUser';
 import {
   opportunityCompLabel, compToListing,
-  COMP_META, COMP_OPTIONS, RATE_PERIODS, RATE_BASIS_OPTIONS, type Comp, type RatePeriod,
+  COMP_META, COMP_OPTIONS, RATE_PERIODS, RATE_BASIS_OPTIONS, oppRoleBadge,
+  type Comp, type RatePeriod,
 } from '../lib/opportunity';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import {
@@ -429,7 +430,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   /* Share → generate a Spotify-style card and open the preview/share modal. */
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const handleShare = () => {
-    track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : 'item' });
+    track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : item.kind === 'opportunity' ? 'job' : 'item' });
     setShareCardOpen(true);
   };
   /* The card shows every photo (cover full-bleed + the rest as a strip). */
@@ -447,11 +448,20 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
     .filter((u): u is string => !!u && /^https?:|^\//.test(u));
   const shareCardSpec: ShareCardSpec = {
-    kind: item.isRequest ? 'request' : 'item',
+    /* An opportunity is a job/gig and gets its own share palette; only a
+       physical listing is 'item'. Without this, hiring posts shared with the
+       marketplace's white-and-green wash and a "Condition" cell. */
+    kind: item.isRequest ? 'request' : item.kind === 'opportunity' ? 'job' : 'item',
     title: item.title,
     imageUrls: shareImages,
-    price: isPriced ? item.price : undefined,
-    badge: isPriced ? undefined : priceLabel,
+    /* Opportunities put the FULL rate on the pill ("₹300/hr") — passing `price`
+       instead would drop the period and print a bare "₹300". */
+    price: item.kind === 'opportunity' ? undefined : (isPriced ? item.price : undefined),
+    badge: item.kind === 'opportunity' ? priceLabel : (isPriced ? undefined : priceLabel),
+    roleLabel: item.kind === 'opportunity' ? oppRoleBadge(item.oppRole) : undefined,
+    conditionLabel: item.kind === 'opportunity' || item.isRequest
+      ? undefined
+      : ({ like_new: 'Like new', good: 'Good', fair: 'Fair' } as const)[item.condition],
     location: item.location,
     description: item.description,
     byName: item.user.name,
@@ -1357,11 +1367,20 @@ function DesktopLayout({
     .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
     .filter((u): u is string => !!u && /^https?:|^\//.test(u));
   const shareCardSpec: ShareCardSpec = {
-    kind: item.isRequest ? 'request' : 'item',
+    /* An opportunity is a job/gig and gets its own share palette; only a
+       physical listing is 'item'. Without this, hiring posts shared with the
+       marketplace's white-and-green wash and a "Condition" cell. */
+    kind: item.isRequest ? 'request' : item.kind === 'opportunity' ? 'job' : 'item',
     title: item.title,
     imageUrls: shareImages,
-    price: isPriced ? item.price : undefined,
-    badge: isPriced ? undefined : priceLabel,
+    /* Opportunities put the FULL rate on the pill ("₹300/hr") — passing `price`
+       instead would drop the period and print a bare "₹300". */
+    price: item.kind === 'opportunity' ? undefined : (isPriced ? item.price : undefined),
+    badge: item.kind === 'opportunity' ? priceLabel : (isPriced ? undefined : priceLabel),
+    roleLabel: item.kind === 'opportunity' ? oppRoleBadge(item.oppRole) : undefined,
+    conditionLabel: item.kind === 'opportunity' || item.isRequest
+      ? undefined
+      : ({ like_new: 'Like new', good: 'Good', fair: 'Fair' } as const)[item.condition],
     location: item.location,
     description: item.description,
     byName: item.user.name,
@@ -1983,7 +2002,7 @@ function DesktopLayout({
             <button
               aria-label="Share"
               onClick={() => {
-                track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : 'item' });
+                track(EVT.share_clicked, { post_id: item.id, post_kind: item.isRequest ? 'request' : item.kind === 'opportunity' ? 'job' : 'item' });
                 setShareCardOpen(true);
               }}
               style={{

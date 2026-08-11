@@ -17,7 +17,7 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { X, Share2, Download, Link2, Loader2, Check } from 'lucide-react';
 import gsap from 'gsap';
 import {
-  renderShareCard, downloadCardBlob,
+  renderShareCard, downloadCardBlob, shareCardBlob,
   type ShareCardSpec,
 } from '../lib/shareCard';
 import { shareLink } from '../lib/share';
@@ -114,12 +114,30 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
     if (!spec || busy) return;
     setBusy(true);
     haptics.medium();
-    /* Share the LINK — it unfurls into a rich preview (photo · title · price)
-       from the per-post OG tags on /s/<id>, the way any e-commerce share works.
-       The card itself is saved/previewed; the link carries the picture. */
-    const res = await shareLink({ title: spec.title, text: shareText(spec), url: spec.url });
+    /* Share the CARD IMAGE, with the link in the caption.
+     *
+     * The old version shared only text + URL and trusted link unfurling to
+     * supply the picture. It doesn't, in exactly the places that matter:
+     *   - WhatsApp builds a link preview on the SENDER's device while you type
+     *     a URL. A share-sheet payload arrives pre-composed, so it never
+     *     unfurls — you get a bare blue link. (Verified: /s/<id> serves correct
+     *     absolute og:image for both listings and events, 200 to a WhatsApp UA,
+     *     ~210KB — the tags were never the problem.)
+     *   - Instagram has no link preview at all, ever. An image is the only
+     *     thing it can carry.
+     *   - Most email clients don't unfurl either.
+     * Attaching the PNG works in all three. The OG tags still do their job when
+     * someone pastes the link by hand.
+     *
+     * Falls back to the link when the card hasn't finished rendering, and
+     * shareCardBlob itself falls back to a download + copied link on desktop
+     * browsers that can't share files. */
+    const res = blob
+      ? await shareCardBlob(blob, spec)
+      : await shareLink({ title: spec.title, text: shareText(spec), url: spec.url });
     setBusy(false);
     if (res === 'shared') { sfxShare(); successPop(); flashToast('Shared!'); }
+    else if (res === 'downloaded') { sfxShare(); successPop(); flashToast('Card saved — attach it anywhere'); }
     else if (res === 'copied') { sfxShare(); successPop(); flashToast('Link copied'); }
     else flashToast("Couldn't share");
   };
