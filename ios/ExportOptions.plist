@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Export settings for an App Store submission.
+
+	     method 'app-store-connect' is the current name for what used to be
+	     'app-store'; it produces the .ipa that Transporter and Xcode Organizer
+	     accept for review.
+
+	     uploadSymbols keeps the dSYMs in the package so crash reports from
+	     review (and from real users) come back symbolised instead of as raw
+	     addresses.
+
+	     manageAppVersionAndBuildNumber is false on purpose: the build number
+	     is set in the project (CURRENT_PROJECT_VERSION) and matched to the
+	     Android release, and letting Xcode silently bump it makes the two
+	     platforms drift. -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>teamID</key>
+	<string>ZBRL964RQL</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+	<key>destination</key>
+	<string>export</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+</dict>
+</plist>

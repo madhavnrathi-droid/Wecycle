@@ -14,6 +14,19 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: '#FAFAF6',
   },
+  ios: {
+    backgroundColor: '#FAFAF6',
+    /* The web layer already paints its own strip behind the status bar
+       (.app-container::before, sized by env(safe-area-inset-top)) and pads for
+       the home indicator itself. Letting Capacitor inset the WebView as well
+       would double every safe-area allowance and leave a dead band under the
+       notch. 'never' hands safe-area handling entirely to the CSS, which is
+       where it already lives for Android. */
+    contentInset: 'never',
+    /* Keep the rubber-band scroll — an app that doesn't bounce reads as a
+       website in a shell, which is the first thing App Review looks for. */
+    scrollEnabled: true,
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 600,

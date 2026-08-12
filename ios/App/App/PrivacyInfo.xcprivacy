@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Privacy manifest.
+
+	  Required since spring 2024. Without the NSPrivacyAccessedAPITypes entry
+	  below, App Store Connect rejects the upload automatically with
+	  ITMS-91053 ("Missing API declaration") minutes after it lands, before any
+	  human reviews the build.
+
+	  Why UserDefaults is on the list: lib/supabase.ts persists the Supabase
+	  auth session through @capacitor/preferences, which is UserDefaults on
+	  iOS. Reason CA92.1 is the correct one — "access info from the app itself,
+	  or from the app's container, and the access is not for tracking".
+
+	  NSPrivacyCollectedDataTypes is deliberately absent. The App Privacy
+	  questionnaire in App Store Connect is the authoritative declaration for a
+	  first-party app, and a manifest that contradicts those answers is worse
+	  than one that leaves them to it. Wecycle does collect an email address,
+	  a name, photos, other user content and product-interaction analytics
+	  (GA4) — answer the questionnaire accordingly.
+
+	  NSPrivacyTracking is false: nothing here follows a person across other
+	  companies' apps or sites, and there is no ad network or data broker in
+	  the build, so App Tracking Transparency does not apply.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

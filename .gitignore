@@ -67,3 +67,8 @@ service-account*.json
 
 # Supabase CLI scratch — version checks and link state, not source.
 supabase/.temp/
+
+# iOS build output — archives and IPAs are large artifacts, never source
+ios/build/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
