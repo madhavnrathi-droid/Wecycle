@@ -33,7 +33,7 @@
  * Demo fallback: with no Supabase env we drop into the localStorage demo
  * session so the screens stay navigable.
  *
- * App-review test account: playreview@wecycle.page + REVIEW_PASSWORD below —
+ * App-review test account (Apple AND Google): playreview@wecycle.page + REVIEW_PASSWORD below —
  * signs into DEMO mode (never real data). Mirrored in docs/play-console-launch.md.
  */
 
@@ -427,7 +427,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
         await new Promise(r => setTimeout(r, 200));
         if (password === REVIEW_PASSWORD) {
           setDemoMode(true);
-          createDemoSession({ name: 'Play Reviewer', email: REVIEW_EMAIL, collegeId: '' });
+          createDemoSession({ name: 'App Reviewer', email: REVIEW_EMAIL, collegeId: '' });
           track(EVT.login, { method: 'reviewer' });
           handleClose();
         } else {

@@ -128,6 +128,7 @@ export default function Support() {
         <ul style={ul}>
           <li style={li}><a href="/privacy" style={link}>Privacy Policy</a> — what we collect and why</li>
           <li style={li}><a href="/terms" style={link}>Terms of Service</a> — the rules for using Wecycle</li>
+          <li style={li}><a href="/copyright" style={link}>Copyright &amp; IP</a> — ownership and how to report infringement</li>
           <li style={li}><a href="/mission" style={link}>Our mission</a> — why Wecycle exists</li>
           <li style={li}><a href="/delete-account" style={link}>Delete your account</a></li>
         </ul>
