@@ -439,7 +439,7 @@ body {
   border: 1.5px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: var(--text-base);
+  font-size: 16px; /* 16px floor: see iOS note below */
   padding: 12px 16px;
   width: 100%;
   outline: none;
@@ -454,7 +454,7 @@ body {
   border: 1.5px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   color: var(--text-primary);
-  font-size: var(--text-sm);
+  font-size: 16px; /* 16px floor — iOS zoom guard, see note at EOF */
   padding: 10px 16px 10px 40px;
   width: 100%;
   outline: none;
@@ -1710,7 +1710,7 @@ section.mobile-only { display: block; }
 /* Plain text input — location, single-line meta */
 .inline-edit--input,
 .inline-edit--meta {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.4;
@@ -1718,14 +1718,14 @@ section.mobile-only { display: block; }
 
 /* Body variant — description textarea */
 .inline-edit--body {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-primary);
   line-height: 1.55;
   resize: vertical;
   min-height: 96px;
 }
 .inline-edit--body-desktop {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
   min-height: 120px;
 }
@@ -1735,7 +1735,7 @@ section.mobile-only { display: block; }
   display: inline-block;
   width: auto;
   min-width: 160px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   background: var(--edit-bg);
@@ -1821,7 +1821,7 @@ section.mobile-only { display: block; }
   color: var(--accent-amber);
   font-family: inherit;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
   padding: 0;
   margin: 0;
   outline: none;
@@ -1882,7 +1882,7 @@ section.mobile-only { display: block; }
   .screen-transition .segmented { max-width: 360px; }
 
   /* Search pill stays inline; if free-standing it's a hairline */
-  .search-pill { max-width: none; padding: 10px 14px 10px 38px; font-size: 13px; }
+  .search-pill { max-width: none; padding: 10px 14px 10px 38px; font-size: 16px; }
 }
 
 /* Account screen form caps width on desktop so labels stay readable */
@@ -2508,7 +2508,7 @@ section.mobile-only { display: block; }
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 16px;
   padding: 11px 14px;
   outline: none;
   font-family: inherit;
@@ -3227,7 +3227,7 @@ img[src*="/storage/v1/object/public/"] {
   border: 1px solid transparent;
   border-radius: 999px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 16px;
   padding: 12px 16px 12px 42px;
   outline: none;
   font-family: inherit;
@@ -4430,7 +4430,7 @@ textarea:focus-visible {
   border: 1px solid var(--border-default);
   background: var(--bg-base);
   color: var(--text-primary);
-  font-size: 15px;            /* ≥16px-ish avoids iOS zoom; 15 is fine w/ meta */
+  font-size: 16px;            /* ≥16px-ish avoids iOS zoom; 15 is fine w/ meta */
 }
 .ss-input::placeholder { color: var(--text-muted); }
 
@@ -5181,3 +5181,20 @@ textarea:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .photo-empty[data-dropping] { transform: none; }
 }
+
+/* ── iOS zoom-on-focus guard ──────────────────────────────────────────────
+ *
+ * Every text-entry control above sits at 16px or more, and that is load-
+ * bearing rather than a style choice. WKWebView zooms the whole page in when a
+ * focused control's font-size is below 16px, and it does not reliably zoom back
+ * out — the app is left scrolled sideways with content cut off the right edge.
+ * It was reproduced on the sign-in sheet in the iOS Simulator, which is the
+ * first surface anyone touches, so the app looked broken from the first tap.
+ *
+ * The usual shortcut is maximum-scale=1 in the viewport meta. Don't: it kills
+ * pinch-zoom and fails WCAG 1.4.4. Two extra pixels of type in a form field is
+ * the cheaper price, and it reads better anyway.
+ *
+ * Anything added here that a user can focus and type into needs to stay at
+ * 16px or above. The 22px post-title input is fine — the floor is a minimum,
+ * not a target. */
