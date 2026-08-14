@@ -452,12 +452,18 @@ export default function FeedScreen({
       id: 'mahe',
       image: '/banners/mahe.jpg',
       illustration: 'twemoji:graduation-cap',
-      title: 'For MAHE, by MAHE',
-      subtitle: 'Built for our campus',
+      /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
+           plainly that it is not affiliated with, endorsed by, or sponsored by
+           any university. A banner written in the institution's own voice
+           contradicts that, and App Review asks submitters to prove they are
+           authorised to use protected third-party material. Students
+           describing themselves claims nothing on anyone else's behalf. */
+        title: 'By students, for students',
+      subtitle: 'Built on campus, run by classmates',
       detail: 'Invite a friend — the more of us here, the more there is to share.',
       gradient:
         'linear-gradient(135deg, rgba(37,99,235,0.92) 0%, rgba(168,85,247,0.9) 55%, rgba(34,197,94,0.9) 100%)',
-      ariaLabel: 'For MAHE, by MAHE — invite a friend to Wecycle',
+      ariaLabel: 'By students, for students — invite a friend to Wecycle',
       onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'mahe' }); onBannerAction?.('invite'); },
     },
   ];
