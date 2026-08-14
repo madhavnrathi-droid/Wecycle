@@ -306,6 +306,41 @@ function coverDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
 }
 
 /** object-fit: contain (whole image, never cropped). */
+/** A blurred, scaled-up copy of the image behind a contained one.
+ *
+ * Used only where the image must not be cropped (see the event case in the
+ * renderer). Nothing is cut, and the space beside a poster reads as deliberate
+ * rather than as bars.
+ *
+ * The blur comes from downscaling to a few dozen pixels and letting the canvas
+ * smooth it back up, NOT from ctx.filter: filter support in older iOS WebViews
+ * is patchy, and a bed that silently fails to blur looks like the image has
+ * been printed twice — a worse failure than the space it replaces. */
+function blurredBed(
+  ctx: CanvasRenderingContext2D, img: HTMLImageElement,
+  x: number, y: number, w: number, h: number,
+) {
+  const TINY = 28;
+  const th = Math.max(2, Math.round(TINY * (img.height / img.width)));
+  let tiny: HTMLCanvasElement;
+  try { tiny = document.createElement('canvas'); } catch { return; }
+  tiny.width = TINY; tiny.height = th;
+  const tctx = tiny.getContext('2d');
+  if (!tctx) return;
+  tctx.drawImage(img, 0, 0, TINY, th);
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const ir = TINY / th, rr = w / h;
+  const dw = ir > rr ? h * ir : w;
+  const dh = ir > rr ? h : w / ir;
+  ctx.drawImage(tiny, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  ctx.fillStyle = 'rgba(255,255,255,0.34)';
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
 function containDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const ir = img.width / img.height;
   const rr = w / h;
@@ -614,7 +649,18 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   const photoH = hasPhoto ? Math.round(Math.min(photoNaturalH, photoBudget)) : 0;
   /* Cover only when the photo is taller than its frame; a landscape photo that
      fits exactly must not be scaled up and cropped for no reason. */
-  const photoNeedsCover = hasPhoto && photoNaturalH > photoH + 0.5;
+  /* Crop a photo, never a poster.
+   *
+   * Cover-cropping the long edge of a phone photo of a wardrobe costs nothing —
+   * the subject is in the middle and the trimmed strip was floor. Doing the same
+   * to an event poster cuts off whatever the designer put at the bottom, which
+   * on the poster this was found with was the dates and the venue: the two facts
+   * the poster exists to carry. So events keep the whole image and get a blurred
+   * bed beside it; everything else fills the frame. */
+  const isPoster = spec.kind === 'event';
+  const overflows = hasPhoto && photoNaturalH > photoH + 0.5;
+  const photoNeedsCover = overflows && !isPoster;
+  const photoNeedsBed = overflows && isPoster;
 
   const H = panelA + (hasPhoto ? photoH + STRIP : 0);
   canvas.height = H + PAD * 2;
@@ -659,8 +705,15 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
            when the photo is taller than its frame; when it fits exactly, cover
            and contain are the same draw, so there is one code path and never a
            blurred bed or a bar. */
-        if (photoNeedsCover) coverDraw(ctx, photo, 0, 0, W, photoH);
-        else containDraw(ctx, photo, 0, 0, W, photoH);
+        if (photoNeedsCover) {
+          coverDraw(ctx, photo, 0, 0, W, photoH);
+        } else {
+          /* A poster taller than its frame is contained, so every word on it
+             survives; the bed fills what's left. When the image already fits,
+             the bed is skipped and contain draws it edge to edge. */
+          if (photoNeedsBed) blurredBed(ctx, photo, 0, 0, W, photoH);
+          containDraw(ctx, photo, 0, 0, W, photoH);
+        }
       }
       ctx.restore();
     }
