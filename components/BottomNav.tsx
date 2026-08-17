@@ -50,18 +50,55 @@ const INK_DARK = '#0E0E08';
 
 interface Section { fill: string; ink: string; edge: string }
 
-const SECTION: Record<'feed' | 'events' | 'lost_found' | 'inventory', Section> = {
+/* The four screens that own a slot in the bar. `Screen` is deliberately wider
+   than this — 'account', 'impact' and 'activity' are all reachable — so this
+   stays a separate, narrower type instead of being derived from `Screen`. */
+type SectionKey = 'feed' | 'events' | 'lost_found' | 'inventory';
+
+const SECTION: Record<SectionKey, Section> = {
   feed:       { fill: '#008939', ink: INK_LIGHT, edge: 'transparent' },
   events:     { fill: '#A43BFF', ink: INK_LIGHT, edge: 'transparent' },
   lost_found: { fill: '#DB3A00', ink: INK_LIGHT, edge: 'transparent' },
   inventory:  { fill: '#FFC526', ink: INK_DARK,  edge: '#8A6100' },
 };
 
+/* Screens with no slot of their own — Account, Impact, Activity — still render
+ * the bar, just with nothing lit and no pill. They need a Section regardless,
+ * because the bar reads `.ink` off it while building the buttons.
+ *
+ * This fallback is not defensive padding; its absence was a crash. The bar this
+ * one replaced asked `active === 'feed'` four times, and that is merely false on
+ * an off-slot screen. The redesign turned those comparisons into a lookup, and a
+ * lookup that misses yields undefined — so opening Account threw "Cannot read
+ * properties of undefined (reading 'ink')" during render and took the entire app
+ * down to Next's client-exception notice, on every device.
+ *
+ * `ink` is never actually painted from here (only an active button takes it, and
+ * on these screens none is active) but it has to exist. */
+const NEUTRAL: Section = { fill: 'transparent', ink: 'inherit', edge: 'transparent' };
+
+/* Which slot each screen lights. Partial over the full `Screen` union on
+ * purpose: a lookup returns `SectionKey | undefined`, so TypeScript forces the
+ * miss to be handled rather than letting it reach the DOM as undefined. The
+ * previous code asserted `as keyof typeof SECTION` instead, which told the
+ * compiler the other four Screen values could not occur — that lie is precisely
+ * why this shipped. Adding a member to `Screen` now cannot smuggle an unhandled
+ * key into the lookups below.
+ *
+ * `market` is the storefront view of the feed, so it lights Home. */
+const SLOT_FOR: Partial<Record<Screen, SectionKey>> = {
+  feed:       'feed',
+  market:     'feed',
+  events:     'events',
+  lost_found: 'lost_found',
+  inventory:  'inventory',
+};
+
 /* Slot order drives both the layout and where the indicator slides to. The
    post button is the middle slot so the row stays symmetrical — five equal
    grid columns, not space-around, which is what left the old bar looking
    off-centre once the post button and the labels were in it. */
-const SLOTS: { key: keyof typeof SECTION; screen: Screen; label: string; srLabel?: string }[] = [
+const SLOTS: { key: SectionKey; screen: Screen; label: string; srLabel?: string }[] = [
   { key: 'feed',       screen: 'feed',       label: 'Home' },
   { key: 'events',     screen: 'events',     label: 'Events' },
   { key: 'lost_found', screen: 'lost_found', label: 'Lost', srLabel: 'Lost & Found' },
@@ -69,7 +106,7 @@ const SLOTS: { key: keyof typeof SECTION; screen: Screen; label: string; srLabel
 ];
 
 /** Which slot the indicator sits under, in grid-column terms (post is col 3). */
-const COLUMN_OF: Record<string, number> = { feed: 1, events: 2, lost_found: 4, inventory: 5 };
+const COLUMN_OF: Record<SectionKey, number> = { feed: 1, events: 2, lost_found: 4, inventory: 5 };
 
 export default function BottomNav({ active, onChange, onPost }: BottomNavProps) {
   /* Wraps the parent's onChange so we get a single source of nav events. */
@@ -80,10 +117,11 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
     onChange(next);
   };
 
-  /* `market` is the storefront view of the feed, so it lights the Home slot. */
-  const activeKey = (active === 'market' ? 'feed' : active) as keyof typeof SECTION;
-  const section = SECTION[activeKey];
-  const column = COLUMN_OF[activeKey];
+  /* null on Account / Impact / Activity: no slot is lit, no pill is drawn, and
+     `section` falls back to NEUTRAL so nothing reads a field off undefined. */
+  const activeKey = SLOT_FOR[active] ?? null;
+  const section = activeKey ? SECTION[activeKey] : NEUTRAL;
+  const column = activeKey ? COLUMN_OF[activeKey] : null;
 
   return (
     <nav
@@ -156,7 +194,7 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
   );
 }
 
-function SlotIcon({ slot, active }: { slot: keyof typeof SECTION; active: boolean }) {
+function SlotIcon({ slot, active }: { slot: SectionKey; active: boolean }) {
   const sw = active ? 2.1 : 1.7;
   if (slot === 'feed') return <Home size={21} strokeWidth={sw} />;
   if (slot === 'events') return <CalendarDays size={21} strokeWidth={sw} />;
