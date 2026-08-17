@@ -369,7 +369,7 @@ export default function PhotoCarousel({
  * gives us free via scroll-snap. Anything heavier would have to coexist with the
  * carousel's own pointer handling underneath.
  */
-function PhotoViewer({
+export function PhotoViewer({
   photos, index, onClose,
 }: { photos: string[]; index: number; onClose: () => void }) {
   const [i, setI] = useState(index);

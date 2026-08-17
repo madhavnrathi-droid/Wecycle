@@ -35,6 +35,8 @@ import { getAvatar, getLostFoundPhoto } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import { Z_LAYER, zPanel } from '../lib/zLayers';
 import { shareUrl } from '../lib/shareUrl';
+import { PhotoViewer } from './PhotoCarousel';
+import { WA_FILL, WA_INK } from '../lib/whatsapp';
 
 interface LostFoundScreenProps {
   onReport: (defaultStatus?: 'lost' | 'found') => void;
@@ -422,6 +424,10 @@ export function LostFoundDetailSheet({
 
   /* Photo editing — only relevant when isOwner. */
   const [photoEditOpen, setPhotoEditOpen] = useState(false);
+  /* Full-screen viewer for the detail hero. This sheet renders a bare <img>
+     rather than a PhotoCarousel, so it does not inherit the carousel's viewer
+     and opens one itself. */
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   /* Share card (Spotify-style). Spec is built lower, after displayPhotoUrl. */
   const [shareCardOpen, setShareCardOpen] = useState(false);
@@ -707,7 +713,8 @@ export function LostFoundDetailSheet({
               <img
                 src={displayPhotoUrl}
                 alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', background: /\.png(\?|$)/i.test(displayPhotoUrl) ? '#fff' : undefined }}
+                  onClick={() => setViewerOpen(true)}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'pointer', background: /\.png(\?|$)/i.test(displayPhotoUrl) ? '#fff' : undefined }}
               />
             ) : isOwner ? (
               <button
@@ -1025,8 +1032,15 @@ export function LostFoundDetailSheet({
                   style={{
                     flex: '1 1 160px', minWidth: 0,
                     height: 48, borderRadius: 14,
-                    background: isWa ? '#25D366' : 'var(--text-primary)',
-                    color: isWa ? '#0B141A' : 'var(--bg-base)',
+                    /* White label, as asked. That forces the fill to change:
+                       white on WhatsApp's brand #25D366 is 1.98:1, which is not
+                       readable text by any measure. #00863C is the brightest
+                       colour at WhatsApp's own hue (142deg) that carries white
+                       at 4.69:1, so it still reads as the WhatsApp button —
+                       reinforced by the glyph and the word next to it — while
+                       the label is actually legible. */
+                    background: isWa ? WA_FILL : 'var(--text-primary)',
+                    color: isWa ? WA_INK : 'var(--bg-base)',
                     border: 'none', cursor: 'pointer',
                     fontSize: 14, fontWeight: 600,
                     letterSpacing: '-0.01em',
@@ -1054,6 +1068,9 @@ export function LostFoundDetailSheet({
         />
       )}
       <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
+      {viewerOpen && displayPhotoUrl && (
+        <PhotoViewer photos={[displayPhotoUrl]} index={0} onClose={() => setViewerOpen(false)} />
+      )}
     </>
   );
 }

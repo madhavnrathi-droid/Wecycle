@@ -36,6 +36,7 @@ import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
+import { WA_FILL, WA_INK } from '../lib/whatsapp';
 
 /* Wecycle brand stamp pinned to the top-right corner of a detail hero photo.
    A small frosted-white circle so the logomark reads on any image. `offset`
@@ -1205,8 +1206,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               aria-label={link.ariaLabel}
               style={{
                 flex: 1, height: 52, borderRadius: 999,
-                background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                background: link.channel === 'whatsapp' ? WA_FILL : 'var(--text-primary)',
+                color: link.channel === 'whatsapp' ? WA_INK : 'var(--bg-base)',
                 border: 'none', cursor: 'pointer',
                 fontSize: 14, fontWeight: 600,
                 letterSpacing: '-0.01em',
@@ -1939,8 +1940,8 @@ function DesktopLayout({
                     aria-label={link.ariaLabel}
                     style={{
                       flex: '1 1 220px', minWidth: 0, height: 52, borderRadius: 14,
-                      background: link.channel === 'whatsapp' ? '#25D366' : 'var(--text-primary)',
-                      color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--bg-base)',
+                      background: link.channel === 'whatsapp' ? WA_FILL : 'var(--text-primary)',
+                      color: link.channel === 'whatsapp' ? WA_INK : 'var(--bg-base)',
                       border: 'none', cursor: 'pointer',
                       fontSize: 15, fontWeight: 600,
                       letterSpacing: '-0.01em',

@@ -34,6 +34,7 @@ import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
+import { WA_FILL, WA_INK } from '../lib/whatsapp';
 
 interface EventDetailScreenProps {
   event: CommunityEvent;
@@ -764,8 +765,8 @@ export default function EventDetailScreen({
                   aria-label={link.ariaLabel}
                   style={{
                     width: 52, height: 52, borderRadius: 999,
-                    background: link.channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
-                    color: link.channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
+                    background: link.channel === 'whatsapp' ? WA_FILL : 'var(--bg-surface)',
+                    color: link.channel === 'whatsapp' ? WA_INK : 'var(--text-secondary)',
                     border: link.channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', flexShrink: 0,
@@ -780,8 +781,8 @@ export default function EventDetailScreen({
                 aria-label={contactLinks[0].ariaLabel}
                 style={{
                   width: 52, height: 52, borderRadius: 999,
-                  background: contactLinks[0].channel === 'whatsapp' ? '#25D366' : 'var(--bg-surface)',
-                  color: contactLinks[0].channel === 'whatsapp' ? '#0B141A' : 'var(--text-secondary)',
+                  background: contactLinks[0].channel === 'whatsapp' ? WA_FILL : 'var(--bg-surface)',
+                  color: contactLinks[0].channel === 'whatsapp' ? WA_INK : 'var(--text-secondary)',
                   border: contactLinks[0].channel === 'whatsapp' ? 'none' : '1px solid var(--border-subtle)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', flexShrink: 0,
