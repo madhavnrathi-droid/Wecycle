@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
 
 /* Each slide is either a photo URL (string) or a video descriptor. We keep the
  * legacy "string[]" entry point so existing callers (detail screens, picker
@@ -82,6 +83,7 @@ export default function PhotoCarousel({
   const single = photos.length <= 1;
   const [muted, setMuted] = useCarouselMuted();
   /* Track whether the pointer moved enough to count as a drag */
+  const [viewerAt, setViewerAt] = useState<number | null>(null);
   const dragRef = useRef<{ startX: number; moved: boolean }>({ startX: 0, moved: false });
 
   /* Pre-resolve which slides are videos so we can expose an unmute button only
@@ -180,8 +182,16 @@ export default function PhotoCarousel({
       dragRef.current.moved = true;
     }
   };
+  /* Tap opens the photo full screen — unless the caller claimed the tap for
+     something else. The three detail screens pass no onClick, so they get the
+     viewer for free; the Inventory card passes a navigation handler and keeps
+     it. A swipe is never a tap: dragRef.moved is already tracked for exactly
+     this reason. */
   const handleClick = () => {
-    if (!dragRef.current.moved && onClick) onClick();
+    if (dragRef.current.moved) return;
+    if (onClick) { onClick(); return; }
+    const slide = photos[active];
+    if (typeof slide === 'string') setViewerAt(active);
   };
 
   return (
@@ -193,7 +203,7 @@ export default function PhotoCarousel({
         borderRadius: radius,
         position: 'relative',
         overflow: 'hidden',
-        cursor: onClick ? 'pointer' : undefined,
+        cursor: 'pointer',
         /* Cut-outs always render on white (overrides the cream frame default). */
         background: hasCutout ? '#fff' : undefined,
       }}
@@ -334,6 +344,150 @@ export default function PhotoCarousel({
           </button>
         </>
       )}
+
+      {viewerAt !== null && (
+        <PhotoViewer
+          photos={photos.filter((p): p is string => typeof p === 'string')}
+          index={viewerAt}
+          onClose={() => setViewerAt(null)}
+        />
+      )}
     </div>
   );
+}
+
+/* ── Full-screen photo viewer ──────────────────────────────────────────────
+ *
+ * Rendered through a portal onto document.body rather than inside the carousel.
+ * The carousel frame sets `overflow: hidden` and sits inside detail sheets that
+ * are themselves transformed and clipped, so a fixed-position child of it would
+ * be cropped to the thumbnail — the classic reason lightboxes "don't go full
+ * screen".
+ *
+ * Deliberately simple: no pinch-zoom library. Escape, a close button, a tap on
+ * the backdrop, and arrow keys — plus swipe between photos, which the platform
+ * gives us free via scroll-snap. Anything heavier would have to coexist with the
+ * carousel's own pointer handling underneath.
+ */
+function PhotoViewer({
+  photos, index, onClose,
+}: { photos: string[]; index: number; onClose: () => void }) {
+  const [i, setI] = useState(index);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      if (e.key === 'ArrowRight') setI(v => Math.min(photos.length - 1, v + 1));
+      if (e.key === 'ArrowLeft')  setI(v => Math.max(0, v - 1));
+    };
+    document.addEventListener('keydown', onKey);
+    /* Lock the page behind the viewer, and restore exactly what was there —
+       not a hardcoded '' — so a screen that was already locked stays locked. */
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [photos.length, onClose]);
+
+  if (!mounted || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Photo viewer"
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(8,8,6,0.96)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        /* The close button must clear the notch, and the counter the home
+           indicator, on a device where this covers the whole screen. */
+        padding: 'env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px)',
+        animation: 'fade-in 0.18s ease-out',
+      }}
+    >
+      <button
+        onClick={e => { e.stopPropagation(); onClose(); }}
+        aria-label="Close photo"
+        style={{
+          position: 'absolute',
+          top: 'calc(12px + env(safe-area-inset-top, 0px))', right: 12,
+          width: 40, height: 40, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.16)', color: '#fff',
+          border: 'none', cursor: 'pointer', zIndex: 2,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <X size={20} strokeWidth={2} />
+      </button>
+
+      {/* Stop the image's own click from closing, so tapping the photo does
+          nothing and only the backdrop dismisses. */}
+      <img
+        src={photos[i]}
+        alt=""
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth: '100%', maxHeight: '100%',
+          width: 'auto', height: 'auto',
+          objectFit: 'contain',
+          display: 'block',
+        }}
+      />
+
+      {photos.length > 1 && (
+        <>
+          <button
+            onClick={e => { e.stopPropagation(); setI(v => Math.max(0, v - 1)); }}
+            aria-label="Previous photo"
+            disabled={i === 0}
+            style={viewerArrow('left', i === 0)}
+          >
+            <ChevronLeft size={22} strokeWidth={2} />
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); setI(v => Math.min(photos.length - 1, v + 1)); }}
+            aria-label="Next photo"
+            disabled={i === photos.length - 1}
+            style={viewerArrow('right', i === photos.length - 1)}
+          >
+            <ChevronRight size={22} strokeWidth={2} />
+          </button>
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+              left: '50%', transform: 'translateX(-50%)',
+              color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {i + 1} / {photos.length}
+          </span>
+        </>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
+function viewerArrow(side: 'left' | 'right', disabled: boolean): React.CSSProperties {
+  return {
+    position: 'absolute',
+    [side]: 8,
+    top: '50%', transform: 'translateY(-50%)',
+    width: 42, height: 42, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.14)', color: '#fff',
+    border: 'none', cursor: disabled ? 'default' : 'pointer',
+    opacity: disabled ? 0.3 : 1,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 2,
+  };
 }

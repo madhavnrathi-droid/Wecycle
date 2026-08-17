@@ -53,6 +53,7 @@ import {
 } from '../lib/password';
 import { emailGateProblem, isManipalEmail } from '../lib/emailDomain';
 import { REQUIRE_EMAIL_CONFIRMATION } from '../lib/authConfig';
+import { tenDigits, isAcceptable, toE164 } from '../lib/phone';
 import { COLLEGES } from '../lib/colleges';
 
 type Step = 'credentials' | 'confirm' | 'newpassword';
@@ -275,7 +276,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
      isStaleIncompleteSignup. Only worth saying on the sign-up form. */
   const staleSignup =
     emailOk && domainOk && mode === 'signup' && !resetting && isStaleIncompleteSignup(email);
-  const phoneOk = phone.trim() === '' || PHONE_LIKE.test(phone.trim());
+  const phoneOk = isAcceptable(phone);   /* `phone` holds 10 local digits only */
   /* Only surfaced once they've typed enough to be worth judging. */
   const passwordProblem = password ? validatePassword(password, { email, name }) : null;
   const passwordsMatch = password.length > 0 && password === password2;
@@ -313,7 +314,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     full_name: name.trim() || undefined,
     initials: name.trim() ? initialsOf(name) : undefined,
     college: college || undefined,
-    ...(phone.trim() ? { phone: phone.trim() } : {}),
+    ...(toE164(phone) ? { phone: toE164(phone) as string } : {}),
 
   });
 
@@ -460,7 +461,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
           mode,
           has_name: !!name.trim(),
           college,
-          has_phone: !!phone.trim(),
+          has_phone: !!toE164(phone),
         });
         if (!REQUIRE_EMAIL_CONFIRMATION) {
           await createAccountWithPassword();
@@ -899,20 +900,39 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   <Phone size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                   Phone <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
                 </label>
-                <input
-                  id="auth-phone"
-                  type="tel"
-                  inputMode="tel"
-                  className="form-input"
-                  placeholder="+91 98765 43210"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  autoComplete="tel"
-                  maxLength={25}
-                />
-                {phone.trim() !== '' && !phoneOk && (
+                {/* Fixed +91 affix rather than a country-code field: this is
+                    an India-only launch, so the code is a question with exactly
+                    one answer and one way to get it wrong. Mirrors the Account
+                    screen — both call lib/phone, so the column can only ever
+                    receive one shape. */}
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    padding: '0 12px', borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-inset)', border: '1px solid var(--border-default)',
+                    fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    +91
+                  </span>
+                  <input
+                    id="auth-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="form-input"
+                    placeholder="98765 43210"
+                    value={phone}
+                    onChange={e => setPhone(tenDigits(e.target.value))}
+                    autoComplete="tel-national"
+                    aria-invalid={!phoneOk || undefined}
+                    maxLength={10}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+                {phone !== '' && !phoneOk && (
                   <span className="field-hint" style={{ color: 'var(--accent-rose)' }}>
-                    Enter a valid phone number with optional country code.
+                    Enter a 10-digit mobile number (without +91).
                   </span>
                 )}
               </div>

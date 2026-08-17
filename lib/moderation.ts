@@ -16,6 +16,8 @@
  * writes are no-ops, reads return empty data.
  */
 
+import { shareUrl } from './shareUrl';
+import { ADMIN_EMAIL } from './AuthContext';
 import { supabase, hasSupabaseEnv } from './supabase';
 import { isDemoMode } from './demoMode';
 
@@ -246,4 +248,50 @@ export function onBlocksChange(cb: () => void): () => void {
   return () => {
     _listeners.delete(cb);
   };
+}
+
+/** Compose the escalation email a reporter's mail client opens after filing.
+ *
+ * The in-app trigger already pings admins, so why this as well: a notification
+ * is only seen when an admin opens the app, and the reports that matter most —
+ * harassment, a threat, something illegal — are exactly the ones that should
+ * not wait for that. Mail reaches a phone that is not running Wecycle. The two
+ * are deliberately redundant.
+ *
+ * Everything is prefilled so a distressed person is not asked to compose
+ * anything: reason, what was reported, and a direct link to the post. The
+ * reporter can still add context in the body before sending, and can cancel
+ * without losing the report — the database row is already written by then.
+ */
+export function reportMailto(input: {
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: string;
+  details?: string;
+  reporterEmail?: string | null;
+}): string {
+  const link = isUuid(input.targetId) ? shareUrl(input.targetId) : '(not a linkable post)';
+  const subject = `Wecycle report: ${input.reason} (${input.targetType})`;
+  const body = [
+    `I am reporting a ${input.targetType} on Wecycle.`,
+    '',
+    `Reason: ${input.reason}`,
+    `Link:   ${link}`,
+    `Ref:    ${input.targetType}/${input.targetId}`,
+    input.reporterEmail ? `From:   ${input.reporterEmail}` : '',
+    '',
+    input.details ? `What happened:\n${input.details}` : 'What happened:\n',
+    '',
+    '— sent from the Wecycle app',
+  ].filter(l => l !== undefined).join('\n');
+
+  return `mailto:${ADMIN_EMAIL}`
+    + `?subject=${encodeURIComponent(subject)}`
+    + `&body=${encodeURIComponent(body)}`;
+}
+
+/** Only a real uuid can be turned into a /s/ link. Comment and message ids are
+ *  not all uuids, so guard rather than emit a link that 404s. */
+function isUuid(v: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 }

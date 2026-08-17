@@ -3686,10 +3686,15 @@ img[src*="/storage/v1/object/public/"] {
 }
 .bottom-nav-inner {
   pointer-events: auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 2px;
+  /* Five EQUAL columns, not space-around. With a post button and four labels
+     in the row, space-around distributed the leftover unevenly and the middle
+     button drifted off centre — the thing this redesign was asked to fix. Equal
+     columns put the post button exactly on the midline at any width. */
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+  position: relative;
+  gap: 0;
   /* Mobile: edge-to-edge dock flush to the bottom. The surface fills down past
      the home indicator (content padded up by the safe-area inset), and the
      BOTTOM corners use the iPhone screen radius so the dock nests into the
@@ -3734,13 +3739,17 @@ img[src*="/storage/v1/object/public/"] {
  *     reset the transition and cause the first paint to flash.
  */
 .bottom-nav-btn {
-  min-width: 44px;
-  height: 44px;
-  padding: 0;
+  position: relative;
+  z-index: 1;                  /* above the sliding indicator */
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: 7px 2px 5px;
   display: inline-flex;
+  flex-direction: column;      /* icon over label, as in the references */
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 3px;
   background: transparent;
   border: none;
   border-radius: 999px;
@@ -3758,20 +3767,57 @@ img[src*="/storage/v1/object/public/"] {
   flex-shrink: 0;
 }
 .bottom-nav-btn[data-active] {
-  background: var(--text-primary);
+  /* The pill itself is the sliding indicator behind this button, so the button
+     only takes the ink colour. Painting a background here too would double up
+     and kill the slide. */
+  background: transparent;
   color: var(--bg-base);
-  padding: 0 16px;
-  gap: 8px;
+}
+
+/* ── The sliding indicator ──
+   One element that moves between grid columns, so it reads as a single object
+   travelling along the bar rather than four pills taking turns. It is placed by
+   `gridColumn` from the component and animates via the grid's own layout, which
+   keeps it pixel-locked to the column it lands on at every width. */
+/* Every child is placed explicitly on row 1. Auto-flow put the slider in a
+   cell of its own, which made six items compete for five columns and pushed
+   Inventory onto a second row. The slider and the active button must occupy
+   the SAME cell — one behind the other — not sit side by side. */
+.bottom-nav-inner > button { grid-row: 1; }
+.bottom-nav-inner > button:nth-of-type(1) { grid-column: 1; }
+.bottom-nav-inner > button:nth-of-type(2) { grid-column: 2; }
+.bottom-nav-inner > button:nth-of-type(3) { grid-column: 3; }  /* post */
+.bottom-nav-inner > button:nth-of-type(4) { grid-column: 4; }
+.bottom-nav-inner > button:nth-of-type(5) { grid-column: 5; }
+
+.bottom-nav-slider {
+  grid-row: 1;
+  align-self: stretch;
+  margin: 2px 4px;
+  border-radius: 16px;
+  /* Painted inline by BottomNav — this is only the resting colour for the
+     first frame before hydration. */
+  background: var(--text-primary);
+  /* Inventory's amber cannot reach 3:1 against a white bar on fill alone, so
+     that section supplies a darker rim and the boundary comes from the rim
+     instead — permitted by WCAG 1.4.11. Every other section sets it
+     transparent, where the fill already clears 3:1 on its own. */
+
+  transition:
+    background-color 260ms ease-out,
+    box-shadow 260ms ease-out;
+  pointer-events: none;
 }
 .bottom-nav-btn:active { transform: scale(0.92); }
 
 .bottom-nav-btn-label {
-  display: inline-block;
-  max-width: 0;
-  opacity: 0;
+  display: block;
+  max-width: none;
+  opacity: 1;
   overflow: hidden;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 10.5px;
+  line-height: 1.1;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: inherit;
@@ -3781,14 +3827,21 @@ img[src*="/storage/v1/object/public/"] {
     max-width 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
     opacity 180ms ease-out 60ms;
 }
-.bottom-nav-btn[data-active] .bottom-nav-btn-label {
-  max-width: 120px;
-  opacity: 1;
-}
+.bottom-nav-btn[data-active] .bottom-nav-btn-label { font-weight: 700; }
 
 .bottom-nav-post {
-  width: 52px;
-  height: 52px;
+  /* In line with the other slots, not lifted proud of the bar. justify-self
+     centres it inside its own grid column — the middle one — so it sits on the
+     exact midline at any width. It carries no label by design: the four
+     destinations are labelled because they need naming, while a plus is
+     already unambiguous, and giving it a word would make it read as a fifth
+     destination rather than an action. */
+  justify-self: center;
+  align-self: center;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: var(--text-primary);
   color: var(--bg-base);
@@ -4249,19 +4302,17 @@ textarea:focus-visible {
   --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Floating dock pill: slower, smoother morph (was 280ms snappy spring) */
+/* Nav: the pill no longer expands, so padding/gap/max-width are no longer
+   animated — the indicator slides and the ink cross-fades instead. Leaving the
+   old property list here would have kept animating properties that never
+   change while leaving the ones that do un-eased. */
 .bottom-nav-btn {
   transition:
-    padding 360ms var(--ease-emphasized),
-    gap 360ms var(--ease-emphasized),
-    background-color 240ms ease-out,
     color 220ms ease-out,
     transform 0.24s var(--ease-spring);
 }
 .bottom-nav-btn-label {
-  transition:
-    max-width 360ms var(--ease-emphasized),
-    opacity 240ms ease-out 80ms;
+  transition: color 220ms ease-out;
 }
 .bottom-nav-btn:active,
 .bottom-nav-post:active { transform: scale(0.94); }

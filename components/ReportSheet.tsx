@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { X, Check, Loader2 } from 'lucide-react';
-import { REPORT_REASONS, reportContent, blockUser } from '../lib/moderation';
+import { REPORT_REASONS, reportContent, blockUser, reportMailto } from '../lib/moderation';
 import type { ReportTargetType } from '../lib/moderation';
 import { Z_LAYER, zPanel } from '../lib/zLayers';
 
@@ -127,6 +127,21 @@ export default function ReportSheet({
     setLoading(false);
     if (ok) {
       setSubmitted(true);
+      /* Two channels on purpose. The insert has already fired the trigger that
+         notifies admins in-app; this opens the reporter's mail client with the
+         whole thing prefilled — reason, reference, and a link to the post — so
+         a serious report also reaches a human who is not currently looking at
+         Wecycle. Fired after the row is committed, so cancelling the email
+         loses nothing: the report already stands. */
+      try {
+        window.location.href = reportMailto({
+          targetType,
+          targetId,
+          reason: selectedReason,
+          details: details.trim() || undefined,
+          reporterEmail: user?.email ?? null,
+        });
+      } catch { /* no mail client — report + admin ping still stand */ }
       setTimeout(() => {
         onReported?.();
         onClose();

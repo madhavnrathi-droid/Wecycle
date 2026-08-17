@@ -8,14 +8,9 @@ import { COLLEGES, normalizeCollege } from '../lib/colleges';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
 
-/* Strip everything down to the local 10-digit number, dropping a leading
-   +91 / 91 / 0 if the user pasted one. */
-function tenDigits(raw: string): string {
-  let d = raw.replace(/\D+/g, '');
-  if (d.length > 10 && d.startsWith('91')) d = d.slice(2);
-  if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
-  return d.slice(0, 10);
-}
+/* Phone handling lives in lib/phone so sign-up and this screen cannot drift
+   into writing different shapes to the same column again. */
+import { tenDigits, toE164 } from '../lib/phone';
 
 interface AccountScreenProps {
   onBack: () => void;
@@ -120,7 +115,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
     setSaveStatus('saving');
     setError(null);
     try {
-      const storedPhone = phone.length === 10 ? `+91${phone}` : null;
+      const storedPhone = toE164(phone);
 
       if (isDemo) {
         updateDemoSession({

@@ -19,13 +19,26 @@
  * Adding one here is not enough on its own — profiles_college_check in the
  * database constrains the same set, so a new code needs a migration too.
  */
+/* These are the MAHE **Bengaluru** campus units (Yelahanka/Govindapura), which
+ * is what the sign-up domain and the …blr… in student addresses point at. Two
+ * names were wrong and were displayed to every student picking their school:
+ *
+ *   SMI was "School of Information Sciences" — it is Srishti Manipal Institute
+ *   of Art, Design and Technology, the Bengaluru art-and-design institute MAHE
+ *   took over. The clue was in this file's own comment all along: addresses
+ *   read smiblr2026@learner.manipal.edu, and "blr" is Bengaluru.
+ *
+ *   MLS was "Manipal Life Sciences" — it is Manipal Law School.
+ *
+ * Only the display names changed. profiles_college_check constrains the CODES,
+ * so no migration is needed and no stored row is affected. */
 export const COLLEGES = [
-  { id: 'SMI',   name: 'School of Information Sciences' },
-  { id: 'MIT',   name: 'Manipal Institute of Technology' },
-  { id: 'TAPMI', name: 'T. A. Pai Management Institute' },
+  { id: 'SMI',   name: 'Srishti Manipal Institute of Art, Design & Technology' },
+  { id: 'MIT',   name: 'Manipal Institute of Technology, Bengaluru' },
+  { id: 'TAPMI', name: 'T. A. Pai Management Institute, Bengaluru' },
   { id: 'MLHS',  name: 'Manipal Lifestyle & Health Sciences' },
   { id: 'MIRM',  name: 'Manipal Institute of Regenerative Medicine' },
-  { id: 'MLS',   name: 'Manipal Life Sciences' },
+  { id: 'MLS',   name: 'Manipal Law School' },
   { id: 'DOC',   name: 'Department of Commerce' },
 ] as const;
 
