@@ -43,7 +43,16 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
      with the form — otherwise the initial profile hydration would itself fire
      a save (no-op, but we'd flash "Saving…" on every visit). */
   const userInteracted = useRef(false);
-  const markInteracted = () => { userInteracted.current = true; };
+  /* Edits not yet covered by a completed write. Set on every edit, cleared as a
+     write starts (that write covers everything typed up to that point, and
+     anything typed during it re-dirties). This is what the unmount flush reads
+     to decide whether leaving the screen needs to save first. */
+  const dirty = useRef(false);
+  const markInteracted = () => { userInteracted.current = true; dirty.current = true; };
+
+  /* Handle for the "Saved → idle" timer, so a new save can cancel the previous
+     one. Leaving them uncancelled is what made the tick flicker: see persist. */
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Hydrate when profile loads. The email defaults from the SIGN-UP auth
      email (user.email) — that's the college address they registered with —
@@ -51,8 +60,21 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
      isn't there. This keeps the field populated immediately on every visit
      without the user needing to type it in. */
   const authEmail = (user as { email?: string } | null)?.email ?? '';
+  /* Which profile we have already hydrated from. Hydration must happen ONCE per
+     account, not on every change to the profile object, because saving ends in
+     refreshProfile() — so re-hydrating meant a completed write pushed its own
+     result back into the fields the user was still typing in. Type "Madhav",
+     let the debounce fire at "Madh", and the refresh landing a moment later
+     would reset the input to "Madh" mid-word. That looked like the edit being
+     rejected, and any keystroke between the write and the refresh was lost.
+     The email field does not need re-hydration to stay correct: currentEmail
+     below already falls back to the auth address at render time. */
+  const hydratedFor = useRef<string | null>(null);
   useEffect(() => {
     if (!profile) return;
+    const id = (profile as { id?: string }).id ?? user?.id ?? 'anon';
+    if (hydratedFor.current === id) return;
+    hydratedFor.current = id;
     setName(profile.full_name ?? '');
     setEmail((profile as { email?: string }).email ?? authEmail);
     setPhone(tenDigits(profile.phone ?? ''));
@@ -69,7 +91,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
       || normalizeCollege((profile as { department?: string | null }).department),
     );
     setResidence(((profile as { residence?: Residence | null }).residence ?? '') as Residence | '');
-  }, [profile, authEmail]);
+  }, [profile, authEmail, user]);
 
   /* One-time backfill — many existing profile rows have email=null because the
    * on-auth-create trigger predates the email column. Without this, every
@@ -112,8 +134,15 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
      and from onBlur for selects/toggles (immediate write feels right there). */
   const persist = useCallback(async () => {
     if (!canSave) return;
-    setSaveStatus('saving');
+    /* This write covers everything typed up to now; anything typed while it is
+       in flight will re-dirty and be picked up by the next one. */
+    dirty.current = false;
     setError(null);
+    /* Don't announce "Saving…" until the write has actually been slow enough to
+       be worth mentioning. Most saves here finish well inside 300ms, and showing
+       a spinner for 80ms — then swapping it for a tick — is the flicker, not a
+       progress report. A slow write still gets its spinner. */
+    const spinner = setTimeout(() => setSaveStatus('saving'), 300);
     try {
       const storedPhone = toE164(phone);
 
@@ -159,13 +188,28 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         has_course: !!course.trim(),
         college: college || null,
       });
+      clearTimeout(spinner);
       setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(s => (s === 'saved' ? 'idle' : s)), 1600);
+      /* Cancel any previous countdown before starting this one. Uncancelled,
+         they stacked: save at t=0 and again at t=1000 left the first timer to
+         fire at t=1600 and knock the second "Saved" back to idle after only
+         600ms of the 1600 it was owed. The tick's lifetime became a function of
+         typing rhythm, which is exactly what "flickers and glitches" describes. */
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      idleTimer.current = setTimeout(() => setSaveStatus(s => (s === 'saved' ? 'idle' : s)), 1600);
     } catch (e) {
+      clearTimeout(spinner);
+      /* Still unsaved — let the flush and the next edit retry it. */
+      dirty.current = true;
       setError((e as Error).message ?? 'Could not save');
       setSaveStatus('error');
     }
   }, [canSave, phone, isDemo, name, collegeId, currentEmail, graduatingYear, course, college, residence, user, refreshProfile]);
+
+  /* Always points at the newest persist closure, so the flush below can call it
+     without re-subscribing its listeners on every keystroke. */
+  const persistRef = useRef(persist);
+  useEffect(() => { persistRef.current = persist; }, [persist]);
 
   /* Debounced auto-save — fires 700ms after the last edit. We re-derive the
      timer on every field change so rapid typing collapses into a single
@@ -174,9 +218,47 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
   useEffect(() => {
     if (!userInteracted.current) return;
     if (!canSave) return;
-    const t = setTimeout(() => { void persist(); }, 700);
+    /* Through the ref, NOT persist directly. Listing persist here was an
+       infinite save loop: persist closes over refreshProfile, AuthContext builds
+       its value inline so refreshProfile is a new function on every provider
+       render, and persist ends by awaiting refreshProfile(). So each save
+       re-rendered the provider, gave persist a new identity, re-ran this effect,
+       and armed the next save — round and round every 700ms for as long as the
+       screen stayed open, each one a real write and an account_edited event.
+       That is what kept "Saved" lit permanently: every pass reset its countdown.
+
+       The dependency list is now exactly the form values, which is what should
+       actually trigger a save. */
+    const t = setTimeout(() => { void persistRef.current(); }, 700);
     return () => clearTimeout(t);
-  }, [name, phone, collegeId, currentEmail, graduatingYear, course, college, residence, canSave, persist]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, phone, collegeId, currentEmail, graduatingYear, course, college, residence, canSave]);
+
+  /* Leaving the screen must not discard the edit that was still in the debounce.
+   *
+   * The 700ms timer above is cancelled by its own cleanup when this component
+   * unmounts — and it unmounts the moment activeScreen changes, because the
+   * parent renders it as {activeScreen === 'account' && <AccountScreen/>}. So
+   * editing a field and tapping Back or a nav tab inside that window cancelled
+   * the write and the change was simply gone. It reappeared as the original
+   * value on the next visit, which is the "it didn't save" report.
+   *
+   * Mount-scoped ([] deps) so the listeners attach once; persistRef supplies the
+   * current values. Both hidden-tab and unmount paths matter: pagehide and
+   * visibilitychange cover backgrounding the PWA or locking the phone, where no
+   * unmount happens at all, and the cleanup covers navigating within the app. */
+  useEffect(() => {
+    const flush = () => { if (dirty.current) void persistRef.current(); };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      flush();
+    };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -220,7 +302,10 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           aria-atomic="true"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
-            minWidth: 64, justifyContent: 'flex-end',
+            /* Wide enough for "Saving…" plus its spinner, so the tick does not
+               shift the header as the label swaps. */
+            minWidth: 76, justifyContent: 'flex-end',
+            whiteSpace: 'nowrap',
             fontSize: 12, fontWeight: 500,
             color:
               saveStatus === 'saved'   ? 'var(--accent-mint, #22C55E)' :
