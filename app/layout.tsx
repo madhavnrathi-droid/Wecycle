@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "../lib/AuthContext";
 import { SITE_URL } from "../lib/siteUrl";
 import SessionSplash from "../components/SessionSplash";
@@ -163,6 +164,21 @@ export default function RootLayout({
         {/* Native (Capacitor) runtime setup — status bar, keyboard, splash.
             No-op on the web. */}
         <NativeInit />
+        {/* Vercel Analytics — page views and Web Vitals, measured at the edge
+            rather than in a tag manager. The /next entry point subscribes to
+            App Router navigation, which is what this app needs: every screen is
+            a client component swapped inside one route, so a script that only
+            counts document loads would record a single visit per session no
+            matter how much of the app someone walked through.
+
+            Nothing needs disabling for the native build, though not because
+            the component checks: in production it points at the relative path
+            /_vercel/insights/script.js, which only exists because the Vercel
+            platform serves it. Inside the Capacitor app that path resolves
+            against the local bundle and 404s, so no data leaves the device. In
+            local dev it instead loads Vercel's debug script, which reports to
+            the console rather than recording anything. */}
+        <Analytics />
       </body>
     </html>
   );
