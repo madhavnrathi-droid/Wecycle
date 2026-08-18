@@ -54,6 +54,13 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
      one. Leaving them uncancelled is what made the tick flicker: see persist. */
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* Whether the user has actually edited these two fields this visit.
+     They are write-only to the client (UPDATE granted, SELECT not), so they
+     always hydrate empty no matter what is stored — and an untouched empty field
+     must therefore never be written back. See persist. */
+  const phoneTouched = useRef(false);
+  const emailTouched = useRef(false);
+
   /* Hydrate when profile loads. The email defaults from the SIGN-UP auth
      email (user.email) — that's the college address they registered with —
      and only falls back to profile.email if for some reason the auth user
@@ -98,19 +105,55 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
    * listing they post joins with profile.email=null and the Contact Seller
    * button silently has nothing to email. We push the auth user's email into
    * the profile row the moment we notice the gap. */
+  /* Read back this member's own email and phone.
+     Neither column is SELECTable by the authenticated role — column grants are
+     role-wide, so making them readable would expose every member's contact
+     details to every signed-in member. The consequence for this form is that the
+     phone input rendered empty on every visit even for someone with a number
+     stored: a blank box, with no way to tell whether a number was saved or to
+     correct the one that was.
+     get_contact is the existing SECURITY DEFINER route used by Contact Seller,
+     and both of its CASE arms already open with `p.id = auth.uid()`, so asking
+     it about yourself returns your own values whatever your contact-visibility
+     settings say. Reused rather than adding a second privileged function.
+     Skipped for whichever field is already being edited, so a slow response
+     cannot land on top of live typing. */
+  useEffect(() => {
+    if (isDemo || !hasSupabaseEnv || !user) return;
+    let cancelled = false;
+    void supabase.rpc('get_contact', { target: user.id }).then(({ data, error: err }) => {
+      if (cancelled || err || !data) return;
+      const row = (Array.isArray(data) ? data[0] : data) as { email?: string | null; phone?: string | null } | undefined;
+      if (!row) return;
+      if (!emailTouched.current && row.email) setEmail(row.email);
+      if (!phoneTouched.current && row.phone) setPhone(tenDigits(row.phone));
+    }, () => { /* best-effort — the touched guards already prevent data loss */ });
+    return () => { cancelled = true; };
+  }, [isDemo, user]);
+
+  const backfilledFor = useRef<string | null>(null);
   useEffect(() => {
     if (isDemo) return;
     if (!hasSupabaseEnv) return;
     if (!user || !authEmail) return;
-    const profileEmail = (profile as { email?: string | null } | null)?.email;
-    if (profileEmail) return;
-    /* Fire-and-forget; refresh profile so the form picks up the new value. */
-    supabase
+    if (backfilledFor.current === user.id) return;
+    backfilledFor.current = user.id;
+    /* Fire-and-forget, and deliberately WITHOUT refreshProfile.
+       This effect used to read the row back and bail early when email was
+       already set — `if (profileEmail) return`. That guard could never be true:
+       the authenticated role is granted UPDATE on profiles.email but not SELECT,
+       so the client can write the column and can never read it. profileEmail was
+       therefore permanently undefined, every run issued an UPDATE and called
+       refreshProfile, that re-rendered AuthProvider, refreshProfile came back
+       with a new identity, and this effect — which listed it — ran again. An
+       endless stream of writes for as long as the screen stayed open, on real
+       accounts only, which is why the demo account never showed it.
+       Once per account per mount now, and idempotent. */
+    void supabase
       .from('profiles')
       .update({ email: authEmail } as never)
-      .eq('id', user.id)
-      .then(() => { void refreshProfile(); }, () => { /* swallow — best-effort */ });
-  }, [isDemo, user, authEmail, profile, refreshProfile]);
+      .eq('id', user.id);
+  }, [isDemo, user, authEmail]);
 
   /* Always show the address the user signed up with as the default; the
      local `email` state can deviate (e.g. they're typing) but a fresh
@@ -151,7 +194,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           name: name.trim(),
           collegeId: collegeId.trim(),
           email: currentEmail.trim() || undefined,
-          phone: storedPhone ?? undefined,
+          phone: phoneTouched.current ? (storedPhone ?? undefined) : undefined,
           graduatingYear: graduatingYear ? Number(graduatingYear) : undefined,
           course: course.trim() || undefined,
           department: college || undefined,   /* demo session has no college field yet */
@@ -164,15 +207,27 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
            a denormalized `email` column we use for display + contact. */
         const update: Record<string, unknown> = {
           full_name: name.trim() || null,
-          phone: storedPhone,
           college_id: collegeId.trim() || null,
           graduating_year: graduatingYear ? Number(graduatingYear) : null,
           course: course.trim() || null,
           college: college || null,
           residence: residence || null,
         };
+        /* Phone and email are only written when the user actually edited them.
+         *
+         * This is not caution, it is a data-loss fix. The authenticated role has
+         * UPDATE but not SELECT on either column, so hydration cannot read them
+         * back and the phone input starts empty on every visit even for someone
+         * with a number stored. Writing that empty field unconditionally sent
+         * phone: null — so changing your name, or anything else, silently
+         * deleted your phone number. 15 of 24 profiles currently hold one.
+         *
+         * Untouched means "the form never had this value", not "the user cleared
+         * it", and those must not be the same request. A real clear still works:
+         * touching the field sets the flag, and toE164('') sends null. */
+        if (phoneTouched.current) update.phone = storedPhone;
         const trimmedEmail = currentEmail.trim();
-        if (trimmedEmail) update.email = trimmedEmail;
+        if (emailTouched.current && trimmedEmail) update.email = trimmedEmail;
         const { error: err } = await supabase
           .from('profiles')
           .update(update as never)
@@ -400,7 +455,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 /* 80-char cap mirrors the AuthModal sign-up rule. The email
                  * column on profiles is text, so this is purely a UX guard. */
                 maxLength={80}
-                onChange={e => { setEmail(e.target.value); markInteracted(); }}
+                onChange={e => { emailTouched.current = true; setEmail(e.target.value); markInteracted(); }}
                 autoComplete="email"
               />
               <span className="field-hint">
@@ -451,7 +506,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 className="form-input"
                 placeholder="98765 43210"
                 value={phone}
-                onChange={e => { setPhone(tenDigits(e.target.value)); markInteracted(); }}
+                onChange={e => { phoneTouched.current = true; setPhone(tenDigits(e.target.value)); markInteracted(); }}
                 autoComplete="tel-national"
                 aria-invalid={!phoneValid}
                 style={{ flex: 1 }}
