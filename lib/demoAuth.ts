@@ -119,13 +119,12 @@ export function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/* ── department options ──────────────────────────────── */
-export const DEPARTMENTS = [
-  { id: 'mit',   label: 'MIT',   description: 'Manipal Institute of Technology' },
-  { id: 'smi',   label: 'SMI',   description: 'School of Information Sciences' },
-  { id: 'dlhs',  label: 'DLHS',  description: 'Dept. of Lifestyle & Health Sciences' },
-  { id: 'mirm',  label: 'MIRM',  description: 'Manipal Institute of Regenerative Medicine' },
-  { id: 'tapmi', label: 'TAPMI', description: 'T. A. Pai Management Institute' },
-  { id: 'mls',   label: 'MLS',   description: 'Manipal Life Sciences' },
-  { id: 'doc',   label: 'DOC',   description: 'Department of Commerce' },
-];
+/* The DEPARTMENTS list that stood here is gone. It was the predecessor of
+   lib/colleges.ts — lowercase ids, a 'dlhs' code that no longer exists, and all
+   three of the wrong expansions ("School of Information Sciences", "Manipal Life
+   Sciences", "Dept. of Lifestyle & Health Sciences") that colleges.ts was
+   written to correct. Nothing imported it, so it never reached a user.
+
+   Deleting rather than fixing it: a second copy of this list is the exact
+   mechanism behind the drift colleges.ts documents, and a dead export is one
+   import away from being live again. COLLEGES is the only list. */

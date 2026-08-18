@@ -20,7 +20,7 @@
  * database constrains the same set, so a new code needs a migration too.
  */
 /* These are the MAHE **Bengaluru** campus units (Yelahanka/Govindapura), which
- * is what the sign-up domain and the …blr… in student addresses point at. Two
+ * is what the sign-up domain and the …blr… in student addresses point at. Three
  * names were wrong and were displayed to every student picking their school:
  *
  *   SMI was "School of Information Sciences" — it is Srishti Manipal Institute
@@ -30,13 +30,20 @@
  *
  *   MLS was "Manipal Life Sciences" — it is Manipal Law School.
  *
+ *   MLHS was "Manipal Lifestyle & Health Sciences" — it is the Manipal Institute
+ *   of Liberal Arts, Humanities & Social Sciences. This was the one entry left
+ *   unverified when the other two were corrected, and guessing from the acronym
+ *   is what produced the wrong expansion: L-H-S reads as "Lifestyle & Health
+ *   Sciences" just as plausibly as "Liberal arts, Humanities & Social sciences".
+ *   Corrected on the owner's word.
+ *
  * Only the display names changed. profiles_college_check constrains the CODES,
  * so no migration is needed and no stored row is affected. */
 export const COLLEGES = [
   { id: 'SMI',   name: 'Srishti Manipal Institute of Art, Design & Technology' },
   { id: 'MIT',   name: 'Manipal Institute of Technology, Bengaluru' },
   { id: 'TAPMI', name: 'T. A. Pai Management Institute, Bengaluru' },
-  { id: 'MLHS',  name: 'Manipal Lifestyle & Health Sciences' },
+  { id: 'MLHS',  name: 'Manipal Institute of Liberal Arts, Humanities & Social Sciences' },
   { id: 'MIRM',  name: 'Manipal Institute of Regenerative Medicine' },
   { id: 'MLS',   name: 'Manipal Law School' },
   { id: 'DOC',   name: 'Department of Commerce' },
