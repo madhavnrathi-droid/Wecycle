@@ -55,6 +55,10 @@ import { emailGateProblem, isManipalEmail } from '../lib/emailDomain';
 import { REQUIRE_EMAIL_CONFIRMATION } from '../lib/authConfig';
 import { tenDigits, isAcceptable, toE164 } from '../lib/phone';
 import { COLLEGES } from '../lib/colleges';
+import {
+  LEARNER_DOMAIN, FACULTY_DOMAIN, composeLocalPart, composeEmail,
+  joiningYears, type ManipalDomain,
+} from '../lib/manipalEmail';
 
 type Step = 'credentials' | 'confirm' | 'newpassword';
 type AuthMode = 'signin' | 'signup';
@@ -174,6 +178,37 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
      Cleared whenever the address changes — a tick against the old spelling
      confirms nothing. */
   const [emailChecked, setEmailChecked] = useState(false);
+
+  /* ── Address builder (sign-up only) ──
+     Campus addresses are formulaic, so the form assembles one from answers the
+     student has already given rather than asking them to transcribe it. The
+     email field is split into the part they might need to change and the domain,
+     which is a two-item choice and therefore a dropdown. */
+  const [joiningYear, setJoiningYear] = useState('');
+  const [emailLocal, setEmailLocal] = useState('');
+  const [emailDomain, setEmailDomain] = useState<ManipalDomain>(LEARNER_DOMAIN);
+  /* Set the moment the address is edited by hand, and never cleared. Autofill
+     is a helpful first draft, not an owner: once someone has corrected it,
+     picking a different college must not overwrite what they typed. */
+  const emailEdited = useRef(false);
+  const buildingEmail = mode === 'signup' && !resetting;
+  const facultyAddress = emailDomain === FACULTY_DOMAIN;
+
+  /* Compose. Silent unless it can produce a complete address — a half-built
+     local part is worse than an empty box, because it looks finished. */
+  useEffect(() => {
+    if (!buildingEmail || emailEdited.current) return;
+    const next = composeLocalPart({ fullName: name, college, joiningYear, domain: emailDomain });
+    if (next) setEmailLocal(next);
+  }, [buildingEmail, name, college, joiningYear, emailDomain]);
+
+  /* The two halves are the input; `email` stays the single value the rest of
+     this component validates and submits, so none of that had to change. */
+  useEffect(() => {
+    if (!buildingEmail) return;
+    setEmail(composeEmail(emailLocal, emailDomain));
+    setEmailChecked(false);
+  }, [buildingEmail, emailLocal, emailDomain]);
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -291,6 +326,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     resetting ? emailOk && domainOk
     : mode === 'signup'
       ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk && !!college
+        && (emailDomain === FACULTY_DOMAIN || !!joiningYear)
         && emailCheckSatisfied && !passwordProblem && passwordsMatch
       /* Sign-in: don't judge the password, just require something typed —
          the server is the authority on whether it's right. */
@@ -754,29 +790,142 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
               </div>
             )}
 
+            {/* Sign-up only: college (required).
+                Replaces the old "College ID" (a roll number) and free-text
+                "Department / course". Neither answered the question that
+                actually matters here — which MAHE school you're at — and both
+                were optional, so most profiles carried nothing usable. A fixed
+                list can be filtered and grouped; free text can't. */}
+            {mode === 'signup' && !resetting && (
+              <div className="field">
+                <label htmlFor="auth-college" className="field-label">
+                  <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                  College <span className="required" aria-hidden="true">*</span>
+                </label>
+                <select
+                  id="auth-college"
+                  className="form-input"
+                  value={college}
+                  onChange={e => setCollege(e.target.value)}
+                  aria-invalid={!college}
+                  required
+                >
+                  <option value="">Choose your college</option>
+                  {COLLEGES.map(c => <option key={c.id} value={c.id}>{c.id} — {c.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Year of joining — the one number the address depends on, and the
+                only part a student cannot infer from what they've already typed.
+                A list rather than a text box: it is the difference between a
+                mis-keyed address that fails silently at the mailbox and one that
+                cannot be got wrong. Hidden for faculty, whose addresses carry no
+                year at all. */}
+            {mode === 'signup' && !resetting && !facultyAddress && (
+              <div className="field">
+                <label htmlFor="auth-joinyear" className="field-label">
+                  <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                  Year you joined <span className="required" aria-hidden="true">*</span>
+                </label>
+                <select
+                  id="auth-joinyear"
+                  className="form-input"
+                  value={joiningYear}
+                  onChange={e => setJoiningYear(e.target.value)}
+                  aria-invalid={!joiningYear}
+                  required
+                >
+                  <option value="">Choose your intake year</option>
+                  {joiningYears().map(y => <option key={y} value={String(y)}>{y}</option>)}
+                </select>
+              </div>
+            )}
+
             {/* Email — always shown */}
             <div className="field">
-              <label htmlFor="auth-email" className="field-label">
+              <label htmlFor={buildingEmail ? 'auth-email-local' : 'auth-email'} className="field-label">
                 <Mail size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 Email <span className="required" aria-hidden="true">*</span>
               </label>
-              <input
-                id="auth-email"
-                type="email"
-                inputMode="email"
-                className="form-input"
-                placeholder="you@learner.manipal.edu"
-                value={email}
-                maxLength={80}
-                /* Editing the address retracts the "I've checked it" tick —
-                   it was a promise about the old spelling. */
-                onChange={e => { setEmail(e.target.value); setEmailChecked(false); }}
-                autoComplete="email"
-                aria-invalid={!!domainProblem}
-                aria-describedby={domainProblem ? 'auth-email-problem' : undefined}
-                required
-                autoFocus
-              />
+              {/* Sign-up gets the address in two pieces: the part that varies
+                  and the domain, which has exactly two possible answers and is
+                  therefore a dropdown rather than something to be typed and
+                  mis-typed. Sign-in and reset keep the plain field — people sign
+                  in with whatever address they registered, including the handful
+                  of non-campus ones already in the table. */}
+              {buildingEmail ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
+                    <input
+                      id="auth-email-local"
+                      type="text"
+                      inputMode="email"
+                      className="form-input"
+                      placeholder={facultyAddress ? 'firstname.lastname' : 'firstname.smiblr2026'}
+                      value={emailLocal}
+                      maxLength={64}
+                      /* Any edit hands ownership to the user — see emailEdited. */
+                      onChange={e => {
+                        emailEdited.current = true;
+                        setEmailLocal(e.target.value.replace(/\s+/g, '').toLowerCase());
+                      }}
+                      autoComplete="username"
+                      aria-invalid={!!domainProblem}
+                      aria-describedby={domainProblem ? 'auth-email-problem' : 'auth-email-help'}
+                      required
+                      style={{ flex: '1 1 58%', minWidth: 0 }}
+                    />
+                    <select
+                      aria-label="Email domain"
+                      className="form-input"
+                      value={emailDomain}
+                      onChange={e => setEmailDomain(e.target.value as ManipalDomain)}
+                      style={{ flex: '0 1 42%', minWidth: 0, fontSize: 12, paddingLeft: 8, paddingRight: 2 }}
+                    >
+                      <option value={LEARNER_DOMAIN}>@{LEARNER_DOMAIN}</option>
+                      <option value={FACULTY_DOMAIN}>@{FACULTY_DOMAIN}</option>
+                    </select>
+                  </div>
+                  {/* The whole address, spelled out. Two boxes side by side on a
+                      phone cannot show a long local part in full, and the one
+                      thing a student must be able to do here is READ what we
+                      built before committing to it — a wrong address costs them
+                      the account, silently. So it is echoed rather than left to
+                      whatever fits. */}
+                  <span id="auth-email-help" className="field-hint" style={{ lineHeight: 1.5 }}>
+                    {emailLocal ? (
+                      <>
+                        <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                          {emailLocal}@{emailDomain}
+                        </span>
+                        <br />
+                      </>
+                    ) : null}
+                    {facultyAddress
+                      ? 'Faculty addresses are firstname.lastname. Edit it if yours differs.'
+                      : 'Built from your name, college and intake year. Edit it if yours differs.'}
+                  </span>
+                </>
+              ) : (
+                <input
+                  id="auth-email"
+                  type="email"
+                  inputMode="email"
+                  className="form-input"
+                  placeholder="you@learner.manipal.edu"
+                  value={email}
+                  maxLength={80}
+                  /* Editing the address retracts the "I've checked it" tick —
+                     it was a promise about the old spelling. */
+                  onChange={e => { setEmail(e.target.value); setEmailChecked(false); }}
+                  autoComplete="email"
+                  aria-invalid={!!domainProblem}
+                  aria-describedby={domainProblem ? 'auth-email-problem' : undefined}
+                  required
+                  autoFocus
+                />
+              )}
               {/* Rejected domain (or a near-miss typo) — shown the moment the
                   address is well-formed, long before any send. */}
               {domainProblem ? (
@@ -865,32 +1014,6 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 reveal={showPassword}
                 mismatch={password2.length > 0 && !passwordsMatch}
               />
-            )}
-
-            {/* Sign-up only: college (required).
-                Replaces the old "College ID" (a roll number) and free-text
-                "Department / course". Neither answered the question that
-                actually matters here — which MAHE school you're at — and both
-                were optional, so most profiles carried nothing usable. A fixed
-                list can be filtered and grouped; free text can't. */}
-            {mode === 'signup' && !resetting && (
-              <div className="field">
-                <label htmlFor="auth-college" className="field-label">
-                  <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                  College <span className="required" aria-hidden="true">*</span>
-                </label>
-                <select
-                  id="auth-college"
-                  className="form-input"
-                  value={college}
-                  onChange={e => setCollege(e.target.value)}
-                  aria-invalid={!college}
-                  required
-                >
-                  <option value="">Choose your college</option>
-                  {COLLEGES.map(c => <option key={c.id} value={c.id}>{c.id} — {c.name}</option>)}
-                </select>
-              </div>
             )}
 
             {/* Sign-up only: phone (optional) */}
