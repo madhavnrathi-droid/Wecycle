@@ -185,7 +185,6 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
      email field is split into the part they might need to change and the domain,
      which is a two-item choice and therefore a dropdown. */
   const [joiningYear, setJoiningYear] = useState('');
-  const [emailLocal, setEmailLocal] = useState('');
   const [emailDomain, setEmailDomain] = useState<ManipalDomain>(LEARNER_DOMAIN);
   /* Set the moment the address is edited by hand, and never cleared. Autofill
      is a helpful first draft, not an owner: once someone has corrected it,
@@ -194,21 +193,40 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const buildingEmail = mode === 'signup' && !resetting;
   const facultyAddress = emailDomain === FACULTY_DOMAIN;
 
-  /* Compose. Silent unless it can produce a complete address — a half-built
-     local part is worse than an empty box, because it looks finished. */
+  /* Autofill writes the COMPLETE address into `email` — the same single value
+     the field displays, the form validates, and a password manager reads. */
   useEffect(() => {
     if (!buildingEmail || emailEdited.current) return;
-    const next = composeLocalPart({ fullName: name, college, joiningYear, domain: emailDomain });
-    if (next) setEmailLocal(next);
+    const local = composeLocalPart({ fullName: name, college, joiningYear, domain: emailDomain });
+    setEmail(composeEmail(local, emailDomain));
+    setEmailChecked(false);
   }, [buildingEmail, name, college, joiningYear, emailDomain]);
 
-  /* The two halves are the input; `email` stays the single value the rest of
-     this component validates and submits, so none of that had to change. */
-  useEffect(() => {
-    if (!buildingEmail) return;
-    setEmail(composeEmail(emailLocal, emailDomain));
+  /* The dropdown swaps the tail of whatever is in the box. Only needed once the
+     address has been hand-edited; before that the effect above recomposes it. */
+  const changeDomain = (next: ManipalDomain) => {
+    setEmailDomain(next);
+    if (!emailEdited.current) return;
+    const at = email.lastIndexOf('@');
+    const local = at >= 0 ? email.slice(0, at) : email;
+    setEmail(local ? `${local}@${next}` : '');
     setEmailChecked(false);
-  }, [buildingEmail, emailLocal, emailDomain]);
+  };
+
+  /* Hand-editing. The dropdown follows along, but only once what has been typed
+     matches one of the two exactly — resolving a partial domain would rewrite
+     the box under someone still mid-word. */
+  const changeEmail = (raw: string) => {
+    const v = raw.replace(/\s+/g, '').toLowerCase();
+    emailEdited.current = true;
+    setEmail(v);
+    setEmailChecked(false);
+    const at = v.lastIndexOf('@');
+    if (at >= 0) {
+      const d = v.slice(at + 1);
+      if (d === FACULTY_DOMAIN || d === LEARNER_DOMAIN) setEmailDomain(d);
+    }
+  };
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -844,64 +862,54 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
 
             {/* Email — always shown */}
             <div className="field">
-              <label htmlFor={buildingEmail ? 'auth-email-local' : 'auth-email'} className="field-label">
+              <label htmlFor="auth-email" className="field-label">
                 <Mail size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 Email <span className="required" aria-hidden="true">*</span>
               </label>
-              {/* Sign-up gets the address in two pieces: the part that varies
-                  and the domain, which has exactly two possible answers and is
-                  therefore a dropdown rather than something to be typed and
-                  mis-typed. Sign-in and reset keep the plain field — people sign
-                  in with whatever address they registered, including the handful
-                  of non-campus ones already in the table. */}
+              {/* ONE field, holding the WHOLE address.
+                  It used to be two — a box for the local part and a dropdown for
+                  the domain — which read well and saved badly. A password
+                  manager stores the value of the single field it identifies as
+                  the username; it does not concatenate a neighbouring <select>.
+                  So "Save & Fill" captured nirnay.dlhsblr2024 with no domain,
+                  and the saved credential could never sign anyone back in.
+                  The input is therefore the complete address, type=email and
+                  autocomplete=username, and the dropdown edits its tail rather
+                  than owning a piece of it. Sign-in and reset keep the same
+                  field, so the credential saved here matches the one looked up
+                  there. */}
               {buildingEmail ? (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
-                    <input
-                      id="auth-email-local"
-                      type="text"
-                      inputMode="email"
-                      className="form-input"
-                      placeholder={facultyAddress ? 'firstname.lastname' : 'firstname.smiblr2026'}
-                      value={emailLocal}
-                      maxLength={64}
-                      /* Any edit hands ownership to the user — see emailEdited. */
-                      onChange={e => {
-                        emailEdited.current = true;
-                        setEmailLocal(e.target.value.replace(/\s+/g, '').toLowerCase());
-                      }}
-                      autoComplete="username"
-                      aria-invalid={!!domainProblem}
-                      aria-describedby={domainProblem ? 'auth-email-problem' : 'auth-email-help'}
-                      required
-                      style={{ flex: '1 1 58%', minWidth: 0 }}
-                    />
+                  <input
+                    id="auth-email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    className="form-input"
+                    placeholder={facultyAddress ? 'firstname.lastname@manipal.edu' : 'firstname.smiblr2026@learner.manipal.edu'}
+                    value={email}
+                    maxLength={80}
+                    onChange={e => changeEmail(e.target.value)}
+                    autoComplete="username"
+                    aria-invalid={!!domainProblem}
+                    aria-describedby={domainProblem ? 'auth-email-problem' : 'auth-email-help'}
+                    required
+                  />
+                  {/* Subordinate to the field above, not a second half of it —
+                      it rewrites the domain in one tap and picks the format. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
                     <select
                       aria-label="Email domain"
                       className="form-input"
                       value={emailDomain}
-                      onChange={e => setEmailDomain(e.target.value as ManipalDomain)}
-                      style={{ flex: '0 1 42%', minWidth: 0, fontSize: 12, paddingLeft: 8, paddingRight: 2 }}
+                      onChange={e => changeDomain(e.target.value as ManipalDomain)}
+                      style={{ width: 'auto', maxWidth: '100%', fontSize: 12, padding: '6px 8px', height: 'auto' }}
                     >
-                      <option value={LEARNER_DOMAIN}>@{LEARNER_DOMAIN}</option>
-                      <option value={FACULTY_DOMAIN}>@{FACULTY_DOMAIN}</option>
+                      <option value={LEARNER_DOMAIN}>@{LEARNER_DOMAIN} · student</option>
+                      <option value={FACULTY_DOMAIN}>@{FACULTY_DOMAIN} · faculty</option>
                     </select>
                   </div>
-                  {/* The whole address, spelled out. Two boxes side by side on a
-                      phone cannot show a long local part in full, and the one
-                      thing a student must be able to do here is READ what we
-                      built before committing to it — a wrong address costs them
-                      the account, silently. So it is echoed rather than left to
-                      whatever fits. */}
                   <span id="auth-email-help" className="field-hint" style={{ lineHeight: 1.5 }}>
-                    {emailLocal ? (
-                      <>
-                        <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
-                          {emailLocal}@{emailDomain}
-                        </span>
-                        <br />
-                      </>
-                    ) : null}
                     {facultyAddress
                       ? 'Faculty addresses are firstname.lastname. Edit it if yours differs.'
                       : 'Built from your name, college and intake year. Edit it if yours differs.'}
@@ -910,6 +918,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
               ) : (
                 <input
                   id="auth-email"
+                  name="email"
                   type="email"
                   inputMode="email"
                   className="form-input"
@@ -919,7 +928,10 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   /* Editing the address retracts the "I've checked it" tick —
                      it was a promise about the old spelling. */
                   onChange={e => { setEmail(e.target.value); setEmailChecked(false); }}
-                  autoComplete="email"
+                  /* username, not email: this is the identifier half of a
+                     credential pair, and it has to carry the same token as the
+                     sign-up field or a manager will not offer what it saved. */
+                  autoComplete="username"
                   aria-invalid={!!domainProblem}
                   aria-describedby={domainProblem ? 'auth-email-problem' : undefined}
                   required
