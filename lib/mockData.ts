@@ -127,6 +127,10 @@ export interface MarketplaceItem {
      hardcoded Unsplash sets keyed by id in lib/photos.ts). */
   photoUrls?: string[];
   videoUrls?: string[];
+  /* Optional outbound link, already normalised to http/https. `linkOnPhoto`
+     makes the photo itself follow it — see components/PostLink.tsx. */
+  linkUrl?: string;
+  linkOnPhoto?: boolean;
   /* Real metric counts from the DB (absent on mock items → deterministic
      pseudo-random fallback via lib/metrics.ts). */
   viewCount?: number;

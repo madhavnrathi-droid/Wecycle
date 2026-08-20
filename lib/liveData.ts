@@ -43,6 +43,8 @@ interface ListingRow {
   user_id: string;
   title: string;
   description: string | null;
+  link_url?: string | null;
+  link_on_photo?: boolean | null;
   category_id: string | null;
   /* 'item' (default) or 'opportunity' (a service offer). Column added by the
      add_kind_to_listings migration; existing rows default to 'item'. */
@@ -205,6 +207,9 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     tags: row.tags ?? [],
     photoUrls: row.photo_urls ?? [],
     videoUrls: row.video_urls ?? [],
+    linkUrl: row.link_url ?? undefined,
+    /* Never armed without a photo to arm, whatever the column says. */
+    linkOnPhoto: !!row.link_on_photo && (row.photo_urls?.length ?? 0) > 0,
     viewCount: row.view_count ?? 0,
     saveCount: row.save_count ?? 0,
     isClosed: (row as { status?: string }).status === 'completed',
@@ -364,6 +369,10 @@ export interface NewListingInput {
   price?: number;
   media: CompressedMedia[];
   notifyOnEngagement?: boolean;
+  /* Already through normalizeLink() at the form; the column's CHECK is what
+     actually guarantees the scheme. */
+  linkUrl?: string | null;
+  linkOnPhoto?: boolean;
   /* 'item' (default) for a physical listing, 'opportunity' for a service. */
   kind?: 'item' | 'opportunity';
   /* Opportunity-only: compensation + optional paid price band. */
@@ -419,6 +428,11 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
          the card then reads "Selling" / "Rate on ask". */
       price: input.listingType === 'sell' ? (input.price ?? null) : null,
       location: input.location?.trim() || null,
+      link_url: input.linkUrl || null,
+      /* Meaningless without both a link and a photo, so it is never stored on
+         its own — otherwise adding a photo later would silently arm a link the
+         poster had forgotten about. */
+      link_on_photo: !!(input.linkUrl && input.linkOnPhoto && photoUrls.length > 0),
       photo_urls: photoUrls,
       video_urls: videoUrls,
       tags: [],

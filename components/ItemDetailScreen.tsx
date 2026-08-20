@@ -6,6 +6,7 @@ import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
 import PhotoCarousel from './PhotoCarousel';
+import { LinkChip, LinkedText, PhotoLinkBadge, openExternal } from './PostLink';
 import OnlineBadge from './OnlineBadge';
 import CommentsSection from './CommentsSection';
 import RelatedShelf from './RelatedShelf';
@@ -375,6 +376,22 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     : item.listingType === 'free' ? 'Free'
     : item.listingType[0].toUpperCase() + item.listingType.slice(1);
   const desc = item.description ?? '';
+
+  /* When a link is armed on the photo, the photo stops opening the lightbox and
+     follows the link instead — and says so, because the tap target is identical
+     and the two outcomes are not. Spread onto the carousel so a post without a
+     link keeps exactly its previous behaviour. */
+  const photoLink = item.linkOnPhoto && item.linkUrl ? item.linkUrl : null;
+  const photoLinkProps = photoLink
+    ? {
+        onClick: () => {
+          track(EVT.post_link_opened, { id: item.id, from: 'photo' });
+          openExternal(photoLink);
+        },
+        overlay: <PhotoLinkBadge url={photoLink} />,
+      }
+    : {};
+
   const shouldClamp = desc.length > 140;
   const { isDesktop } = useBreakpoint();
   const { user, profile } = useAuth();
@@ -704,6 +721,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               objectFit="contain"
               dotsPosition="bottom"
               radius={24}
+              {...photoLinkProps}
             />
             <PhotoLogoStamp />
             {canManage && (
@@ -929,7 +947,11 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           </EditFieldRow>
         ) : (
           <>
-            <p style={{
+            {/* LinkedText, not a plain <p>: a URL someone typed into the
+                description is a link they meant, and leaving it as dead text
+                makes them paste it somewhere by hand. Rendered from segments,
+                never from HTML — the text is member-written. */}
+            <LinkedText text={desc} style={{
               margin: 0,
               fontSize: 14,
               color: 'var(--text-secondary)',
@@ -939,9 +961,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               WebkitLineClamp: shouldClamp && !expanded ? 4 : undefined,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-            }}>
-              {desc}
-            </p>
+            }} />
             {shouldClamp && (
               <button
                 onClick={() => setExpanded(e => !e)}
@@ -955,6 +975,11 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               >
                 {expanded ? 'Show less' : 'Read more'}
               </button>
+            )}
+            {item.linkUrl && (
+              <div style={{ marginTop: 12 }}>
+                <LinkChip url={item.linkUrl} onOpen={() => track(EVT.post_link_opened, { id: item.id, from: 'chip' })} />
+              </div>
             )}
           </>
         )}
@@ -1360,6 +1385,17 @@ function DesktopLayout({
   void hasBoth;
   const isOpportunity = item.kind === 'opportunity';
   const [reportOpen, setReportOpen] = useState(false);
+  /* Same derivation as the mobile layout — see the comment there. */
+  const photoLink = item.linkOnPhoto && item.linkUrl ? item.linkUrl : null;
+  const photoLinkProps = photoLink
+    ? {
+        onClick: () => {
+          track(EVT.post_link_opened, { id: item.id, from: 'photo' });
+          openExternal(photoLink);
+        },
+        overlay: <PhotoLinkBadge url={photoLink} />,
+      }
+    : {};
   /* Owner contact for the share card — same on-demand resolve as the main
      component (raw email/phone columns are locked down). */
   const ownerContact = useOwnerContact(item.user.id, { email: item.user.email, phone: item.user.phone });
@@ -1522,6 +1558,7 @@ function DesktopLayout({
               objectFit="contain"
               dotsPosition="bottom"
               radius={20}
+              {...photoLinkProps}
             />
             <PhotoLogoStamp />
             {canManage && (
@@ -1758,7 +1795,7 @@ function DesktopLayout({
                 />
               ) : (
                 <>
-                  <p style={{
+                  <LinkedText text={desc} style={{
                     margin: 0,
                     fontSize: 15,
                     color: 'var(--text-secondary)',
@@ -1768,7 +1805,7 @@ function DesktopLayout({
                     WebkitLineClamp: shouldClamp && !expanded ? 5 : undefined,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
-                  }}>{desc}</p>
+                  }} />
                   {shouldClamp && (
                     <button
                       onClick={() => setExpanded(e => !e)}
@@ -1782,6 +1819,11 @@ function DesktopLayout({
                     >
                       {expanded ? 'Show less' : 'Read more'}
                     </button>
+                  )}
+                  {item.linkUrl && (
+                    <div style={{ marginTop: 12 }}>
+                      <LinkChip url={item.linkUrl} onOpen={() => track(EVT.post_link_opened, { id: item.id, from: 'chip' })} />
+                    </div>
                   )}
                 </>
               )}

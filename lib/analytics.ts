@@ -128,6 +128,11 @@ export const EVT = {
   nav_switched:             'nav_switched',
   drawer_opened:            'drawer_opened',
   drawer_item_tapped:       'drawer_item_tapped',
+
+  /** An outbound link on a post was followed. `from` separates the button
+   *  under the description from a tap on the photo itself — which of the two
+   *  people actually use decides whether the photo affordance earns its keep. */
+  post_link_opened:         'post_link_opened',
 } as const;
 
 export type EventName = typeof EVT[keyof typeof EVT];

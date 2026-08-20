@@ -1,6 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { Link2 } from 'lucide-react';
+import { normalizeLink, linkHost } from '../../lib/postLink';
 import { Gift, Tag, MapPin, Bell } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
@@ -52,6 +54,11 @@ export interface ShareItemForm {
   pricing: 'free' | 'sell';
   price?: number;
   photos: string[];
+  /* Optional outbound link, exactly as typed. Normalised on submit, not on
+     every keystroke — rewriting the box while someone is mid-URL is the same
+     mistake the email field made. */
+  link: string;
+  linkOnPhoto: boolean;
   /* Service (opportunity) compensation — only used in mode="service".
      Every field below `comp` is optional: a paid gig can be posted with no
      amount, no range and no period, and reads as "Rate on ask". */
@@ -72,6 +79,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
   const isService = mode === 'service';
   const [form, setForm] = useState<ShareItemForm>({
     title: '', category: isService ? 'Services' : '', condition: '', description: '',
+    link: '', linkOnPhoto: false,
     location: '', pricing: 'free', photos: [], comp: 'free', oppRole: 'offering',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ShareItemForm, string>>>({});
@@ -79,6 +87,10 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const pickerRef = useRef<PhotoPickerHandle>(null);
+  /* Host of the link as typed, or null while it isn't a link yet. Drives both
+     the confirmation hint and whether the photo toggle is offered at all. */
+  const normalizedLink = normalizeLink(form.link);
+  const linkPreviewHost = normalizedLink ? linkHost(normalizedLink) : null;
 
   const update = <K extends keyof ShareItemForm>(key: K, value: ShareItemForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -98,6 +110,11 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
     if (!form.category) e.category = 'Pick a category';
     /* Condition is now OPTIONAL — defaults to 'good' on submit if not chosen. */
     if (!form.location.trim()) e.location = isService ? 'Where can people reach you? (or “Online”)' : 'Where can people pick this up?';
+    /* An unusable link is an error, never a silent drop. Posting without the
+       link someone deliberately attached is worse than telling them it's wrong. */
+    if (form.link.trim() && !normalizeLink(form.link)) {
+      e.link = 'That doesn’t look like a web address. Try example.com/page';
+    }
     /* Price is now OPTIONAL even when listing as Sell — empty → "Selling" label. */
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -105,7 +122,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
 
   const reset = () => {
     setForm({
-      title: '', category: isService ? 'Services' : '', condition: '', description: '', location: '', pricing: 'free', photos: [], comp: 'free', oppRole: 'offering',
+      title: '', category: isService ? 'Services' : '', condition: '', description: '', link: '', linkOnPhoto: false, location: '', pricing: 'free', photos: [], comp: 'free', oppRole: 'offering',
     });
     setNotifyOnEngagement(true);
   };
@@ -131,6 +148,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           listingType: isService ? svc.listingType : (form.pricing === 'sell' ? 'sell' : 'free'),
           price: isService ? svc.price : form.price,
           media: pickerRef.current?.getMedia() ?? [],
+          linkUrl: normalizeLink(form.link),
+          linkOnPhoto: form.linkOnPhoto,
           notifyOnEngagement,
           kind: isService ? 'opportunity' : 'item',
           ...(isService ? {
@@ -291,6 +310,74 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
             maxLength={500}
           />
           <span className="field-hint">{form.description.length}/500 characters</span>
+        </div>
+
+        {/* Link — optional, and quiet until used. Any URL typed into the
+            description above also becomes tappable on the post; this field is
+            for the one link that deserves its own button. */}
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label htmlFor="si-link" className="field-label">
+            <Link2 size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+            Link <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
+          </label>
+          <input
+            id="si-link"
+            type="url"
+            inputMode="url"
+            className="form-input"
+            placeholder="example.com/page"
+            value={form.link}
+            maxLength={500}
+            onChange={e => update('link', e.target.value)}
+            aria-invalid={!!errors.link}
+            autoComplete="off"
+          />
+          {errors.link ? (
+            <span className="field-error">{errors.link}</span>
+          ) : linkPreviewHost ? (
+            <span className="field-hint">Opens {linkPreviewHost} in a new tab.</span>
+          ) : (
+            <span className="field-hint">A page, form, or portfolio. Shown as a button on your post.</span>
+          )}
+
+          {/* Only offered once both halves exist. A photo-link with no photo is
+              a setting that does nothing, and a toggle that does nothing is
+              worse than no toggle. */}
+          {linkPreviewHost && form.photos.length > 0 && (
+            <button
+              type="button"
+              aria-pressed={form.linkOnPhoto}
+              onClick={() => update('linkOnPhoto', !form.linkOnPhoto)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                marginTop: 10, padding: '10px 12px',
+                borderRadius: 'var(--radius-md)', border: 'none',
+                background: form.linkOnPhoto ? 'rgba(0,137,57,0.10)' : 'var(--bg-inset)',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 34, height: 20, borderRadius: 999, flexShrink: 0,
+                  background: form.linkOnPhoto ? '#008939' : 'var(--border-default)',
+                  position: 'relative', transition: 'background 160ms ease',
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2, left: form.linkOnPhoto ? 16 : 2,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  transition: 'left 160ms ease',
+                }} />
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
+                Open the link when the photo is tapped
+                <span style={{ display: 'block', fontSize: 11.5, fontWeight: 400, color: 'var(--text-muted)' }}>
+                  The photo gets a {linkPreviewHost} badge so people know before they tap.
+                </span>
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="field" style={{ marginBottom: 14 }}>
