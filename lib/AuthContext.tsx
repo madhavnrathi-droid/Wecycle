@@ -9,14 +9,26 @@ import { getDemoSession, clearDemoSession, onDemoSessionChange, type DemoSession
 import { identify as analyticsIdentify, resetIdentity as analyticsReset, track, EVT } from './analytics';
 import { clearBlockCache } from './moderation';
 
-/* Admin allow-list — hard-coded by request. Anyone signed in with one
-   of these emails gets isAdmin=true and can delete any post/comment
-   regardless of ownership. Mirrored server-side by `public.is_wecycle_admin()`
-   in Supabase, which is wired into DELETE RLS policies on listings,
-   requests, events, lost_found_reports, and comments. */
+/* Admin allow-list — hard-coded by request. Anyone signed in with one of these
+   emails gets isAdmin=true and can edit or delete any post regardless of
+   ownership, plus the organiser view of any event.
+
+   This list decides what the UI OFFERS. It decides nothing about what the
+   server permits: `public.wecycle_admin_emails()` in Supabase is the roster
+   that is_wecycle_admin() reads, and that is what the RLS policies on
+   listings, requests, events, lost_found_reports and comments actually
+   enforce. The two must be kept in step — this copy exists only so the app
+   can hide controls that would fail server-side anyway, and a name added here
+   alone gets buttons that error rather than powers.
+
+   Server-side the roster is one function; it used to be three copies of the
+   same literal list. */
 export const ADMIN_EMAILS: ReadonlyArray<string> = [
   'wecycle.page@gmail.com',
   'madhav.n.rathi@gmail.com',
+  'madhav.smiblr2024@learner.manipal.edu',   /* Madhav Rathi */
+  'vidhi.smiblr2025@learner.manipal.edu',    /* Vidhi Nirzar Shah */
+  'kshama.smiblr2024@learner.manipal.edu',   /* kshama */
 ] as const;
 /** Back-compat: callers that only need a single canonical address. */
 export const ADMIN_EMAIL = ADMIN_EMAILS[0];

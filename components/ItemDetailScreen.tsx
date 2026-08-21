@@ -150,7 +150,11 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   /* "Manage" UI = the owner's inline-edit fields + Delete bar. Admin
      moderation renders INSIDE the regular contact bar so admins still
      see contact CTAs alongside their delete affordance. */
-  const canManage = !!isOwner && !!onDelete;
+  /* Editing rights. Admins were given delete but not edit, so moderating a bad
+     post meant removing it outright when fixing a line would have done. onDelete
+     is still required: the parent only passes it to someone allowed to act, so
+     this cannot grant more than the parent already decided. */
+  const canManage = (!!isOwner || !!isAdmin) && !!onDelete;
   const photos = resolveItemMedia(item);
 
   /* Photo editing — owner can open a picker dialog to add/remove/replace. */
