@@ -57,7 +57,8 @@ import { tenDigits, isAcceptable, toE164 } from '../lib/phone';
 import { COLLEGES } from '../lib/colleges';
 import {
   LEARNER_DOMAIN, FACULTY_DOMAIN, composeLocalPart, composeEmail,
-  joiningYears, type ManipalDomain,
+  joiningYears, localPartOf, hasCompleteDomain, withDomain, DOMAINS,
+  type ManipalDomain,
 } from '../lib/manipalEmail';
 
 type Step = 'credentials' | 'confirm' | 'newpassword';
@@ -192,6 +193,16 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const emailEdited = useRef(false);
   const buildingEmail = mode === 'signup' && !resetting;
   const facultyAddress = emailDomain === FACULTY_DOMAIN;
+
+  /* Offer the two campus domains on sign-in and reset, but only while the
+     address is still missing one. Requiring a local part first is what keeps a
+     tap from producing a bare "@learner.manipal.edu", and requiring the domain
+     to be absent is what keeps them off screen once a password manager has
+     filled the whole thing. */
+  const showDomainChips =
+    !buildingEmail
+    && localPartOf(email).trim().length > 0
+    && !hasCompleteDomain(email);
 
   /* Autofill writes the COMPLETE address into `email` — the same single value
      the field displays, the form validates, and a password manager reads. */
@@ -938,6 +949,45 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   autoFocus
                 />
               )}
+
+              {/* Domain completion for sign-in and reset.
+                *
+                * Chips rather than the dropdown sign-up uses, for one reason
+                * that outranks consistency: a password manager fills this field.
+                * A permanent second control next to it is one more thing for
+                * autofill to aim at, and anything that rewrites the box after a
+                * fill would undo the fill. These appear only while the address
+                * is INCOMPLETE, so the moment Google or iCloud Passwords drops a
+                * whole address in, they vanish and never touch it.
+                *
+                * On sign-up the dropdown earns its place by also choosing the
+                * format — student or faculty — and hiding the intake year. Here
+                * there is nothing to choose, only typing to save, so the lighter
+                * control is the right one. Same job, different amount of work.
+                *
+                * type="button" is load-bearing: inside a form, a bare <button>
+                * submits, so a tap meant to finish the address would try to sign
+                * in with a half-typed one. */}
+              {showDomainChips && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {DOMAINS.map(d => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => { setEmail(withDomain(email, d)); setEmailChecked(false); }}
+                      style={{
+                        border: 'none', cursor: 'pointer',
+                        borderRadius: 999, padding: '6px 11px',
+                        background: 'var(--bg-inset)', color: 'var(--text-secondary)',
+                        fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em',
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      }}
+                    >
+                      @{d}
+                    </button>
+                  ))}
+                </div>
+              )}
               {/* Rejected domain (or a near-miss typo) — shown the moment the
                   address is well-formed, long before any send. */}
               {domainProblem ? (
@@ -981,6 +1031,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 <div style={{ position: 'relative' }}>
                   <input
                     id="auth-password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
                     className="form-input"
                     style={{ paddingRight: 44 }}
@@ -1336,6 +1387,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
               <div style={{ position: 'relative' }}>
                 <input
                   id="auth-newpassword"
+                  name="new-password"
                   type={showPassword ? 'text' : 'password'}
                   className="form-input"
                   style={{ paddingRight: 44 }}
@@ -1444,6 +1496,7 @@ function ConfirmPasswordField({
       </label>
       <input
         id="auth-password2"
+        name="confirm-password"
         type={reveal ? 'text' : 'password'}
         className="form-input"
         placeholder="Type it again"

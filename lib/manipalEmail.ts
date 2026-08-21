@@ -96,6 +96,31 @@ export function composeEmail(local: string, domain: ManipalDomain): string {
   return local ? `${local}@${domain}` : '';
 }
 
+/** Everything before the last '@' — what someone has typed so far. */
+export function localPartOf(email: string): string {
+  const at = email.lastIndexOf('@');
+  return at >= 0 ? email.slice(0, at) : email;
+}
+
+/** True once the address already ends in one of the two campus domains, which
+ *  is the signal that no completion help is needed any more. Also true for any
+ *  other complete-looking domain, so a member with a legacy address (there are
+ *  a handful of gmail accounts from before the domain rule) is not nagged. */
+export function hasCompleteDomain(email: string): boolean {
+  const at = email.lastIndexOf('@');
+  if (at < 0) return false;
+  const domain = email.slice(at + 1).toLowerCase();
+  if (domain === LEARNER_DOMAIN || domain === FACULTY_DOMAIN) return true;
+  /* something.tld with a real-looking TLD */
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain);
+}
+
+/** Attach a domain to whatever has been typed, replacing any partial one. */
+export function withDomain(email: string, domain: ManipalDomain): string {
+  const local = localPartOf(email).trim();
+  return local ? `${local}@${domain}` : '';
+}
+
 /** Split an existing address so the editor can show it in its two halves. */
 export function splitEmail(email: string): { local: string; domain: ManipalDomain } {
   const at = email.lastIndexOf('@');
