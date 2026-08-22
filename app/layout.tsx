@@ -137,9 +137,17 @@ export default function RootLayout({
             window.gtag = gtag;
             gtag('js', new Date());
             gtag('config', '${GA4_MEASUREMENT_ID}', {
-              /* Single-page-app: we'll send our own page_view events on
-                 screen changes via lib/analytics.ts → trackScreenView. */
-              send_page_view: true,
+              /* false, and this is load-bearing. Every screen here lives in one
+                 route, so app/page.tsx owns page_view and fires it on each
+                 screen change — including the first, which is why the automatic
+                 one is switched off. Left on, the landing screen would be
+                 counted twice and a deep link would report "/" before it
+                 reported the post that was actually opened.
+
+                 It used to be true, paired with a comment claiming
+                 trackScreenView sent the rest. Nothing called trackScreenView,
+                 so this was the only page_view the app ever sent. */
+              send_page_view: false,
             });
           `}
         </Script>

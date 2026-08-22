@@ -251,12 +251,32 @@ export function resetIdentity(): void {
    ────────────────────────────────────────────────────────────── */
 
 /** Fire when the active screen changes (BottomNav switch, sub-screen push).
- *  GA4 will treat this as both a screen_view AND increment session-level
- *  page metrics. */
+ *
+ *  Sends a real GA4 `page_view`, not the `screen_view` this used to send.
+ *  That distinction is the whole point:
+ *
+ *    - `screen_view` is the Firebase / app-stream event. On a WEB stream GA4
+ *      does not count it as a page at all, so it populated no Pages report and
+ *      contributed nothing to session engagement.
+ *    - Nothing called this function anyway — the only reference to it in the
+ *      codebase was a comment in app/layout.tsx claiming it happened.
+ *
+ *  So every screen change in a single-route SPA was invisible, and the whole
+ *  app reported exactly one page_view per session, at load. That distorts the
+ *  bounce rate directly: GA4 counts a session as engaged if it lasts 10s+, has
+ *  a key event, OR has 2+ page_views, and the third route was unreachable.
+ *
+ *  page_location is synthesised with a path per screen rather than reusing the
+ *  real URL, which never changes here. Without it every row in the Pages report
+ *  would be "/" and the report would say nothing about which screens people use.
+ */
 export function trackScreenView(screen: string, extra: Record<string, unknown> = {}): void {
-  track(EVT.screen_view, {
+  const path = `/${screen.replace(/_/g, '-')}`;
+  track('page_view' as EventName, {
+    page_title: screen,
+    page_location: typeof window !== 'undefined' ? `${window.location.origin}${path}` : path,
+    page_path: path,
     screen_name: screen,
-    screen_class: screen,
     ...extra,
   });
 }

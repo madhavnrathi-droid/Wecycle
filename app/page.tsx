@@ -54,7 +54,7 @@ const ReportLostFoundModal  = dynamic(() => import('../components/forms/ReportLo
 const SubmitEventModal      = dynamic(() => import('../components/forms/SubmitEventModal'), { ssr: false });
 const AlertFormModal        = dynamic(() => import('../components/forms/AlertFormModal'), { ssr: false });
 const AuthModal             = dynamic(() => import('../components/AuthModal'), { ssr: false });
-import { track, EVT } from '../lib/analytics';
+import { track, EVT, trackScreenView } from '../lib/analytics';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
 import type { MarketplaceItem, CommunityEvent, User, LostItem } from '../lib/mockData';
@@ -287,6 +287,26 @@ export default function WecycleApp() {
      and entering one directly from the drawer pops back to the main app. */
   type SubScreen = 'settings' | 'notifications' | 'feedback' | 'password';
   const [subStack, setSubStack] = useState<SubScreen[]>([]);
+
+  /* ── The app's page_view ───────────────────────────────────────────────
+     One route, many screens, so GA4 has to be told what is on screen or its
+     Pages report has a single row reading "/" and its engagement rule that
+     counts 2+ page_views per session can never fire.
+
+     The topmost surface wins: an open post is what the person is looking at,
+     not the tab behind it. Fires on mount too — gtag's automatic page_view is
+     switched off in the layout precisely so this owns all of them, which also
+     makes a deep link report the post rather than the feed. */
+  const currentView =
+      openItem  ? 'listing_detail'
+    : openEvent ? 'event_detail'
+    : openLF    ? 'lostfound_detail'
+    : subStack.length ? subStack[subStack.length - 1]
+    : activeScreen;
+
+  useEffect(() => {
+    trackScreenView(String(currentView));
+  }, [currentView]);
   const subScreen: SubScreen | null = subStack[subStack.length - 1] ?? null;
   const pushSub = (s: SubScreen) => setSubStack(prev => [...prev, s]);
   const popSub  = () => setSubStack(prev => prev.slice(0, -1));
