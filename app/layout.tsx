@@ -148,6 +148,21 @@ export default function RootLayout({
                  trackScreenView sent the rest. Nothing called trackScreenView,
                  so this was the only page_view the app ever sent. */
               send_page_view: false,
+
+              /* ── The two flags that keep this out of ATT territory ──
+                 Apple defines tracking as linking this app's data with data
+                 from OTHER companies' apps or sites for advertising, or sharing
+                 it with a data broker. Analytics is not tracking — but GA4 can
+                 become tracking if Google Signals is on, because that is
+                 precisely Google linking this property's data to its
+                 cross-property ads graph.
+
+                 Off, explicitly, so "Wecycle does not track" is something the
+                 code enforces rather than something we assert. App Review asked
+                 the question once; this is the answer being true by
+                 construction, and it is quotable in the reply. */
+              allow_google_signals: false,
+              allow_ad_personalization_signals: false,
             });
           `}
         </Script>

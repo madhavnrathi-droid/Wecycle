@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { Link2 } from 'lucide-react';
 import { normalizeLink, linkHost } from '../../lib/postLink';
+import { findObjectionable, objectionableMessage } from '../../lib/contentFilter';
 import { Gift, Tag, MapPin, Bell } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
@@ -115,6 +116,14 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
     if (form.link.trim() && !normalizeLink(form.link)) {
       e.link = 'That doesn’t look like a web address. Try example.com/page';
     }
+    /* Guideline 1.2 asks for a method of FILTERING objectionable content, not
+       only for reporting it after the fact. Checked here so the refusal is
+       attached to the field that caused it; enforced again by a database
+       trigger, since this check runs on the client. */
+    const badTitle = findObjectionable(form.title);
+    if (badTitle) e.title = objectionableMessage(badTitle);
+    const badDesc = findObjectionable(form.description);
+    if (badDesc) e.description = objectionableMessage(badDesc);
     /* Price is now OPTIONAL even when listing as Sell — empty → "Selling" label. */
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -309,7 +318,9 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
             onChange={e => update('description', e.target.value)}
             maxLength={500}
           />
-          <span className="field-hint">{form.description.length}/500 characters</span>
+          {errors.description
+            ? <span className="field-error">{errors.description}</span>
+            : <span className="field-hint">{form.description.length}/500 characters</span>}
         </div>
 
         {/* Link — optional, and quiet until used. Any URL typed into the
