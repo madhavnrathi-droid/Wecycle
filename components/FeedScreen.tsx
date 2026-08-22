@@ -312,6 +312,17 @@ export default function FeedScreen({
 
   const greetingName = (profile?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0];
 
+  /* The top strip is the first thing above the fold, and for a signed-OUT
+     visitor it was spending that on "Hi, there 👋" and today's date — a
+     greeting to nobody, and a fact they already knew. Nothing on the first
+     screen said what this is or why to stay, which is a lot to ask of someone
+     deciding in three seconds.
+     Signed-in members keep the greeting: by then the name is warm rather than
+     empty, and they already know what the app does. Rendered before mount too,
+     so the value proposition is what paints first rather than arriving a beat
+     late — the flash a member sees is one frame of a true sentence. */
+  const showValueProp = !mounted || !user;
+
   /* ── Storefront rails (the "All" home view) ─────────────────────────
      Segregate the mixed feed into themed, horizontally-scrolling rows —
      an e-commerce storefront rather than a Pinterest wall. Each rail is
@@ -406,7 +417,7 @@ export default function FeedScreen({
   const bannerSlides: BannerSlide[] = [
     {
       id: 'share',
-      image: '/banners/share.png',
+      image: '/banners/share.webp',
       illustration: 'twemoji:wrapped-gift',
       title: 'Share what you don’t use',
       subtitle: 'Give it a second life nearby',
@@ -417,7 +428,7 @@ export default function FeedScreen({
     },
     {
       id: 'request',
-      image: '/banners/request.jpg',
+      image: '/banners/request.webp',
       illustration: 'twemoji:raising-hand',
       title: 'Ask for what you need',
       subtitle: 'Borrow before you buy',
@@ -428,7 +439,7 @@ export default function FeedScreen({
     },
     {
       id: 'events',
-      image: '/banners/events.jpg',
+      image: '/banners/events.webp',
       illustration: 'twemoji:tear-off-calendar',
       title: 'Join local events',
       subtitle: 'Repair cafés, swaps, cleanups',
@@ -439,7 +450,7 @@ export default function FeedScreen({
     },
     {
       id: 'lost-found',
-      image: '/banners/lost-found.jpg',
+      image: '/banners/lost-found.webp',
       illustration: 'twemoji:magnifying-glass-tilted-left',
       title: 'Lost something?',
       subtitle: 'Or help return what you found',
@@ -450,7 +461,7 @@ export default function FeedScreen({
     },
     {
       id: 'mahe',
-      image: '/banners/mahe.jpg',
+      image: '/banners/mahe.webp',
       illustration: 'twemoji:graduation-cap',
       /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
            plainly that it is not affiliated with, endorsed by, or sponsored by
@@ -536,15 +547,19 @@ export default function FeedScreen({
               color: 'var(--text-primary)',
               lineHeight: 1.15,
             }} suppressHydrationWarning>
-              Hi, {mounted ? greetingName : 'there'} <span aria-hidden="true">👋</span>
+              {showValueProp
+                ? 'Buy, borrow and give away on campus'
+                : <>Hi, {greetingName} <span aria-hidden="true">👋</span></>}
             </h1>
             <p style={{
               margin: '4px 0 0',
               fontSize: 13, color: 'var(--text-muted)',
             }} suppressHydrationWarning>
-              {mounted && new Date().toLocaleDateString('en-US', {
-                weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
-              })}
+              {showValueProp
+                ? 'Free to use, no commission — just verified Manipal students.'
+                : mounted && new Date().toLocaleDateString('en-US', {
+                    weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
+                  })}
             </p>
           </div>
 

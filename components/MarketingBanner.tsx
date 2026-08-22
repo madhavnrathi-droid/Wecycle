@@ -52,7 +52,7 @@ export interface BannerSlide {
    *  underneath stay visible). Used as the fallback render when `image` is
    *  absent or fails to load. */
   gradient: string;
-  /** Full-bleed banner artwork (e.g. /banners/share.png). When set and it
+  /** Full-bleed banner artwork (e.g. /banners/share.webp). When set and it
    *  loads, the whole card is just this image — the gradient + doodles +
    *  illustration + text overlay are skipped because the artwork already
    *  contains all of that. If it 404s or errors, we fall back to the

@@ -5,7 +5,6 @@ import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "../lib/AuthContext";
 import { SITE_URL } from "../lib/siteUrl";
-import SessionSplash from "../components/SessionSplash";
 import NativeInit from "../components/NativeInit";
 import "./globals.css";
 
@@ -94,8 +93,14 @@ export default function RootLayout({
             itself is installed directly below — DO NOT also add a GA4
             Configuration tag inside GTM or every hit will be counted twice.
             Both GTM and gtag use the same `window.dataLayer` so events
-            pushed by `lib/analytics.ts` reach both pipelines. */}
-        <Script id="gtm-init" strategy="afterInteractive">
+            pushed by `lib/analytics.ts` reach both pipelines.
+
+            lazyOnload, not afterInteractive: this is a tag CONTAINER, and until
+            tags are configured in it there is nothing here the first screen
+            needs. afterInteractive put it in the same queue as the app's own
+            hydration, on a page whose problem is people leaving before it
+            finishes. */}
+        <Script id="gtm-init" strategy="lazyOnload">
           {`
             (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
             new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -111,7 +116,15 @@ export default function RootLayout({
             loader + the inline gtag init are the standard GA4 snippet,
             wrapped in next/script. The inline init runs synchronously
             against window.dataLayer (which GTM may have already created).
-            Custom events live in lib/analytics.ts. */}
+            Custom events live in lib/analytics.ts.
+
+            DELIBERATELY still afterInteractive while GTM and Clarity move to
+            lazyOnload. GA4 is the thing measuring the bounce rate, and a
+            bounced visit is by definition a short one — defer the beacon and
+            the quickest exits stop being counted, which lowers the REPORTED
+            number without a single real user staying longer. Fixing a metric by
+            breaking its instrument is the one optimisation here that would be
+            worse than doing nothing. gtag is also the lightest of the three. */}
         <Script
           id="ga4-loader"
           src={`https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}`}
@@ -132,10 +145,14 @@ export default function RootLayout({
         </Script>
 
         {/* Microsoft Clarity — session replay + heatmaps + funnel analytics.
-            Loaded via next/script with strategy="afterInteractive" so it
-            never blocks the first paint, but still injects before the user
-            starts clicking around. */}
-        <Script id="ms-clarity" strategy="afterInteractive">
+
+            The heaviest third party here by a distance: it does not just report,
+            it RECORDS, instrumenting the DOM and streaming mutations for the
+            whole visit. afterInteractive had it doing that while the feed was
+            still trying to render. lazyOnload holds it until the browser is
+            idle after load, which costs a fraction of a second of replay
+            coverage and buys that time back on every first paint. */}
+        <Script id="ms-clarity" strategy="lazyOnload">
           {`
             (function(c,l,a,r,i,t,y){
                 c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
@@ -158,9 +175,13 @@ export default function RootLayout({
           />
         </noscript>
         <AuthProvider>{children}</AuthProvider>
-        {/* Full-screen brand splash on a new session — overlays everything,
-            decides + paints before the app shows, then fades out. */}
-        <SessionSplash />
+        {/* The session splash that stood here is gone. It held a full-screen
+            overlay for 1400ms and then faded for another 640ms, so better than
+            two seconds of every new session were spent looking at a logo
+            instead of the app. On a bounce-rate problem that is the single
+            most expensive thing on the page: it delayed nothing technical, it
+            was pure dwell, and it ran on exactly the visit — the first one —
+            where a stranger decides whether to stay. */}
         {/* Native (Capacitor) runtime setup — status bar, keyboard, splash.
             No-op on the web. */}
         <NativeInit />

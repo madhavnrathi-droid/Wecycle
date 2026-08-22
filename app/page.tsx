@@ -1,32 +1,59 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+
+/* ── What ships with the first paint, and what doesn't ─────────────────────
+ *
+ * Every screen in this app is a client component swapped inside this one route,
+ * and all 26 of them used to be imported statically. That meant someone landing
+ * on the feed downloaded the item detail screen, all five post forms, the event
+ * insights dashboard, the form builder and the account screen before they could
+ * read a single card — on a campus phone, over campus wifi.
+ *
+ * Only the feed and the bar under it are needed to render the first screen.
+ * Everything below is behind a tap, so it is fetched on that tap instead. The
+ * chunks are small and the network is already idle by then, so the swap is
+ * imperceptible; what it removes is weight from the one moment that decides
+ * whether a stranger stays.
+ *
+ * ssr:false throughout because these are client-only screens — they read
+ * window, localStorage and the auth session — and there is no SSR pass to
+ * benefit from. */
 import BottomNav, { type Screen } from '../components/BottomNav';
 import FeedScreen from '../components/FeedScreen';
-import MarketplaceScreen from '../components/MarketplaceScreen';
-import EventsScreen from '../components/EventsScreen';
-import ImpactScreen from '../components/ImpactScreen';
-import InventoryScreen from '../components/InventoryScreen';
-import LostFoundScreen, { LostFoundDetailSheet, type LFSavePatch } from '../components/LostFoundScreen';
-import ItemDetailScreen from '../components/ItemDetailScreen';
-import EventDetailScreen from '../components/EventDetailScreen';
-import EventRegistrationScreen from '../components/EventRegistrationScreen';
-import EventInsightsScreen from '../components/EventInsightsScreen';
-import AccountScreen from '../components/AccountScreen';
-import ActivityScreen from '../components/ActivityScreen';
-import SettingsScreen from '../components/SettingsScreen';
-import NotificationsScreen from '../components/NotificationsScreen';
-import FeedbackScreen from '../components/FeedbackScreen';
-import ChangePasswordScreen from '../components/ChangePasswordScreen';
-import StorefrontScreen from '../components/StorefrontScreen';
-import Drawer from '../components/Drawer';
-import PostSheet from '../components/PostSheet';
-import ShareItemModal from '../components/forms/ShareItemModal';
-import PostRequestModal from '../components/forms/PostRequestModal';
-import ReportLostFoundModal from '../components/forms/ReportLostFoundModal';
-import SubmitEventModal from '../components/forms/SubmitEventModal';
-import AlertFormModal from '../components/forms/AlertFormModal';
-import AuthModal from '../components/AuthModal';
+import type { LFSavePatch } from '../components/LostFoundScreen';
+
+/* Nav destinations — one tap from the feed. */
+const MarketplaceScreen = dynamic(() => import('../components/MarketplaceScreen'), { ssr: false });
+const EventsScreen      = dynamic(() => import('../components/EventsScreen'), { ssr: false });
+const ImpactScreen      = dynamic(() => import('../components/ImpactScreen'), { ssr: false });
+const InventoryScreen   = dynamic(() => import('../components/InventoryScreen'), { ssr: false });
+const LostFoundScreen   = dynamic(() => import('../components/LostFoundScreen'), { ssr: false });
+
+/* Detail + secondary screens. */
+const LostFoundDetailSheet    = dynamic(() => import('../components/LostFoundScreen').then(m => m.LostFoundDetailSheet), { ssr: false });
+const ItemDetailScreen        = dynamic(() => import('../components/ItemDetailScreen'), { ssr: false });
+const EventDetailScreen       = dynamic(() => import('../components/EventDetailScreen'), { ssr: false });
+const EventRegistrationScreen = dynamic(() => import('../components/EventRegistrationScreen'), { ssr: false });
+const EventInsightsScreen     = dynamic(() => import('../components/EventInsightsScreen'), { ssr: false });
+const AccountScreen           = dynamic(() => import('../components/AccountScreen'), { ssr: false });
+const ActivityScreen          = dynamic(() => import('../components/ActivityScreen'), { ssr: false });
+const SettingsScreen          = dynamic(() => import('../components/SettingsScreen'), { ssr: false });
+const NotificationsScreen     = dynamic(() => import('../components/NotificationsScreen'), { ssr: false });
+const FeedbackScreen          = dynamic(() => import('../components/FeedbackScreen'), { ssr: false });
+const ChangePasswordScreen    = dynamic(() => import('../components/ChangePasswordScreen'), { ssr: false });
+const StorefrontScreen        = dynamic(() => import('../components/StorefrontScreen'), { ssr: false });
+
+/* Overlays — none of these exist until something is opened. */
+const Drawer                = dynamic(() => import('../components/Drawer'), { ssr: false });
+const PostSheet             = dynamic(() => import('../components/PostSheet'), { ssr: false });
+const ShareItemModal        = dynamic(() => import('../components/forms/ShareItemModal'), { ssr: false });
+const PostRequestModal      = dynamic(() => import('../components/forms/PostRequestModal'), { ssr: false });
+const ReportLostFoundModal  = dynamic(() => import('../components/forms/ReportLostFoundModal'), { ssr: false });
+const SubmitEventModal      = dynamic(() => import('../components/forms/SubmitEventModal'), { ssr: false });
+const AlertFormModal        = dynamic(() => import('../components/forms/AlertFormModal'), { ssr: false });
+const AuthModal             = dynamic(() => import('../components/AuthModal'), { ssr: false });
 import { track, EVT } from '../lib/analytics';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useAuth } from '../lib/AuthContext';
