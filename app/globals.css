@@ -3874,9 +3874,16 @@ img[src*="/storage/v1/object/public/"] {
       0 8px 28px rgba(0, 0, 0, 0.14),
       0 2px 8px rgba(0, 0, 0, 0.08);
   }
-  /* `min-width` (not width) so the inactive icons sit at 40px but the
-     active button can still expand into a pill. */
-  .bottom-nav-btn  { min-width: 40px; height: 40px; }
+  /* min-width, not width, so inactive icons stay compact while the active
+     button expands into a pill.
+
+     min-height, NOT height. These overrides were written when the bar was
+     icon-only; the redesign put a permanent label under every icon, and a
+     fixed 40px could not hold an icon plus a line of text — so on any screen
+     at least 768px wide, which includes a phone turned sideways, "Inventory"
+     was sliced through the middle. A column that sizes to its content cannot
+     clip it. */
+  .bottom-nav-btn  { min-width: 40px; height: auto; min-height: 40px; }
   .bottom-nav-post { width: 46px; height: 46px; }
 }
 
@@ -3892,7 +3899,7 @@ img[src*="/storage/v1/object/public/"] {
       0 12px 30px rgba(0, 0, 0, 0.10),
       0 4px 12px rgba(0, 0, 0, 0.06);
   }
-  .bottom-nav-btn  { min-width: 38px; height: 38px; }
+  .bottom-nav-btn  { min-width: 38px; height: auto; min-height: 38px; }
   .bottom-nav-post { width: 42px; height: 42px; }
   .bottom-nav-btn  svg { width: 18px; height: 18px; }
   .bottom-nav-post svg { width: 18px; height: 18px; }
