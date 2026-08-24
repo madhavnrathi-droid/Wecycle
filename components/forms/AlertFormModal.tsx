@@ -9,10 +9,11 @@ import {
   type WecycleAlert, type NotifyChannel, type CreateAlertInput, type StorageMode,
 } from '../../lib/alerts';
 
-const CATEGORIES = [
-  'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
-  'Tools', 'Kitchen', 'Lab', 'Art', 'Clothing', 'Services', 'Other',
-];
+/* The taxonomy lives in lib/categories — one list for the chips, the rails and
+   every post form. This file used to carry its own copy, which had already
+   drifted from the chips, so a member could file a post under a category the
+   feed had no way to show. */
+import { CATEGORIES } from '../../lib/categories';
 
 const CONDITIONS: { value: NonNullable<WecycleAlert['condition']>; label: string }[] = [
   { value: 'any',      label: 'Any condition' },
@@ -215,7 +216,7 @@ export default function AlertFormModal({
               required
             >
               <option value="">Select…</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
             </select>
             {errors.category && <span className="field-error">{errors.category}</span>}
           </div>

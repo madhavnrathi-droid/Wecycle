@@ -20,6 +20,7 @@ import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData
 import { listingToComp } from './opportunity';
 import type { CompressedMedia } from './mediaCompression';
 import type { Database } from './database.types';
+import { normalizeCategory } from './categories';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -413,7 +414,11 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
 
   /* 2. Insert the row. category_id must be an existing categories.id —
         we lowercase the label the form gave us. */
-  const categoryId = input.category.trim().toLowerCase();
+  /* Normalised, not just lowercased. The forms now submit ids, but a client
+     that has not reloaded still submits a label, and multi-word labels do not
+     lowercase into valid ids — that would fail the foreign key and the post
+     would simply not go up. */
+  const categoryId = normalizeCategory(input.category) ?? 'hobbies';
   const { data, error } = await supabase
     .from('listings')
     .insert({

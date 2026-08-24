@@ -19,10 +19,11 @@ import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
 import { haptics } from '../../lib/haptics';
 
-const CATEGORIES = [
-  'Electronics', 'Furniture', 'Books', 'Stationery', 'Sports',
-  'Tools', 'Kitchen', 'Lab', 'Art', 'Clothing', 'Services', 'Other',
-];
+/* The taxonomy lives in lib/categories — one list for the chips, the rails and
+   every post form. This file used to carry its own copy, which had already
+   drifted from the chips, so a member could file a post under a category the
+   feed had no way to show. */
+import { CATEGORIES } from '../../lib/categories';
 
 /* Condition slider — 5 stops with an animated emoji face per stop. Stored as
    one of the three Supabase enum values, but the user picks via a colorful
@@ -288,7 +289,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
             aria-invalid={!!errors.category}
           >
             <option value="">Select…</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
           </select>
           {errors.category && <span className="field-error">{errors.category}</span>}
         </div>

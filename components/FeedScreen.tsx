@@ -1,5 +1,6 @@
 'use client';
 
+import { CATEGORIES as CATEGORY_LIST, normalizeCategory } from '../lib/categories';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
 import { Wordmark } from './Brand';
@@ -382,20 +383,23 @@ export default function FeedScreen({
   const upcoming     = events.filter(ev => !blocked.has(ev.organizer.id)).slice(0, 12);
   const lostItems    = lostFound.filter(lf => !blocked.has(lf.user.id) && lf.status === 'lost');
   const foundItems   = lostFound.filter(lf => !blocked.has(lf.user.id) && lf.status === 'found').slice(0, 12);
-  const itemsByCat   = (cat: string) => liveItems.filter(it => (it.category || '').toLowerCase() === cat).slice(0, 12);
+  /* Match on the category ID, not the display label. `item.category` carries
+     the LABEL, so this compared "art" against "art & stationery" and every
+     multi-word category silently produced an empty rail — which is why only
+     Electronics and Fashion had one, those being the two whose label happens to
+     equal its id. normalizeCategory covers rows that predate the id. */
+  const itemsByCat   = (cat: string) =>
+    liveItems.filter(it => (it.categoryId ?? normalizeCategory(it.category)) === cat).slice(0, 12);
 
-  /* Category rails, each with its own bit of copy. Only the ones with a
-     couple of items to show survive — a rail of one looks broken. */
-  const CATEGORY_RAILS = [
-    { id: 'furniture',   title: 'Dorm glow-up',       sub: 'Desks, chairs, the whole set-up' },
-    { id: 'electronics', title: 'Gently-used gadgets', sub: 'Half the price, all the specs' },
-    { id: 'books',       title: 'Passed-down reads',   sub: 'Someone survived this syllabus' },
-    { id: 'sports',      title: 'Game on',             sub: 'Gear after a second player' },
-    { id: 'kitchen',     title: 'Midnight-Maggi kit',  sub: 'Kettles, pans, mugs and more' },
-    { id: 'tools',       title: 'Borrow the toolbox',  sub: 'Fix it without buying it' },
-  ] as const;
-  const categoryRails = CATEGORY_RAILS
-    .map(r => ({ ...r, list: itemsByCat(r.id) }))
+  /* Category rails, generated from the taxonomy rather than a hand-picked
+     subset of it. The old list named six categories inline, so the other six —
+     including every one added since — could never get a row however much was
+     posted into them. Now a category that fills up earns a rail automatically,
+     which is what makes the storefront keep working as people post.
+
+     Two is still the floor: a rail holding one card reads as broken. */
+  const categoryRails = CATEGORY_LIST
+    .map(c => ({ id: c.id, title: c.rail.title, sub: c.rail.sub, list: itemsByCat(c.id) }))
     .filter(r => r.list.length >= 2);
 
   /* Storefront when nothing is narrowing the view; a product grid the

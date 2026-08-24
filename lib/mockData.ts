@@ -1,3 +1,4 @@
+import { CATEGORIES as CATEGORY_LIST, ALL_CATEGORY } from './categories';
 /* ═══════════════════════════════════════════════
    WECYCLE — Rich Mock Data
    Community Operating System
@@ -870,18 +871,10 @@ export const PERSONAL_IMPACT = {
 
 /* ─── CATEGORIES ────────────────────────────────── */
 
-export const CATEGORIES = [
-  { id: 'all', label: 'All', icon: '⚡' },
-  { id: 'electronics', label: 'Electronics', icon: '💻' },
-  { id: 'furniture', label: 'Furniture', icon: '🪑' },
-  { id: 'books', label: 'Books', icon: '📚' },
-  { id: 'sports', label: 'Sports', icon: '⚽' },
-  { id: 'lab', label: 'Lab', icon: '🧪' },
-  { id: 'tools', label: 'Tools', icon: '🔧' },
-  { id: 'kitchen', label: 'Kitchen', icon: '☕' },
-  { id: 'clothing', label: 'Clothing', icon: '👕' },
-  { id: 'services', label: 'Services', icon: '🤝' },
-];
+/* Re-exported from lib/categories, which is the one taxonomy the chips, the
+   storefront rails and every post form now share. Kept here so the many
+   existing importers of CATEGORIES do not all have to change at once. */
+export const CATEGORIES = [ALL_CATEGORY, ...CATEGORY_LIST];
 
 export const LISTING_TYPES = [
   { id: 'all', label: 'All' },
