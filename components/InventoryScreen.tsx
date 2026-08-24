@@ -310,7 +310,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       {/* ── GRID ── */}
       <section style={{ padding: '0 12px' }}>
         {entries.length === 0 ? (
-          <InventoryEmpty tab={activeTab} onPostNew={onPostNew} />
+          <InventoryEmpty tab={activeTab} onPostNew={onPostNew} signedIn={!!user} />
         ) : (
           <div className="masonry-2">
             {entries.map((entry, idx) => {
@@ -809,7 +809,23 @@ function InventoryLostFoundCard({
   );
 }
 
-function InventoryEmpty({ tab, onPostNew }: { tab: Tab; onPostNew: () => void }) {
+function InventoryEmpty({ tab, onPostNew, signedIn }: { tab: Tab; onPostNew: () => void; signedIn: boolean }) {
+  /* Signed-out visitors are not people with an empty shelf — they are people
+     without a shelf. Every line below said "you haven't posted anything yet",
+     which reads as an accusation to someone who has no account to have posted
+     from, and explains nothing about what this screen is for. One state, one
+     truth: say what Inventory is and offer the account that makes it exist. */
+  if (!signedIn) {
+    return (
+      <EmptyState
+        icon="🗂️"
+        prompt="Your posts will live here"
+        sub="Anything you share, request or organise shows up on this screen, along with its views and saves. Join with your Manipal email to start one."
+        cta={{ label: 'Join Wecycle', onClick: onPostNew }}
+      />
+    );
+  }
+
   /* Per-tab copy lives here because each tab has a different verb and CTA. */
   const copy =
     tab === 'all' ? {

@@ -334,6 +334,49 @@ export default function FeedScreen({
     [liveItems],
   );
   const freeItems    = liveItems.filter(it => it.listingType === 'free').slice(0, 12);
+
+  /* ── Rails that always have something in them ─────────────────────────────
+   *
+   * "Just dropped" is every live item sorted by date, so with a young
+   * catalogue it swallowed the lot and every other row went dark: free
+   * listings are 0, requests 1, services 1, and 17 items spread over 8
+   * categories leaves almost none with the two a rail needs. The page looked
+   * empty while holding everything it had.
+   *
+   * The fix is not more thresholds, it is merchandising on axes the data
+   * cannot be missing. Price and view count exist on every listing, so these
+   * two rows populate on day one and keep populating.
+   *
+   * Overlap between rows is deliberate and normal — a shop shows the same
+   * product under New, under Popular and in its category. What was wrong was
+   * one row holding everything while the rest showed nothing, not an item
+   * appearing twice. */
+
+  /* Social proof. The strongest merchandising signal a marketplace has, and
+     the one a new visitor trusts most: other people already looked at this. */
+  const popularItems = useMemo(
+    () => [...liveItems]
+      .filter(it => (it.viewCount ?? 0) > 0)
+      .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
+      .slice(0, 12),
+    [liveItems],
+  );
+
+  /* Price anchoring. Students sort by cost before anything else, and a
+     budget row is the one every marketplace opens with. Free counts as under
+     the cap rather than being excluded on a technicality. */
+  const budgetItems = liveItems
+    .filter(it => it.listingType === 'free' || (typeof it.price === 'number' && it.price > 0 && it.price <= 500))
+    .slice(0, 12);
+
+  /* Proximity beats everything else in a campus marketplace: the same desk is
+     worth more three buildings away than across town. Only for signed-in
+     members, because it needs a college to compare against, and only when it
+     is not simply the whole catalogue rebadged. */
+  const myCollege = (profile as { college?: string | null } | null)?.college ?? null;
+  const collegeItems = myCollege
+    ? liveItems.filter(it => (it.user as { college?: string | null }).college === myCollege).slice(0, 12)
+    : [];
   const openRequests = requests.filter(it => !blocked.has(it.user.id) && !it.isClosed).slice(0, 12);
   const services     = opportunities.filter(it => !blocked.has(it.user.id) && !it.isClosed).slice(0, 12);
   const upcoming     = events.filter(ev => !blocked.has(ev.organizer.id)).slice(0, 12);
@@ -361,6 +404,8 @@ export default function FeedScreen({
   const railCount =
     (lostItems.length ? 1 : 0) + (foundItems.length ? 1 : 0) +
     (freshItems.length >= 3 ? 1 : 0) + (freeItems.length >= 2 ? 1 : 0) +
+    (popularItems.length >= 3 ? 1 : 0) + (budgetItems.length >= 2 ? 1 : 0) +
+    (collegeItems.length >= 2 ? 1 : 0) +
     categoryRails.length + (openRequests.length ? 1 : 0) +
     (services.length ? 1 : 0) + (upcoming.length ? 1 : 0);
 
@@ -744,6 +789,41 @@ export default function FeedScreen({
             </div>
           )}
 
+          {/* JUST DROPPED — the hero shelf, so it gets the biggest cards */}
+          {freshItems.length >= 3 && (
+            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" variant="featured" onSeeAll={() => setActiveType('shared')}>
+              {freshItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_fresh')}</div>)}
+            </Rail>
+          )}
+
+          {/* MOST LOOKED AT — social proof is what a stranger reads first, and
+              unlike Free it is never empty. */}
+          {popularItems.length >= 3 && (
+            <Rail title="Most looked at 👀" sub="What everyone's been opening this week" onSeeAll={() => setActiveType('shared')}>
+              {popularItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_popular')}</div>)}
+            </Rail>
+          )}
+
+          {/* UNDER ₹500 — students sort by price before anything else. */}
+          {budgetItems.length >= 2 && (
+            <Rail title="Under ₹500 💸" sub="Cheaper than a night out" onSeeAll={() => setActiveType('shared')}>
+              {budgetItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_budget')}</div>)}
+            </Rail>
+          )}
+
+          {/* FROM YOUR COLLEGE — proximity, the strongest signal on a campus. */}
+          {collegeItems.length >= 2 && (
+            <Rail title="From your college 🎓" sub="Same campus, shorter walk" onSeeAll={() => setActiveType('shared')}>
+              {collegeItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_college')}</div>)}
+            </Rail>
+          )}
+
+          {/* LOST + FOUND, moved down deliberately.
+              They used to open the page, which meant the first thing a
+              marketplace showed was other people's lost property — and on a
+              phone that pushed every purchasable item off the first screen
+              entirely. They are a real service but a secondary one: lead with
+              what someone came for, keep this where it is still easy to reach. */}
           {/* LOST — slow auto-scrolling loop so it takes zero effort to spot yours */}
           {lostItems.length > 0 && (
             <section className="rail">
@@ -771,13 +851,6 @@ export default function FeedScreen({
                   <LostFoundCard lf={lf} onClick={() => { trackPostOpened('lostfound', lf.id, { source: 'feed_found_rail', lf_status: lf.status }); onOpenLF?.(lf); }} />
                 </div>
               ))}
-            </Rail>
-          )}
-
-          {/* JUST DROPPED — the hero shelf, so it gets the biggest cards */}
-          {freshItems.length >= 3 && (
-            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" variant="featured" onSeeAll={() => setActiveType('shared')}>
-              {freshItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_fresh')}</div>)}
             </Rail>
           )}
 

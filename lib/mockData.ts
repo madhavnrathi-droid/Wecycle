@@ -17,6 +17,8 @@ export interface Community {
 }
 
 export interface User {
+  /** Poster's college code, when known. Drives the "from your college" rail. */
+  college?: string;
   id: string;
   name: string;
   initials: string;

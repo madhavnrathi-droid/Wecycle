@@ -36,6 +36,11 @@ export interface JoinedProfile {
   phone?: string | null;
   contact_email_enabled?: boolean | null;
   contact_whatsapp_enabled?: boolean | null;
+  /* Which MAHE school the poster is at. Carried on feed rows so the storefront
+     can surface "from your college" — proximity is the strongest merchandising
+     signal a campus marketplace has. It is one of the columns the profiles
+     SELECT allow-list already permits, unlike email and phone. */
+  college?: string | null;
 }
 
 interface ListingRow {
@@ -96,6 +101,7 @@ export function profileToUser(p: JoinedProfile | null | undefined, fallbackId: s
     impactScore: 0,
     badges: [],
     isOnline: p?.is_online ?? false,
+    college: p?.college ?? undefined,
     /* email/phone are intentionally NOT carried on feed rows anymore — the raw
        columns are locked down at the DB so the feed can't leak them in bulk.
        Detail screens fetch a single owner's contact on demand via fetchContact
@@ -220,7 +226,7 @@ const SELECT_WITH_JOINS = `
   *,
   user:profiles!listings_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, contact_email_enabled, contact_whatsapp_enabled
+    is_online, contact_email_enabled, contact_whatsapp_enabled, college
   ),
   category:categories(id, label, icon)
 `;
