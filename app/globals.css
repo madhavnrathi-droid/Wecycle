@@ -4600,8 +4600,13 @@ textarea:focus-visible {
    faces — so nearest-neighbour scaling would chew the edges it is meant to
    protect. Smooth downscaling is what keeps them clean. */
 .cat-tile-ico img {
-  width: 40px;
-  height: 40px;
+  /* Fills the 56px box edge to edge. The art is exported with no internal
+     margin, so this is the size the ILLUSTRATION renders at rather than the
+     size of a box containing a smaller illustration. Nothing clips: each icon
+     is fitted into its square, so the long axis touches the edge and the short
+     one leaves the transparent gap the shape itself implies. */
+  width: 56px;
+  height: 56px;
   display: block;
   object-fit: contain;
   /* The plate already animates; stop the image dragging its own transition. */

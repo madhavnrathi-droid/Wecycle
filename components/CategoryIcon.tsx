@@ -12,7 +12,7 @@
  * emoji sitting among twelve voxel illustrations reads as an oversight. */
 
 export default function CategoryIcon({
-  id, src, emoji, size = 40,
+  id, src, emoji, size = 56,
 }: {
   id: string;
   src?: string;
