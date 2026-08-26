@@ -1,5 +1,6 @@
 'use client';
 
+import CategoryIcon from '../components/CategoryIcon';
 import { CATEGORIES as CATEGORY_LIST, normalizeCategory } from '../lib/categories';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
@@ -777,7 +778,9 @@ export default function FeedScreen({
               data-active={activeCategory === cat.id || undefined}
               onClick={() => { setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id }); }}
             >
-              <span className="cat-tile-ico" aria-hidden="true">{cat.icon}</span>
+              <span className="cat-tile-ico" aria-hidden="true">
+                <CategoryIcon id={cat.id} src={(cat as { iconSrc?: string }).iconSrc} emoji={cat.icon} size={40} />
+              </span>
               <span className="cat-tile-label">{(cat as { short?: string }).short ?? cat.label}</span>
             </button>
           ))}

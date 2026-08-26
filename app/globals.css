@@ -4585,14 +4585,49 @@ textarea:focus-visible {
   justify-content: center;
   font-size: 25px;
   line-height: 1;
-  background: var(--bg-inset);
+  /* No plate by default. Every tile used to carry a grey rounded square, which
+     boxed in twelve illustrations that already have their own silhouette and
+     turned the strip into a row of containers rather than a row of things.
+     The selection is the only state that needs a surface. */
+  background: transparent;
   transition: transform 0.16s var(--ease-spring), background 0.16s, box-shadow 0.16s;
 }
+/* The voxel icon inside the plate. 40 in a 56 leaves the art breathing room
+   without letting it rattle around.
+
+   Deliberately NOT image-rendering: pixelated. These read as pixel art but are
+   smoothly RENDERED voxel illustrations — they carry soft shadows and shaded
+   faces — so nearest-neighbour scaling would chew the edges it is meant to
+   protect. Smooth downscaling is what keeps them clean. */
+.cat-tile-ico img {
+  width: 40px;
+  height: 40px;
+  display: block;
+  object-fit: contain;
+  /* The plate already animates; stop the image dragging its own transition. */
+  pointer-events: none;
+}
+/* Chip strip on the desktop marketplace — same art, smaller. */
+.filter-chip-ico { display: inline-flex; align-items: center; }
+.filter-chip-ico img { width: 20px; height: 20px; object-fit: contain; display: block; }
+
+/* The All glyph inherits currentColor, so it flips with the plate instead of
+   vanishing into it when the tile goes black. */
+/* The All glyph stays dark in both states now — the selected plate is light,
+   so inverting it to a pale colour would erase it. */
+.cat-tile-ico svg { color: var(--text-primary); display: block; }
+.cat-tile[data-active] .cat-tile-ico svg { color: var(--text-primary); }
+
 .cat-tile:hover .cat-tile-ico { transform: translateY(-2px); }
 .cat-tile:active .cat-tile-ico { transform: scale(0.94); }
+/* Selected: a soft blue plate. Blue rather than the brand green because the
+   icons are themselves green — a green plate behind a green object flattens
+   it, while a cool tint sits behind the warm palette and lets the artwork stay
+   the thing you look at. Light enough that the navy and green voxels keep
+   their contrast on top of it. */
 .cat-tile[data-active] .cat-tile-ico {
-  background: var(--text-primary);
-  box-shadow: var(--shadow-md);
+  background: #D8EAF8;
+  box-shadow: none;
 }
 .cat-tile-label {
   font-size: 11px;

@@ -1,5 +1,6 @@
 'use client';
 
+import CategoryIcon from './CategoryIcon';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search, SlidersHorizontal, Heart, MapPin, MessageCircle,
@@ -130,7 +131,9 @@ export default function MarketplaceScreen() {
               onClick={() => setActiveCategory(cat.id)}
               className={`filter-chip ${activeCategory === cat.id ? 'active' : ''}`}
             >
-              <span>{cat.icon}</span>
+              <span className="filter-chip-ico">
+                <CategoryIcon id={cat.id} src={(cat as { iconSrc?: string }).iconSrc} emoji={cat.icon} size={20} />
+              </span>
               {cat.label}
             </button>
           ))}
