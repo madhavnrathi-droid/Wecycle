@@ -10,10 +10,28 @@ import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
 import { haptics } from '../../lib/haptics';
 
+/* What gets LOST is not what gets SOLD — keys and ID cards are not marketplace
+   categories and never will be. So this list stays its own thing, and the map
+   below translates only the entries that have a real home in the taxonomy.
+   The rest store no category at all, which the column allows.
+
+   Before this, the raw label was lowercased straight into category_id: 'keys'
+   and 'bag/wallet' are not categories, so the insert failed its foreign key and
+   the whole report — photos included — never saved. That is the reason
+   reporting a lost item appeared to do nothing. */
 const CATEGORIES = [
   'Electronics', 'Bag/Wallet', 'Keys', 'ID/Card', 'Clothing',
   'Books', 'Accessory', 'Other',
 ];
+
+const LF_TO_TAXONOMY: Record<string, string | undefined> = {
+  'Electronics': 'electronics',
+  'Bag/Wallet':  'fashion',
+  'Clothing':    'fashion',
+  'Accessory':   'fashion',
+  'Books':       'books',
+  /* Keys, ID/Card and Other deliberately have no marketplace equivalent. */
+};
 
 interface ReportLostFoundModalProps {
   open: boolean;
@@ -86,7 +104,8 @@ export default function ReportLostFoundModal({
           title: form.name,
           status: form.status as 'lost' | 'found',
           description: form.description,
-          category: form.category,
+          /* Translated, not raw — see LF_TO_TAXONOMY. */
+          category: LF_TO_TAXONOMY[form.category] ?? '',
           lastSeen: form.location,
           media: pickerRef.current?.getMedia() ?? [],
           notifyOnEngagement,
@@ -98,7 +117,7 @@ export default function ReportLostFoundModal({
       track(EVT.post_form_submitted, {
         post_kind: 'lostfound',
         lf_status: form.status,
-        category: form.category,
+        category: LF_TO_TAXONOMY[form.category] ?? '',
         has_description: form.description.trim().length > 0,
         has_photos: form.photos.length > 0,
       });
@@ -267,11 +286,17 @@ export default function ReportLostFoundModal({
           <legend className="field-label" style={{ marginBottom: 8 }}>
             Photo <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
           </legend>
+          {/* Photos only. allowVideo defaults to TRUE, which put video/* in the
+              file input's accept list — and with capture="environment" that
+              makes the phone camera open in VIDEO mode. A lost-property report
+              wants a picture of the thing so someone can recognise it; a video
+              is the wrong artefact and was also the reported bug. */}
           <PhotoPicker
             ref={pickerRef}
             photos={form.photos}
             onChange={next => update('photos', next)}
             max={MAX_PHOTOS}
+            allowVideo={false}
           />
         </fieldset>
 

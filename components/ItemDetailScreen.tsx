@@ -33,6 +33,7 @@ import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES, closedLabelFor } from '../lib/mockData';
+import { normalizeCategory } from '../lib/categories';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
@@ -187,7 +188,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
   const [eComp, setEComp]               = useState<Comp>(item.comp ?? 'free');
   const [eRatePeriod, setERatePeriod]   = useState<RatePeriod | undefined>(item.ratePeriod);
   const [ePriceMaxStr, setEPriceMaxStr] = useState<string>(item.priceMax != null ? String(item.priceMax) : '');
-  const [eCategory, setECategory]       = useState((item.category || '').toLowerCase());
+  /* Seed from the category ID. item.category carries the LABEL, so this used to
+     hold "hobbies & collectibles" — which matches no <option value>, so the
+     select fell back to displaying the first entry (Electronics) while still
+     holding the bad value. Opening a post therefore showed the wrong category,
+     and saving sent an id no category has. */
+  const categoryIdOf = (it: { categoryId?: string; category?: string }) =>
+    it.categoryId ?? normalizeCategory(it.category) ?? '';
+  const [eCategory, setECategory]       = useState(categoryIdOf(item));
   const [eUrgent, setEUrgent]           = useState(!!item.urgent);
 
   /* Re-hydrate when the item prop changes (e.g. after server refetch). We
@@ -202,7 +210,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setEComp(item.comp ?? 'free');
     setERatePeriod(item.ratePeriod);
     setEPriceMaxStr(item.priceMax != null ? String(item.priceMax) : '');
-    setECategory((item.category || '').toLowerCase());
+    setECategory(categoryIdOf(item));
     setEUrgent(!!item.urgent);
   }, [item.id, item.title, item.description, item.location, item.price, item.listingType, item.comp, item.ratePeriod, item.category, item.urgent]);
 
@@ -221,7 +229,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       if ((eRatePeriod ?? null) !== (item.ratePeriod ?? null)) return true;
       if ((ePriceMaxStr.trim() === '' ? null : Number(ePriceMaxStr)) !== (item.priceMax ?? null)) return true;
     }
-    if (eCategory !== (item.category || '').toLowerCase()) return true;
+    if (eCategory !== categoryIdOf(item)) return true;
     if (isRequestPost && eUrgent !== !!item.urgent) return true;
     return false;
   }, [eTitle, eDescription, eLocation, ePriceStr, eListingType, eComp, eRatePeriod, ePriceMaxStr, eCategory, eUrgent, item, isRequestPost]);
@@ -316,7 +324,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setEComp(item.comp ?? 'free');
     setERatePeriod(item.ratePeriod);
     setEPriceMaxStr(item.priceMax != null ? String(item.priceMax) : '');
-    setECategory((item.category || '').toLowerCase());
+    setECategory(categoryIdOf(item));
     setEUrgent(!!item.urgent);
   }, [item]);
 

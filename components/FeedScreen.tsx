@@ -778,7 +778,7 @@ export default function FeedScreen({
               onClick={() => { setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id }); }}
             >
               <span className="cat-tile-ico" aria-hidden="true">{cat.icon}</span>
-              <span className="cat-tile-label">{cat.label}</span>
+              <span className="cat-tile-label">{(cat as { short?: string }).short ?? cat.label}</span>
             </button>
           ))}
         </div>

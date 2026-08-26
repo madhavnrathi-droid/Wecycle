@@ -506,7 +506,7 @@ export async function createRequest(input: NewRequestInput) {
     community_id: communityId,
     title: input.title.trim(),
     description: input.description?.trim() || null,
-    category_id: input.category.trim().toLowerCase() || null,
+    category_id: normalizeCategory(input.category),
     urgency: input.urgency,
     need_by_date: input.needByDate || null,
     status: 'open',
@@ -607,7 +607,7 @@ export async function createLostFound(input: NewLostFoundInput) {
     community_id: communityId,
     title: input.title.trim(),
     description: input.description?.trim() || null,
-    category_id: input.category?.trim().toLowerCase() || null,
+    category_id: normalizeCategory(input.category),
     status: input.status,
     last_seen: input.lastSeen?.trim() || null,
     reward: input.reward?.trim() || null,
@@ -1215,7 +1215,12 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   const update: ListingUpdate = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
-  if (patch.category !== undefined)    update.category_id = patch.category.trim().toLowerCase();
+  /* normalizeCategory, not toLowerCase. The edit screen seeds this field from
+     item.category, which carries the LABEL — so "Hobbies & Collectibles"
+     lowercased to an id no category has and every save died on the foreign key,
+     taking the price and every other field in the same patch down with it. That
+     is why editing appeared to silently do nothing. */
+  if (patch.category !== undefined)    update.category_id = normalizeCategory(patch.category);
   if (patch.condition !== undefined)   update.condition = patch.condition;
   if (patch.description !== undefined) update.description = patch.description.trim() || null;
   if (patch.location !== undefined)    update.location = patch.location.trim() || null;

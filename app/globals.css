@@ -4566,7 +4566,10 @@ textarea:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 7px;
-  width: 62px;
+  /* 72, not 62: the labels grew when the taxonomy did. Fixed rather than auto
+     so the icon squares stay on a rhythm instead of jittering to the width of
+     whatever word sits under them. */
+  width: 72px;
   padding: 0;
   background: none;
   border: none;
@@ -4596,7 +4599,14 @@ textarea:focus-visible {
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-secondary);
-  white-space: nowrap;
+  /* Wraps instead of running under its neighbour. nowrap on a fixed-width tile
+     does not clip, it overflows — which is why the labels were overlapping
+     rather than truncating. */
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .cat-tile[data-active] .cat-tile-label { color: var(--text-primary); }
 

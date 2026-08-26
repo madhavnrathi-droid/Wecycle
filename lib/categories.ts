@@ -23,7 +23,12 @@
 
 export interface Category {
   id: string;
+  /** Full name. Used where there is room: the post form, the detail header. */
   label: string;
+  /** One word, for the chip strip. The full names collide there — the tiles are
+   *  a fixed width and "Furniture & Room Essentials" is three times it, so
+   *  neighbouring labels overlapped. A filter chip wants a word, not a name. */
+  short: string;
   icon: string;
   /** Examples, shown as a hint when posting so the pick is obvious. */
   examples: string;
@@ -34,62 +39,62 @@ export interface Category {
 
 export const CATEGORIES: Category[] = [
   {
-    id: 'electronics', label: 'Electronics', icon: '💻',
+    id: 'electronics', label: 'Electronics', short: 'Electronics', icon: '💻',
     examples: 'Phones, laptops, tablets, monitors, headphones, keyboards, calculators',
     rail: { title: 'Gently-used gadgets', sub: 'Half the price, all the specs' },
   },
   {
-    id: 'furniture', label: 'Furniture & Room Essentials', icon: '🪑',
+    id: 'furniture', label: 'Furniture & Room Essentials', short: 'Furniture', icon: '🪑',
     examples: 'Chairs, tables, mattresses, lamps, shelves, storage',
     rail: { title: 'Dorm glow-up', sub: 'Desks, chairs, the whole set-up' },
   },
   {
-    id: 'fashion', label: 'Fashion', icon: '👕',
+    id: 'fashion', label: 'Fashion', short: 'Fashion', icon: '👕',
     examples: 'Clothes, shoes, bags, watches, accessories',
     rail: { title: 'Second-hand, first-rate', sub: 'Clothes, shoes and watches worth a second run' },
   },
   {
-    id: 'books', label: 'Books & Academic', icon: '📚',
+    id: 'books', label: 'Books & Academic', short: 'Books', icon: '📚',
     examples: 'Textbooks, reference books, notes, lab coats',
     rail: { title: 'Passed-down reads', sub: 'Someone survived this syllabus' },
   },
   {
-    id: 'mobility', label: 'Vehicles & Mobility', icon: '🚲',
+    id: 'mobility', label: 'Vehicles & Mobility', short: 'Mobility', icon: '🚲',
     examples: 'Bicycles, scooters, helmets, skateboards',
     rail: { title: 'Get around campus', sub: 'Cycles, scooters and the helmet to match' },
   },
   {
-    id: 'kitchen', label: 'Hostel & Kitchen', icon: '🍳',
+    id: 'kitchen', label: 'Hostel & Kitchen', short: 'Kitchen', icon: '🍳',
     examples: 'Cookware, induction stoves, kettles, utensils, mini appliances',
     rail: { title: 'Midnight-Maggi kit', sub: 'Kettles, pans, mugs and more' },
   },
   {
-    id: 'sports', label: 'Sports & Fitness', icon: '⚽',
+    id: 'sports', label: 'Sports & Fitness', short: 'Sports', icon: '⚽',
     examples: 'Gym equipment, sports gear, cycles, badminton rackets',
     rail: { title: 'Game on', sub: 'Gear after a second player' },
   },
   {
-    id: 'services', label: 'Services & Skills', icon: '🤝',
+    id: 'services', label: 'Services & Skills', short: 'Services', icon: '🤝',
     examples: 'Tutoring, photography, design, editing, music, freelance work',
     rail: { title: 'Hire a classmate', sub: 'Skills for rent, right here on campus' },
   },
   {
-    id: 'tickets', label: 'Events & Tickets', icon: '🎟️',
+    id: 'tickets', label: 'Events & Tickets', short: 'Tickets', icon: '🎟️',
     examples: 'Event tickets, passes, club and event merchandise',
     rail: { title: 'Tickets & passes', sub: 'Going spare before the night' },
   },
   {
-    id: 'hobbies', label: 'Hobbies & Collectibles', icon: '🎸',
+    id: 'hobbies', label: 'Hobbies & Collectibles', short: 'Hobbies', icon: '🎸',
     examples: 'Instruments, cameras, gaming gear, collectibles',
     rail: { title: 'For the hobby', sub: 'Instruments, cameras and gaming gear' },
   },
   {
-    id: 'art', label: 'Art & Stationery', icon: '🎨',
+    id: 'art', label: 'Art & Stationery', short: 'Art', icon: '🎨',
     examples: 'Paints, brushes, sketchbooks, pens, paper, craft supplies',
     rail: { title: 'Make something', sub: 'Paint, paper and everything in between' },
   },
   {
-    id: 'adopt', label: 'Adopt', icon: '🐾',
+    id: 'adopt', label: 'Adopt', short: 'Adopt', icon: '🐾',
     examples: 'Pets and plants looking for someone to care for them',
     /* Never priced in practice, and the copy stays away from anything that
        reads as selling an animal. */
