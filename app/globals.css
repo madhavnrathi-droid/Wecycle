@@ -5363,3 +5363,17 @@ textarea:focus-visible {
  * Anything added here that a user can focus and type into needs to stay at
  * 16px or above. The 22px post-title input is fine — the floor is a minimum,
  * not a target. */
+
+/* ── Disclosure ("Add more details") ──
+   The chevron is the only affordance saying the row opens, so it has to move
+   when it does. `summary::-webkit-details-marker` is hidden via list-style:none
+   on the summary itself; this rotates our own icon in its place. */
+.details-chevron {
+  flex-shrink: 0;
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+details[open] > summary .details-chevron { transform: rotate(90deg); }
+summary::-webkit-details-marker { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .details-chevron { transition: none; }
+}

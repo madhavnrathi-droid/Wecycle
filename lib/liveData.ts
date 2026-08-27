@@ -69,6 +69,8 @@ interface ListingRow {
   /* Upper end of a rate range; `price` is the lower end. Both optional. */
   price_max: number | null;
   listing_type: MarketplaceItem['listingType'];
+  deposit?: number | string | null;
+  swap_for?: string | null;
   condition: MarketplaceItem['condition'];
   price: number | null;
   location: string | null;
@@ -205,6 +207,8 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     ratePeriod: (row.rate_period as MarketplaceItem['ratePeriod']) ?? undefined,
     priceMax: row.price_max ?? undefined,
     listingType: row.listing_type,
+    deposit: row.deposit == null ? undefined : Number(row.deposit),
+    swapFor: row.swap_for ?? undefined,
     price: row.price ?? undefined,
     condition: row.condition,
     photoColor: row.photo_color ?? '#1C1C1A',
@@ -570,6 +574,13 @@ export interface NewListingInput {
   description?: string;
   location?: string;
   listingType: 'free' | 'sell' | 'borrow' | 'swap';
+  /* Rent: the recurring rate's unit. `price` is the rate itself. */
+  rentPeriod?: 'day' | 'week' | 'month';
+  /* Rent: refundable security amount, kept apart from price because one comes
+     back and the other does not. */
+  deposit?: number;
+  /* Swap: what the poster wants in exchange. */
+  swapFor?: string;
   price?: number;
   media: CompressedMedia[];
   notifyOnEngagement?: boolean;
@@ -630,13 +641,23 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       comp: input.kind === 'opportunity' ? (input.comp ?? 'free') : null,
       opp_role: input.kind === 'opportunity' ? (input.oppRole ?? 'offering') : null,
       price_band: input.kind === 'opportunity' ? (input.priceBand ?? null) : null,
-      rate_period: input.kind === 'opportunity' ? (input.ratePeriod ?? null) : null,
+      /* rate_period does double duty: the pay basis on an opportunity, and the
+         rental unit on a borrow listing. Same column, same check constraint,
+         and the two never coexist on one row. */
+      rate_period: input.kind === 'opportunity'
+        ? (input.ratePeriod ?? null)
+        : (input.listingType === 'borrow' ? (input.rentPeriod ?? 'day') : null),
       price_max:   input.kind === 'opportunity' ? (input.priceMax   ?? null) : null,
       listing_type: input.listingType,
       condition: input.condition,
-      /* A null price on a 'sell' row is allowed and means "no number given" —
-         the card then reads "Selling" / "Rate on ask". */
-      price: input.listingType === 'sell' ? (input.price ?? null) : null,
+      /* Priced types are sell AND borrow — a rental has a rate, and gating this
+         on 'sell' alone silently dropped every rent price on the way to the
+         database. A null price on either is allowed and means "no number
+         given", so the card reads "Ask" rather than inventing a zero. */
+      price: (input.listingType === 'sell' || input.listingType === 'borrow')
+        ? (input.price ?? null) : null,
+      deposit: input.listingType === 'borrow' ? (input.deposit ?? null) : null,
+      swap_for: input.listingType === 'swap' ? (input.swapFor?.trim() || null) : null,
       location: input.location?.trim() || null,
       link_url: input.linkUrl || null,
       /* Meaningless without both a link and a photo, so it is never stored on

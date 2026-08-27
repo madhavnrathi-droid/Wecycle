@@ -120,6 +120,10 @@ export interface MarketplaceItem {
   categoryId?: string;
   listingType: 'free' | 'swap' | 'borrow' | 'sell';
   price?: number;
+  /** Rent only: refundable security deposit, in rupees. */
+  deposit?: number;
+  /** Swap only: what the poster wants in exchange. */
+  swapFor?: string;
   condition: 'like_new' | 'good' | 'fair';
   photoColor: string;
   photoIcon: string;

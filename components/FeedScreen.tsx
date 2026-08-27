@@ -30,6 +30,7 @@ import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
 import FitImage from './FitImage';
+import { priceChip, fromListingType, DEAL_BY_ID } from '../lib/dealTypes';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -1165,18 +1166,24 @@ function ProductCard({
   const isPriced = item.listingType === 'sell' && typeof item.price === 'number';
   const isOpportunity = item.kind === 'opportunity';
 
+  /* Routed through the shared chip so rent finally reads as a RATE. The last
+     branch here used to be `listingType[0].toUpperCase() + slice(1)`, which
+     turned a ₹200-per-day rental into the word "Borrow" — the price, the period
+     and the fact that it comes back were all in the database and none of them
+     reached the card. */
+  const deal = fromListingType(item.listingType);
   const priceLabel = item.isRequest
     ? (item.urgent ? 'Urgent' : 'Wanted')
     : isOpportunity
       ? (hidePrice && item.comp === 'paid' ? 'Paid' : opportunityCompLabel(item))
-    : isPriced && hidePrice                        ? 'Sell'
-    : isPriced                                      ? `₹${item.price!.toLocaleString('en-IN')}`
-    : item.listingType === 'sell'                   ? 'Selling'
-    : item.listingType === 'free'                   ? 'Free'
-    : item.listingType[0].toUpperCase() + item.listingType.slice(1);
+    /* The "hide prices on feed" preference suppresses the NUMBER, not the kind
+       of deal — someone who hides prices still needs to know a thing is for
+       rent rather than for sale. */
+    : hidePrice && (deal === 'sell' || deal === 'rent') ? DEAL_BY_ID[deal].badge
+    : priceChip({ deal, price: item.price, ratePeriod: item.ratePeriod });
 
   const priceTone = item.isRequest ? 'wanted'
-    : (!isOpportunity && item.listingType === 'free') ? 'free'
+    : (!isOpportunity && deal === 'free') ? 'free'
     : undefined;
 
   /* An opportunity's badge comes from its DIRECTION, not its compensation.

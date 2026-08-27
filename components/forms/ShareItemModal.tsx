@@ -1,10 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Link2 } from 'lucide-react';
 import { normalizeLink, linkHost } from '../../lib/postLink';
 import { findObjectionable, objectionableMessage } from '../../lib/contentFilter';
-import { Gift, Tag, MapPin, Bell } from 'lucide-react';
+import { MapPin, Bell, Link2, ChevronRight } from 'lucide-react';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
@@ -17,6 +16,10 @@ import {
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
+import {
+  DEAL_TYPES, RENT_PERIODS, DEFAULT_RENT_PERIOD, toListingType,
+  type DealType, type RentPeriod,
+} from '../../lib/dealTypes';
 import { haptics } from '../../lib/haptics';
 
 /* The taxonomy lives in lib/categories — one list for the chips, the rails and
@@ -53,7 +56,12 @@ export interface ShareItemForm {
   condition: string;
   description: string;
   location: string;
-  pricing: 'free' | 'sell';
+  /* How the thing changes hands. Replaces the old two-way free/sell toggle —
+     the enum has carried swap and borrow all along, they were just unreachable. */
+  deal: DealType;
+  rentPeriod: RentPeriod;
+  deposit?: number;
+  swapFor: string;
   price?: number;
   photos: string[];
   /* Optional outbound link, exactly as typed. Normalised on submit, not on
@@ -82,7 +90,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
   const [form, setForm] = useState<ShareItemForm>({
     title: '', category: isService ? 'Services' : '', condition: '', description: '',
     link: '', linkOnPhoto: false,
-    location: '', pricing: 'free', photos: [], comp: 'free', oppRole: 'offering',
+    location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '',
+    photos: [], comp: 'free', oppRole: 'offering',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ShareItemForm, string>>>({});
   const [notifyOnEngagement, setNotifyOnEngagement] = useState(true);
@@ -109,9 +118,11 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
     const e: typeof errors = {};
     if (rateRangeBackwards) e.priceMax = 'The second number should be the higher one.';
     if (!form.title.trim()) e.title = 'Required';
-    if (!form.category) e.category = 'Pick a category';
-    /* Condition is now OPTIONAL — defaults to 'good' on submit if not chosen. */
-    if (!form.location.trim()) e.location = isService ? 'Where can people reach you? (or “Online”)' : 'Where can people pick this up?';
+    /* Category and pickup location are no longer gates. Both are nullable in
+       the database, both can be added by editing the post, and neither is
+       something the poster is missing — they are things the FORM was insisting
+       on before it would accept a photo and a name. Condition was already
+       optional and defaults to 'good' on submit. */
     /* An unusable link is an error, never a silent drop. Posting without the
        link someone deliberately attached is worse than telling them it's wrong. */
     if (form.link.trim() && !normalizeLink(form.link)) {
@@ -132,7 +143,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
 
   const reset = () => {
     setForm({
-      title: '', category: isService ? 'Services' : '', condition: '', description: '', link: '', linkOnPhoto: false, location: '', pricing: 'free', photos: [], comp: 'free', oppRole: 'offering',
+      title: '', category: isService ? 'Services' : '', condition: '', description: '', link: '', linkOnPhoto: false, location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '', photos: [], comp: 'free', oppRole: 'offering',
     });
     setNotifyOnEngagement(true);
   };
@@ -155,8 +166,13 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           condition: (form.condition || 'good') as 'like_new' | 'good' | 'fair',
           description: form.description,
           location: form.location,
-          listingType: isService ? svc.listingType : (form.pricing === 'sell' ? 'sell' : 'free'),
+          listingType: isService ? svc.listingType : toListingType(form.deal),
           price: isService ? svc.price : form.price,
+          ...(isService ? {} : {
+            rentPeriod: form.deal === 'rent' ? form.rentPeriod : undefined,
+            deposit:    form.deal === 'rent' ? form.deposit    : undefined,
+            swapFor:    form.deal === 'swap' ? form.swapFor    : undefined,
+          }),
           media: pickerRef.current?.getMedia() ?? [],
           linkUrl: normalizeLink(form.link),
           linkOnPhoto: form.linkOnPhoto,
@@ -176,7 +192,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
       haptics.success();
       track(EVT.post_form_submitted, {
         post_kind: isService ? 'service' : 'share',
-        listing_type: isService ? (form.comp === 'paid' ? 'sell' : 'free') : (form.pricing === 'sell' ? 'sell' : 'free'),
+        listing_type: isService ? (form.comp === 'paid' ? 'sell' : 'free') : toListingType(form.deal),
+        ...(isService ? {} : { deal_type: form.deal }),
         ...(isService ? {
           comp: form.comp,
           opp_role: form.oppRole,
@@ -185,7 +202,13 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
         } : {}),
         has_photos: form.photos.length > 0,
         photo_count: form.photos.length,
-        has_price: isService ? (form.comp === 'paid' && typeof form.price === 'number') : (form.pricing === 'sell' && typeof form.price === 'number'),
+        has_price: isService
+          ? (form.comp === 'paid' && typeof form.price === 'number')
+          : ((form.deal === 'sell' || form.deal === 'rent') && typeof form.price === 'number'),
+        ...(isService ? {} : {
+          has_deposit: form.deal === 'rent' && typeof form.deposit === 'number',
+          has_swap_ask: form.deal === 'swap' && form.swapFor.trim().length > 0,
+        }),
         has_description: form.description.trim().length > 0,
         category: form.category,
       });
@@ -276,138 +299,6 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           {errors.title && <span id="si-title-err" className="field-error">{errors.title}</span>}
         </div>
 
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label htmlFor="si-cat" className="field-label">
-            Category <span className="required" aria-hidden="true">*</span>
-          </label>
-          <select
-            id="si-cat"
-            className="form-select"
-            value={form.category}
-            onChange={e => update('category', e.target.value)}
-            aria-required="true"
-            aria-invalid={!!errors.category}
-          >
-            <option value="">Select…</option>
-            {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-          </select>
-          {errors.category && <span className="field-error">{errors.category}</span>}
-        </div>
-
-        {/* Colored condition slider — optional. Hidden for services, where an
-            item's physical condition is meaningless. */}
-        {!isService && (
-          <div className="field" style={{ marginBottom: 14 }}>
-            <label className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <span>Condition</span>
-              <span className="field-hint" style={{ fontWeight: 400 }}>Optional</span>
-            </label>
-            <ConditionSlider
-              value={form.condition}
-              onChange={v => update('condition', v)}
-            />
-          </div>
-        )}
-
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label htmlFor="si-desc" className="field-label">Description</label>
-          <textarea
-            id="si-desc"
-            className="form-textarea"
-            placeholder={isService ? 'What you offer, experience, availability…' : 'Condition notes, accessories, anything to mention…'}
-            value={form.description}
-            onChange={e => update('description', e.target.value)}
-            maxLength={500}
-          />
-          {errors.description
-            ? <span className="field-error">{errors.description}</span>
-            : <span className="field-hint">{form.description.length}/500 characters</span>}
-        </div>
-
-        {/* Link — optional, and quiet until used. Any URL typed into the
-            description above also becomes tappable on the post; this field is
-            for the one link that deserves its own button. */}
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label htmlFor="si-link" className="field-label">
-            <Link2 size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-            Link <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
-          </label>
-          <input
-            id="si-link"
-            type="url"
-            inputMode="url"
-            className="form-input"
-            placeholder="example.com/page"
-            value={form.link}
-            maxLength={500}
-            onChange={e => update('link', e.target.value)}
-            aria-invalid={!!errors.link}
-            autoComplete="off"
-          />
-          {errors.link ? (
-            <span className="field-error">{errors.link}</span>
-          ) : linkPreviewHost ? (
-            <span className="field-hint">Opens {linkPreviewHost} in a new tab.</span>
-          ) : (
-            <span className="field-hint">A page, form, or portfolio. Shown as a button on your post.</span>
-          )}
-
-          {/* Only offered once both halves exist. A photo-link with no photo is
-              a setting that does nothing, and a toggle that does nothing is
-              worse than no toggle. */}
-          {linkPreviewHost && form.photos.length > 0 && (
-            <button
-              type="button"
-              aria-pressed={form.linkOnPhoto}
-              onClick={() => update('linkOnPhoto', !form.linkOnPhoto)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                marginTop: 10, padding: '10px 12px',
-                borderRadius: 'var(--radius-md)', border: 'none',
-                background: form.linkOnPhoto ? 'rgba(0,137,57,0.10)' : 'var(--bg-inset)',
-                cursor: 'pointer', textAlign: 'left',
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 34, height: 20, borderRadius: 999, flexShrink: 0,
-                  background: form.linkOnPhoto ? '#008939' : 'var(--border-default)',
-                  position: 'relative', transition: 'background 160ms ease',
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 2, left: form.linkOnPhoto ? 16 : 2,
-                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
-                  transition: 'left 160ms ease',
-                }} />
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
-                Open the link when the photo is tapped
-                <span style={{ display: 'block', fontSize: 11.5, fontWeight: 400, color: 'var(--text-muted)' }}>
-                  The photo gets a {linkPreviewHost} badge so people know before they tap.
-                </span>
-              </span>
-            </button>
-          )}
-        </div>
-
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label htmlFor="si-loc" className="field-label">
-            <MapPin size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-            {isService ? 'Location' : 'Pickup location'} <span className="required" aria-hidden="true">*</span>
-          </label>
-          <input
-            id="si-loc"
-            className="form-input"
-            placeholder={isService ? 'e.g. Online, or Meera Bhawan' : 'e.g. Meera Bhawan, Block 15'}
-            value={form.location}
-            onChange={e => update('location', e.target.value)}
-            aria-required="true"
-            aria-invalid={!!errors.location}
-          />
-          {errors.location && <span className="field-error">{errors.location}</span>}
-        </div>
 
         {isService ? (
           /* ── Compensation: Volunteer / Free / Paid (+ price bands) ── */
@@ -568,48 +459,283 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           </>
         ) : (
           <fieldset style={{ border: 'none', padding: 0, margin: '0 0 14px' }}>
-            <legend className="field-label" style={{ marginBottom: 8 }}>Pricing</legend>
+            <legend className="field-label" style={{ marginBottom: 8 }}>How are you sharing it?</legend>
+
+            {/* Four ways, 2x2. The enum has carried swap and borrow since the
+                beginning; the form only ever offered two of them, so renting a
+                drill or swapping a calculator — the two most campus-shaped
+                transactions there are — simply could not be posted.
+
+                A 2x2 grid rather than four across: at 375px, four option-cards
+                in a row leaves ~80px each, which cannot hold a label and a
+                blurb without wrapping mid-word. */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button
-                type="button"
-                className="option-card"
-                aria-pressed={form.pricing === 'free'}
-                onClick={() => update('pricing', 'free')}
-              >
-                <Gift size={20} strokeWidth={1.8} />
-                <span style={{ fontWeight: 600, fontSize: 13 }}>Free</span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Give it away</span>
-              </button>
-              <button
-                type="button"
-                className="option-card"
-                aria-pressed={form.pricing === 'sell'}
-                onClick={() => update('pricing', 'sell')}
-              >
-                <Tag size={20} strokeWidth={1.8} />
-                <span style={{ fontWeight: 600, fontSize: 13 }}>Sell</span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Set a price</span>
-              </button>
+              {DEAL_TYPES.map(d => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className="option-card"
+                  aria-pressed={form.deal === d.id}
+                  onClick={() => { haptics.selection(); update('deal', d.id); }}
+                >
+                  <span style={{ fontSize: 20 }} aria-hidden="true">{d.emoji}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{d.label}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
+                    {d.blurb}
+                  </span>
+                </button>
+              ))}
             </div>
-            {form.pricing === 'sell' && (
+
+            {/* The money changes with the choice and nothing else does. Only the
+                fields this deal actually needs are rendered — a give-away shows
+                none at all, which is the shortest the form can be and is also
+                the commonest case. */}
+            {form.deal === 'sell' && (
               <div className="field" style={{ marginTop: 10 }}>
                 <label htmlFor="si-price" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                   <span>Price (₹)</span>
-                  <span className="field-hint" style={{ fontWeight: 400 }}>Optional — leave blank for &quot;Selling&quot;</span>
+                  <span className="field-hint" style={{ fontWeight: 400 }}>Leave blank for &quot;Ask&quot;</span>
                 </label>
                 <input
                   id="si-price"
-                  type="number" inputMode="numeric" min="1"
+                  type="number" inputMode="numeric" min="0"
                   className="form-input"
-                  placeholder="e.g. 500 (or leave blank)"
+                  placeholder="e.g. 500"
                   value={form.price ?? ''}
                   onChange={e => update('price', Number(e.target.value) || undefined)}
                 />
               </div>
             )}
+
+            {form.deal === 'rent' && (
+              <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                {/* Rate and unit on one row: "₹200 per day" is a single thought
+                    and splitting it over two labelled fields makes it read as
+                    two decisions. */}
+                <div className="field">
+                  <label htmlFor="si-rate" className="field-label">Rate</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 8, alignItems: 'center' }}>
+                    <input
+                      id="si-rate"
+                      type="number" inputMode="numeric" min="0"
+                      className="form-input"
+                      placeholder="₹ e.g. 200"
+                      value={form.price ?? ''}
+                      onChange={e => update('price', Number(e.target.value) || undefined)}
+                      style={{ minWidth: 0 }}
+                    />
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>per</span>
+                    <select
+                      aria-label="Rental period"
+                      className="form-select"
+                      value={form.rentPeriod}
+                      onChange={e => update('rentPeriod', e.target.value as RentPeriod)}
+                      style={{ width: 104 }}
+                    >
+                      {RENT_PERIODS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="si-deposit" className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                    <span>Deposit (₹)</span>
+                    <span className="field-hint" style={{ fontWeight: 400 }}>Refundable — optional</span>
+                  </label>
+                  <input
+                    id="si-deposit"
+                    type="number" inputMode="numeric" min="0"
+                    className="form-input"
+                    placeholder="e.g. 1000"
+                    value={form.deposit ?? ''}
+                    onChange={e => update('deposit', Number(e.target.value) || undefined)}
+                  />
+                  {/* Stated plainly because a deposit is the thing that makes
+                      handing an expensive object to a stranger thinkable, and
+                      because a renter who thinks it is a fee will not enquire. */}
+                  <span className="field-hint" style={{ fontWeight: 400 }}>
+                    Held while they have it, returned when you get it back.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {form.deal === 'swap' && (
+              <div className="field" style={{ marginTop: 10 }}>
+                <label htmlFor="si-swap" className="field-label">What would you like in return?</label>
+                <input
+                  id="si-swap"
+                  className="form-input"
+                  /* Category-shaped, not object-shaped: people rarely want one
+                     exact thing, and a swap post that names one gets no replies. */
+                  placeholder="e.g. any scientific calculator, art supplies"
+                  value={form.swapFor}
+                  onChange={e => update('swapFor', e.target.value)}
+                  maxLength={280}
+                />
+                <span className="field-hint" style={{ fontWeight: 400 }}>
+                  Leave blank and it posts as open to offers.
+                </span>
+              </div>
+            )}
           </fieldset>
         )}
 
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label htmlFor="si-desc" className="field-label">Description</label>
+          <textarea
+            id="si-desc"
+            className="form-textarea"
+            placeholder={isService ? 'What you offer, experience, availability…' : 'Condition notes, accessories, anything to mention…'}
+            value={form.description}
+            onChange={e => update('description', e.target.value)}
+            maxLength={500}
+          />
+          {errors.description
+            ? <span className="field-error">{errors.description}</span>
+            : <span className="field-hint">{form.description.length}/500 characters</span>}
+        </div>
+
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label htmlFor="si-cat" className="field-label">
+            Category
+          </label>
+          <select
+            id="si-cat"
+            className="form-select"
+            value={form.category}
+            onChange={e => update('category', e.target.value)}
+            aria-invalid={!!errors.category}
+          >
+            <option value="">Pick one — helps people find it</option>
+            {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+          </select>
+          {errors.category && <span className="field-error">{errors.category}</span>}
+        </div>
+
+
+        {/* ── Everything else, folded away ─────────────────────────────────
+            The flow people already know is Instagram's: pick the photo, write
+            the caption, post. Everything beyond that is a row you can ignore.
+            This form asked for nine things up front, three of them required,
+            which is why posting felt long — not because any single field was
+            hard, but because the whole list had to be read before the button
+            at the bottom could be trusted.
+
+            What stays above the fold is what a buyer scrolling the feed
+            actually decides on: the photo, what it is, what it costs. Condition,
+            pickup point and a link matter once someone is interested, and they
+            are one tap away rather than nine fields deep. */}
+        <details style={{ marginBottom: 14 }}>
+          <summary style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            minHeight: 44, cursor: 'pointer', listStyle: 'none',
+            fontSize: 13.5, fontWeight: 600, color: 'var(--text-secondary)',
+            userSelect: 'none',
+          }}>
+            <ChevronRight size={15} strokeWidth={2.2} className="details-chevron" aria-hidden="true" />
+            Add more details
+            <span style={{ fontWeight: 400, fontSize: 12.5, color: 'var(--text-muted)' }}>
+              condition, pickup, link
+            </span>
+          </summary>
+          <div style={{ paddingTop: 12 }}>
+        {/* Colored condition slider — optional. Hidden for services, where an
+            item's physical condition is meaningless. */}
+        {!isService && (
+          <div className="field" style={{ marginBottom: 14 }}>
+            <label className="field-label" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span>Condition</span>
+              <span className="field-hint" style={{ fontWeight: 400 }}>Optional</span>
+            </label>
+            <ConditionSlider
+              value={form.condition}
+              onChange={v => update('condition', v)}
+            />
+          </div>
+        )}
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label htmlFor="si-loc" className="field-label">
+            <MapPin size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+            {isService ? 'Location' : 'Pickup location'}
+          </label>
+          <input
+            id="si-loc"
+            className="form-input"
+            placeholder={isService ? 'e.g. Online, or Meera Bhawan' : 'e.g. Meera Bhawan, Block 15'}
+            value={form.location}
+            onChange={e => update('location', e.target.value)}
+            aria-invalid={!!errors.location}
+          />
+          {errors.location && <span className="field-error">{errors.location}</span>}
+        </div>
+        {/* Link — optional, and quiet until used. Any URL typed into the
+            description above also becomes tappable on the post; this field is
+            for the one link that deserves its own button. */}
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label htmlFor="si-link" className="field-label">
+            <Link2 size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+            Link <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
+          </label>
+          <input
+            id="si-link"
+            type="url"
+            inputMode="url"
+            className="form-input"
+            placeholder="example.com/page"
+            value={form.link}
+            maxLength={500}
+            onChange={e => update('link', e.target.value)}
+            aria-invalid={!!errors.link}
+            autoComplete="off"
+          />
+          {errors.link ? (
+            <span className="field-error">{errors.link}</span>
+          ) : linkPreviewHost ? (
+            <span className="field-hint">Opens {linkPreviewHost} in a new tab.</span>
+          ) : (
+            <span className="field-hint">A page, form, or portfolio. Shown as a button on your post.</span>
+          )}
+
+          {/* Only offered once both halves exist. A photo-link with no photo is
+              a setting that does nothing, and a toggle that does nothing is
+              worse than no toggle. */}
+          {linkPreviewHost && form.photos.length > 0 && (
+            <button
+              type="button"
+              aria-pressed={form.linkOnPhoto}
+              onClick={() => update('linkOnPhoto', !form.linkOnPhoto)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                marginTop: 10, padding: '10px 12px',
+                borderRadius: 'var(--radius-md)', border: 'none',
+                background: form.linkOnPhoto ? 'rgba(0,137,57,0.10)' : 'var(--bg-inset)',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 34, height: 20, borderRadius: 999, flexShrink: 0,
+                  background: form.linkOnPhoto ? '#008939' : 'var(--border-default)',
+                  position: 'relative', transition: 'background 160ms ease',
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2, left: form.linkOnPhoto ? 16 : 2,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  transition: 'left 160ms ease',
+                }} />
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
+                Open the link when the photo is tapped
+                <span style={{ display: 'block', fontSize: 11.5, fontWeight: 400, color: 'var(--text-muted)' }}>
+                  The photo gets a {linkPreviewHost} badge so people know before they tap.
+                </span>
+              </span>
+            </button>
+          )}
+        </div>
         {/* ── Engagement notification toggle ── */}
         <NotifyToggle
           checked={notifyOnEngagement}
@@ -617,6 +743,10 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           label="Alert me when someone comments"
           onClose={onClose}
         />
+          </div>
+        </details>
+
+
 
         {submitError && (
           <div role="alert" style={{
