@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   ChevronLeft, ChevronRight,
-  Bell, BellRing, Shield, Tag, Info,
+  Bell, BellRing, Shield, Tag, Info, LifeBuoy,
   MessageSquare, Globe, EyeOff, Trash2, Loader2, UserX, Lock,
 } from 'lucide-react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push';
@@ -376,6 +376,22 @@ export default function SettingsScreen({
 
       {/* ── HELP & FEEDBACK ── */}
       <Section title="Help & feedback">
+        {/* Guideline 1.2 requires PUBLISHED contact information a member can
+            reach easily. Feedback and a support page both existed, but neither
+            put a real address in front of someone who needs to report abuse —
+            so the address is now spelled out, tappable, and first in the list. */}
+        <LinkCard
+          icon={<LifeBuoy size={16} strokeWidth={1.8} />}
+          title="Contact support"
+          subtitle="wecycle.page@gmail.com · replies within two working days"
+          onClick={() => { window.location.href = 'mailto:wecycle.page@gmail.com?subject=Wecycle%20support'; }}
+        />
+        <LinkCard
+          icon={<Shield size={16} strokeWidth={1.8} />}
+          title="Community guidelines"
+          subtitle="What isn't allowed, and how we deal with it"
+          onClick={() => window.open('/terms#rules', '_blank', 'noopener,noreferrer')}
+        />
         <LinkCard
           icon={<MessageSquare size={16} strokeWidth={1.8} />}
           title="Send feedback"

@@ -34,15 +34,48 @@ export default function Terms() {
           current.
         </p>
 
-        <h2 style={h2}>3. Acceptable use</h2>
+        {/* Guideline 1.2 requires the terms to state plainly that objectionable
+            content and abusive users are not tolerated. The old list implied it
+            across several polite bullets; App Review asked for it said outright,
+            so it is now the first thing in this section and unmissable. */}
+        <h2 style={h2}>3. Zero tolerance for objectionable content and abusive behaviour</h2>
+        <p style={{ ...p, fontWeight: 600 }}>
+          Wecycle has no tolerance for objectionable content or abusive users.
+          Content that breaks the rules below is removed, and the accounts
+          responsible are suspended or permanently banned.
+        </p>
+        <p style={p}>By using Wecycle you agree never to post, send, or share:</p>
+        <ul style={ul}>
+          <li style={li}>Harassment, bullying, stalking, or targeted abuse of any person.</li>
+          <li style={li}>Hate speech, slurs, or content attacking people for their race, caste, religion, sex, gender, sexuality, disability, or nationality.</li>
+          <li style={li}>Threats of violence, or content encouraging self-harm or harm to others.</li>
+          <li style={li}>Sexual or pornographic content, nudity, or any sexual content involving minors.</li>
+          <li style={li}>Impersonation of another person, a business, or an institution.</li>
+          <li style={li}>Spam, scams, phishing, or deliberately misleading listings.</li>
+          <li style={li}>Anything illegal, or content that breaks someone else&apos;s copyright or trademark.</li>
+        </ul>
+        <p style={p}>
+          We filter posts, comments, and profiles for prohibited wording as they
+          are submitted, and content that gets through can be reported by any
+          member from the ⋯ menu on it. Reports reach our moderators directly.
+          You can also block any member, which removes their posts and comments
+          from your view immediately and stops them contacting you.
+        </p>
+        <p style={p}>
+          We remove violating content and we suspend or ban the accounts behind
+          it. Serious cases — threats, sexual content involving minors, or
+          anything illegal — are removed on sight and may be referred to the
+          university or the police.
+        </p>
+
+        <h2 style={h2}>4. Acceptable use</h2>
         <ul style={ul}>
           <li style={li}>Don&apos;t post illegal, stolen, counterfeit, hazardous, or prohibited items.</li>
-          <li style={li}>Don&apos;t harass, spam, impersonate, or deceive other members.</li>
           <li style={li}>Don&apos;t post content you don&apos;t have the right to share.</li>
           <li style={li}>Transactions and exchanges happen directly between members. Wecycle is not a party to them and does not guarantee any item, price, or person. Meet safely and use your judgment.</li>
         </ul>
 
-        <h2 style={h2}>4. Content</h2>
+        <h2 style={h2}>5. Content</h2>
         <p style={p}>
           You keep ownership of what you post, and grant Wecycle a non-exclusive,
           royalty-free license to store, display, and distribute it within the app
@@ -52,7 +85,7 @@ export default function Terms() {
           that violate these terms or our community safety rules.
         </p>
 
-        <h2 style={h2}>5. No warranty &amp; limitation of liability</h2>
+        <h2 style={h2}>6. No warranty &amp; limitation of liability</h2>
         <p style={p}>
           Wecycle is provided &ldquo;as is,&rdquo; without warranties. To the
           extent permitted by law, Wecycle is not liable for (a) disputes, losses,
@@ -62,14 +95,14 @@ export default function Terms() {
           your judgment, and transact at your own risk.
         </p>
 
-        <h2 style={h2}>6. Termination</h2>
+        <h2 style={h2}>7. Termination</h2>
         <p style={p}>
           You can delete your account at any time (see our{' '}
           <a href="/delete-account" style={link}>account deletion page</a>). We may
           suspend or terminate access for violations of these terms.
         </p>
 
-        <h2 style={h2}>7. Changes &amp; contact</h2>
+        <h2 style={h2}>8. Changes &amp; contact</h2>
         <p style={p}>
           We may update these terms; we&apos;ll revise the date above for material
           changes. Questions? Email{' '}

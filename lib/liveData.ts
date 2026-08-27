@@ -21,6 +21,7 @@ import { listingToComp } from './opportunity';
 import type { CompressedMedia } from './mediaCompression';
 import type { Database } from './database.types';
 import { normalizeCategory } from './categories';
+import { assertClean } from './contentFilter';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -394,6 +395,8 @@ export interface NewListingInput {
 
 export async function createListingWithMedia(input: NewListingInput): Promise<MarketplaceItem> {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  /* Guideline 1.2: filter before it is posted, not after it is reported. */
+  assertClean([input.title, input.description, input.location]);
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in to post');
@@ -487,6 +490,7 @@ async function resolveCommunityId(userId: string): Promise<string> {
 
 export async function createRequest(input: NewRequestInput) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  assertClean([input.title, input.description]);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in to post');
   const communityId = await resolveCommunityId(user.id);
@@ -538,6 +542,7 @@ export interface NewEventInput {
  *  registration form) right after creation. */
 export async function createEvent(input: NewEventInput): Promise<string> {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  assertClean([input.title, input.description, input.location]);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in to post');
   const communityId = await resolveCommunityId(user.id);
@@ -594,6 +599,7 @@ export interface NewLostFoundInput {
 
 export async function createLostFound(input: NewLostFoundInput) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  assertClean([input.title, input.description, input.lastSeen, input.reward]);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in to post');
   const communityId = await resolveCommunityId(user.id);
@@ -955,6 +961,7 @@ export interface EditEventPatch {
 
 export async function updateEvent(id: string, patch: EditEventPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  assertClean([patch.title, patch.description, patch.location]);
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
   if (patch.eventType !== undefined)   update.event_type = patch.eventType;
@@ -1156,6 +1163,7 @@ export interface EditLostFoundPatch {
 
 export async function updateLostFoundFields(id: string, patch: EditLostFoundPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  assertClean([patch.title, patch.description, patch.lastSeen, patch.reward]);
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
   if (patch.description !== undefined) update.description = patch.description.trim() || null;
@@ -1213,6 +1221,7 @@ type ListingUpdate = Database['public']['Tables']['listings']['Update'];
 
 export async function updateListingFields(id: string, patch: EditListingPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  assertClean([patch.title, patch.description, patch.location]);
   const update: ListingUpdate = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
   /* normalizeCategory, not toLowerCase. The edit screen seeds this field from
@@ -1286,6 +1295,7 @@ export interface EditRequestPatch {
 
 export async function updateRequestFields(id: string, patch: EditRequestPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  assertClean([patch.title, patch.description]);
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
   if (patch.category !== undefined)    update.category_id = patch.category.trim().toLowerCase();

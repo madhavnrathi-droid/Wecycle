@@ -11,6 +11,7 @@
  *     have a registered authorId.
  */
 
+import { assertClean } from './contentFilter';
 import { USERS, type User } from './mockData';
 import { supabase } from './supabase';
 import type { FeedEntityType } from './api/feed';
@@ -191,6 +192,11 @@ export async function createComment(
   },
   isDemo: boolean,
 ): Promise<Comment | null> {
+  /* Comments were the largest hole: the filter was wired into the item form
+     only, so the fastest way to publish abuse was to type it under someone
+     else's post instead of your own. Guarded before the demo branch too — a
+     demo session still renders the text on screen. */
+  assertClean([input.body]);
   if (isDemo) {
     return addComment({
       postId: input.postId, author: input.author, body: input.body,

@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Send, CornerDownRight, Trash2, Flag } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { fetchComments, createComment, removeComment, timeAgo, type Comment } from '../lib/comments';
+import { isServerModerationError } from '../lib/contentFilter';
 import type { FeedEntityType } from '../lib/api/feed';
 import { track, EVT } from '../lib/analytics';
 import { USERS, type User } from '../lib/mockData';
@@ -51,6 +52,10 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
     return onBlocksChange(() => getBlockedUserIds().then(setBlocked));
   }, []);
   const [draft, setDraft] = useState('');
+  /* Why a comment was refused. The composer clears optimistically, so a refusal
+     has to both explain itself AND hand the text back — losing what someone
+     typed is a worse outcome than the post they were trying to make. */
+  const [postError, setPostError] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -145,10 +150,26 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
        persisted row (real id + createdAt, live author from the DB join). */
     setDraft('');
     setReplyTo(null);
-    const created = await createComment(
-      { postId, entityType, author: me, body, parentId: wasReplyingTo?.id, mentions },
-      isDemo,
-    );
+    setPostError(null);
+    let created: Awaited<ReturnType<typeof createComment>> = null;
+    try {
+      created = await createComment(
+        { postId, entityType, author: me, body, parentId: wasReplyingTo?.id, mentions },
+        isDemo,
+      );
+    } catch (e) {
+      /* Blocked by the filter — client-side, or by the database if this client
+         is out of date. Either way the person needs the sentence and their
+         words back. */
+      setPostError(
+        isServerModerationError(e)
+          ? 'That wording isn’t allowed on Wecycle. Please reword and try again.'
+          : ((e as Error).message || 'Could not post that comment.'),
+      );
+      setDraft(body);
+      setReplyTo(wasReplyingTo);
+      return;
+    }
     if (!created) {
       /* Write failed (network / not signed in) — restore the draft + reply
          target so the user doesn't lose what they typed. */
@@ -294,7 +315,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
           <textarea
             ref={inputRef}
             value={draft}
-            onChange={e => setDraft(e.target.value)}
+            onChange={e => { setDraft(e.target.value); if (postError) setPostError(null); }}
             onKeyDown={onKeyDown}
             onFocus={() => { if (!user) { onRequireAuth(); inputRef.current?.blur(); } }}
             placeholder={user ? 'Add a comment…' : 'Sign in to comment'}
@@ -327,6 +348,16 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
             <Send size={14} strokeWidth={2} />
           </button>
         </div>
+        {postError && (
+          <p role="alert" style={{
+            margin: '8px 4px 0',
+            fontSize: 12.5,
+            lineHeight: 1.45,
+            color: 'var(--accent-rose)',
+          }}>
+            {postError}
+          </p>
+        )}
 
         <p style={{
           margin: '8px 4px 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.45,

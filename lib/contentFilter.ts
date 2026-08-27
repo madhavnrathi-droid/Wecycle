@@ -81,3 +81,36 @@ export function isObjectionable(text: string): boolean {
 export function objectionableMessage(term: string): string {
   return `Please reword this — “${term}” isn’t allowed on Wecycle.`;
 }
+
+/* ── One guard for every write path ────────────────────────────────────────
+ *
+ * Called from the data layer rather than from each form, because the filter
+ * being wired into ONE form is exactly how this shipped incomplete the first
+ * time: listings were checked and comments, requests, events and lost-and-found
+ * were not. A choke point cannot be forgotten by the next screen someone adds.
+ *
+ * Throws rather than returning a flag so a caller cannot accidentally ignore
+ * it; every create path already surfaces thrown errors to the user. */
+export class ObjectionableContentError extends Error {
+  readonly term: string;
+  constructor(term: string) {
+    super(objectionableMessage(term));
+    this.name = 'ObjectionableContentError';
+    this.term = term;
+  }
+}
+
+/** Check every user-written field going into one post. */
+export function assertClean(fields: Array<string | null | undefined>): void {
+  for (const f of fields) {
+    const hit = f ? findObjectionable(f) : null;
+    if (hit) throw new ObjectionableContentError(hit);
+  }
+}
+
+/** Turn the database's refusal into the same sentence the client would have
+ *  shown, so a post blocked server-side does not surface raw Postgres text. */
+export function isServerModerationError(e: unknown): boolean {
+  const msg = (e as { message?: string } | null)?.message ?? '';
+  return /isn.t allowed on Wecycle|blocked term/i.test(msg);
+}

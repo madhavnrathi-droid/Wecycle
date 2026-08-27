@@ -295,3 +295,43 @@ export function reportMailto(input: {
 function isUuid(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   SUSPENSION (admins only)
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Suspend an account for `days`, or lift a suspension with days = 0.
+ *
+ * Guideline 1.2 makes removing violating content the developer's job, and a
+ * report queue with no consequence at the end of it is not a moderation
+ * process — admins could delete a post but not stop the next one. The rule is
+ * enforced by the database (block_suspended_authors), so this is the control,
+ * not the mechanism: a client that skipped it would change nothing.
+ *
+ * Returns the expiry, or null when lifted. Throws if the caller is not an admin
+ * — that check is in the SECURITY DEFINER function, not here.
+ */
+export async function setSuspension(
+  targetId: string,
+  days: number,
+  reason?: string,
+): Promise<string | null> {
+  if (isDemoMode() || !hasSupabaseEnv) return null;
+  const { data, error } = await supabase.rpc('admin_set_suspension' as never, {
+    target: targetId,
+    days,
+    reason: reason ?? null,
+  } as never);
+  if (error) throw error;
+  return (data as string | null) ?? null;
+}
+
+/** Common lengths, so a moderator picks rather than types. */
+export const SUSPENSION_OPTIONS = [
+  { days: 3,    label: '3 days' },
+  { days: 7,    label: '1 week' },
+  { days: 30,   label: '30 days' },
+  { days: 3650, label: 'Permanent' },
+] as const;
