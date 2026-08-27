@@ -60,6 +60,7 @@ import {
   joiningYears, localPartOf, hasCompleteDomain, withDomain, DOMAINS,
   type ManipalDomain,
 } from '../lib/manipalEmail';
+import { legalLinkProps, LEGAL_TERMS, LEGAL_PRIVACY } from '../lib/legal';
 
 type Step = 'credentials' | 'confirm' | 'newpassword';
 type AuthMode = 'signin' | 'signup';
@@ -1180,14 +1181,12 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                     the rejection asked for. */}
                 <span>
                   I agree to Wecycle&apos;s{' '}
-                  <a href="/terms" target="_blank" rel="noopener noreferrer"
+                  <a {...legalLinkProps(LEGAL_TERMS)}
                     style={{ color: 'var(--text-primary)', textDecoration: 'underline' }}
-                    onClick={e => e.stopPropagation()}
                   >Terms</a>
                   {' '}and{' '}
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                  <a {...legalLinkProps(LEGAL_PRIVACY)}
                     style={{ color: 'var(--text-primary)', textDecoration: 'underline' }}
-                    onClick={e => e.stopPropagation()}
                   >Privacy Policy</a>, and I understand that Wecycle has{' '}
                   <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                     no tolerance for objectionable content or abusive behaviour

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import BackToApp from '../../components/BackToApp';
 
 export const metadata: Metadata = {
   title: 'Terms of Service — Wecycle',
@@ -13,7 +14,7 @@ export default function Terms() {
   return (
     <main style={page}>
       <div style={wrap}>
-        <a href="/" style={back}>← Back to Wecycle</a>
+        <BackToApp />
         <h1 style={h1}>Terms of Service</h1>
         <p style={meta}>Last updated: {UPDATED}</p>
 
@@ -117,12 +118,21 @@ export default function Terms() {
 }
 
 const page: React.CSSProperties = {
-  background: '#FAFAF6', color: '#1A1A17', minHeight: '100vh',
+  background: '#FAFAF6', color: '#1A1A17', minHeight: '100dvh',
   fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  padding: '32px 20px 64px', lineHeight: 1.6,
+  /* Safe-area insets, not a flat 32px. The root layout ships
+     viewport-fit=cover with a black-translucent status bar, so this page really
+     does extend behind the clock on a notched iPhone — and 32px put the back
+     link directly underneath it: unreadable, and untappable, because the status
+     bar takes the touch first. The left/right max() covers the same overlap in
+     landscape, where the notch eats one margin. */
+  paddingTop: 'calc(24px + env(safe-area-inset-top))',
+  paddingRight: 'max(20px, env(safe-area-inset-right))',
+  paddingBottom: 'calc(64px + env(safe-area-inset-bottom))',
+  paddingLeft: 'max(20px, env(safe-area-inset-left))',
+  lineHeight: 1.6,
 };
 const wrap: React.CSSProperties = { maxWidth: 720, margin: '0 auto' };
-const back: React.CSSProperties = { color: '#5C7A00', textDecoration: 'none', fontSize: 14, fontWeight: 600 };
 const h1: React.CSSProperties = { fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em', margin: '20px 0 4px' };
 const meta: React.CSSProperties = { color: '#6B6B63', fontSize: 13, margin: '0 0 24px' };
 const h2: React.CSSProperties = { fontSize: 19, fontWeight: 700, letterSpacing: '-0.01em', margin: '30px 0 8px' };

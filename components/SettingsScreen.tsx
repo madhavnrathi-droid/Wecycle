@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../lib/AuthContext';
 import { supabase, rpcUntyped } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
+import { openLegal, LEGAL_TERMS, LEGAL_PRIVACY, LEGAL_RULES } from '../lib/legal';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -22,6 +23,14 @@ interface SettingsScreenProps {
   onOpenFeedback: () => void;
   onOpenAccount: () => void;
   onOpenPassword?: () => void;
+}
+
+/** Open a legal page from a settings row. openLegal handles the native app and
+ *  reports back whether it took over; on the web we still just open a tab. */
+function openLegalFromApp(path: string) {
+  void openLegal(path).then(handled => {
+    if (!handled) window.open(path, '_blank', 'noopener,noreferrer');
+  });
 }
 
 export default function SettingsScreen({
@@ -390,7 +399,7 @@ export default function SettingsScreen({
           icon={<Shield size={16} strokeWidth={1.8} />}
           title="Community guidelines"
           subtitle="What isn't allowed, and how we deal with it"
-          onClick={() => window.open('/terms#rules', '_blank', 'noopener,noreferrer')}
+          onClick={() => openLegalFromApp(LEGAL_RULES)}
         />
         <LinkCard
           icon={<MessageSquare size={16} strokeWidth={1.8} />}
@@ -407,14 +416,15 @@ export default function SettingsScreen({
         <LinkCard
           icon={<Shield size={16} strokeWidth={1.8} />}
           title="Privacy policy"
-          /* Relative path → resolves on whatever origin serves the app
-             (vercel.app today, wecycle.page once the custom domain is wired). */
-          onClick={() => window.open('/privacy', '_blank', 'noopener,noreferrer')}
+          /* Native opens this in an in-app Safari view on the live origin; the
+             web keeps a plain new tab. A relative window.open was silently
+             dead inside the Capacitor WebView. */
+          onClick={() => openLegalFromApp(LEGAL_PRIVACY)}
         />
         <LinkCard
           icon={<Globe size={16} strokeWidth={1.8} />}
           title="Terms of service"
-          onClick={() => window.open('/terms', '_blank', 'noopener,noreferrer')}
+          onClick={() => openLegalFromApp(LEGAL_TERMS)}
         />
       </Section>
 
