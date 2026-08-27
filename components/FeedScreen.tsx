@@ -54,6 +54,43 @@ interface FeedScreenProps {
   onPostService?: () => void;
 }
 
+/* ── Rail filters ──────────────────────────────────────────────────────────
+ *
+ * One definition per merchandising rail, used BOTH to build the row and to
+ * filter the page behind its "See all". That shared definition is the whole
+ * point: the two were written separately, the row filtered and the page did
+ * not, and a heading promising free things opened onto the full catalogue.
+ *
+ * `match` is the row's predicate. `compare` exists for the two rails that are
+ * orderings rather than filters — "Just dropped" and "Most looked at" are every
+ * item, arranged, so filtering them would empty a page that should simply be
+ * sorted differently.
+ */
+type RailFilterId = 'fresh' | 'popular' | 'budget' | 'college' | 'free';
+
+interface RailFilterCtx { myCollege: string | null }
+
+const RAIL_FILTERS: Record<RailFilterId, {
+  /** Shown back to the user as a removable chip. */
+  label: string;
+  match: (it: MarketplaceItem, ctx: RailFilterCtx) => boolean;
+  compare?: (a: MarketplaceItem, b: MarketplaceItem) => number;
+}> = {
+  fresh:   { label: 'Just dropped',   match: () => true,
+             compare: (a, b) => a.postedDaysAgo - b.postedDaysAgo },
+  popular: { label: 'Most looked at', match: it => (it.viewCount ?? 0) > 0,
+             compare: (a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0) },
+  budget:  { label: 'Under ₹500',
+             /* Free counts as under the cap rather than being excluded on a
+                technicality — same rule the row uses. */
+             match: it => it.listingType === 'free'
+               || (typeof it.price === 'number' && it.price > 0 && it.price <= 500) },
+  college: { label: 'From your college',
+             match: (it, ctx) => !!ctx.myCollege
+               && (it.user as { college?: string | null }).college === ctx.myCollege },
+  free:    { label: 'Free', match: it => it.listingType === 'free' },
+};
+
 export default function FeedScreen({
   onPost, onOpenMenu, onOpenAccount, onOpenItem, onOpenEvent, onOpenLF,
   onBannerAction, onOpenUser, onRequireAuth, onPostService,
@@ -74,6 +111,28 @@ export default function FeedScreen({
      next visit reseeds this default — that's the "every new session starts
      on the storefront" behaviour. */
   const [activeType, setActiveType] = useState<'all' | 'requests' | 'shared' | 'services'>('all');
+  /* Which merchandising rail "See all" came from.
+   *
+   * Every one of these rails used to hand off to setActiveType('shared') and
+   * nothing else, so tapping See all under "Free & up for grabs 🎁" showed the
+   * whole catalogue — the row promised free things and the page behind it
+   * delivered everything, including the ₹4,500 monitor. The promise a rail
+   * makes in its heading has to survive the tap, or the heading is decoration.
+   *
+   * Held as a name rather than a predicate so it can also be shown back to the
+   * user and cleared; a filtered list with no visible reason for being filtered
+   * is the other half of this bug. */
+  const [railFilter, setRailFilter] = useState<RailFilterId | null>(null);
+
+  /* One place that opens a rail's full list, so the tab and the filter can
+     never be set apart from each other. */
+  const openRail = (id: RailFilterId) => {
+    setActiveType('shared');
+    setRailFilter(id);
+    setActiveCategory('all');
+    track(EVT.feed_tab_changed, { tab: 'shared', rail: id });
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const [query, setQuery] = useState('');
   /* Faceted sub-filter for the Jobs & gigs tab only. Keeping the direction
      filter here — rather than as a second homepage rail — is what lets one
@@ -255,11 +314,24 @@ export default function FeedScreen({
           : opportunities.filter(o => (o.oppRole ?? 'offering') === workFilter))
     : items;
   const source = pool.filter(item => !blocked.has(item.user.id));
-  const filtered = source.filter(item => {
-    if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
-    if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
-    return true;
-  });
+  /* Declared here rather than beside the college rail further down: `filtered`
+     reads it, and a const is in its temporal dead zone until its own line has
+     run. Leaving it below meant every render threw ReferenceError before the
+     feed could paint — and TypeScript does not catch this one. */
+  const myCollege = (profile as { college?: string | null } | null)?.college ?? null;
+
+  const filtered = (() => {
+    const base = source.filter(item => {
+      if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
+      if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
+      /* The rail's own promise, applied to the whole catalogue rather than to
+         the twelve items the row had space for. */
+      if (railFilter && !RAIL_FILTERS[railFilter].match(item, { myCollege })) return false;
+      return true;
+    });
+    const cmp = railFilter ? RAIL_FILTERS[railFilter].compare : undefined;
+    return cmp ? [...base].sort(cmp) : base;
+  })();
 
   /* ── "All" tab GRID entries (shown when a category/search narrows the
      storefront) ──────────────────────────────────────────────────────
@@ -376,7 +448,6 @@ export default function FeedScreen({
      worth more three buildings away than across town. Only for signed-in
      members, because it needs a college to compare against, and only when it
      is not simply the whole catalogue rebadged. */
-  const myCollege = (profile as { college?: string | null } | null)?.college ?? null;
   const collegeItems = myCollege
     ? liveItems.filter(it => (it.user as { college?: string | null }).college === myCollege).slice(0, 12)
     : [];
@@ -720,28 +791,28 @@ export default function FeedScreen({
       <section style={{ padding: '0 16px 14px' }}>
         <div className="segmented segmented--scroll">
           <button
-            onClick={() => { setActiveType('all'); track(EVT.feed_tab_changed, { tab: 'all' }); }}
+            onClick={() => { setActiveType('all'); setRailFilter(null); track(EVT.feed_tab_changed, { tab: 'all' }); }}
             aria-pressed={activeType === 'all'}
             data-active={activeType === 'all' || undefined}
           >
             All
           </button>
           <button
-            onClick={() => { setActiveType('requests'); track(EVT.feed_tab_changed, { tab: 'requests' }); }}
+            onClick={() => { setActiveType('requests'); setRailFilter(null); track(EVT.feed_tab_changed, { tab: 'requests' }); }}
             aria-pressed={activeType === 'requests'}
             data-active={activeType === 'requests' || undefined}
           >
             Requests
           </button>
           <button
-            onClick={() => { setActiveType('shared'); track(EVT.feed_tab_changed, { tab: 'shared' }); }}
+            onClick={() => { setActiveType('shared'); setRailFilter(null); track(EVT.feed_tab_changed, { tab: 'shared' }); }}
             aria-pressed={activeType === 'shared'}
             data-active={activeType === 'shared' || undefined}
           >
             Shared
           </button>
           <button
-            onClick={() => { setActiveType('services'); track(EVT.feed_tab_changed, { tab: 'services' }); }}
+            onClick={() => { setActiveType('services'); setRailFilter(null); track(EVT.feed_tab_changed, { tab: 'services' }); }}
             aria-pressed={activeType === 'services'}
             data-active={activeType === 'services' || undefined}
           >
@@ -749,6 +820,35 @@ export default function FeedScreen({
           </button>
         </div>
       </section>
+
+      {/* ── Active rail filter ────────────────────────────────────────────
+         Shown because a list that has been narrowed must say so. Arriving from
+         "Free & up for grabs" into a page of nine items with no explanation
+         reads as a broken catalogue, not as a filter — and there would be no
+         way back to the rest of it. The chip is the label the rail promised,
+         and tapping it returns the full list. */}
+      {railFilter && (
+        <section style={{ padding: '0 16px 12px' }}>
+          <button
+            type="button"
+            onClick={() => { haptics.selection(); setRailFilter(null); }}
+            aria-label={`Clear the ${RAIL_FILTERS[railFilter].label} filter`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              minHeight: 36, padding: '7px 12px 7px 14px',
+              borderRadius: 999, border: 'none', cursor: 'pointer',
+              background: 'var(--text-primary)', color: '#fff',
+              fontSize: 13, fontWeight: 600,
+            }}
+          >
+            {RAIL_FILTERS[railFilter].label}
+            <X size={14} strokeWidth={2.6} aria-hidden="true" />
+          </button>
+          <span style={{ marginLeft: 10, fontSize: 12.5, color: 'var(--text-muted)' }}>
+            {filtered.length} {filtered.length === 1 ? 'item' : 'items'}
+          </span>
+        </section>
+      )}
 
       {/* ── HIRING / OFFERING FACETS (Jobs & gigs tab only) ──
          The board holds two opposite things; this is where you narrow to one.
@@ -819,7 +919,7 @@ export default function FeedScreen({
 
           {/* JUST DROPPED — the hero shelf, so it gets the biggest cards */}
           {freshItems.length >= 3 && (
-            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" variant="featured" onSeeAll={() => setActiveType('shared')}>
+            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" variant="featured" onSeeAll={() => openRail('fresh')}>
               {freshItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_fresh')}</div>)}
             </Rail>
           )}
@@ -827,21 +927,21 @@ export default function FeedScreen({
           {/* MOST LOOKED AT — social proof is what a stranger reads first, and
               unlike Free it is never empty. */}
           {popularItems.length >= 3 && (
-            <Rail title="Most looked at 👀" sub="What everyone's been opening this week" onSeeAll={() => setActiveType('shared')}>
+            <Rail title="Most looked at 👀" sub="What everyone's been opening this week" onSeeAll={() => openRail('popular')}>
               {popularItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_popular')}</div>)}
             </Rail>
           )}
 
           {/* UNDER ₹500 — students sort by price before anything else. */}
           {budgetItems.length >= 2 && (
-            <Rail title="Under ₹500 💸" sub="Cheaper than a night out" onSeeAll={() => setActiveType('shared')}>
+            <Rail title="Under ₹500 💸" sub="Cheaper than a night out" onSeeAll={() => openRail('budget')}>
               {budgetItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_budget')}</div>)}
             </Rail>
           )}
 
           {/* FROM YOUR COLLEGE — proximity, the strongest signal on a campus. */}
           {collegeItems.length >= 2 && (
-            <Rail title="From your college 🎓" sub="Same campus, shorter walk" onSeeAll={() => setActiveType('shared')}>
+            <Rail title="From your college 🎓" sub="Same campus, shorter walk" onSeeAll={() => openRail('college')}>
               {collegeItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_college')}</div>)}
             </Rail>
           )}
@@ -884,7 +984,7 @@ export default function FeedScreen({
 
           {/* FREE */}
           {freeItems.length >= 2 && (
-            <Rail title="Free & up for grabs 🎁" sub="₹0. Yes, really." onSeeAll={() => setActiveType('shared')}>
+            <Rail title="Free & up for grabs 🎁" sub="₹0. Yes, really." onSeeAll={() => openRail('free')}>
               {freeItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_free', 'free')}</div>)}
             </Rail>
           )}

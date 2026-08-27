@@ -84,7 +84,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   if (!m) {
     return {
       title: 'Wecycle',
-      openGraph: { type: 'website', siteName: 'Wecycle', title: 'Wecycle', description: 'Circulate resources within your community.', images: [{ url: '/og-image.png', width: 1200, height: 630 }] },
+      openGraph: { type: 'website', siteName: 'Wecycle', title: 'Wecycle', description: 'Buy, borrow, swap and give away on campus. By students, for students.', images: [{ url: '/og-image.png', width: 1200, height: 630 }] },
       twitter: { card: 'summary_large_image', images: ['/og-image.png'] },
     };
   }

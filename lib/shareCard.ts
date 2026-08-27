@@ -849,12 +849,268 @@ async function renderStorefrontCard(spec: ShareCardSpec): Promise<RenderedCard> 
   return { blob, dataUrl };
 }
 
+/* ── The card ──────────────────────────────────────────────────────────────
+ *
+ * Photo on top, everything else on the gradient below. The structure the owner
+ * chose; what changed is which facts get the room.
+ *
+ * The version this replaces buried the two things a reader actually decides on
+ * — what it costs and where it is — in a three-column micro-row of 28px labels,
+ * making them the SMALLEST legible text on a card whose entire job is to
+ * communicate them. The title was 92px and the price was 28px, which is a
+ * hierarchy exactly upside down: the headline says what the thing is, and the
+ * price says whether you care.
+ *
+ * So price and location are now anchored at fixed positions near the bottom and
+ * sized to be read at a glance — the price is the largest text on the card
+ * after the title, and the location sits directly beneath it, because "how much"
+ * and "where" are one question asked twice.
+ *
+ * White, not the accent colour, for both. The per-board accents were tuned to
+ * clear 2.58:1 against their own lightest stop, which is under the 3:1 WCAG
+ * asks even for large text; white clears it on all four washes with room to
+ * spare. Size and weight carry the hierarchy instead of hue, which is also what
+ * makes the card survive being resized into a WhatsApp thumbnail.
+ *
+ * No call to action. This is a flat PNG that will sit in a chat — a button
+ * drawn on it is a button that cannot be pressed, and a card asking to be
+ * tapped when it cannot be is the fastest way to make it feel fake. The action
+ * travels as the message pasted alongside it.
+ *
+ * No description either. It is not one of the five things this card is for, and
+ * every line it takes is a line off the price. It rides in the caption instead.
+ */
+async function renderClassicCard(spec: ShareCardSpec): Promise<RenderedCard> {
+  const t = THEME[spec.kind];
+
+  const canvas = document.createElement('canvas');
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
+  const ctx = canvas.getContext('2d')!;
+
+  const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
+  const [wordmark, avatar, hero] = await Promise.all([
+    loadImage('/brand/wordmark.png', false),
+    spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
+    urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
+  ]);
+
+  const PHOTO_H = 660;
+  const FX = 72;                       // text gutter
+  const TEXT_W = CARD_W - FX * 2;
+
+  /* Bottom-anchored blocks. Price and location keep the same position on every
+     card no matter how long the title runs, so someone who has seen one Wecycle
+     card knows where to look on the next one. A layout that flows top-down puts
+     them somewhere different each time. */
+  const NAME_CY   = CARD_H - 92;       // poster row, vertical centre
+  const RULE_Y    = NAME_CY - 62;
+  const LOC_TOP   = RULE_Y - 34 - 46;
+  const PRICE_TOP = LOC_TOP - 14 - 98;
+
+  /* Title auto-fit into whatever is left between the photo and the price. */
+  const TITLE_TOP = PHOTO_H + 46;
+  const TITLE_ROOM = PRICE_TOP - 26 - TITLE_TOP;
+  let titleSize = 44;
+  let titleLines: string[] = [spec.title];
+  for (const [size, maxLines] of [[70, 2], [62, 2], [56, 3], [50, 3], [44, 3]] as [number, number][]) {
+    ctx.font = `800 ${size}px ${FONT}`;
+    const lines = wrapText(ctx, spec.title, TEXT_W, maxLines);
+    const lh = Math.round(size * 1.12);
+    if (lines.length * lh <= TITLE_ROOM) {
+      titleSize = size; titleLines = lines;
+      if (!lines[lines.length - 1].endsWith('…')) break;
+    }
+  }
+  const TITLE_LH = Math.round(titleSize * 1.12);
+
+  const money = (spec.priceLine || (spec.price != null && Number.isFinite(spec.price)
+    ? `₹${Number(spec.price).toLocaleString('en-IN')}` : '')).trim();
+  const where = (spec.location ?? '').trim();
+  const when  = (spec.dateLine ?? '').trim();
+
+  const paint = (withPhoto: boolean) => {
+    ctx.clearRect(0, 0, CARD_W, CARD_H);
+    paintWash(ctx, CARD_W, CARD_H, t.colors);
+    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
+
+    /* ── Photo ── */
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, CARD_W, PHOTO_H);
+    ctx.clip();
+    if (withPhoto && hero) {
+      const ir = hero.width / hero.height;
+      if (Math.abs(ir - CARD_W / PHOTO_H) > 0.32) {
+        blurredBed(ctx, hero, 0, 0, CARD_W, PHOTO_H);
+        containDraw(ctx, hero, 0, 0, CARD_W, PHOTO_H);
+      } else {
+        coverDraw(ctx, hero, 0, 0, CARD_W, PHOTO_H);
+      }
+    } else {
+      paintWash(ctx, CARD_W, PHOTO_H, t.colors);
+      paintGrain(ctx, CARD_W, PHOTO_H, 0.1, 1);
+      ctx.font = `400 170px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.92;
+      ctx.fillText(t.glyph, CARD_W / 2, PHOTO_H / 2);
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.restore();
+
+    /* A short scrim at the photo's foot so the join to the gradient reads as
+       one surface rather than two stacked rectangles. */
+    const seam = ctx.createLinearGradient(0, PHOTO_H - 90, 0, PHOTO_H);
+    seam.addColorStop(0, 'rgba(0,0,0,0)');
+    seam.addColorStop(1, withAlpha(t.colors[0], 0.5));
+    ctx.fillStyle = seam;
+    ctx.fillRect(0, PHOTO_H - 90, CARD_W, 90);
+
+    /* ── Badge + wordmark ── */
+    const badgeText = (spec.badge || t.label).toUpperCase();
+    ctx.font = `700 27px ${FONT}`;
+    const bw = ctx.measureText(badgeText).width + 62;
+    const bh = 54;
+    const by = PHOTO_H - bh - 34;
+    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+    roundRect(ctx, FX, by, bw, bh, bh / 2); ctx.fill();
+    setStroke(ctx, 'rgba(255,255,255,0.42)', 1.6);
+    roundRect(ctx, FX, by, bw, bh, bh / 2); ctx.stroke();
+    ctx.fillStyle = t.accent;
+    ctx.beginPath(); ctx.arc(FX + 28, by + bh / 2, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, FX + 46, by + bh / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
+
+    /* The wordmark, on the photo's bottom-right and twice the size it was.
+       "Wecycle should read better" — it was 28px in a corner of the gradient,
+       competing with body text; here it sits on the scrim at the card's optical
+       centre-right, which is where a maker's mark belongs. */
+    if (wordmark) {
+      const wmH = 46;
+      const wmW = wmH * (wordmark.width / wordmark.height);
+      const white = tintImage(wordmark, Math.round(wmW), wmH, '#FFFFFF');
+      ctx.drawImage(white, CARD_W - FX - wmW, by + (bh - wmH) / 2, wmW, wmH);
+    } else {
+      ctx.font = `800 40px ${FONT}`;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Wecycle', CARD_W - FX, by + bh / 2);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    /* ── Title ── */
+    /* Bottom-anchored, growing upward from just above the price. Anchoring it
+       to the top of the panel instead left a floating band of empty gradient
+       between a two-line title and the price below — the words read as two
+       unrelated groups with a hole between them. Title, price and location are
+       one block making one statement, so they sit together and the slack goes
+       above them where it reads as breathing room against the photo. */
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `800 ${titleSize}px ${FONT}`;
+    let ty = Math.max(TITLE_TOP, PRICE_TOP - 30 - titleLines.length * TITLE_LH);
+    for (const line of titleLines) { ctx.fillText(line, FX, ty); ty += TITLE_LH; }
+
+    /* ── Price — the largest thing on the card after the headline ── */
+    if (money) {
+      let ps = 98;
+      for (const size of [98, 84, 70, 58, 48, 40]) {
+        ctx.font = `800 ${size}px ${FONT}`;
+        ps = size;
+        if (ctx.measureText(money).width <= TEXT_W) break;
+      }
+      ctx.font = `800 ${ps}px ${FONT}`;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(money, FX, PRICE_TOP + (98 - ps));
+    }
+
+    /* ── Location — directly beneath the price, same gutter, one question ── */
+    const place = where || when;
+    if (place) {
+      ctx.textBaseline = 'middle';
+      const cy = LOC_TOP + 23;
+      /* Filled pin: a stroked one dissolves when the card is scaled into a
+         chat bubble. */
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath();
+      ctx.arc(FX + 13, cy - 4, 13, Math.PI * 0.82, Math.PI * 0.18, false);
+      ctx.lineTo(FX + 13, cy + 20);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = withAlpha(t.colors[1], 1);
+      ctx.beginPath(); ctx.arc(FX + 13, cy - 5, 5, 0, Math.PI * 2); ctx.fill();
+
+      ctx.font = `600 44px ${FONT}`;
+      ctx.fillStyle = 'rgba(255,255,255,0.94)';
+      const line = wrapText(ctx, where && when ? `${where}  ·  ${when}` : place, TEXT_W - 46, 1)[0];
+      ctx.fillText(line, FX + 40, cy + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    /* ── Rule ── */
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.fillRect(FX, RULE_Y, TEXT_W, 1.5);
+
+    /* ── Who posted it — the credibility line ── */
+    const r = 34;
+    drawAvatar(ctx, FX + r, NAME_CY, r, avatar, spec.byInitials, spec.byColor);
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 38px ${FONT}`;
+    ctx.fillStyle = '#FFFFFF';
+    const nameX = FX + r * 2 + 22;
+    const name = spec.byName || 'A Wecycle member';
+    ctx.fillText(name, nameX, NAME_CY - 1);
+    if (spec.verified) {
+      const nw = ctx.measureText(name).width;
+      checkBadge(ctx, nameX + nw + 24, NAME_CY - 1, 15, t.accent, '#0B1F14');
+    }
+
+    /* The domain, right-aligned on the same line. Not a button: it is where the
+       card came from, which is what makes it checkable. */
+    ctx.font = `600 32px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.74)';
+    ctx.textAlign = 'right';
+    ctx.fillText('wecycle.page', CARD_W - FX, NAME_CY - 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  };
+
+  paint(true);
+  let dataUrl: string;
+  try { dataUrl = canvas.toDataURL('image/png'); }
+  catch { paint(false); dataUrl = canvas.toDataURL('image/png'); }
+  const blob = await new Promise<Blob | null>(res => {
+    try { canvas.toBlob(res, 'image/png', 0.95); } catch { res(null); }
+  });
+  return { blob, dataUrl };
+}
+
+/** Which listing layout ships. Both are maintained; this is the switch. */
+const CARD_LAYOUT: 'classic' | 'spotlight' = 'classic';
+
 export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard> {
   /* A storefront advertises a person and takes a different composition
      entirely — cover, avatar on the seam, bio, stats — so it renders on its
-     own path rather than through a pile of conditionals in this one. */
+     own path rather than through a pile of conditionals. */
   if (spec.kind === 'storefront') return renderStorefrontCard(spec);
+  return CARD_LAYOUT === 'classic' ? renderClassicCard(spec) : renderSpotlightCard(spec);
+}
 
+/* KEPT, NOT DEFAULT.
+ *
+ * The photo-first layout: hero photo on top, words on a white panel below.
+ * Superseded by renderClassicCard, which the owner preferred, but retained
+ * whole rather than deleted — it is a working second opinion and the two
+ * differ in structure rather than in polish, so a future call between them is
+ * a one-line change to CARD_LAYOUT and not a rebuild. */
+async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
   const t = THEME[spec.kind];
 
   const canvas = document.createElement('canvas');
@@ -1487,6 +1743,25 @@ export type ShareCardResult = 'shared' | 'downloaded' | 'copied' | 'unavailable'
 
 /** Share the rendered card AS AN IMAGE, with the product link in the caption.
  *  Falls back to a PNG download + link copy where files can't be shared. */
+/** The full message that goes out with the card: the hook, the poster's own
+ *  description, then the link.
+ *
+ *  The description used to be drawn ON the card and is now not — it is not one
+ *  of the five things the card exists to show, and every line it took came off
+ *  the price. It travels here instead, which is the better home for it anyway:
+ *  in a chat bubble it is selectable, searchable and translatable, none of
+ *  which is true of words baked into a PNG.
+ *
+ *  Trimmed to ~220 characters. WhatsApp collapses a long message behind "Read
+ *  more", and a hook that has to be expanded to be read has stopped being a
+ *  hook. */
+function shareMessage(spec: ShareCardSpec, url: string): string {
+  const hook = cardText(spec);
+  const desc = (spec.description ?? '').replace(/\s+/g, ' ').trim();
+  const blurb = desc.length > 220 ? `${desc.slice(0, 219).trimEnd()}…` : desc;
+  return [hook, blurb, url].filter(Boolean).join('\n\n');
+}
+
 export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Promise<ShareCardResult> {
   if (typeof navigator === 'undefined') return 'unavailable';
   const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : 'https://wecycle.page');
@@ -1506,7 +1781,7 @@ export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Pro
      * silently discard `url` when `files` is present, so keeping it there
      * risked sharing a card with no link at all. One copy, guaranteed. */
     const data: ShareData = {
-      files: [file], title: spec.title, text: `${cardText(spec)}\n${url}`,
+      files: [file], title: spec.title, text: shareMessage(spec, url),
     } as ShareData;
     if (typeof nav.share === 'function' && nav.canShare?.(data)) {
       try {

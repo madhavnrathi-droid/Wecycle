@@ -29,9 +29,9 @@ const GA4_MEASUREMENT_ID = "G-FR9104LN7N";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Wecycle — Community Operating System",
+  title: "Wecycle — by students, for students",
   description:
-    "Circulate resources within your community — share, swap, repair, and request what you need. Built for campuses, apartments, and neighborhoods.",
+    "Buy, borrow, swap and give away on campus — by students, for students. Share what you don't use, find what you need, and post events, jobs and lost & found.",
   manifest: "/manifest.json",
   applicationName: "Wecycle",
   /* Favicon + apple-touch-icon come from app/icon.png and app/apple-icon.png
@@ -47,15 +47,15 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    title: "Wecycle — Community Operating System",
-    description: "Circulate resources within your community.",
+    title: "Wecycle — by students, for students",
+    description: "Buy, borrow, swap and give away on campus. By students, for students.",
     siteName: "Wecycle",
     images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Wecycle" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Wecycle",
-    description: "Circulate resources within your community.",
+    description: "Buy, borrow, swap and give away on campus. By students, for students.",
     images: ["/og-image.png"],
   },
   /* Hint to the OS that this is an installable PWA */

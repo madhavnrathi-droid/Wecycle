@@ -1,7 +1,7 @@
 import { CATEGORIES as CATEGORY_LIST, ALL_CATEGORY } from './categories';
 /* ═══════════════════════════════════════════════
    WECYCLE — Rich Mock Data
-   Community Operating System
+   Wecycle — by students, for students
    ═══════════════════════════════════════════════ */
 
 export type CommunityMode = 'campus' | 'apartment' | 'office' | 'neighborhood';

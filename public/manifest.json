@@ -1,18 +1,26 @@
 {
-  "name": "Wecycle — Community Operating System",
+  "name": "Wecycle — by students, for students",
   "short_name": "Wecycle",
-  "description": "Circulate resources within your community — share, swap, repair, and request what you need.",
+  "description": "Buy, borrow, swap and give away on campus — by students, for students. Share what you don't use, find what you need, and post events, jobs and lost & found.",
   "id": "/?source=pwa",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "background_color": "#FAFAF6",
   "theme_color": "#FAFAF6",
   "orientation": "any",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["lifestyle", "shopping", "social", "productivity"],
+  "categories": [
+    "lifestyle",
+    "shopping",
+    "social",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -45,21 +53,36 @@
       "short_name": "Share",
       "description": "Give or sell something to your community",
       "url": "/?action=share",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Post a request",
       "short_name": "Request",
       "description": "Ask the community for what you need",
       "url": "/?action=request",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Report lost / found",
       "short_name": "Lost & Found",
       "description": "Help reunite items with their owners",
       "url": "/?action=lost-found",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "screenshots": [],
