@@ -35,6 +35,11 @@ import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
 import { WA_FILL, WA_INK } from '../lib/whatsapp';
+import { eventTypeGroups, eventTypeText } from '../lib/eventTypes';
+import {
+  scheduleFromTimestamps, applyChange, durationLabel,
+  type Schedule, type ScheduleField,
+} from '../lib/eventSchedule';
 
 interface EventDetailScreenProps {
   event: CommunityEvent;
@@ -51,52 +56,10 @@ interface EventDetailScreenProps {
   onEditRegistration?: () => void;
 }
 
-const EVENT_TYPES: { id: CommunityEvent['eventType']; label: string }[] = [
-  { id: 'swap',      label: 'Swap drive' },
-  { id: 'repair',    label: 'Repair café' },
-  { id: 'cleanup',   label: 'Cleanup' },
-  { id: 'workshop',  label: 'Workshop' },
-  { id: 'drive',     label: 'Collection drive' },
-  { id: 'challenge', label: 'Challenge' },
-];
+/* The vocabulary lives in lib/eventTypes.ts. It used to be duplicated here AND
+   in the create form, which is the same drift that let the category list rot:
+   two lists, one of which nobody remembers to update. */
 
-/* Seed the organizer's <input type="date"> / <input type="time"> from an event.
- *
- * This used to re-parse the DISPLAY strings — `new Date("Sat, Aug 15, 2026 " +
- * "11:00pm")` — after stripping the space before am/pm. V8 rejects that form,
- * so it returned Invalid Date for EVERY real event (verified against the actual
- * fmtDate/fmtTime output: 5 of 5 invalid). Both inputs were therefore always
- * blank, and saving with only one of them filled recomposed starts_at as
- * 1970-01-01, which hid the event and then let purgeExpiredEvents delete it
- * outright — taking its RSVPs and form responses with it.
- *
- * Now it reads the raw ISO the mapper carries through, and only falls back to
- * parsing display text for demo fixtures (which have no startsAt). The fallback
- * keeps the am/pm space so it actually parses.
- */
-function parseEventDateTime(
-  dateStr: string, timeStr: string, startsAt?: string,
-): { date: string; time: string } {
-  const fromDate = (d: Date) => ({
-    date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-    time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
-  });
-
-  if (startsAt) {
-    const d = new Date(startsAt);
-    if (!Number.isNaN(d.getTime())) return fromDate(d);
-  }
-
-  /* Demo/mock fallback only. Re-insert the space am/pm needs to be parseable. */
-  try {
-    const spaced = timeStr.trim().replace(/\s*(am|pm)$/i, ' $1');
-    const d = new Date(`${dateStr} ${spaced}`);
-    if (Number.isNaN(d.getTime())) return { date: '', time: '' };
-    return fromDate(d);
-  } catch {
-    return { date: '', time: '' };
-  }
-}
 
 function WhatsAppGlyph({ size = 14 }: { size?: number }) {
   return (
@@ -107,14 +70,6 @@ function WhatsAppGlyph({ size = 14 }: { size?: number }) {
   );
 }
 
-const TYPE_LABEL: Record<CommunityEvent['eventType'], string> = {
-  swap:      'Swap drive',
-  repair:    'Repair café',
-  cleanup:   'Cleanup',
-  workshop:  'Workshop',
-  drive:     'Collection drive',
-  challenge: 'Challenge',
-};
 
 export default function EventDetailScreen({
   event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onDelete,
@@ -238,16 +193,18 @@ export default function EventDetailScreen({
   };
 
   /* ── Inline edit state (owner only) ── */
-  const initial = useMemo(
-    () => parseEventDateTime(event.date, event.time, event.startsAt),
-    [event.date, event.time, event.startsAt],
-  );
   const [eTitle, setETitle]             = useState(event.title);
   const [eDescription, setEDescription] = useState(event.description ?? '');
   const [eLocation, setELocation]       = useState(event.location);
-  const [eDate, setEDate]               = useState(initial.date);
-  const [eTime, setETime]               = useState(initial.time);
-  const [eType, setEType]               = useState<CommunityEvent['eventType']>(event.eventType);
+  /* One Schedule, seeded from the raw timestamps — never from the formatted
+     display strings, which is what once blanked this form and rescheduled
+     events to 1970. */
+  const [eSched, setESched] = useState<Schedule>(
+    () => scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay),
+  );
+  const editSchedule = (field: ScheduleField, value: string | boolean) =>
+    setESched(s => applyChange(s, field, value));
+  const [eType, setEType]               = useState<string>(event.eventType);
   const [eMaxAttendeesStr, setEMaxAttendeesStr] = useState(
     event.maxAttendees ? String(event.maxAttendees) : '',
   );
@@ -256,18 +213,17 @@ export default function EventDetailScreen({
     setETitle(event.title);
     setEDescription(event.description ?? '');
     setELocation(event.location);
-    setEDate(initial.date);
-    setETime(initial.time);
+    setESched(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay));
     setEType(event.eventType);
     setEMaxAttendeesStr(event.maxAttendees ? String(event.maxAttendees) : '');
-  }, [event.id, event.title, event.description, event.location, event.eventType, event.maxAttendees, initial.date, initial.time]);
+  }, [event.id, event.title, event.description, event.location, event.eventType,
+      event.maxAttendees, event.startsAt, event.endsAt, event.allDay]);
 
   const isDirty =
     eTitle !== event.title ||
     eDescription !== (event.description ?? '') ||
     eLocation !== event.location ||
-    eDate !== initial.date ||
-    eTime !== initial.time ||
+    JSON.stringify(eSched) !== JSON.stringify(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay)) ||
     eType !== event.eventType ||
     (eMaxAttendeesStr ? Number(eMaxAttendeesStr) : null) !== (event.maxAttendees ?? null);
 
@@ -288,8 +244,7 @@ export default function EventDetailScreen({
         await updateEvent(event.id, {
           title: eTitle,
           eventType: eType,
-          date: eDate || undefined,
-          time: eTime || undefined,
+          schedule: eSched,
           location: eLocation,
           description: eDescription,
           maxAttendees: eMaxAttendeesStr ? Number(eMaxAttendeesStr) : undefined,
@@ -300,17 +255,16 @@ export default function EventDetailScreen({
     } finally {
       setSaving(false);
     }
-  }, [isDirty, saving, event.id, eTitle, eType, eDate, eTime, eLocation, eDescription, eMaxAttendeesStr]);
+  }, [isDirty, saving, event.id, eTitle, eType, eSched, eLocation, eDescription, eMaxAttendeesStr]);
 
   const handleDiscard = useCallback(() => {
     setETitle(event.title);
     setEDescription(event.description ?? '');
     setELocation(event.location);
-    setEDate(initial.date);
-    setETime(initial.time);
+    setESched(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay));
     setEType(event.eventType);
     setEMaxAttendeesStr(event.maxAttendees ? String(event.maxAttendees) : '');
-  }, [event, initial]);
+  }, [event]);
 
   /* Owner contact resolved on demand — raw email/phone columns are locked down. */
   const ownerContact = useOwnerContact(event.organizer?.id, { email: event.organizer?.email, phone: event.organizer?.phone });
@@ -356,13 +310,22 @@ export default function EventDetailScreen({
   const handleAddToCalendar = () => {
     haptics.success();
     track(EVT.share_clicked, { post_id: event.id, post_kind: 'event', action: 'add_to_calendar' });
-    const parsed = new Date(`${event.date} ${event.time}`);
-    const start = Number.isNaN(parsed.getTime()) ? new Date(event.date) : parsed;
+    /* From the raw timestamps, not the formatted strings. Those are display
+       text and now express a RANGE — "6:00pm – 8:00pm" — which no Date parser
+       accepts, so reading them here would have silently sent every event to the
+       calendar at midnight. Re-parsing formatted output is the same mistake
+       that once rescheduled events to 1970. */
+    const start = event.startsAt ? new Date(event.startsAt) : new Date(event.date);
+    const end = event.endsAt ? new Date(event.endsAt) : null;
     addEventToCalendar({
       title: event.title,
       description: event.description,
       location: event.location,
       start,
+      /* A real end, where the organiser gave one. The helper otherwise assumes
+         two hours, which was a guess standing in for data we did not collect
+         until the schedule existed. */
+      end: end && !Number.isNaN(end.getTime()) ? end : undefined,
       uid: `${event.id}@wecycle.page`,
     });
   };
@@ -440,7 +403,7 @@ export default function EventDetailScreen({
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           padding: '0 12px',
         }}>
-          {TYPE_LABEL[event.eventType]}
+          {eventTypeText(event.eventType)}
         </span>
         {/* Header right-side is share only now — "add to calendar" moved down
            beside RSVP, where the other event actions live. */}
@@ -515,7 +478,7 @@ export default function EventDetailScreen({
                       fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
                       zIndex: 4,
                     }}>
-                      {TYPE_LABEL[event.eventType]}
+                      {eventTypeText(event.eventType)}
                     </div>
                     {/* Wecycle brand stamp — top-right corner. */}
                     <span aria-hidden="true" style={{
@@ -852,34 +815,79 @@ export default function EventDetailScreen({
             <EventEditField label="Type">
               <select
                 value={eType}
-                onChange={e => setEType(e.target.value as CommunityEvent['eventType'])}
+                onChange={e => setEType(e.target.value)}
                 className="inline-edit inline-edit--pill"
                 aria-label="Event type"
               >
-                {EVENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                {eventTypeGroups().map(g => (
+                  <optgroup key={g.group} label={g.group}>
+                    {g.options.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </EventEditField>
 
+            {/* Same range editor as the create form, same rules — the end
+                follows the start, and nothing here can be rejected. */}
+            <EventEditField label="All day" icon={<Clock size={13} strokeWidth={1.8} />}>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={eSched.allDay}
+                onChange={e => { haptics.selection(); editSchedule('allDay', e.target.checked); }}
+                style={{ width: 42, height: 26, accentColor: 'var(--color-lime, #5C7A00)', cursor: 'pointer' }}
+                aria-label="All day"
+              />
+            </EventEditField>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <EventEditField label="Date" icon={<CalendarDays size={13} strokeWidth={1.8} />}>
+              <EventEditField label="Starts" icon={<CalendarDays size={13} strokeWidth={1.8} />}>
                 <input
                   type="date"
-                  value={eDate}
-                  onChange={e => setEDate(e.target.value)}
+                  value={eSched.startDate}
+                  onChange={e => editSchedule('startDate', e.target.value)}
                   className="inline-edit inline-edit--input"
-                  aria-label="Date"
+                  aria-label="Start date"
                 />
               </EventEditField>
-              <EventEditField label="Time" icon={<Clock size={13} strokeWidth={1.8} />}>
+              {eSched.allDay ? <span /> : (
+                <EventEditField label="Start time" icon={<Clock size={13} strokeWidth={1.8} />}>
+                  <input
+                    type="time"
+                    value={eSched.startTime}
+                    onChange={e => editSchedule('startTime', e.target.value)}
+                    className="inline-edit inline-edit--input"
+                    aria-label="Start time"
+                  />
+                </EventEditField>
+              )}
+              <EventEditField label="Ends" icon={<CalendarDays size={13} strokeWidth={1.8} />}>
                 <input
-                  type="time"
-                  value={eTime}
-                  onChange={e => setETime(e.target.value)}
+                  type="date"
+                  value={eSched.endDate}
+                  min={eSched.startDate}
+                  onChange={e => editSchedule('endDate', e.target.value)}
                   className="inline-edit inline-edit--input"
-                  aria-label="Time"
+                  aria-label="End date"
                 />
               </EventEditField>
+              {eSched.allDay ? <span /> : (
+                <EventEditField label="End time" icon={<Clock size={13} strokeWidth={1.8} />}>
+                  <input
+                    type="time"
+                    value={eSched.endTime}
+                    onChange={e => editSchedule('endTime', e.target.value)}
+                    className="inline-edit inline-edit--input"
+                    aria-label="End time"
+                  />
+                </EventEditField>
+              )}
             </div>
+            {durationLabel(eSched) && (
+              <p aria-live="polite" style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-secondary, #6B6B60)' }}>
+                {durationLabel(eSched)}
+              </p>
+            )}
 
             <EventEditField label="Location" icon={<MapPin size={13} strokeWidth={1.8} />}>
               <input
@@ -931,11 +939,16 @@ export default function EventDetailScreen({
                   value={event.time}
                 />
               )}
-              <FactRow
-                icon={<MapPin size={14} strokeWidth={1.8} />}
-                label="Location"
-                value={event.location}
-              />
+              {/* Hidden when there is no venue — location is optional now, and
+                  a Location row with an empty value reads as missing data
+                  rather than as an event that simply has no fixed place. */}
+              {event.location && (
+                <FactRow
+                  icon={<MapPin size={14} strokeWidth={1.8} />}
+                  label="Location"
+                  value={event.location}
+                />
+              )}
               <FactRow
                 icon={<Users size={14} strokeWidth={1.8} />}
                 label={event.maxAttendees ? `${event.attendees} / ${event.maxAttendees} going` : `${event.attendees} going`}

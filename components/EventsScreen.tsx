@@ -388,13 +388,16 @@ function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; 
         </div>
       </button>
       <div className="rsvp-card-footer">
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 11, color: 'var(--text-muted)',
-        }}>
-          <MapPin size={11} strokeWidth={1.8} />
-          {event.location}
-        </span>
+        {/* Hidden entirely when there is no venue — location became optional, and a lone pin icon with nothing beside it reads as a rendering fault. */}
+        {event.location && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, color: 'var(--text-muted)',
+          }}>
+            <MapPin size={11} strokeWidth={1.8} />
+            {event.location}
+          </span>
+        )}
         <button
           onClick={onCancel}
           style={{
@@ -477,13 +480,15 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
             {[event.date, event.time].filter(Boolean).join(' · ')}
           </span>
         </div>
-        <div style={{
-          marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
-          fontSize: 12, color: 'var(--text-muted)',
-        }}>
-          <MapPin size={12} strokeWidth={1.8} />
-          {event.location}
-        </div>
+        {event.location && (
+          <div style={{
+            marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
+            fontSize: 12, color: 'var(--text-muted)',
+          }}>
+            <MapPin size={12} strokeWidth={1.8} />
+            {event.location}
+          </div>
+        )}
 
         {/* Attendance bar */}
         <div style={{ marginTop: 14 }}>
@@ -571,10 +576,12 @@ function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEve
             <CalendarDays size={11} strokeWidth={1.9} />
             <span className="ev-row-meta-text">{when}</span>
           </span>
-          <span className="ev-row-meta">
-            <MapPin size={11} strokeWidth={1.9} />
-            <span className="ev-row-meta-text">{event.location}</span>
-          </span>
+          {event.location && (
+            <span className="ev-row-meta">
+              <MapPin size={11} strokeWidth={1.9} />
+              <span className="ev-row-meta-text">{event.location}</span>
+            </span>
+          )}
           {event.attendees > 0 && (
             <span className="ev-row-going-count">{event.attendees} going</span>
           )}

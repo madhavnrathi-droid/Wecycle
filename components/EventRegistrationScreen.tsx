@@ -127,9 +127,13 @@ export default function EventRegistrationScreen({
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <CalendarDays size={13} strokeWidth={2} /> {event.date} · {event.time}
           </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <MapPin size={13} strokeWidth={2} /> {event.location}
-          </span>
+          {/* Hidden when there is no venue — location is optional now, and a
+              lone pin with nothing beside it reads as a rendering fault. */}
+          {event.location && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <MapPin size={13} strokeWidth={2} /> {event.location}
+            </span>
+          )}
           <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
             {editMode
               ? 'Update your answers below — the organizer sees the latest version.'

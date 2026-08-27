@@ -74,7 +74,10 @@ export interface FeedItem {
   // Event
   event?: {
     title: string;
-    eventType: 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge';
+    /* A value of the event_type enum. Deliberately `string` rather than a union:
+     the vocabulary is 16 entries and grows, lib/eventTypes.ts is the one place
+     that knows them, and a union duplicated here is a second place to forget. */
+  eventType: string;
     date: string;
     time: string;
     location: string;
@@ -205,6 +208,15 @@ export interface CommunityEvent {
    *  Absent on mock/demo fixtures. The edit form seeds its date + time inputs
    *  from this, so it round-trips exactly instead of via `toLocaleString`. */
   startsAt?: string;
+  /** Raw ISO end timestamp, when the organiser gave one. The column existed
+   *  from the start but nothing read or wrote it until the schedule was
+   *  rebuilt, so every event before that has none. */
+  endsAt?: string | null;
+  /** No specific clock time — rendered as "All day" rather than as midnight. */
+  allDay?: boolean;
+  /** Optional: an event may have no fixed venue (online, campus-wide, or a
+   *  room not booked yet). Empty string when unset, so display sites can stay
+   *  falsy-checked rather than null-checked. */
   location: string;
   attendees: number;
   maxAttendees?: number;

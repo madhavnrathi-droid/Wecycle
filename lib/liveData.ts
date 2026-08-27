@@ -22,6 +22,8 @@ import type { CompressedMedia } from './mediaCompression';
 import type { Database } from './database.types';
 import { normalizeCategory } from './categories';
 import { assertClean, isServerModerationError } from './contentFilter';
+import { normalizeEventType } from './eventTypes';
+import { type Schedule, toTimestamps } from './eventSchedule';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -728,10 +730,15 @@ export async function createRequest(input: NewRequestInput) {
 
 export interface NewEventInput {
   title: string;
-  eventType: 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge';
-  date: string;            /* yyyy-mm-dd */
-  time: string;            /* HH:MM */
-  location: string;
+  /** A value of the event_type enum; normalised before it reaches the insert. */
+  eventType?: string;
+  /** The whole range in one object. Replaces the old date + time pair, which
+   *  could only express a start — an event could not end. Passing it whole also
+   *  means the two timestamps are derived together, by the same rules the form
+   *  used, rather than being reassembled from halves here. */
+  schedule: Schedule;
+  /** Optional: not every event has a fixed venue. */
+  location?: string;
   description?: string;
   maxAttendees?: number;
   media: CompressedMedia[];
@@ -755,22 +762,25 @@ export async function createEvent(input: NewEventInput): Promise<string> {
       : Promise.resolve({ photoUrls: [] as string[], videoUrls: [] as string[] }),
   ]);
 
-  /* Combine date + time into a timestamptz. A blank time is legitimate — the
-     organiser has a date but not an hour yet — so starts_at holds midnight and
-     `time_unspecified` records WHY, since midnight is otherwise a real time and
-     would read back as "12:00 am" as though they'd chosen it. */
-  const timeUnspecified = !input.time;
-  const startsAt = new Date(`${input.date}T${input.time || '00:00'}:00`).toISOString();
+  /* Both timestamps at once, by the same rules the form applied while the
+     organiser was editing. A blank time is legitimate — all-day, or an hour not
+     settled yet — so starts_at holds midnight and `time_unspecified` records
+     WHY, since midnight is otherwise a real time and would read back as
+     "12:00 am" as though someone had chosen it. */
+  const { startsAt, endsAt, timeUnspecified } = toTimestamps(input.schedule);
 
   const { data, error } = await supabase.from('events').insert({
     organizer_id: uid,
     community_id: communityId,
     title: input.title.trim(),
     description: input.description?.trim() || null,
-    event_type: input.eventType,
+    event_type: normalizeEventType(input.eventType),
     starts_at: startsAt,
+    ends_at: endsAt,
     time_unspecified: timeUnspecified,
-    location: input.location.trim(),
+    /* null, not '', when there is no venue — an empty string is a value that
+       reads as "they answered, with nothing", and null is the truth. */
+    location: input.location?.trim() || null,
     max_attendees: input.maxAttendees ?? null,
     status: 'published',
     cover_url: photoUrls[0] ?? null,
@@ -961,7 +971,8 @@ interface EventRowLite {
   starts_at: string;
   /* True when the organiser gave a date but no start time. */
   time_unspecified?: boolean | null;
-  location: string;
+  ends_at?: string | null;
+  location: string | null;
   max_attendees: number | null;
   attendee_count: number | null;
   view_count: number | null;
@@ -980,6 +991,34 @@ function fmtDate(iso: string): string {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
   });
 }
+/** Same day? Compared on the viewer's local calendar day, not on UTC — an
+ *  event ending 00:30 is a late night, and calling it a two-day event because
+ *  UTC rolled over would be wrong for everyone in India. */
+function sameLocalDay(a: string, b: string): boolean {
+  const x = new Date(a), y = new Date(b);
+  return x.getFullYear() === y.getFullYear()
+    && x.getMonth() === y.getMonth()
+    && x.getDate() === y.getDate();
+}
+
+/** "Sat, Sep 1, 2026" — or "Sat, Sep 1 – Mon, Sep 3, 2026" across days. */
+function fmtDateRange(startIso: string, endIso?: string | null): string {
+  if (!endIso || sameLocalDay(startIso, endIso)) return fmtDate(startIso);
+  const short = new Date(startIso).toLocaleDateString('en-US', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+  return `${short} – ${fmtDate(endIso)}`;
+}
+
+/** "6:00pm" — or "6:00pm – 8:00pm" when it ends the same day. Across days the
+ *  end time is dropped from here, because the date line above is already
+ *  carrying the span and repeating it reads as a contradiction. */
+function fmtTimeRange(startIso: string, endIso?: string | null): string {
+  const start = fmtTime(startIso);
+  if (!endIso || !sameLocalDay(startIso, endIso)) return start;
+  return `${start} – ${fmtTime(endIso)}`;
+}
+
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '');
 }
@@ -990,14 +1029,22 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
     title: row.title,
     description: row.description ?? '',
     eventType: row.event_type,
-    date: fmtDate(row.starts_at),
-    /* Empty string when the organiser never gave a time; every display site
-       treats a falsy time as "date only". */
-    time: row.time_unspecified ? '' : fmtTime(row.starts_at),
+    /* The RANGE, formatted here rather than at each display site.
+       Every screen already renders these two strings — the detail page, the
+       events list, the share card, the registration screen — so composing the
+       end into them is what makes an end time visible everywhere at once,
+       instead of five separate edits that drift apart later. */
+    date: fmtDateRange(row.starts_at, row.ends_at),
+    /* Empty string when there is no clock time — all-day, or an hour not
+       settled. Every display site treats a falsy time as "date only", which for
+       an all-day event reads correctly as just the date. */
+    time: row.time_unspecified ? '' : fmtTimeRange(row.starts_at, row.ends_at),
     /* Carry the raw timestamp so the organizer's edit form never has to
        re-parse the formatted strings above. */
     startsAt: row.starts_at,
-    location: row.location,
+    endsAt: row.ends_at ?? null,
+    allDay: Boolean(row.time_unspecified),
+    location: row.location ?? '',
     attendees: row.attendee_count ?? 0,
     maxAttendees: row.max_attendees ?? undefined,
     colorAccent: row.color_accent ?? '#A8DD00',
@@ -1160,9 +1207,18 @@ export async function fetchEventCommentCount(eventId: string): Promise<number> {
 
 export interface EditEventPatch {
   title?: string;
-  eventType?: 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge';
-  date?: string;     /* yyyy-mm-dd */
-  time?: string;     /* HH:MM */
+  eventType?: string;
+  /** The whole range, or omitted to leave the timing alone.
+   *
+   *  Deliberately not a date/time pair any more. The pair had to be merged
+   *  against the stored row because a patch could arrive half-filled, and
+   *  getting that merge wrong is what once defaulted the missing half to
+   *  1970-01-01: an organiser who changed only the time silently moved their
+   *  event to 1 Jan 1970, where it vanished from every listing and was then
+   *  deleted for good by the expired-event purge, cascading its RSVPs and form
+   *  responses. A Schedule is complete by construction, so there is no half to
+   *  guess and no merge to get wrong. */
+  schedule?: Schedule;
   location?: string;
   description?: string;
   maxAttendees?: number;
@@ -1173,45 +1229,20 @@ export async function updateEvent(id: string, patch: EditEventPatch) {
   assertClean([patch.title, patch.description, patch.location]);
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
-  if (patch.eventType !== undefined)   update.event_type = patch.eventType;
-  if (patch.location !== undefined)    update.location = patch.location.trim();
+  if (patch.eventType !== undefined)   update.event_type = normalizeEventType(patch.eventType);
+  if (patch.location !== undefined)    update.location = patch.location.trim() || null;
   if (patch.description !== undefined) update.description = patch.description.trim() || null;
   if (patch.maxAttendees !== undefined) update.max_attendees = patch.maxAttendees ?? null;
-  if (patch.date !== undefined || patch.time !== undefined) {
-    /* Recompose starts_at — but NEVER from a half-filled patch. This used to
-       default the missing half to '1970-01-01' or '00:00', so an organizer who
-       changed only the time silently moved their event to 1 Jan 1970; it then
-       vanished from every listing and the expired-event purge deleted it for
-       good, cascading its RSVPs and form responses. Merge against the row's
-       current value instead, and refuse anything that doesn't parse. */
-    const { data: current, error: readErr } = await supabase
-      .from('events').select('starts_at').eq('id', id).single();
-    if (readErr) throw readErr;
-    const base = current?.starts_at ? new Date(current.starts_at) : null;
-    const baseValid = base && !Number.isNaN(base.getTime());
-    const two = (n: number) => String(n).padStart(2, '0');
-    const datePart = patch.date
-      || (baseValid ? `${base!.getFullYear()}-${two(base!.getMonth() + 1)}-${two(base!.getDate())}` : '');
-    /* An explicitly-cleared time is now legitimate (time is optional), so only
-       the DATE is mandatory. A blank time stores midnight and records
-       time_unspecified, exactly like create — never guessed from the old row,
-       which is what once moved events to 1970. */
-    const clearedTime = patch.time !== undefined && !patch.time;
-    const timePart = clearedTime
-      ? '00:00'
-      : (patch.time
-         || (baseValid ? `${two(base!.getHours())}:${two(base!.getMinutes())}` : ''));
-    if (!datePart) {
-      throw new Error('Add a date before saving.');
+  if (patch.schedule) {
+    /* Both timestamps together, from a complete object — see EditEventPatch
+       above for why this is no longer a merge against the stored row. */
+    const { startsAt, endsAt, timeUnspecified } = toTimestamps(patch.schedule);
+    if (Number.isNaN(new Date(startsAt).getTime())) {
+      throw new Error('That date didn\u2019t make sense — please re-enter it.');
     }
-    const next = new Date(`${datePart}T${timePart || '00:00'}:00`);
-    if (Number.isNaN(next.getTime())) {
-      throw new Error('That date didn’t make sense — please re-enter it.');
-    }
-    update.starts_at = next.toISOString();
-    if (patch.time !== undefined) {
-      (update as { time_unspecified?: boolean }).time_unspecified = clearedTime;
-    }
+    update.starts_at = startsAt;
+    update.ends_at = endsAt;
+    update.time_unspecified = timeUnspecified;
   }
   const { error } = await supabase.from('events').update(update as never).eq('id', id);
   if (error) throw error;
