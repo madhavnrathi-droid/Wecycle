@@ -72,3 +72,6 @@ supabase/.temp/
 ios/build/
 ios/App/App/public/
 ios/App/App/capacitor.config.json
+
+# iOS build products — archives and exported ipas are large and rebuildable
+ios/build/
