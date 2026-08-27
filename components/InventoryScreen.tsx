@@ -19,6 +19,7 @@ import { track, EVT } from '../lib/analytics';
 import { getDemoUploads, getDemoRequests, deleteDemoPost, updateDemoPost } from '../lib/demoInventory';
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
+import { priceChip, fromListingType } from '../lib/dealTypes';
 
 type Tab = 'all' | 'requests' | 'shared' | 'events' | 'saved';
 
@@ -312,9 +313,21 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
         {entries.length === 0 ? (
           <InventoryEmpty tab={activeTab} onPostNew={onPostNew} signedIn={!!user} />
         ) : (
-          <div className="masonry-2">
+          <div className="pgrid" style={{ padding: 0 }}>
+                {/* The app's own product grid, not a masonry column layout.
+                    Two reasons beyond consistency. CSS `column-count` fills
+                    top-to-bottom and THEN left-to-right, so on a shop sorted by
+                    recency the second item lands underneath the first rather
+                    than beside it — the reading order silently stops matching
+                    the sort. And staggered tile heights put every price on a
+                    different baseline, which is exactly the comparison a
+                    marketplace grid exists to make easy. */}
             {entries.map((entry, idx) => {
-              const tall = idx % 4 === 0 || idx % 4 === 3;
+              /* Uniform tiles. The idx % 4 stagger existed only to give the
+                 masonry its variety; on a real grid it just puts every fourth
+                 price at a different height. */
+              const tall = false;
+              void idx;
               if (entry.kind === 'item') {
                 const isMine = activeTab !== 'saved';
                 /* Pick the right action label for owner-only quick-close.
@@ -518,10 +531,11 @@ function InventoryCard({
                 {item.isRequest
                   ? (item.urgent ? 'Urgent' : 'Wanted')
                   : item.kind === 'opportunity' ? opportunityCompLabel(item)
-                  : isPriced ? `₹${item.price}`
-                  : item.listingType === 'sell' ? 'Selling'
-                  : item.listingType === 'free' ? 'Free'
-                  : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+                  /* Same shared chip the feed uses. The branch this replaces
+                     was `listingType[0].toUpperCase() + slice(1)`, which showed
+                     a ₹200-a-day rental as the bare word "Borrow" — no rate, no
+                     period, and the stored enum leaking into the interface. */
+                  : priceChip({ deal: fromListingType(item.listingType), price: item.price, ratePeriod: item.ratePeriod })}
               </span>
             </div>
           </button>
@@ -574,10 +588,7 @@ function InventoryCard({
                     {item.isRequest
                       ? (item.urgent ? 'Urgent' : 'Wanted')
                       : item.kind === 'opportunity' ? opportunityCompLabel(item)
-                      : isPriced ? `₹${item.price}`
-                      : item.listingType === 'sell' ? 'Selling'
-                      : item.listingType === 'free' ? 'Free'
-                      : item.listingType[0].toUpperCase() + item.listingType.slice(1)}
+                      : priceChip({ deal: fromListingType(item.listingType), price: item.price, ratePeriod: item.ratePeriod })}
                   </span>
                 </div>
               </div>

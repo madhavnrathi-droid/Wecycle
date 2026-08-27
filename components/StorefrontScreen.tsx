@@ -397,7 +397,15 @@ export default function StorefrontScreen({
           filteredUploads.length === 0
             ? <EmptyState label={isMe ? "You haven't shared anything yet" : `${user.name.split(' ')[0]} hasn't shared anything yet`} />
             : (
-              <div className="masonry-2">
+              <div className="pgrid" style={{ padding: 0 }}>
+                {/* The app's own product grid, not a masonry column layout.
+                    Two reasons beyond consistency. CSS `column-count` fills
+                    top-to-bottom and THEN left-to-right, so on a shop sorted by
+                    recency the second item lands underneath the first rather
+                    than beside it — the reading order silently stops matching
+                    the sort. And staggered tile heights put every price on a
+                    different baseline, which is exactly the comparison a
+                    marketplace grid exists to make easy. */}
                 {filteredUploads.map((item, idx) => (
                   <ItemTile
                     key={item.id}
@@ -444,7 +452,9 @@ export default function StorefrontScreen({
           lostFound.length === 0
             ? <EmptyState label={`${user.name.split(' ')[0]} hasn't posted in Lost & Found`} />
             : (
-              <div className="masonry-2" style={{ padding: '0 8px' }}>
+              <div className="pgrid" style={{ padding: 0 }}>
+                {/* Same grid as the Shared tab above — a storefront that
+                    changes layout between its own tabs reads as two pages. */}
                 {lostFound.map(lf => (
                   <LostFoundTile
                     key={lf.id}
