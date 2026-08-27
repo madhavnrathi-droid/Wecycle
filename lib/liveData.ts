@@ -321,27 +321,162 @@ export async function fetchListingsByUser(userId: string): Promise<MarketplaceIt
   return notRemoved((data as unknown as ListingRow[]).map(mapListingRow));
 }
 
+/* ── Who is posting ────────────────────────────────── */
+
+/** The signed-in user's id, read from the session the client already holds
+ *  instead of fetched from the auth server.
+ *
+ *  supabase.auth.getUser() is an HTTP GET to /auth/v1/user on every single
+ *  call, and the post path was making two of them — one in
+ *  createListingWithMedia and another inside uploadMedia — back to back,
+ *  before any image data moved. getSession() reads locally and only touches
+ *  the network when the access token has genuinely expired, so in the normal
+ *  case this costs nothing at all.
+ *
+ *  Trusting a locally-read id is fine here because nothing is relying on it
+ *  for authority: it populates user_id, and RLS checks that against auth.uid()
+ *  taken from the JWT server-side. A stale or forged id fails at the database,
+ *  which is the only place that check means anything. */
+async function currentUserId(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id ?? null;
+}
+
 /* ── Media upload ──────────────────────────────────── */
 
+/* Uploads used to run strictly one after another, with no timeout and no
+   retry. That combination is what put a bare "Failed to fetch" on the share
+   form where a post should have been: one dropped request anywhere in the
+   chain threw the browser's raw TypeError straight through to the UI. On
+   campus wi-fi a dropped request is not an exceptional event.
+
+   Three changes, in descending order of what each is worth:
+     - files upload concurrently, so a three-photo post costs roughly one
+       round trip instead of three;
+     - each attempt is bounded and retried, so one blip no longer costs the
+       whole post;
+     - what finally escapes is a sentence a person can act on. */
+
+/** Files in flight at once. Past ~3, a phone on weak wi-fi is splitting the
+ *  same bandwidth more ways and every file slows down together — the aim is to
+ *  overlap latency, not to saturate the link. */
+const UPLOAD_CONCURRENCY = 3;
+const UPLOAD_ATTEMPTS = 3;
+
+/** Per-attempt budget, scaled by size. A 200KB photo and a 5MB video can't
+ *  share one deadline: whatever suits the video lets a stalled photo hang for
+ *  most of a minute before anyone retries it. */
+function attemptTimeoutMs(bytes: number): number {
+  return Math.min(90_000, 20_000 + (bytes / (1024 * 1024)) * 12_000);
+}
+
+class UploadTimeout extends Error {
+  constructor() { super('upload timed out'); this.name = 'UploadTimeout'; }
+}
+
+/** Stop waiting on `work` after `ms`.
+ *
+ *  Stop *waiting* — not stop. The storage client's upload() accepts no
+ *  AbortSignal (only download() does), so the request we gave up on keeps
+ *  running, unwatched, and may still land. That is precisely why each retry
+ *  below sets upsert: true on the same path: with upsert false, an abandoned
+ *  first attempt arriving late would fail its own retry as a duplicate — on a
+ *  file that had, in fact, uploaded. */
+function withTimeout<T>(work: PromiseLike<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    work,
+    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new UploadTimeout()), ms); }),
+  ]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
+/** Worth a second attempt: timeouts, rate limits, and the server's own 5xx.
+ *  A 400/403/409 means the request itself is wrong — the token, the policy,
+ *  the path — and repeating it verbatim only delays the error. */
+function isRetryableUploadError(err: unknown): boolean {
+  if (err instanceof UploadTimeout) return true;
+  const raw = (err as { statusCode?: string | number; status?: number })?.statusCode
+    ?? (err as { status?: number })?.status;
+  const status = Number(raw);
+  if (Number.isFinite(status) && status > 0) return status === 408 || status === 429 || status >= 500;
+  /* A failed connection rejects as a TypeError whose message is
+     browser-specific — "Failed to fetch" (Chrome), "Load failed" (Safari),
+     "NetworkError when attempting to fetch resource" (Firefox) — carrying no
+     code and no status.
+
+     It does not arrive here as that TypeError, though. The storage client
+     catches the rejection and re-wraps it as a StorageUnknownError, stashing
+     the original under .originalError, so an `instanceof TypeError` test on
+     the error in hand misses every real network drop there is. Unwrap first,
+     then fall back to matching the message. */
+  const original = (err as { originalError?: unknown })?.originalError;
+  if (err instanceof TypeError || original instanceof TypeError) return true;
+  const text = `${(err as Error)?.message ?? ''} ${(original as Error)?.message ?? ''}`;
+  return /failed to fetch|load failed|networkerror|network error|timed out|timeout|connection/i.test(text);
+}
+
+/** Something the poster can act on, in place of the browser's raw wording. */
+function uploadFailure(err: unknown, kind: CompressedMedia['kind']): Error {
+  const noun = kind === 'video' ? 'video' : 'photo';
+  if (isRetryableUploadError(err)) {
+    return new Error(
+      `Couldn't upload your ${noun} — the connection dropped partway. `
+      + `Check your signal and tap post again; everything you typed is still here.`,
+    );
+  }
+  const detail = (err as Error)?.message?.trim();
+  return new Error(detail ? `Couldn't upload your ${noun}: ${detail}` : `Couldn't upload your ${noun}. Please try again.`);
+}
+
 /** Upload a single compressed blob to {bucket}/{uid}/{ts}-{n}.{ext}.
- *  Returns the public URL. */
+ *  Returns the public URL. Retries transient failures; throws a human-readable
+ *  Error once it has genuinely run out of attempts. */
 async function uploadOne(
   bucket: string,
   uid: string,
   media: CompressedMedia,
   index: number,
 ): Promise<string> {
-  // Keep the .png extension for transparent cutouts (bg-removed photos) so the
-  // feed can tell them apart from ordinary opaque photos by their URL.
-  const ext = media.kind === 'video' ? 'mp4' : (media.blob.type === 'image/png' ? 'png' : 'jpg');
+  /* Extension follows what the encoder actually produced. WebP is the usual
+     output now; PNG survives only where the browser couldn't encode WebP and
+     the image carries transparency (a background-removed cutout), since JPEG
+     would flatten the alpha away. */
+  const ext = media.kind === 'video' ? 'mp4'
+    : media.blob.type === 'image/webp' ? 'webp'
+    : media.blob.type === 'image/png'  ? 'png'
+    : 'jpg';
+  /* Chosen once, outside the loop: a retry then overwrites its own earlier
+     attempt instead of stranding a half-written orphan in the bucket. The
+     index keeps concurrent files apart when Date.now() ties, which at three
+     at a time it routinely does. */
   const path = `${uid}/${Date.now()}-${index}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, media.blob, {
-    cacheControl: '3600',
-    upsert: false,
-    contentType: media.blob.type || (media.kind === 'video' ? 'video/mp4' : 'image/jpeg'),
-  });
-  if (error) throw error;
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  const contentType = media.blob.type || (media.kind === 'video' ? 'video/mp4' : 'image/jpeg');
+  const budget = attemptTimeoutMs(media.blob.size);
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt++) {
+    try {
+      const { error } = await withTimeout(
+        supabase.storage.from(bucket).upload(path, media.blob, {
+          cacheControl: '3600',
+          upsert: attempt > 1,
+          contentType,
+        }),
+        budget,
+      );
+      if (error) throw error;
+      return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+    } catch (err) {
+      lastError = err;
+      if (attempt === UPLOAD_ATTEMPTS || !isRetryableUploadError(err)) break;
+      /* Exponential, with jitter. When a lecture hall's wi-fi drops for
+         everyone at once, a fixed schedule has the whole room retrying in
+         lockstep and knocking it over again. */
+      const backoff = 500 * 2 ** (attempt - 1);
+      await new Promise(r => setTimeout(r, backoff + Math.random() * 400));
+    }
+  }
+  throw uploadFailure(lastError, media.kind);
 }
 
 export interface UploadedMedia {
@@ -351,17 +486,30 @@ export interface UploadedMedia {
 
 /** Upload every picker blob, splitting photos vs videos. Order preserved. */
 export async function uploadMedia(bucket: string, media: CompressedMedia[]): Promise<UploadedMedia> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in');
+  const uid = await currentUserId();
+  if (!uid) throw new Error('Not signed in');
+
+  /* A fixed pool of workers pulling from a shared cursor, rather than
+     Promise.all over every file: three photos and a video should overlap, but
+     ten files should not all start at once on a phone.
+
+     Each result goes into its own slot, so ordering comes from the index and
+     not from the order things finish in — which, once these run concurrently,
+     is no longer the order the poster arranged them in. */
+  const urls = new Array<string>(media.length);
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= media.length) return;
+      urls[i] = await uploadOne(bucket, uid, media[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, media.length) }, worker));
 
   const photoUrls: string[] = [];
   const videoUrls: string[] = [];
-  let i = 0;
-  for (const m of media) {
-    const url = await uploadOne(bucket, user.id, m, i++);
-    if (m.kind === 'video') videoUrls.push(url);
-    else photoUrls.push(url);
-  }
+  media.forEach((m, i) => (m.kind === 'video' ? videoUrls : photoUrls).push(urls[i]));
   return { photoUrls, videoUrls };
 }
 
@@ -398,22 +546,22 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
   /* Guideline 1.2: filter before it is posted, not after it is reported. */
   assertClean([input.title, input.description, input.location]);
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Please sign in to post');
+  const uid = await currentUserId();
+  if (!uid) throw new Error('Please sign in to post');
 
-  /* Need the poster's community to satisfy the NOT NULL FK. */
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('community_id')
-    .eq('id', user.id)
-    .single();
-  const communityId = (profile as { community_id?: string } | null)?.community_id;
+  /* 1. The poster's community (a NOT NULL FK on the row) and the poster's
+        photos have nothing to do with one another, so they no longer wait for
+        one another. This lookup used to sit in front of every upload, adding a
+        full round trip to the front of the slowest part of posting for no
+        reason at all. */
+  const [communityId, { photoUrls, videoUrls }] = await Promise.all([
+    supabase.from('profiles').select('community_id').eq('id', uid).single()
+      .then(({ data }) => (data as { community_id?: string } | null)?.community_id),
+    input.media.length
+      ? uploadMedia('listings', input.media)
+      : Promise.resolve({ photoUrls: [] as string[], videoUrls: [] as string[] }),
+  ]);
   if (!communityId) throw new Error('Your profile has no community yet — try signing out and back in.');
-
-  /* 1. Upload media (if any). */
-  const { photoUrls, videoUrls } = input.media.length
-    ? await uploadMedia('listings', input.media)
-    : { photoUrls: [], videoUrls: [] };
 
   /* 2. Insert the row. category_id must be an existing categories.id —
         we lowercase the label the form gave us. */
@@ -425,7 +573,7 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
   const { data, error } = await supabase
     .from('listings')
     .insert({
-      user_id: user.id,
+      user_id: uid,
       community_id: communityId,
       title: input.title.trim(),
       description: input.description?.trim() || null,
@@ -491,13 +639,18 @@ async function resolveCommunityId(userId: string): Promise<string> {
 export async function createRequest(input: NewRequestInput) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   assertClean([input.title, input.description]);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Please sign in to post');
-  const communityId = await resolveCommunityId(user.id);
+  const uid = await currentUserId();
+  if (!uid) throw new Error('Please sign in to post');
 
-  const { photoUrls, videoUrls } = input.media.length
-    ? await uploadMedia('listings', input.media)
-    : { photoUrls: [], videoUrls: [] };
+  /* One local session read, then the community lookup and the media upload
+     run together rather than nose-to-tail — same reasoning as
+     createListingWithMedia: neither needs the other's answer. */
+  const [communityId, { photoUrls, videoUrls }] = await Promise.all([
+    resolveCommunityId(uid),
+    input.media.length
+      ? uploadMedia('listings', input.media)
+      : Promise.resolve({ photoUrls: [] as string[], videoUrls: [] as string[] }),
+  ]);
 
   /* Clamp duration to the allowed window [24, 168]. Anything missing
      defaults to a full week — long enough that nobody loses a post by
@@ -506,7 +659,7 @@ export async function createRequest(input: NewRequestInput) {
   const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
   const { error } = await supabase.from('requests').insert({
-    user_id: user.id,
+    user_id: uid,
     community_id: communityId,
     title: input.title.trim(),
     description: input.description?.trim() || null,
@@ -543,13 +696,18 @@ export interface NewEventInput {
 export async function createEvent(input: NewEventInput): Promise<string> {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   assertClean([input.title, input.description, input.location]);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Please sign in to post');
-  const communityId = await resolveCommunityId(user.id);
+  const uid = await currentUserId();
+  if (!uid) throw new Error('Please sign in to post');
 
-  const { photoUrls, videoUrls } = input.media.length
-    ? await uploadMedia('events', input.media)
-    : { photoUrls: [], videoUrls: [] };
+  /* One local session read, then the community lookup and the media upload
+     run together rather than nose-to-tail — same reasoning as
+     createListingWithMedia: neither needs the other's answer. */
+  const [communityId, { photoUrls, videoUrls }] = await Promise.all([
+    resolveCommunityId(uid),
+    input.media.length
+      ? uploadMedia('events', input.media)
+      : Promise.resolve({ photoUrls: [] as string[], videoUrls: [] as string[] }),
+  ]);
 
   /* Combine date + time into a timestamptz. A blank time is legitimate — the
      organiser has a date but not an hour yet — so starts_at holds midnight and
@@ -559,7 +717,7 @@ export async function createEvent(input: NewEventInput): Promise<string> {
   const startsAt = new Date(`${input.date}T${input.time || '00:00'}:00`).toISOString();
 
   const { data, error } = await supabase.from('events').insert({
-    organizer_id: user.id,
+    organizer_id: uid,
     community_id: communityId,
     title: input.title.trim(),
     description: input.description?.trim() || null,
@@ -600,16 +758,21 @@ export interface NewLostFoundInput {
 export async function createLostFound(input: NewLostFoundInput) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   assertClean([input.title, input.description, input.lastSeen, input.reward]);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Please sign in to post');
-  const communityId = await resolveCommunityId(user.id);
+  const uid = await currentUserId();
+  if (!uid) throw new Error('Please sign in to post');
 
-  const { photoUrls, videoUrls } = input.media.length
-    ? await uploadMedia('lost-found', input.media)
-    : { photoUrls: [], videoUrls: [] };
+  /* One local session read, then the community lookup and the media upload
+     run together rather than nose-to-tail — same reasoning as
+     createListingWithMedia: neither needs the other's answer. */
+  const [communityId, { photoUrls, videoUrls }] = await Promise.all([
+    resolveCommunityId(uid),
+    input.media.length
+      ? uploadMedia('lost-found', input.media)
+      : Promise.resolve({ photoUrls: [] as string[], videoUrls: [] as string[] }),
+  ]);
 
   const { error } = await supabase.from('lost_found_reports').insert({
-    user_id: user.id,
+    user_id: uid,
     community_id: communityId,
     title: input.title.trim(),
     description: input.description?.trim() || null,

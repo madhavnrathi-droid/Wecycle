@@ -117,6 +117,23 @@ export async function compressMediaBatch(
 
 /* ── Photos ────────────────────────────────────────── */
 
+/* Can this browser ENCODE WebP from a canvas? Decoding is near-universal;
+   encoding is what matters here and is the thing older Safari lacked. Probed
+   once and cached — the check allocates a canvas, so doing it per photo would
+   be silly. */
+let webpEncodable: boolean | null = null;
+function canEncodeWebp(): boolean {
+  if (webpEncodable !== null) return webpEncodable;
+  try {
+    const c = document.createElement('canvas');
+    c.width = 1; c.height = 1;
+    webpEncodable = c.toDataURL('image/webp').startsWith('data:image/webp');
+  } catch {
+    webpEncodable = false;
+  }
+  return webpEncodable;
+}
+
 async function compressPhoto(file: File, opts: CompressOptions): Promise<CompressedMedia> {
   const { maxEdge, quality, skipUnderBytes } = { ...PHOTO_DEFAULTS, ...opts };
   const originalBytes = file.size;
@@ -147,9 +164,23 @@ async function compressPhoto(file: File, opts: CompressOptions): Promise<Compres
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, w, h);
 
-    const [outMime, outQuality] = hasAlpha
-      ? (['image/png', undefined] as const)
-      : (['image/jpeg', quality] as const);
+    /* WebP where the browser can encode it — typically 25-35% smaller than
+       JPEG at the same visible quality, and unlike JPEG it keeps an alpha
+       channel, so background-removed cutouts stop having to ship as PNG. Those
+       were by far the heaviest uploads: a transparent PNG of a photograph is
+       often several times the size of the JPEG it came from, which on a slow
+       campus connection is the difference between a post landing and timing
+       out.
+
+       Nothing downstream reads the file extension, so the format is free to
+       change: the only place a .png name is constructed is the local cutout
+       filename in PhotoPicker, which never reaches storage. */
+    const useWebp = canEncodeWebp();
+    const [outMime, outQuality] = useWebp
+      ? (['image/webp', quality] as const)
+      : hasAlpha
+        ? (['image/png', undefined] as const)
+        : (['image/jpeg', quality] as const);
 
     const blob = await new Promise<Blob | null>(resolve =>
       canvas.toBlob(resolve, outMime, outQuality),
