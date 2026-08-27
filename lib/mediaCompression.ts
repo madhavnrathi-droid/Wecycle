@@ -117,6 +117,37 @@ export async function compressMediaBatch(
 
 /* ── Photos ────────────────────────────────────────── */
 
+/** Does this image ACTUALLY have transparent pixels?
+ *
+ *  The old code asked `file.type === 'image/png'` and called that alpha, which
+ *  is a guess, and for the commonest PNG of all — a phone screenshot — it is
+ *  the wrong one. Every screenshot is an opaque PNG, so the guess forced PNG
+ *  output; re-encoding a photograph as PNG is routinely LARGER than the source,
+ *  which tripped the "keep the original" guard, and the full-size original went
+ *  up. On a browser that cannot encode WebP that is a multi-megabyte upload of
+ *  something that should have been a couple of hundred kilobytes.
+ *
+ *  Sampled on a stride rather than scanned pixel by pixel: a cutout has large
+ *  transparent REGIONS, never a lone stray pixel, so a coarse pass finds it for
+ *  a fraction of the work on a cheap phone. The four corners are checked
+ *  outright because that is where a background-removed subject is transparent
+ *  almost by definition. */
+function hasTransparentPixels(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  try {
+    const { data } = ctx.getImageData(0, 0, w, h);
+    const corners = [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + (w - 1)) * 4];
+    for (const c of corners) if (data[c + 3] < 250) return true;
+    /* Every 8th pixel: ~1.5% of the work, and a transparent region is orders of
+       magnitude larger than the gap between samples. */
+    for (let i = 3; i < data.length; i += 32) if (data[i] < 250) return true;
+    return false;
+  } catch {
+    /* getImageData throws on a tainted canvas. Nothing here is cross-origin, but
+       if it ever were, assuming transparency is the lossless answer. */
+    return true;
+  }
+}
+
 /* Can this browser ENCODE WebP from a canvas? Decoding is near-universal;
    encoding is what matters here and is the thing older Safari lacked. Probed
    once and cached — the check allocates a canvas, so doing it per photo would
@@ -142,9 +173,9 @@ async function compressPhoto(file: File, opts: CompressOptions): Promise<Compres
     return passthroughPhoto(file);
   }
 
-  /* Transparent PNGs (e.g. from background-removal) must stay as PNG so the
-   * alpha channel is preserved — JPEG discards transparency entirely. */
-  const hasAlpha = file.type === 'image/png';
+  /* Only these formats CAN carry alpha; a JPEG never does, so it is not worth
+     reading a megabyte of pixels back to prove it. */
+  const mayHaveAlpha = /^image\/(png|webp|gif|avif)$/.test(file.type);
 
   try {
     const img = await loadBitmap(file);
@@ -156,9 +187,10 @@ async function compressPhoto(file: File, opts: CompressOptions): Promise<Compres
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    /* Keep alpha context for transparent images; disable for everything else
-     * (saves memory and avoids accidental premult blending artefacts). */
-    const ctx = canvas.getContext('2d', { alpha: hasAlpha });
+    /* Alpha-capable context whenever the source format could carry alpha —
+       the transparency test below reads this back, so the channel has to
+       survive the draw in order to be measured at all. */
+    const ctx = canvas.getContext('2d', { alpha: mayHaveAlpha });
     if (!ctx) return passthroughPhoto(file);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
@@ -175,6 +207,9 @@ async function compressPhoto(file: File, opts: CompressOptions): Promise<Compres
        Nothing downstream reads the file extension, so the format is free to
        change: the only place a .png name is constructed is the local cutout
        filename in PhotoPicker, which never reaches storage. */
+    /* Measured, not assumed — see hasTransparentPixels. */
+    const hasAlpha = mayHaveAlpha && hasTransparentPixels(ctx, w, h);
+
     const useWebp = canEncodeWebp();
     const [outMime, outQuality] = useWebp
       ? (['image/webp', quality] as const)
