@@ -1026,11 +1026,54 @@ section.mobile-only { display: block; }
 .marketing-banner-art {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* contain, not cover. These are complete scenes exported to the card's exact
+     2:1 with a deliberate margin — cover would scale them up and crop the very
+     edges the margin was added to protect. */
+  object-fit: contain;
   object-position: center;
   display: block;
   user-select: none;
+  position: relative;
+  z-index: 1;
 }
+/* ── Art-slide stacking, scoped to [data-art] ──────────────────────────────
+   Every layer gets an EXPLICIT z-index under a two-class selector, because the
+   flat versions of these rules lost twice over: the gradient shares z-index 1
+   with the artwork so painting order came down to DOM order, and
+   .marketing-banner-text sets position:relative 120 lines further down the
+   file, which beat an equally-specific override on source order alone. Scoping
+   to the slide raises specificity above both and states the order outright. */
+.marketing-banner-slide[data-art] .marketing-banner-gradient { z-index: 0; }
+.marketing-banner-slide[data-art] .marketing-banner-art      { position: relative; z-index: 1; }
+.marketing-banner-slide[data-art] .marketing-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* Bottom-weighted: the scenes are busiest through the middle and quietest
+     along the ground line, so the darkening buys legibility where the type sits
+     without dulling the illustration where it matters. */
+  background: linear-gradient(
+    to top,
+    rgba(12, 16, 12, 0.66) 0%,
+    rgba(12, 16, 12, 0.36) 24%,
+    rgba(12, 16, 12, 0) 50%
+  );
+}
+.marketing-banner-slide[data-art] .marketing-banner-text--over {
+  position: absolute;
+  z-index: 3;
+  left: 16px;
+  right: 52px;
+  /* Clears the pagination dots, which occupy the bottom 16px of the card. At
+     12px the subtitle and the dots were measurably on top of each other. */
+  bottom: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.marketing-banner-slide[data-art] .marketing-banner-arrow { z-index: 4; }
 
 /* Compact slide layout: vertical, text bottom-anchored. */
 .marketing-banner-compact .marketing-banner-slide {
@@ -4577,9 +4620,13 @@ textarea:focus-visible {
   font-family: inherit;
 }
 .cat-tile-ico {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
+  /* 64 around a 56 icon. The plate used to be exactly the icon's size, so the
+     selected state had no padding and read as a swatch stuck behind the art
+     rather than a container holding it. 4px on every side is what makes it a
+     highlight. */
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4625,13 +4672,23 @@ textarea:focus-visible {
 
 .cat-tile:hover .cat-tile-ico { transform: translateY(-2px); }
 .cat-tile:active .cat-tile-ico { transform: scale(0.94); }
-/* Selected: a soft blue plate. Blue rather than the brand green because the
-   icons are themselves green — a green plate behind a green object flattens
-   it, while a cool tint sits behind the warm palette and lets the artwork stay
-   the thing you look at. Light enough that the navy and green voxels keep
-   their contrast on top of it. */
+/* Selected: a warm amber plate.
+ *
+ * Not blue, and not the brand green either — the reasoning is the same in both
+ * directions. The icons are predominantly green with navy accents, so a green
+ * plate sits at the same hue as the artwork and flattens it, while blue landed
+ * adjacent to those navy accents and muddied them.
+ *
+ * Amber is roughly opposite green on the warm/cool axis, so simultaneous
+ * contrast pushes the green voxels FORWARD instead of absorbing them, and it
+ * stays in the same warm family as the cream page (#FAFAF6) so the strip still
+ * reads as one surface rather than a blue chip pasted onto beige.
+ *
+ * Kept pale on purpose: a selected state has to be obvious without competing
+ * with the artwork it is meant to be pointing at, and the icons' own navy holds
+ * easily against this value. */
 .cat-tile[data-active] .cat-tile-ico {
-  background: #D8EAF8;
+  background: #FCE7C0;
   box-shadow: none;
 }
 .cat-tile-label {

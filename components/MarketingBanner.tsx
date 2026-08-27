@@ -248,20 +248,48 @@ export default function MarketingBanner({
             aria-current={i === active ? 'true' : undefined}
           >
             {useImage ? (
-              /* ── Full-bleed artwork — the graphic already bakes in the
-                 gradient, illustration, headline + arrow, so nothing else
-                 renders on top. Falls back to the CSS composition if it
-                 fails to load. ── */
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={slide.image}
-                alt={slide.ariaLabel ?? `${slide.title} — ${slide.subtitle}`}
-                className="marketing-banner-art"
-                loading={i === 0 ? 'eager' : 'lazy'}
-                decoding="async"
-                draggable={false}
-                onError={() => markImgError(slide.id)}
-              />
+              /* ── Artwork over the slide's own gradient ──
+                 The voxel banners are transparent cut-outs, not flattened
+                 graphics: they carry no background and no headline. The old
+                 files baked in both, which is why this branch used to render
+                 the image alone — drop these in under that assumption and the
+                 art floats on bare page cream with no card and no message.
+
+                 So the gradient paints behind, and the headline goes back to
+                 being REAL TEXT on top. Baking a headline into the file was
+                 always the weaker option: the card renders 343px wide on a
+                 phone, so a 1600px asset is scaled down 4.7x and any text in it
+                 has to be enormous to survive — and it still cannot be
+                 translated, selected, or read by a screen reader. */
+              <>
+                <span
+                  className="marketing-banner-gradient"
+                  style={{ backgroundImage: slide.gradient }}
+                  aria-hidden="true"
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={slide.image}
+                  alt=""
+                  className="marketing-banner-art"
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  draggable={false}
+                  onError={() => markImgError(slide.id)}
+                />
+                {/* A scrim, not a slab. The illustrations are busiest in the
+                    middle and quietest along the bottom edge, so the darkening
+                    is weighted there — enough to hold white type, little enough
+                    that the scene still reads. */}
+                <span className="marketing-banner-scrim" aria-hidden="true" />
+                <span className="marketing-banner-text marketing-banner-text--over">
+                  <span className="marketing-banner-title">{slide.title}</span>
+                  <span className="marketing-banner-subtitle">{slide.subtitle}</span>
+                </span>
+                <span className="marketing-banner-arrow" aria-hidden="true">
+                  <ArrowUpRight size={variant === 'wide' ? 15 : 13} strokeWidth={2.4} />
+                </span>
+              </>
             ) : (
               <>
                 {/* Foreground accent gradient — legibility + colour code. */}

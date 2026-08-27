@@ -510,8 +510,28 @@ export default function FeedScreen({
       onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'lost-found' }); onBannerAction?.('lost-found'); },
     },
     {
-      id: 'mahe',
-      image: '/banners/mahe.webp',
+      /* New slide: the Jobs & gigs tab had no promotion anywhere on the home
+         screen, and its rail carries one post — the surface nobody knows exists
+         is the one that stays empty. This points at the tab rather than the post
+         form, because browsing what is already there is the lower-commitment
+         first step. */
+      id: 'jobs',
+      image: '/banners/jobs.webp',
+      illustration: 'twemoji:briefcase',
+      title: 'Get paid for what you’re good at',
+      subtitle: 'Design, tutoring, photography',
+      detail: 'Small paid work on campus — post a gig, or take one on this week.',
+      gradient:
+        'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
+      ariaLabel: 'Get paid for what you’re good at — browse jobs and gigs',
+      onClick: () => {
+        track(EVT.marketing_banner_tapped, { slide: 'jobs' });
+        setActiveType('services');
+      },
+    },
+    {
+      id: 'whatsapp',
+      image: '/banners/whatsapp.webp',
       illustration: 'twemoji:graduation-cap',
       /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
            plainly that it is not affiliated with, endorsed by, or sponsored by
@@ -519,13 +539,13 @@ export default function FeedScreen({
            contradicts that, and App Review asks submitters to prove they are
            authorised to use protected third-party material. Students
            describing themselves claims nothing on anyone else's behalf. */
-        title: 'By students, for students',
-      subtitle: 'Built on campus, run by classmates',
-      detail: 'Invite a friend — the more of us here, the more there is to share.',
+        title: 'Better than the group chat',
+      subtitle: 'Searchable, and still here tomorrow',
+      detail: 'No scrolling four hundred messages to find who was selling a kettle.',
       gradient:
         'linear-gradient(135deg, rgba(37,99,235,0.92) 0%, rgba(168,85,247,0.9) 55%, rgba(34,197,94,0.9) 100%)',
-      ariaLabel: 'By students, for students — invite a friend to Wecycle',
-      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'mahe' }); onBannerAction?.('invite'); },
+      ariaLabel: 'Better than the group chat — invite a friend to Wecycle',
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'whatsapp' }); onBannerAction?.('invite'); },
     },
   ];
 
