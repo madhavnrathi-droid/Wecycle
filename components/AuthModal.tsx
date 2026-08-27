@@ -1173,6 +1173,11 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   style={{ marginTop: 2, accentColor: 'var(--color-lime, #5C7A00)', flexShrink: 0 }}
                   required
                 />
+                {/* Names the zero-tolerance rule in the agreement itself, not
+                    only behind the link. App Review has to SEE the agreement
+                    being made before registration; a reviewer filming this
+                    should not have to open a second page to find the sentence
+                    the rejection asked for. */}
                 <span>
                   I agree to Wecycle&apos;s{' '}
                   <a href="/terms" target="_blank" rel="noopener noreferrer"
@@ -1183,7 +1188,11 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   <a href="/privacy" target="_blank" rel="noopener noreferrer"
                     style={{ color: 'var(--text-primary)', textDecoration: 'underline' }}
                     onClick={e => e.stopPropagation()}
-                  >Privacy Policy</a>.
+                  >Privacy Policy</a>, and I understand that Wecycle has{' '}
+                  <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    no tolerance for objectionable content or abusive behaviour
+                  </strong>
+                  {' '}— posts that break the rules are removed and accounts are suspended.
                 </span>
               </label>
             )}
