@@ -1,6 +1,10 @@
 /* Wecycle service worker — cache-first for static, network-first for HTML */
 
-const VERSION = 'wecycle-v2';
+/* Bumped to v3: the activate handler deletes every cache whose key is not
+   VERSION, so changing this string is what evicts a stale cache from a device
+   that already has one. It had sat on v2 across every deploy, which meant the
+   eviction branch never once fired in production. */
+const VERSION = 'wecycle-v3';
 const APP_SHELL = [
   '/',
   '/manifest.json',
@@ -63,20 +67,35 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  /* Static assets: stale-while-revalidate */
+  /* Next's build output is content-hashed and already served immutable, so the
+     browser's own HTTP cache handles it correctly and for free. This used to
+     intercept it anyway with stale-while-revalidate — `cached || fetchPromise`
+     hands back the stored copy and refreshes in the background — which buys
+     nothing on a filename that changes whenever its contents do, and quietly
+     stakes the correctness of every deploy on that being true. Combined with a
+     VERSION constant that never moved (so nothing was ever evicted), this was
+     the one place a device could keep serving code from a build we had already
+     replaced. Leave it to HTTP. */
+  if (url.pathname.startsWith('/_next/')) return;
+
+  /* What is left is the small, stable shell — icons and the manifest — where
+     cache-first is genuinely what we want, because it is what makes the app
+     open at all offline. Anything not pre-cached falls through to the network
+     untouched rather than being opportunistically stored. */
+  const isShell = APP_SHELL.includes(url.pathname);
+  if (!isShell) return;
+
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetchPromise = fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(VERSION).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+    caches.match(request).then((cached) =>
+      cached ||
+      fetch(request).then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(VERSION).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+    )
   );
 });
 
