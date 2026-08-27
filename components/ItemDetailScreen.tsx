@@ -39,6 +39,7 @@ import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
 import { WA_FILL, WA_INK } from '../lib/whatsapp';
+import { priceLine, fromListingType, DEAL_BY_ID } from '../lib/dealTypes';
 
 /* Wecycle brand stamp pinned to the top-right corner of a detail hero photo.
    A small frosted-white circle so the logomark reads on any image. `offset`
@@ -488,7 +489,21 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     /* Opportunities put the FULL rate on the pill ("₹300/hr") — passing `price`
        instead would drop the period and print a bare "₹300". */
     price: item.kind === 'opportunity' ? undefined : (isPriced ? item.price : undefined),
-    badge: item.kind === 'opportunity' ? priceLabel : (isPriced ? undefined : priceLabel),
+    /* The money, already formatted, so the card never re-derives it. A rental
+       has to arrive as "₹200 / day" and a swap as its ask — passing the bare
+       number would print "₹200" on a card advertising a daily rate, and nothing
+       at all on a swap. Opportunities keep their existing rate label. */
+    priceLine: item.kind === 'opportunity' || item.isRequest
+      ? undefined
+      : priceLine({
+          deal: fromListingType(item.listingType),
+          price: item.price,
+          ratePeriod: item.ratePeriod,
+          swapFor: item.swapFor,
+        }),
+    badge: item.kind === 'opportunity'
+      ? priceLabel
+      : item.isRequest ? priceLabel : DEAL_BY_ID[fromListingType(item.listingType)].badge,
     roleLabel: item.kind === 'opportunity' ? oppRoleBadge(item.oppRole) : undefined,
     conditionLabel: item.kind === 'opportunity' || item.isRequest
       ? undefined

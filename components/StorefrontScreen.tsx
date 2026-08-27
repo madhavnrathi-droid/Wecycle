@@ -22,6 +22,10 @@ import {
   Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal,
 } from 'lucide-react';
 import ReportSheet from './ReportSheet';
+import ShareCardModal from './ShareCardModal';
+import { Share2 } from 'lucide-react';
+import { haptics } from '../lib/haptics';
+import { shareUrl } from '../lib/shareUrl';
 import type {
   User, MarketplaceItem, CommunityEvent, FeedItem, LostItem,
 } from '../lib/mockData';
@@ -69,6 +73,7 @@ export default function StorefrontScreen({
 }: StorefrontScreenProps) {
   const { user: viewer } = useAuth();
   const isMe = !!viewer && viewer.id === user.id;
+  const [storeCardOpen, setStoreCardOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
   /* Demo mode slices the seeded catalogue by author; live mode fetches the
@@ -247,18 +252,32 @@ export default function StorefrontScreen({
         }}>
           {isMe ? 'Your storefront' : `${user.name.split(' ')[0]}'s storefront`}
         </h1>
-        {viewer && !isMe ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Promote the shop. Available to anyone viewing — a storefront worth
+              sharing is usually shared BY someone else, and restricting it to
+              the owner would remove the one recommendation people actually
+              trust. */}
           <button
-            onClick={() => setReportOpen(true)}
-            aria-label={`More options for ${user.name}`}
+            onClick={() => { haptics.selection(); setStoreCardOpen(true); }}
+            aria-label={isMe ? 'Share your storefront' : `Share ${user.name}'s storefront`}
             className="theme-toggle"
             style={{ width: 36, height: 36 }}
           >
-            <MoreHorizontal size={20} strokeWidth={1.8} />
+            <Share2 size={18} strokeWidth={1.9} />
           </button>
-        ) : (
-          <span style={{ width: 36 }} aria-hidden="true" />
-        )}
+          {viewer && !isMe ? (
+            <button
+              onClick={() => setReportOpen(true)}
+              aria-label={`More options for ${user.name}`}
+              className="theme-toggle"
+              style={{ width: 36, height: 36 }}
+            >
+              <MoreHorizontal size={20} strokeWidth={1.8} />
+            </button>
+          ) : (
+            <span style={{ width: 36 }} aria-hidden="true" />
+          )}
+        </div>
       </header>
 
       {/* ── HERO ── */}
@@ -437,6 +456,45 @@ export default function StorefrontScreen({
             )
         )}
       </section>
+      {/* Storefront promo card. The stats are the trust signal — a shop with
+          23 shared and 41 saved is a person who has done this before, which is
+          what decides whether a stranger messages them. */}
+      <ShareCardModal
+        open={storeCardOpen}
+        onOpenChange={setStoreCardOpen}
+        spec={{
+          kind: 'storefront',
+          title: user.name,
+          byName: user.name,
+          byInitials: user.initials,
+          byColor: user.color,
+          byAvatar: getAvatar(user.id, 256),
+          /* The email local-part is the handle students recognise — it is
+             what their own address says and how they introduce themselves. */
+          storeHandle: (publicProfile?.email ?? user.email)?.split('@')[0],
+          /* No bio field exists on a profile, so the card writes one from what
+             the storefront actually knows: their school and what they have put
+             up. Truer than an empty string and better than a placeholder. */
+          description: [
+            collegeName(normalizeCollege(publicProfile?.college)) ?? undefined,
+            uploads.length ? `${uploads.length} thing${uploads.length === 1 ? '' : 's'} up on Wecycle` : undefined,
+          ].filter(Boolean).join(' · ') || undefined,
+          storeStats: [
+            { value: String(sharedDisplay), label: 'shared' },
+            { value: String(receivedDisplay), label: 'received' },
+            { value: String(impactDisplay), label: 'impact' },
+          ],
+          /* The cover is the poster's own most recent item — a shop
+             photographed by its stock, which is truer and better looking
+             than any stock banner would be. */
+          /* MediaEntry is `string | VideoEntry`, so a plain string IS the
+             photo — take the first one and ignore any video entries. */
+          imageUrls: (uploads[0] ? resolveItemMedia(uploads[0]) : [])
+            .filter((m): m is string => typeof m === 'string').slice(0, 1),
+          url: shareUrl(user.id),
+        }}
+      />
+
       <ReportSheet
         open={reportOpen}
         onClose={() => setReportOpen(false)}

@@ -27,13 +27,62 @@
 
 import { haptics } from './haptics';
 
-export type ShareCardKind = 'item' | 'request' | 'job' | 'event' | 'lost' | 'found';
+export type ShareCardKind = 'item' | 'request' | 'job' | 'event' | 'lost' | 'found' | 'storefront';
+
+/* ── Storefront card styles ────────────────────────────────────────────────
+ *
+ * A storefront card is an advert for a PERSON, not for one object, so it gets
+ * its own look and its own pair of palettes to pick between. Two, not six: a
+ * carousel of six is a decision, and the poster came here to share a shop, not
+ * to art-direct. Two is a glance.
+ *
+ * Both are dark-led, which is the one thing every profile card in the
+ * references had in common and the reason they read as a brand rather than as
+ * a form. Amber is the loud one; Forest is the Wecycle-green one for people who
+ * want it to look like the app it came from. */
+export type StorefrontStyle = 'amber' | 'forest';
+
+interface StoreTheme {
+  id: StorefrontStyle;
+  label: string;
+  wash: Stops;
+  panel: string;
+  ink: string;
+  inkMuted: string;
+  accent: string;
+  /** Ink that sits ON the accent — checked, not guessed. */
+  onAccent: string;
+}
+
+export const STOREFRONT_STYLES: StoreTheme[] = [
+  {
+    id: 'amber', label: 'Ember',
+    /* Orange into near-black. The panel stays black so the accent has somewhere
+       dark to be bright against; an orange panel would flatten the whole card. */
+    wash: ['#7C2D12', '#C2410C', '#EA580C', '#F59E0B'],
+    panel: '#141210', ink: '#FFFFFF', inkMuted: 'rgba(255,255,255,0.62)',
+    accent: '#FB923C', onAccent: '#1A0F06',
+  },
+  {
+    id: 'forest', label: 'Forest',
+    wash: ['#04170E', '#07301C', '#0A5C36', '#0E7A47'],
+    panel: '#0B0F0C', ink: '#FFFFFF', inkMuted: 'rgba(255,255,255,0.60)',
+    /* The app's own lime. On #0B0F0C it clears 13:1, so it can carry the CTA
+       label in black and still be the brightest thing on the card. */
+    accent: '#A8DD00', onAccent: '#0A1200',
+  },
+];
 
 export interface ShareCardSpec {
   kind: ShareCardKind;
   title: string;
   imageUrls?: string[];
   price?: number;
+  /** The money exactly as it should read — "₹200 / day", "Swap for a
+   *  calculator", "Free". Built by lib/dealTypes so the card, the feed and the
+   *  detail page cannot render the same listing three different ways. Falls
+   *  back to `price` when absent. */
+  priceLine?: string;
   badge?: string;
   location?: string;
   dateLine?: string;
@@ -51,6 +100,14 @@ export interface ShareCardSpec {
   url?: string;
   /* Panel-only facts. Kept separate from `badge` so the bottom pill and the
      stats panel never show the same string twice. */
+  /* ── Storefront cards ── */
+  /** @handle under the name. */
+  storeHandle?: string;
+  /** Up to three "12 shared" style facts. More than three stops being a glance
+   *  and starts being a table. */
+  storeStats?: { label: string; value: string }[];
+  /** Which of STOREFRONT_STYLES to paint. Defaults to the first. */
+  cardStyle?: StorefrontStyle;
   roleLabel?: string;       // job: 'Hiring' | 'Offering'
   conditionLabel?: string;  // item: 'Like new' | 'Good' | 'Fair'
 }
@@ -126,6 +183,11 @@ const THEME: Record<ShareCardKind, Theme> = {
   event:   { label: 'Event',     colors: EVENTS, light: false, glyph: '🎉', person: 'Organiser',       accent: '#FFD84D' },
   lost:    { label: 'Lost',      colors: FINDS,  light: false, glyph: '🔎', person: 'Reported by',     accent: '#FF9A6B' },
   found:   { label: 'Found',     colors: FINDS,  light: false, glyph: '✅', person: 'Found by',        accent: '#FF9A6B' },
+  /* Present so the map stays exhaustive, but never actually painted: a
+     storefront card takes its palette from STOREFRONT_STYLES and renders on
+     a separate path entirely. Values mirror `item` so any code reading THEME
+     generically gets something sane rather than undefined. */
+  storefront: { label: 'Storefront', colors: MARKET, light: false, glyph: '\u{1F6CD}', person: 'Shop by', accent: '#A8DD00' },
 };
 
 /** Ink tokens derived from the wash's lightness — one place, so every text
@@ -286,12 +348,31 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-function loadImage(src: string, cors = true): Promise<HTMLImageElement | null> {
+/** Load an image, or give up.
+ *
+ *  The timeout is the point. onload and onerror between them cover a request
+ *  that succeeds and one that fails, but not one that STALLS — and a stalled
+ *  image leaves this promise pending forever, which hangs the whole card behind
+ *  a Promise.all that never settles. The user then sees a spinner that never
+ *  becomes a card, with no error anywhere, because nothing actually threw.
+ *
+ *  Eight seconds, then resolve null and draw the card without the photo. A
+ *  card missing its photo still says what is for sale; a card that never
+ *  appears says nothing at all. */
+function loadImage(src: string, cors = true, timeoutMs = 8000): Promise<HTMLImageElement | null> {
   return new Promise(resolve => {
+    let settled = false;
+    const done = (v: HTMLImageElement | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(v);
+    };
+    const timer = setTimeout(() => done(null), timeoutMs);
     const img = new Image();
     if (cors) img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
+    img.onload = () => done(img);
+    img.onerror = () => done(null);
     img.src = src;
   });
 }
@@ -524,34 +605,261 @@ function withAlphaCss(color: string, a: number): string {
   return color.startsWith('#') ? withAlpha(color, a) : color;
 }
 
-export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  /* Geometry from the reference cards, scaled to 1080 wide. Two stacked panels:
-   *   A — the gradient, carrying every word on the card
-   *   B — the photo, carrying the Wecycle mark and the call to action
-   * That split is the "two parter" in the brief, and it's why the text never has
-   * to fight a photo for contrast: they live in separate panels. */
-  const W = 1080;
-  const PAD = 64;
-  const R = 56;
-  const FX = 72;            // content gutter, in the info panel's own space
+/* ── Card geometry ─────────────────────────────────────────────────────────
+ *
+ * 1080 x 1350 — 4:5 — and fixed, where the old card computed its height from
+ * its content and came out somewhere near square.
+ *
+ * 4:5 is the one aspect ratio that is right in both places these get sent.
+ * Instagram's feed crops anything taller and letterboxes anything wider, so 4:5
+ * is the largest a post can be without losing pixels: the most screen a card
+ * can occupy while someone scrolls past it. WhatsApp shows a 4:5 image whole in
+ * the bubble, where a 9:16 story-shaped card gets clipped to a thumbnail and
+ * the price stops being readable before anyone taps.
+ *
+ * The structure inverts the old one. That card gave the top panel to a gradient
+ * carrying every word and put the photo second; these cards put the PHOTO
+ * first and largest, because a share card competes in a feed of other people's
+ * photos and loses on text. The photo is 700 of the card's 1350 — a clear
+ * majority of the visual field — and the words sit under it on a white panel
+ * where they are read rather than decoded.
+ *
+ * The brand wash survives as the surround. It is what makes a Wecycle card
+ * recognisable at thumbnail size, when the title is far too small to read. */
+const CARD_W = 1080;
+const CARD_H = 1350;
 
-  /* Info panel scale.
-   *
-   * The panel is laid out at its original size in a wider virtual space (PW)
-   * and then drawn through ctx.scale(S), which shrinks the whole block —
-   * type, gutters and rhythm together — without touching a single literal.
-   * That is "make the card a bit smaller so it accommodates all the info":
-   * the panel drops from ~836px tall to ~600, which is what frees the height
-   * the photo needs while leaving room for the attribution row and the CTA
-   * strip that were being clipped off the bottom. */
-  const S = 0.72;
-  const PW = Math.round(W / S);   // layout width inside the scaled panel
-
-  const t = THEME[spec.kind];
-  const ink = inkFor(t);
+/* ── Storefront card ───────────────────────────────────────────────────────
+ *
+ * An advert for a PERSON rather than for one object, so the composition is the
+ * one every profile card converges on and not the product layout above: a cover
+ * band, an avatar breaking the line between cover and panel, the name, a line
+ * about them, and a row of numbers that says this shop is real.
+ *
+ * The avatar overlapping the boundary is the load-bearing detail. It is what
+ * makes the card read as one object instead of two stacked rectangles, and it
+ * puts the face — the thing a person recognises fastest — exactly on the seam
+ * the eye already stops at.
+ *
+ * The stats row is doing trust work, not decoration. A storefront with "23
+ * shared · 41 saved" is a person who has done this before, which is the single
+ * fact that decides whether a stranger messages them. */
+async function renderStorefrontCard(spec: ShareCardSpec): Promise<RenderedCard> {
+  const st = STOREFRONT_STYLES.find(x => x.id === spec.cardStyle) ?? STOREFRONT_STYLES[0];
 
   const canvas = document.createElement('canvas');
-  canvas.width = W + PAD * 2;
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
+  const ctx = canvas.getContext('2d')!;
+
+  const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
+  const [wordmark, avatar, cover] = await Promise.all([
+    loadImage('/brand/wordmark.png', false),
+    spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
+    urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
+  ]);
+
+  const M = 56;
+  const HEAD = 96;
+  const PANEL_X = M, PANEL_Y = HEAD;
+  const PANEL_W = CARD_W - M * 2;
+  const PANEL_H = CARD_H - HEAD - 84;
+  const PANEL_R = 44;
+  const COVER_H = 470;
+  const AV_R = 92;
+  const FX = PANEL_X + 52;
+  const TEXT_W = PANEL_W - 104;
+
+  const name = (spec.byName || spec.title || 'Storefront').trim();
+  const handle = spec.storeHandle?.trim();
+  const bio = (spec.description ?? '').replace(/\s+/g, ' ').trim();
+  const stats = (spec.storeStats ?? []).slice(0, 3);
+
+  /* Name auto-fit — a shop called "Nayonika Gottimukkula" and one called "Pri"
+     cannot share a font size. */
+  let nameSize = 68;
+  for (const size of [68, 60, 52, 46]) {
+    ctx.font = `800 ${size}px ${FONT}`;
+    nameSize = size;
+    if (ctx.measureText(name).width <= TEXT_W) break;
+  }
+  ctx.font = `400 31px ${FONT}`;
+  const bioLines = bio ? wrapText(ctx, bio, TEXT_W, 3) : [];
+
+  const paint = (withPhotos: boolean) => {
+    ctx.clearRect(0, 0, CARD_W, CARD_H);
+    paintWash(ctx, CARD_W, CARD_H, st.wash);
+    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
+
+    /* Brand strip */
+    if (wordmark) {
+      const wmH = 38;
+      const wmW = wmH * (wordmark.width / wordmark.height);
+      ctx.drawImage(tintImage(wordmark, Math.round(wmW), wmH, '#FFFFFF'), M, (HEAD - wmH) / 2 - 2, wmW, wmH);
+    }
+    ctx.font = `700 24px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.78)';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('STOREFRONT', CARD_W - M, HEAD / 2 - 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    /* Panel */
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.42)';
+    ctx.shadowBlur = 48;
+    ctx.shadowOffsetY = 16;
+    ctx.fillStyle = st.panel;
+    roundRect(ctx, PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_R); ctx.fill();
+    ctx.restore();
+
+    /* Cover band, clipped to the panel's top corners only. */
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(PANEL_X, PANEL_Y + COVER_H);
+    ctx.lineTo(PANEL_X, PANEL_Y + PANEL_R);
+    ctx.arcTo(PANEL_X, PANEL_Y, PANEL_X + PANEL_R, PANEL_Y, PANEL_R);
+    ctx.lineTo(PANEL_X + PANEL_W - PANEL_R, PANEL_Y);
+    ctx.arcTo(PANEL_X + PANEL_W, PANEL_Y, PANEL_X + PANEL_W, PANEL_Y + PANEL_R, PANEL_R);
+    ctx.lineTo(PANEL_X + PANEL_W, PANEL_Y + COVER_H);
+    ctx.closePath();
+    ctx.clip();
+    if (withPhotos && cover) {
+      coverDraw(ctx, cover, PANEL_X, PANEL_Y, PANEL_W, COVER_H);
+      /* A scrim under the avatar side so a bright photo cannot swallow it. */
+      const g = ctx.createLinearGradient(0, PANEL_Y + COVER_H - 220, 0, PANEL_Y + COVER_H);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = g;
+      ctx.fillRect(PANEL_X, PANEL_Y + COVER_H - 220, PANEL_W, 220);
+    } else {
+      paintWash(ctx, PANEL_W, COVER_H, st.wash);
+      ctx.save();
+      ctx.translate(PANEL_X, PANEL_Y);
+      paintGrain(ctx, PANEL_W, COVER_H, 0.1, 1);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    /* Avatar, straddling the seam. */
+    const avCx = FX + AV_R;
+    const avCy = PANEL_Y + COVER_H;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avCx, avCy, AV_R + 10, 0, Math.PI * 2);
+    ctx.fillStyle = st.panel;
+    ctx.fill();
+    ctx.restore();
+    drawAvatar(ctx, avCx, avCy, AV_R, withPhotos ? avatar : null, spec.byInitials, spec.byColor ?? st.accent);
+
+    /* Words */
+    ctx.textBaseline = 'top';
+    let y = avCy + AV_R + 34;
+
+    ctx.fillStyle = st.ink;
+    ctx.font = `800 ${nameSize}px ${FONT}`;
+    ctx.fillText(name, FX, y);
+    y += Math.round(nameSize * 1.12);
+
+    if (handle) {
+      ctx.fillStyle = st.accent;
+      ctx.font = `600 32px ${FONT}`;
+      ctx.fillText(handle.startsWith('@') ? handle : `@${handle}`, FX, y);
+      y += 46;
+    }
+
+    if (bioLines.length) {
+      y += 10;
+      ctx.fillStyle = st.inkMuted;
+      ctx.font = `400 31px ${FONT}`;
+      for (const line of bioLines) { ctx.fillText(line, FX, y); y += 41; }
+    }
+    ctx.textBaseline = 'alphabetic';
+
+    /* Stats row + CTA, pinned to the bottom of the panel. */
+    const CTA_H = 78;
+    const ctaY = PANEL_Y + PANEL_H - 46 - CTA_H;
+
+    if (stats.length) {
+      /* Clearance for the LABEL, not just the number. The row was placed 44px
+         above the button, but the label sits 36px below the row's own top and
+         is itself ~30px tall, so it ran straight into the CTA and read as
+         "23 / shar…". Measured from the bottom of the label instead. */
+      const STAT_VALUE_H = 44;
+      const STAT_LABEL_H = 30;
+      const rowY = ctaY - 26 - STAT_LABEL_H - STAT_VALUE_H;
+      const cellW = (PANEL_W - 104) / stats.length;
+      ctx.textAlign = 'left';
+      stats.forEach((cell, i) => {
+        const cx = FX + cellW * i;
+        if (i > 0) {
+          /* Hairline divider, exactly as the reference profile cards do — it is
+             what turns three numbers into one row rather than three orphans. */
+          ctx.fillStyle = 'rgba(255,255,255,0.14)';
+          ctx.fillRect(Math.round(cx - 18), rowY - 6, 1.5, 62);
+        }
+        ctx.fillStyle = st.ink;
+        ctx.font = `800 40px ${FONT}`;
+        ctx.textBaseline = 'top';
+        ctx.fillText(cell.value, cx, rowY - 8);
+        ctx.fillStyle = st.inkMuted;
+        ctx.font = `500 25px ${FONT}`;
+        ctx.fillText(cell.label, cx, rowY + 36);
+        ctx.textBaseline = 'alphabetic';
+      });
+    }
+
+    /* Full-width CTA — this card has one job and it is the tap. */
+    ctx.fillStyle = st.accent;
+    roundRect(ctx, FX, ctaY, PANEL_W - 104, CTA_H, CTA_H / 2); ctx.fill();
+    ctx.fillStyle = st.onAccent;
+    ctx.font = `700 30px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Visit the storefront', PANEL_X + PANEL_W / 2 - 16, ctaY + CTA_H / 2 + 1);
+    const aw = ctx.measureText('Visit the storefront').width;
+    const ax = PANEL_X + PANEL_W / 2 - 16 + aw / 2 + 26;
+    const ay = ctaY + CTA_H / 2;
+    setStroke(ctx, st.onAccent, 3.2);
+    ctx.beginPath();
+    ctx.moveTo(ax - 13, ay + 7); ctx.lineTo(ax + 3, ay - 9);
+    ctx.moveTo(ax - 6, ay - 9); ctx.lineTo(ax + 3, ay - 9); ctx.lineTo(ax + 3, ay);
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    /* Footer */
+    ctx.font = `600 27px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('wecycle.page', CARD_W / 2, PANEL_Y + PANEL_H + (CARD_H - PANEL_Y - PANEL_H) / 2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  };
+
+  paint(true);
+  let dataUrl: string;
+  try { dataUrl = canvas.toDataURL('image/png'); }
+  catch { paint(false); dataUrl = canvas.toDataURL('image/png'); }
+  const blob = await new Promise<Blob | null>(res => {
+    try { canvas.toBlob(res, 'image/png', 0.95); } catch { res(null); }
+  });
+  return { blob, dataUrl };
+}
+
+export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard> {
+  /* A storefront advertises a person and takes a different composition
+     entirely — cover, avatar on the seam, bio, stats — so it renders on its
+     own path rather than through a pile of conditionals in this one. */
+  if (spec.kind === 'storefront') return renderStorefrontCard(spec);
+
+  const t = THEME[spec.kind];
+
+  const canvas = document.createElement('canvas');
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
   const ctx = canvas.getContext('2d')!;
 
   const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
@@ -562,296 +870,279 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
     urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
   ]);
 
-  /* ── Panel A height, measured ── */
-  /* Title auto-fit.
-   *
-   * The title is the one element on the card that must never be cut: a share
-   * card whose headline reads "Lost black Casio watch near the libr…" has
-   * failed at the only job it has. Fixed 92px/2-line wrapping ellipsised any
-   * title past ~38 characters, so instead step down through size/line-count
-   * pairs and take the first that fits whole. Big titles stay big; long ones
-   * get smaller rather than truncated — the trade every editorial layout makes.
-   *
-   * Leading tracks the size (1.09×) so the block stays optically even at any
-   * step, rather than the old hard-coded 100px that only suited 92px type. */
-  const TITLE_MAXW = PW - FX * 2 - 40;
-  /* Ladder verified against real titles from 5 to 121 characters: nothing
-     truncates. Order matters — hold 92px and spend a line first (a 39-char
-     title stays big and goes to three lines), only then start shrinking.
-     Shrinking before wrapping made short titles needlessly small. */
-  const STEPS: [number, number][] = [
-    [92, 2], [92, 3], [80, 3], [80, 4], [70, 4], [62, 4], [56, 4],
-  ];
-  let titleSize = 56;
-  let titleLines = [spec.title];
-  for (const [size, maxLines] of STEPS) {
+  /* Panel geometry. The white card floats on the wash with an even margin, and
+     the photo insets again inside it — the double inset is what the reference
+     cards all do and what stops the photo reading as a banner welded to the
+     top edge. */
+  const M = 56;                         // wash margin around the white card
+  const HEAD = 96;                      // brand strip above the card
+  const PANEL_X = M;
+  const PANEL_Y = HEAD;
+  const PANEL_W = CARD_W - M * 2;
+  const PANEL_H = CARD_H - HEAD - 84;   // leaves the footer line on the wash
+  const PANEL_R = 44;
+
+  const PP = 22;                        // photo inset inside the panel
+  const PHOTO_X = PANEL_X + PP;
+  const PHOTO_Y = PANEL_Y + PP;
+  const PHOTO_W = PANEL_W - PP * 2;
+  const PHOTO_H = 700;
+  const PHOTO_R = 30;
+
+  const FX = PANEL_X + 46;              // text gutter inside the panel
+  const TEXT_W = PANEL_W - 92;
+
+  /* ── Measure the text before drawing any of it ── */
+  const INK = '#12120E';
+  const INK_MUTED = '#5C5C52';
+
+  /* Title auto-fit. The title is the one thing on the card that must never be
+     cut — a card reading "Lost black Casio watch near the libr…" has failed at
+     its only job. Step down through size/line pairs and take the first that
+     fits whole, holding the big size and spending a line before shrinking. */
+  const TITLE_STEPS: [number, number][] = [[64, 2], [58, 2], [52, 3], [46, 3], [40, 3]];
+  let titleSize = 40;
+  let titleLines: string[] = [spec.title];
+  for (const [size, maxLines] of TITLE_STEPS) {
     ctx.font = `800 ${size}px ${FONT}`;
-    const lines = wrapText(ctx, spec.title, TITLE_MAXW, maxLines);
+    const lines = wrapText(ctx, spec.title, TEXT_W, maxLines);
     titleSize = size; titleLines = lines;
     if (!lines[lines.length - 1].endsWith('…')) break;
   }
-  const TITLE_LH = Math.round(titleSize * 1.09);
-  const subtitle = (spec.description ?? '').trim();
-  ctx.font = `400 38px ${FONT}`;
-  const subLines = subtitle ? wrapText(ctx, subtitle, PW - FX * 2 - 120, 2) : [];
+  const TITLE_LH = Math.round(titleSize * 1.14);
 
-  const TOP_ROW = 56 + 62;                       // pill row
-  const TITLE_TOP = TOP_ROW + 50;
-  const TITLE_H = titleLines.length * TITLE_LH;
-  const SUB_H = subLines.length ? 20 + subLines.length * 50 : 0;
-  /* The meta band reserved its full height even with nothing to put in it,
-     which left a visible dead zone between the hairline and the attribution row
-     on a post that has no price, condition or location. Collapse it to just
-     what the arrow needs in that case. */
-  const hasDateBox = spec.kind === 'event' && !!spec.dateBadge;
-  const META_H = (metaColumns(spec).length === 0 && !hasDateBox) ? 120 : 188;
-  const FOOT_H = 102;                            // attribution + tagline
-  /* Layout height in the panel's own space, then the real height after scale. */
-  const panelLayoutH = TITLE_TOP + TITLE_H + SUB_H + 38 + META_H + 28 + FOOT_H;
-  const panelA = Math.round(panelLayoutH * S);
+  /* Description — asked for on every kind of card, capped at two lines. Two is
+     the honest cap: it is enough for the sentence that makes someone tap, and
+     more would push the price off the panel, which is the one number the card
+     exists to communicate. */
+  const desc = (spec.description ?? '').replace(/\s+/g, ' ').trim();
+  ctx.font = `400 32px ${FONT}`;
+  const descLines = desc ? wrapText(ctx, desc, TEXT_W, 2) : [];
 
-  /* ── The photo panel ──
-   *
-   * Sized so the WHOLE card fits inside a shape all three target platforms
-   * render without clipping, measured rather than assumed:
-   *
-   *   LinkedIn   0.800 (4:5)  — crops anything taller, adds "see full image"
-   *   Instagram  0.750 (3:4)  — 4:5 standard, 3:4 newly allowed
-   *   WhatsApp   0.701        — measured off a real cropped card in a chat
-   *
-   * LinkedIn is the binding cap, so 4:5 is the only ratio safe on all three,
-   * and that is the target. The photo then gets every pixel left over after
-   * the (now scaled-down) info panel and the CTA strip — about half the card,
-   * which makes it the subject rather than a header.
-   *
-   * Two ways the frame is filled, and never a third:
-   *   - if the photo's natural height at this width is SHORTER than the
-   *     budget, the frame shrinks to the photo. Nothing is cropped and the
-   *     card just ends up wider than 4:5, which every platform is happy with.
-   *   - if it is TALLER, the frame keeps the budget and the photo is
-   *     centre-cropped to cover it.
-   *
-   * That crop is a real cost and it is deliberate. Three things were asked for
-   * at once — a big photo, no bars beside it, and every line of info visible —
-   * and for a portrait photo those cannot all hold: a 4:5 photo alone is
-   * already taller than a 4:5 card, so something has to give before the info
-   * panel is even added. Cropping the long edge of a phone photo loses the
-   * least: bars were explicitly rejected, and clipping the card loses the
-   * price, the poster and the call to action. */
-  const hasPhoto = !!hero;
-  const STRIP = 96;                              // CTA strip, the card's foot
-  const natural = hero ? hero.width / hero.height : 1.6;
+  const paint = (withPhoto: boolean) => {
+    ctx.clearRect(0, 0, CARD_W, CARD_H);
 
-  const TARGET_RATIO = 0.80;                     // 4:5 — safe on all three
-  const CARD_H_TARGET = Math.round((W + PAD * 2) / TARGET_RATIO) - PAD * 2;
-  const photoBudget = CARD_H_TARGET - panelA - STRIP;
-  const photoNaturalH = W / natural;
-  const photoH = hasPhoto ? Math.round(Math.min(photoNaturalH, photoBudget)) : 0;
-  /* Cover only when the photo is taller than its frame; a landscape photo that
-     fits exactly must not be scaled up and cropped for no reason. */
-  /* Crop a photo, never a poster.
-   *
-   * Cover-cropping the long edge of a phone photo of a wardrobe costs nothing —
-   * the subject is in the middle and the trimmed strip was floor. Doing the same
-   * to an event poster cuts off whatever the designer put at the bottom, which
-   * on the poster this was found with was the dates and the venue: the two facts
-   * the poster exists to carry. So events keep the whole image and get a blurred
-   * bed beside it; everything else fills the frame. */
-  const isPoster = spec.kind === 'event';
-  const overflows = hasPhoto && photoNaturalH > photoH + 0.5;
-  const photoNeedsCover = overflows && !isPoster;
-  const photoNeedsBed = overflows && isPoster;
+    /* ── Brand wash ── */
+    paintWash(ctx, CARD_W, CARD_H, t.colors);
+    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
 
-  const H = panelA + (hasPhoto ? photoH + STRIP : 0);
-  canvas.height = H + PAD * 2;
-
-  /* Panel A starts below the photo now. Every constant in the info panel is
-     measured from its own origin, so the whole block is drawn inside one
-     translate rather than having ~20 offsets rewritten. */
-  const AY = hasPhoto ? photoH : 0;
-
-  const paint = (useHero: boolean) => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.translate(PAD, PAD);
-
-    /* Silhouette + shadow */
-    ctx.save();
-    ctx.shadowColor = 'rgba(17,24,39,0.34)';
-    ctx.shadowBlur = 72;
-    ctx.shadowOffsetY = 28;
-    roundRect(ctx, 0, 0, W, H, R);
-    ctx.fillStyle = t.colors[0];
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    roundRect(ctx, 0, 0, W, H, R);
-    ctx.clip();
-
-    /* ══ THE PHOTO — top of the card ══
-     * It leads because it is the only element that works at thumbnail size:
-     * in a chat list nobody reads a title, they recognise a picture. */
-    if (hasPhoto) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, W, photoH);
-      ctx.clip();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, W, photoH);
-      const photo = useHero ? hero : null;
-      if (photo) {
-        /* Fill the frame completely, always. coverDraw centre-crops the overflow
-           when the photo is taller than its frame; when it fits exactly, cover
-           and contain are the same draw, so there is one code path and never a
-           blurred bed or a bar. */
-        if (photoNeedsCover) {
-          coverDraw(ctx, photo, 0, 0, W, photoH);
-        } else {
-          /* A poster taller than its frame is contained, so every word on it
-             survives; the bed fills what's left. When the image already fits,
-             the bed is skipped and contain draws it edge to edge. */
-          if (photoNeedsBed) blurredBed(ctx, photo, 0, 0, W, photoH);
-          containDraw(ctx, photo, 0, 0, W, photoH);
-        }
-      }
-      ctx.restore();
-    }
-
-    /* ══ THE INFO PANEL — below the photo ══ */
-    ctx.save();
-    ctx.translate(0, AY);
-    ctx.scale(S, S);
-    /* Everything below is laid out in the panel's own space: PW wide and
-       panelLayoutH tall, shrunk by the scale above. */
-    paintWash(ctx, PW, panelLayoutH, t.colors);
-    /* With no photo the wash is the whole card. */
-    if (!hasPhoto) paintWash(ctx, PW, Math.round(H / S), t.colors);
-
-    /* Top row: outlined kind pill, and the wordmark opposite it. */
-    outlinePill(ctx, {
-      x: FX, y: 56, h: 62,
-      text: t.label.toUpperCase(), ink: ink.primary, dot: t.accent,
-    });
+    /* ── Brand strip ──
+       Wecycle is named at the TOP, before the photo, not tucked in a corner at
+       the bottom. On a card that will be seen mid-scroll among other people's
+       photos, the mark has to be where the eye already is. */
     if (wordmark) {
-      const wmH = 40, wmW = wmH * WORDMARK_AR;
-      ctx.drawImage(tintImage(wordmark, wmW, wmH, ink.primary), PW - FX - wmW, 56 + (62 - wmH) / 2, wmW, wmH);
-    }
-
-    /* Title — the largest thing on the card, as in every reference. */
-    ctx.font = `800 ${titleSize}px ${FONT}`;
-    ctx.fillStyle = ink.primary;
-    ctx.textBaseline = 'alphabetic';
-    const capTop = Math.round(titleSize * 0.8);   // first baseline
-    titleLines.forEach((ln, i) => ctx.fillText(ln, FX, TITLE_TOP + capTop + i * TITLE_LH));
-
-    let y = TITLE_TOP + capTop + (titleLines.length - 1) * TITLE_LH;
-
-    /* Subtitle */
-    if (subLines.length) {
-      ctx.font = `400 38px ${FONT}`;
-      ctx.fillStyle = ink.muted;
-      subLines.forEach((ln, i) => ctx.fillText(ln, FX, y + 62 + i * 50));
-      y += 62 + (subLines.length - 1) * 50;
-    }
-
-    /* Hairline → meta row → hairline (reference's rhythm exactly) */
-    y += 44;
-    const hair = (yy: number) => {
-      ctx.strokeStyle = withAlphaCss(ink.primary, 0.18);
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(FX, yy); ctx.lineTo(PW - FX, yy); ctx.stroke();
-    };
-    hair(y);
-
-    const metaTop = y + 28;
-    const arrowR = 48;
-    const arrowCx = PW - FX - arrowR;
-    drawMeta(ctx, spec, t, ink, { fx: FX, top: metaTop, right: arrowCx - arrowR - 40 });
-    arrowButton(ctx, arrowCx, metaTop + 56, arrowR,
-      ink.arrowFill, ink.arrowInk);
-
-    y = metaTop + META_H - 28;
-    hair(y);
-
-    /* Closing row: who posted it (left) against the tagline (right).
-     *
-     * This slot held a decorative barcode, copied from the reference labels. It
-     * looked the part but carried nothing — a share card has one job, and a fake
-     * barcode does not help anyone decide to tap. The poster's name and verified
-     * tick do: "a real classmate listed this" is the single most persuasive thing
-     * left to say once the price and the photo have been seen.
-     *
-     * Left-aligned attribution keeps the card's one alignment spine (pill,
-     * title, subtitle, meta labels all start at FX); the tagline is the only
-     * right-aligned element, so it reads as a sign-off rather than a stray. */
-    const fy = y + 22;
-    /* Both halves hang off two shared centrelines (ROW1/ROW2) and both are drawn
-     * with textBaseline 'middle'. Mixing 'middle' on one side with 'alphabetic'
-     * on the other is what makes a row like this look subtly broken — the two
-     * halves land on different optical lines even though the numbers look
-     * deliberate. One baseline system for the row, always. */
-    const ROW1 = fy + 14;
-    const ROW2 = fy + 46;
-    ctx.textBaseline = 'middle';
-
-    if (spec.byName) {
-      const ar2 = 26;
-      /* Avatar centres between the two rows, not on the first — an avatar
-       * optically anchors the whole block it labels. */
-      drawAvatar(ctx, FX + ar2, (ROW1 + ROW2) / 2, ar2, avatar, spec.byInitials, spec.byColor);
-      const nx = FX + ar2 * 2 + 18;
-      ctx.font = `700 30px ${FONT}`;
-      ctx.fillStyle = ink.primary;
-      const nm = wrapText(ctx, spec.byName, 360, 1)[0];
-      ctx.fillText(nm, nx, ROW1);
-      if (spec.verified) {
-        checkBadge(ctx, nx + ctx.measureText(nm).width + 22, ROW1, 14, t.accent, '#ffffff');
-      }
-      ctx.font = `600 22px ${FONT}`;
-      ctx.fillStyle = ink.muted;
-      ctx.fillText(t.person.toUpperCase(), nx, ROW2);
-    }
-
-    /* Tagline sits a step below the name in size: the poster is the fact, the
-     * tagline is only the sign-off, so it must not out-weigh a person's name. */
-    ctx.textAlign = 'right';
-    ctx.font = `600 28px ${FONT}`;
-    /* Two lines of near-black bold out-shouted the name sitting opposite it.
-       Dropping to ~70% keeps the line legible while letting the eye land on
-       the person first — which is the half of this row that carries a fact. */
-    ctx.fillStyle = withAlphaCss(ink.primary, 0.72);
-    const tag = taglineFor(spec.kind);
-    ctx.fillText(tag[0], PW - FX, ROW1);
-    ctx.fillText(tag[1], PW - FX, ROW2);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    ctx.restore();                               // end of the info panel translate
-
-    /* ══ THE CTA STRIP — the card's foot ══
-     * Last thing read, and the only instruction on the card. It used to sit
-     * over the bottom of the photo; with the photo on top it belongs here, at
-     * the very bottom edge, where a footer goes. */
-    if (hasPhoto) {
-      const sy = H - STRIP;
-      ctx.fillStyle = '#0E0E08';
-      ctx.fillRect(0, sy, W, STRIP);
-      if (logo) ctx.drawImage(logo, FX, sy + 22, 52, 52);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `700 34px ${FONT}`;
+      const wmH = 38;
+      const wmW = wmH * (wordmark.width / wordmark.height);
+      ctx.save();
+      /* The wordmark art is dark; on a dark wash it needs to be white. */
+      const white = tintImage(wordmark, Math.round(wmW), wmH, '#FFFFFF');
+      ctx.drawImage(white, M, (HEAD - wmH) / 2 - 2, wmW, wmH);
+      ctx.restore();
+    } else {
+      ctx.font = `800 36px ${FONT}`;
+      ctx.fillStyle = '#FFFFFF';
       ctx.textBaseline = 'middle';
-      ctx.fillText(ctaFor(spec.kind), FX + 72, sy + 49);
-      ctx.textAlign = 'right';
-      ctx.font = `500 30px ${FONT}`;
-      ctx.fillStyle = 'rgba(255,255,255,0.72)';
-      ctx.fillText('wecycle.page', W - FX, sy + 49);
-      ctx.textAlign = 'left';
+      ctx.fillText('Wecycle', M, HEAD / 2 - 2);
       ctx.textBaseline = 'alphabetic';
     }
 
+    /* Kind badge, top right — "FOR RENT", "LOST", "EVENT". */
+    const badgeText = (spec.badge || t.label).toUpperCase();
+    ctx.font = `700 24px ${FONT}`;
+    const bw = ctx.measureText(badgeText).width + 56;
+    const bh = 46;
+    const bx = CARD_W - M - bw;
+    const by = (HEAD - bh) / 2 - 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    roundRect(ctx, bx, by, bw, bh, bh / 2); ctx.fill();
+    setStroke(ctx, 'rgba(255,255,255,0.34)', 1.5);
+    roundRect(ctx, bx, by, bw, bh, bh / 2); ctx.stroke();
+    ctx.fillStyle = t.accent;
+    ctx.beginPath(); ctx.arc(bx + 26, by + bh / 2, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, bx + 42, by + bh / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
+
+    /* ── White panel ── */
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.28)';
+    ctx.shadowBlur = 46;
+    ctx.shadowOffsetY = 14;
+    ctx.fillStyle = '#FFFFFF';
+    roundRect(ctx, PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_R); ctx.fill();
     ctx.restore();
+
+    /* ── The photo, dominant ── */
+    ctx.save();
+    roundRect(ctx, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H, PHOTO_R);
+    ctx.clip();
+    if (withPhoto && hero) {
+      /* A blurred bed behind a contained draw keeps a portrait photo from
+         sitting on dead grey bars — the bed IS the photo, so the fill always
+         relates to the subject. */
+      const ir = hero.width / hero.height;
+      const rr = PHOTO_W / PHOTO_H;
+      if (Math.abs(ir - rr) > 0.32) {
+        blurredBed(ctx, hero, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H);
+        containDraw(ctx, hero, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H);
+      } else {
+        coverDraw(ctx, hero, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H);
+      }
+    } else {
+      /* No photo: the wash again, one shade up, with the kind's glyph. Never a
+         grey box — an empty card still has to look deliberate. */
+      paintWash(ctx, PHOTO_W, PHOTO_H, t.colors);
+      ctx.save();
+      ctx.translate(PHOTO_X, PHOTO_Y);
+      paintGrain(ctx, PHOTO_W, PHOTO_H, 0.10, 1);
+      ctx.restore();
+      ctx.font = `400 160px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.9;
+      ctx.fillText(t.glyph, PHOTO_X + PHOTO_W / 2, PHOTO_Y + PHOTO_H / 2);
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
     ctx.restore();
+
+    /* ── Words ──
+       textBaseline 'top' rather than the default 'alphabetic', so the gap below
+       the photo is the gap you actually SEE. On the alphabetic baseline the
+       measurement runs to the foot of the letters, and a 64px title puts its
+       cap height 46px back up into that space — a nominal 54px gap rendered as
+       about eight, and the title read as welded to the photo. */
+    ctx.textBaseline = 'top';
+    let y = PHOTO_Y + PHOTO_H + 44;
+
+    ctx.fillStyle = INK;
+    ctx.font = `800 ${titleSize}px ${FONT}`;
+    for (const line of titleLines) {
+      ctx.fillText(line, FX, y);
+      y += TITLE_LH;
+    }
+
+    if (descLines.length) {
+      y += 14;
+      ctx.fillStyle = INK_MUTED;
+      ctx.font = `400 32px ${FONT}`;
+      for (const line of descLines) {
+        ctx.fillText(line, FX, y);
+        y += 42;
+      }
+    }
+    ctx.textBaseline = 'alphabetic';
+
+    /* ── Price + call to action, on one line ──
+       The reference cards all pair them: the number on the left, the action on
+       the right, at the bottom of the panel. It works because those are the two
+       things a reader wants in that order — what does it cost, and how do I get
+       it — and putting them on one line means the eye never has to hunt for the
+       second after finding the first. */
+    const priceText = (spec.price != null && Number.isFinite(spec.price))
+      ? `₹${Number(spec.price).toLocaleString('en-IN')}`
+      : (spec.badge || '');
+    const money = spec.priceLine || priceText;
+
+    const CTA_H = 74;
+    const ctaLabel = ctaFor(spec.kind);
+    ctx.font = `700 27px ${FONT}`;
+    const ctaW = ctx.measureText(ctaLabel).width + 92;
+    const rowY = PANEL_Y + PANEL_H - 44 - CTA_H;
+
+    if (money) {
+      /* Auto-fit the money line too: "Swap for any scientific calculator" and
+         "₹450" are the same field and cannot share one size. */
+      let moneySize = 54;
+      const moneyMax = PANEL_W - 92 - ctaW - 28;
+      for (const size of [54, 46, 38, 32, 28]) {
+        ctx.font = `800 ${size}px ${FONT}`;
+        moneySize = size;
+        if (ctx.measureText(money).width <= moneyMax) break;
+      }
+      ctx.font = `800 ${moneySize}px ${FONT}`;
+      ctx.fillStyle = INK;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(money, FX, rowY + CTA_H / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    /* CTA pill — dark, like every reference. High contrast against white, and
+       it reads as a button rather than as more text. */
+    const ctaX = PANEL_X + PANEL_W - 46 - ctaW;
+    ctx.fillStyle = '#12120E';
+    roundRect(ctx, ctaX, rowY, ctaW, CTA_H, CTA_H / 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `700 27px ${FONT}`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ctaLabel, ctaX + 34, rowY + CTA_H / 2 + 1);
+    /* Arrow, drawn rather than typed — an arrow glyph renders at a different
+       weight in every font on the fallback stack. */
+    const ax = ctaX + ctaW - 34;
+    const ay = rowY + CTA_H / 2;
+    setStroke(ctx, '#FFFFFF', 3);
+    ctx.beginPath();
+    ctx.moveTo(ax - 13, ay + 7); ctx.lineTo(ax + 3, ay - 9);
+    ctx.moveTo(ax - 6, ay - 9);  ctx.lineTo(ax + 3, ay - 9);
+    ctx.lineTo(ax + 3, ay);
+    ctx.stroke();
+    ctx.textBaseline = 'alphabetic';
+
+    /* ── Meta line: location and date, above the price row ── */
+    const metaBits = [spec.location, spec.dateLine].filter(Boolean) as string[];
+    if (metaBits.length) {
+      const metaY = rowY - 30;
+      ctx.font = `500 27px ${FONT}`;
+      ctx.fillStyle = INK_MUTED;
+      ctx.textBaseline = 'middle';
+      let mx = FX;
+      /* A FILLED pin, not a stroked one. At this size a 2.4px outline is a
+         couple of device pixels once the card is scaled into a chat bubble,
+         and it dissolves into a grey smudge; a solid shape with a knocked-out
+         centre survives the downscale and still reads as a map pin. */
+      ctx.save();
+      const px = mx + 8, py = metaY - 2;
+      ctx.fillStyle = INK_MUTED;
+      ctx.beginPath();
+      ctx.arc(px, py, 8, Math.PI * 0.82, Math.PI * 0.18, false);
+      ctx.lineTo(px, py + 14);
+      ctx.closePath();
+      ctx.fill();
+      /* The hole. Drawn in the panel's own white rather than punched out with
+         a composite operation, which would also erase the panel beneath it. */
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(px, py - 1, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      mx += 30;
+      const metaText = metaBits.join('  ·  ');
+      const metaLines = wrapText(ctx, metaText, TEXT_W - 28, 1);
+      ctx.fillText(metaLines[0], mx, metaY + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    /* ── Footer, on the wash ── */
+    ctx.font = `600 27px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const by2 = PANEL_Y + PANEL_H + (CARD_H - PANEL_Y - PANEL_H) / 2;
+    const who = spec.byName ? `${spec.byName}  ·  wecycle.page` : 'wecycle.page';
+    ctx.fillText(who, CARD_W / 2, by2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    /* Avatar tucked left of the footer line when we have one. */
+    if (avatar || spec.byInitials) {
+      const r = 24;
+      ctx.save();
+      drawAvatar(ctx, M + r, by2, r, avatar, spec.byInitials, spec.byColor);
+      ctx.restore();
+    }
+    void logo;
   };
 
   paint(true);
@@ -859,6 +1150,9 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   try {
     dataUrl = canvas.toDataURL('image/png');
   } catch {
+    /* A cross-origin photo taints the canvas and toDataURL throws. Repaint
+       without it rather than returning nothing — a card with the wash and the
+       words still says what is for sale. */
     paint(false);
     dataUrl = canvas.toDataURL('image/png');
   }
@@ -1104,14 +1398,89 @@ function panelCells(spec: ShareCardSpec, t: Theme): { label: string; value: stri
   return out;
 }
 
+/* ── The message that travels with the card ────────────────────────────────
+ *
+ * The caption is doing more work than the card is. On WhatsApp the image
+ * arrives collapsed in a bubble and the TEXT is what someone reads first; in a
+ * group of ninety students, that one line decides whether anyone opens it.
+ *
+ * So it is written per context, in the voice of the person sharing rather than
+ * the platform announcing. "Lost: watch — seen it?" is what a person types.
+ * "Check out this listing on Wecycle" is what an app types, and it is ignored
+ * for the same reason every forwarded marketing line is ignored.
+ *
+ * Three rules held throughout: say the THING first, because that is what
+ * someone is deciding on; keep it to one line, because two lines get truncated
+ * in the preview anyway; and never manufacture urgency, since a swap drive that
+ * claims to be nearly over and is not costs the poster their credibility the
+ * first time someone checks.
+ */
 function cardText(spec: ShareCardSpec): string {
+  const title = spec.title.trim();
+  const money = spec.priceLine?.trim();
+  const where = spec.location?.trim();
+
   switch (spec.kind) {
-    case 'request': return `Looking for "${spec.title}" on Wecycle`;
-    case 'event':   return `${spec.title}${spec.dateLine ? ` · ${spec.dateLine}` : ''} — on Wecycle`;
-    case 'lost':    return `Lost: "${spec.title}" — seen it? Help out on Wecycle`;
-    case 'found':   return `Found: "${spec.title}" — is it yours? On Wecycle`;
-    default:        return `"${spec.title}"${spec.price != null ? ` — ₹${spec.price}` : ''} on Wecycle`;
+    case 'request':
+      /* An ask, phrased as one. The person sharing is admitting they need
+         something, so the line does the admitting for them. */
+      /* Phrased to dodge the article. "Anyone got scientific calculator" needs
+         an "a" that cannot be derived reliably — "a calculator" but "an easel",
+         and neither for "AirPods" — so the sentence is built to not need one. */
+      return `Looking for: ${lowerFirst(title)} — anyone got one going spare? 👀`;
+
+    case 'event':
+      return spec.dateLine
+        ? `${title} — ${spec.dateLine}${where ? `, ${where}` : ''}. Details on Wecycle 🎪`
+        : `${title}${where ? ` at ${where}` : ''} — details on Wecycle 🎪`;
+
+    case 'lost':
+      /* The only card where the reader can help rather than benefit, so it
+         asks rather than offers. */
+      return `Lost: ${lowerFirst(title)}${where ? ` around ${where}` : ''}. Seen it anywhere? 🙏`;
+
+    case 'found':
+      return `Found: ${lowerFirst(title)}${where ? ` near ${where}` : ''} — is this yours? Claim it on Wecycle`;
+
+    case 'job':
+      return `${title}${money ? ` — ${money}` : ''}. On the Wecycle jobs board 💼`;
+
+    default: {
+      /* Items. The deal changes the sentence, because "free" and "₹200 a day"
+         are different offers and a single template flattens both into neither.
+         The badge is the reliable signal here — priceLine can be an ask, a
+         rate, or a swap request. */
+      const badge = (spec.badge ?? '').toLowerCase();
+      if (badge.includes('swap')) {
+        /* priceLine already reads "Swap for a calculator", so pasting it after
+           "Swapping X" says swap twice. Take just the ask. */
+        const ask = money && money !== 'Open to swaps'
+          ? money.replace(/^swap for\s*/i, '').trim()
+          : '';
+        return ask
+          ? `Swapping ${lowerFirst(title)} for ${lowerFirst(ask)} — fancy a trade? 🔄`
+          : `Swapping ${lowerFirst(title)} — open to offers. Fancy a trade? 🔄`;
+      }
+      if (badge.includes('rent')) {
+        return `${title} up for rent${money ? ` — ${money}` : ''} on Wecycle. Borrow it, don't buy it 🔁`;
+      }
+      if (badge.includes('free') || money === 'Free') {
+        return `Giving away ${lowerFirst(title)}${where ? `, ${where}` : ''} — free to whoever wants it 🎁`;
+      }
+      return `${title}${money ? ` — ${money}` : ''}${where ? `, ${where}` : ''}. Grab it on Wecycle 📦`;
+    }
   }
+}
+
+/** Lowercase a leading word unless it looks like a name or an initialism —
+ *  "Casio" and "FX-991EX" must survive being dropped mid-sentence, while
+ *  "Drawing tablet" should not read as "Giving away Drawing tablet". */
+function lowerFirst(s: string): string {
+  const first = s.split(' ')[0] ?? '';
+  if (!first) return s;
+  /* Two or more capitals, or any digit, means a model number or an acronym. */
+  if (/[A-Z].*[A-Z]|\d/.test(first)) return s;
+  return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
 export type ShareCardResult = 'shared' | 'downloaded' | 'copied' | 'unavailable';

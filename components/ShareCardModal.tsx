@@ -18,7 +18,8 @@ import { X, Share2, Download, Link2, Loader2, Check } from 'lucide-react';
 import gsap from 'gsap';
 import {
   renderShareCard, downloadCardBlob, shareCardBlob,
-  type ShareCardSpec,
+  STOREFRONT_STYLES,
+  type ShareCardSpec, type StorefrontStyle,
 } from '../lib/shareCard';
 import { shareLink } from '../lib/share';
 import { sfxOpen, sfxShare, sfxTap } from '../lib/sfx';
@@ -32,6 +33,14 @@ interface Props {
 }
 
 export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
+  /* Style choice, for the card kinds that have one. Held here rather than in
+     the spec so the caller does not have to care: a storefront card is the
+     only thing with a look worth choosing, and the poster picks it at the
+     moment of sharing, not while filling in a form. */
+  const [style, setStyle] = useState<StorefrontStyle>(STOREFRONT_STYLES[0].id);
+  const hasStyles = spec?.kind === 'storefront';
+  const effectiveSpec = hasStyles && spec ? { ...spec, cardStyle: style } : spec;
+
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,7 +53,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
 
   /* Render whenever the modal opens with a spec. */
   useEffect(() => {
-    if (!open || !spec) return;
+    if (!open || !effectiveSpec) return;
     let cancelled = false;
     setDataUrl(null);
     setBlob(null);
@@ -52,14 +61,16 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
     playedRef.current = false;
     (async () => {
       try {
-        const r = await renderShareCard(spec);
+        const r = await renderShareCard(effectiveSpec!);
         if (cancelled) return;
         setDataUrl(r.dataUrl);
         setBlob(r.blob);
       } catch { /* leave empty */ }
     })();
     return () => { cancelled = true; };
-  }, [open, spec?.kind, spec?.title, spec?.imageUrls?.join('|'), spec?.price, spec?.badge, spec?.dateLine, spec?.location, spec?.byName]); // eslint-disable-line react-hooks/exhaustive-deps
+    /* `style` is in the deps on purpose: picking a swatch has to re-render the
+       card, and it is the only control on this sheet that changes the image. */
+  }, [open, spec?.kind, spec?.title, spec?.imageUrls?.join('|'), spec?.price, spec?.priceLine, spec?.badge, spec?.dateLine, spec?.location, spec?.byName, style]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Snappy entrance for the whole sheet when it mounts. */
   useEffect(() => {
@@ -133,7 +144,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
      * shareCardBlob itself falls back to a download + copied link on desktop
      * browsers that can't share files. */
     const res = blob
-      ? await shareCardBlob(blob, spec)
+      ? await shareCardBlob(blob, effectiveSpec!)
       : await shareLink({ title: spec.title, text: shareText(spec), url: spec.url });
     setBusy(false);
     if (res === 'shared') { sfxShare(); successPop(); flashToast('Shared!'); }
@@ -146,7 +157,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
     if (!spec || busy) return;
     setBusy(true);
     sfxTap();
-    const res = await downloadCardBlob(blob, spec);
+    const res = await downloadCardBlob(blob, effectiveSpec!);
     setBusy(false);
     flashToast(res === 'downloaded' ? 'Saved to your device' : "Couldn't save");
   };
@@ -240,6 +251,56 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
                 </div>
               )}
             </div>
+
+            {/* ── Style picker ──
+                Only where a choice exists, which today is the storefront card.
+                A horizontal row of swatches rather than a dropdown: the thing
+                being chosen is a LOOK, so it has to be shown rather than named,
+                and two options fit without scrolling at any width.
+
+                Placed under the preview and above the actions, because it
+                changes what you are about to send and therefore belongs in the
+                path between seeing it and sending it. */}
+            {hasStyles && (
+              <div
+                role="radiogroup"
+                aria-label="Card style"
+                style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}
+              >
+                {STOREFRONT_STYLES.map(st => {
+                  const on = st.id === style;
+                  return (
+                    <button
+                      key={st.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => { haptics.selection(); sfxTap(); setStyle(st.id); }}
+                      style={{
+                        flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 8,
+                        minHeight: 44, padding: '8px 14px 8px 8px',
+                        borderRadius: 999, cursor: 'pointer',
+                        background: on ? 'var(--text-primary)' : 'var(--bg-inset)',
+                        color: on ? '#fff' : 'var(--text-secondary)',
+                        border: 'none',
+                        fontSize: 13, fontWeight: 600,
+                        transition: 'background 160ms',
+                      }}
+                    >
+                      {/* The swatch IS the palette — two stops of the actual
+                          wash, so the button previews the card rather than
+                          describing it. */}
+                      <span aria-hidden="true" style={{
+                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                        background: `linear-gradient(135deg, ${st.wash[1]}, ${st.wash[3]})`,
+                        boxShadow: `inset 0 0 0 2px ${on ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.08)'}`,
+                      }} />
+                      {st.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: 10 }}>
