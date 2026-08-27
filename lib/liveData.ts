@@ -21,7 +21,7 @@ import { listingToComp } from './opportunity';
 import type { CompressedMedia } from './mediaCompression';
 import type { Database } from './database.types';
 import { normalizeCategory } from './categories';
-import { assertClean } from './contentFilter';
+import { assertClean, isServerModerationError } from './contentFilter';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -513,6 +513,52 @@ export async function uploadMedia(bucket: string, media: CompressedMedia[]): Pro
   return { photoUrls, videoUrls };
 }
 
+/** Turn a failed write into a sentence a poster can act on.
+ *
+ *  This exists because a real one got out. The suspension guard was created
+ *  SECURITY INVOKER over a column `authenticated` cannot read, so every post
+ *  died on "permission denied for table profiles" — Postgres talking to an
+ *  operator — printed in red inside the share form under someone's half-typed
+ *  listing. The database bug is fixed; this is the second line of defence, so
+ *  that the next infrastructure fault is not also a support ticket written in
+ *  a language the person reading it does not speak.
+ *
+ *  Two kinds of message pass through untouched: the content filter's refusal
+ *  and the suspension notice. Those are raised BY the database FOR this
+ *  audience, already worded for them, and rewording them here would undo the
+ *  reason they carry those words. */
+function friendlyWriteError(error: unknown): Error {
+  if (isServerModerationError(error)) return error as Error;
+
+  const msg = String((error as { message?: string } | null)?.message ?? '');
+  const code = String((error as { code?: string } | null)?.code ?? '');
+
+  if (/suspended until/i.test(msg)) return error as Error;
+
+  /* 42501 is insufficient_privilege, which also carries an RLS refusal. Both
+     mean the same thing to a poster: nothing they did wrong, nothing they can
+     fix by retyping. Do not tell them to sign in again — that was untrue for
+     the outage that prompted this, and it sends people round in circles. */
+  if (code === '42501' || /permission denied|row-level security/i.test(msg)) {
+    return new Error(
+      "Couldn't save your post — this one is on our side, not yours. "
+      + 'Please try again in a moment, and email wecycle.page@gmail.com if it keeps happening.',
+    );
+  }
+  /* 23503 foreign key: in practice a category that no longer exists, from a
+     tab left open across the taxonomy rewrite. */
+  if (code === '23503') {
+    return new Error('Please pick the category again — the one selected is out of date.');
+  }
+  if (isRetryableUploadError(error)) {
+    return new Error(
+      "Couldn't reach Wecycle — check your connection and try again; "
+      + 'everything you typed is still here.',
+    );
+  }
+  return new Error(msg || 'Could not post — please try again.');
+}
+
 /* ── Create a listing ──────────────────────────────── */
 
 export interface NewListingInput {
@@ -604,7 +650,7 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
     .select(SELECT_WITH_JOINS)
     .single();
 
-  if (error) throw error;
+  if (error) throw friendlyWriteError(error);
   notifyPostsChanged();
   return mapListingRow(data as unknown as ListingRow);
 }
@@ -672,7 +718,7 @@ export async function createRequest(input: NewRequestInput) {
     expires_at: expiresAt,
     notify_on_engagement: input.notifyOnEngagement ?? true,
   } as never);
-  if (error) throw error;
+  if (error) throw friendlyWriteError(error);
   notifyPostsChanged();
 }
 
@@ -734,7 +780,7 @@ export async function createEvent(input: NewEventInput): Promise<string> {
        time_unspecified, so the typed Insert treats any newer column as never.
        Same cast the listings insert uses for the columns added since. */
   } as never).select('id').single();
-  if (error) throw error;
+  if (error) throw friendlyWriteError(error);
   notifyPostsChanged();
   return (data as { id: string }).id;
 }
@@ -784,7 +830,7 @@ export async function createLostFound(input: NewLostFoundInput) {
     video_urls: videoUrls,
     notify_on_engagement: input.notifyOnEngagement ?? true,
   } as never);
-  if (error) throw error;
+  if (error) throw friendlyWriteError(error);
   notifyPostsChanged();
 }
 
