@@ -1092,8 +1092,15 @@ async function renderClassicCard(spec: ShareCardSpec): Promise<RenderedCard> {
   return { blob, dataUrl };
 }
 
-/** Which listing layout ships. Both are maintained; this is the switch. */
-const CARD_LAYOUT: 'classic' | 'spotlight' = 'classic';
+/** Which listing layout ships. Both are maintained; this is the switch.
+ *
+ * 'spotlight' — hero photo on top, words on a white panel below.
+ * 'classic'   — photo on top, words on the gradient, price and location large.
+ *
+ * Back on spotlight at the owner's call after seeing both side by side. The
+ * classic renderer stays whole and reachable by flipping this one word; neither
+ * layout is a branch to be reconstructed. */
+const CARD_LAYOUT: 'classic' | 'spotlight' = 'spotlight';
 
 export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard> {
   /* A storefront advertises a person and takes a different composition
@@ -1302,18 +1309,23 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
       : (spec.badge || '');
     const money = spec.priceLine || priceText;
 
-    const CTA_H = 74;
-    const ctaLabel = ctaFor(spec.kind);
-    ctx.font = `700 27px ${FONT}`;
-    const ctaW = ctx.measureText(ctaLabel).width + 92;
-    const rowY = PANEL_Y + PANEL_H - 44 - CTA_H;
+    /* ── Price ──
+       No call to action beside it any more. This is a flat PNG that will sit in
+       a chat: a button drawn on it is a button that cannot be pressed, and a
+       card asking to be tapped when it cannot be is the fastest way to make it
+       look fake. The action travels as the message pasted alongside, which is
+       where it actually works — so the money gets the full width instead of
+       sharing the row with a decoration. */
+    const PRICE_H = 84;
+    const rowY = PANEL_Y + PANEL_H - 44 - PRICE_H;
 
     if (money) {
-      /* Auto-fit the money line too: "Swap for any scientific calculator" and
-         "₹450" are the same field and cannot share one size. */
-      let moneySize = 54;
-      const moneyMax = PANEL_W - 92 - ctaW - 28;
-      for (const size of [54, 46, 38, 32, 28]) {
+      /* Auto-fit: "Swap for any scientific calculator" and "₹450" are the same
+         field and cannot share one size. Bigger than before now that nothing
+         competes for the row. */
+      let moneySize = 76;
+      const moneyMax = PANEL_W - 92;
+      for (const size of [76, 64, 54, 44, 36, 30]) {
         ctx.font = `800 ${size}px ${FONT}`;
         moneySize = size;
         if (ctx.measureText(money).width <= moneyMax) break;
@@ -1321,36 +1333,18 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
       ctx.font = `800 ${moneySize}px ${FONT}`;
       ctx.fillStyle = INK;
       ctx.textBaseline = 'middle';
-      ctx.fillText(money, FX, rowY + CTA_H / 2 + 1);
+      ctx.fillText(money, FX, rowY + PRICE_H / 2 + 1);
       ctx.textBaseline = 'alphabetic';
     }
-
-    /* CTA pill — dark, like every reference. High contrast against white, and
-       it reads as a button rather than as more text. */
-    const ctaX = PANEL_X + PANEL_W - 46 - ctaW;
-    ctx.fillStyle = '#12120E';
-    roundRect(ctx, ctaX, rowY, ctaW, CTA_H, CTA_H / 2); ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = `700 27px ${FONT}`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ctaLabel, ctaX + 34, rowY + CTA_H / 2 + 1);
-    /* Arrow, drawn rather than typed — an arrow glyph renders at a different
-       weight in every font on the fallback stack. */
-    const ax = ctaX + ctaW - 34;
-    const ay = rowY + CTA_H / 2;
-    setStroke(ctx, '#FFFFFF', 3);
-    ctx.beginPath();
-    ctx.moveTo(ax - 13, ay + 7); ctx.lineTo(ax + 3, ay - 9);
-    ctx.moveTo(ax - 6, ay - 9);  ctx.lineTo(ax + 3, ay - 9);
-    ctx.lineTo(ax + 3, ay);
-    ctx.stroke();
-    ctx.textBaseline = 'alphabetic';
 
     /* ── Meta line: location and date, above the price row ── */
     const metaBits = [spec.location, spec.dateLine].filter(Boolean) as string[];
     if (metaBits.length) {
-      const metaY = rowY - 30;
-      ctx.font = `500 27px ${FONT}`;
+      const metaY = rowY - 34;
+      /* 34px, not 27. Location was the smallest text on a card that exists in
+         part to say where the thing is — and it is half of the question the
+         price asks. */
+      ctx.font = `600 34px ${FONT}`;
       ctx.fillStyle = INK_MUTED;
       ctx.textBaseline = 'middle';
       let mx = FX;
@@ -1375,7 +1369,7 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
       ctx.restore();
       mx += 30;
       const metaText = metaBits.join('  ·  ');
-      const metaLines = wrapText(ctx, metaText, TEXT_W - 28, 1);
+      const metaLines = wrapText(ctx, metaText, TEXT_W - 34, 1);
       ctx.fillText(metaLines[0], mx, metaY + 1);
       ctx.textBaseline = 'alphabetic';
     }
@@ -1757,7 +1751,12 @@ export type ShareCardResult = 'shared' | 'downloaded' | 'copied' | 'unavailable'
  *  hook. */
 function shareMessage(spec: ShareCardSpec, url: string): string {
   const hook = cardText(spec);
-  const desc = (spec.description ?? '').replace(/\s+/g, ' ').trim();
+  /* Only when the card itself does not already show it. The spotlight layout
+     and the storefront card both draw the description; repeating it underneath
+     makes the message read as a copy-paste error rather than as a caption. The
+     classic layout leaves it off the card, so there the message carries it. */
+  const onCard = spec.kind === 'storefront' || CARD_LAYOUT === 'spotlight';
+  const desc = onCard ? '' : (spec.description ?? '').replace(/\s+/g, ' ').trim();
   const blurb = desc.length > 220 ? `${desc.slice(0, 219).trimEnd()}…` : desc;
   return [hook, blurb, url].filter(Boolean).join('\n\n');
 }
