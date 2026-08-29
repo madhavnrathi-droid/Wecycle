@@ -1496,7 +1496,13 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
   if (patch.location !== undefined)    update.location = patch.location.trim() || null;
   if (patch.listingType !== undefined) {
     update.listing_type = patch.listingType;
-    update.price = patch.listingType === 'sell' ? (patch.price ?? null) : null;
+    /* sell OR borrow. A rental's price IS its rate, so the old `=== 'sell'`
+       test wiped it on every edit that carried a listing type: correct the
+       title of a ₹200/day drill and the rate silently became null. createListing
+       has kept the price for both since rent shipped; this path never did, so
+       the two halves of the app disagreed about the same column. */
+    const keepsPrice = patch.listingType === 'sell' || patch.listingType === 'borrow';
+    update.price = keepsPrice ? (patch.price ?? null) : null;
   } else if (patch.price !== undefined) {
     update.price = patch.price;
   }

@@ -33,13 +33,16 @@ import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES, closedLabelFor } from '../lib/mockData';
-import { normalizeCategory } from '../lib/categories';
+import { normalizeCategory, categoryLabel } from '../lib/categories';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
 import { WA_FILL, WA_INK } from '../lib/whatsapp';
-import { priceLine, fromListingType, DEAL_BY_ID } from '../lib/dealTypes';
+import {
+  priceLine, fromListingType, toListingType, DEAL_BY_ID, DEAL_TYPES,
+  RENT_PERIODS, DEFAULT_RENT_PERIOD,
+} from '../lib/dealTypes';
 
 /* Wecycle brand stamp pinned to the top-right corner of a detail hero photo.
    A small frosted-white circle so the logomark reads on any image. `offset`
@@ -193,9 +196,17 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
      hold "hobbies & collectibles" — which matches no <option value>, so the
      select fell back to displaying the first entry (Electronics) while still
      holding the bad value. Opening a post therefore showed the wrong category,
-     and saving sent an id no category has. */
+     and saving sent an id no category has.
+
+     categoryId is normalised too, which it was not before. Trusting it raw is
+     the same bug wearing a different hat: a stored id this bundle has never
+     heard of — a retired one like `clothing`, or the `all` row that really does
+     exist in the categories table — sails through `??` and lands in the select
+     as a value with no matching option. normalizeCategory is exactly the
+     function that maps those forward, and skipping it for the id while
+     applying it to the label made no sense. */
   const categoryIdOf = (it: { categoryId?: string; category?: string }) =>
-    it.categoryId ?? normalizeCategory(it.category) ?? '';
+    normalizeCategory(it.categoryId) ?? normalizeCategory(it.category) ?? '';
   const [eCategory, setECategory]       = useState(categoryIdOf(item));
   const [eUrgent, setEUrgent]           = useState(!!item.urgent);
 
@@ -224,6 +235,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       const origPriceStr = typeof item.price === 'number' ? String(item.price) : '';
       if (ePriceStr !== origPriceStr) return true;
       if (eListingType !== (item.listingType ?? 'free')) return true;
+      /* Changing only "/ day" to "/ week" is a real edit — without this the
+         Save button stays disabled and the change looks ignored. */
+      if (eListingType === 'borrow'
+          && (eRatePeriod ?? DEFAULT_RENT_PERIOD) !== (item.ratePeriod ?? DEFAULT_RENT_PERIOD)) return true;
     }
     if (item.kind === 'opportunity') {
       if (eComp !== (item.comp ?? 'free')) return true;
@@ -250,12 +265,16 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       const svc = isOpp ? compToListing(eComp, priceNum) : null;
       if (isDemoMode()) {
         updateDemoPost(item.id, {
-          title: eTitle, category: eCategory, description: eDescription,
+          /* The demo store's `category` is the LABEL — it is rendered directly
+             by the header and the tile chip — so the id has to be mapped back
+             or the post starts announcing itself as "electronics". */
+          title: eTitle, category: categoryLabel(eCategory), description: eDescription,
           ...(isRequestPost
             ? { urgent: eUrgent }
             : isOpp
               ? { location: eLocation, comp: eComp, ratePeriod: eComp === 'paid' ? eRatePeriod : undefined, priceMax: eComp === 'paid' && ePriceMaxStr.trim() !== '' ? Number(ePriceMaxStr) : undefined, listingType: svc!.listingType, price: svc!.price }
-              : { location: eLocation, listingType: eListingType, price: priceNum }),
+              : { location: eLocation, listingType: eListingType, price: priceNum,
+                  ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : undefined }),
         });
       } else if (isRequestPost) {
         await updateRequestFields(item.id, {
@@ -268,7 +287,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           location: eLocation,
           ...(isOpp
             ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, ratePeriod: eComp === 'paid' ? (eRatePeriod ?? null) : null, priceMax: eComp === 'paid' ? (ePriceMaxStr.trim() === '' ? null : Number(ePriceMaxStr)) : null }
-            : { listingType: eListingType, price: priceNum }),
+            /* Rent stores its period alongside the rate, or "₹200" comes back
+               without the "/ day" that gives it meaning. */
+            : { listingType: eListingType, price: priceNum,
+                ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : null }),
         });
       }
     } catch (e) {
@@ -288,12 +310,16 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       const svc = isOpp ? compToListing(eComp, priceNum) : null;
       if (isDemoMode()) {
         repostDemoPost(item.id, {
-          title: eTitle, category: eCategory, description: eDescription,
+          /* The demo store's `category` is the LABEL — it is rendered directly
+             by the header and the tile chip — so the id has to be mapped back
+             or the post starts announcing itself as "electronics". */
+          title: eTitle, category: categoryLabel(eCategory), description: eDescription,
           ...(isRequestPost
             ? { urgent: eUrgent }
             : isOpp
               ? { location: eLocation, comp: eComp, ratePeriod: eComp === 'paid' ? eRatePeriod : undefined, priceMax: eComp === 'paid' && ePriceMaxStr.trim() !== '' ? Number(ePriceMaxStr) : undefined, listingType: svc!.listingType, price: svc!.price }
-              : { location: eLocation, listingType: eListingType, price: priceNum }),
+              : { location: eLocation, listingType: eListingType, price: priceNum,
+                  ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : undefined }),
         });
       } else if (isRequestPost) {
         await repostRequest(item.id, {
@@ -306,7 +332,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           location: eLocation,
           ...(isOpp
             ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, ratePeriod: eComp === 'paid' ? (eRatePeriod ?? null) : null, priceMax: eComp === 'paid' ? (ePriceMaxStr.trim() === '' ? null : Number(ePriceMaxStr)) : null }
-            : { listingType: eListingType, price: priceNum }),
+            /* Rent stores its period alongside the rate, or "₹200" comes back
+               without the "/ day" that gives it meaning. */
+            : { listingType: eListingType, price: priceNum,
+                ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : null }),
         });
       }
     } catch (e) {
@@ -386,8 +415,17 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     : isOpportunity ? opportunityCompLabel(item)
     : isPriced ? `₹${item.price!.toLocaleString('en-IN')}`
     : isUnpricedSell ? 'Selling'
-    : item.listingType === 'free' ? 'Free'
-    : item.listingType[0].toUpperCase() + item.listingType.slice(1);
+    /* Everything else — free, rent, swap — through the one formatter the feed
+       and the share card already use. Title-casing the stored enum instead is
+       how a ₹200/day rental came to announce itself as "Borrow": the right
+       word for the column, a non-answer for the reader, and the rate dropped
+       entirely. */
+    : priceLine({
+        deal: fromListingType(item.listingType),
+        price: item.price,
+        ratePeriod: item.ratePeriod,
+        swapFor: item.swapFor,
+      });
   const desc = item.description ?? '';
 
   /* When a link is armed on the photo, the photo stops opening the lightbox and
@@ -649,12 +687,21 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         role="banner"
         style={{
           position: 'fixed', top: 0, left: 0, right: 0,
-          zIndex: 31,
+          /* position:fixed puts this OUTSIDE .scroll-shell, so it does not
+             inherit that container's safe-area padding the way the sticky
+             header below does. At top:0 on a notched phone it therefore drew
+             itself into the status-bar strip — and .app-container::before
+             paints an opaque bar over exactly that strip at z-index 35, above
+             this bar's old 31. The result on every modern iPhone: a back
+             button rendered underneath an opaque rectangle. Invisible, with
+             the ordinary header already scrolled away, and no other way out of
+             the post. Pad past the inset and sit above the strip. */
+          zIndex: 36,
           background: 'var(--bg-overlay)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderBottom: '1px solid var(--border-subtle)',
-          padding: '8px 12px',
+          padding: 'calc(8px + env(safe-area-inset-top, 0px)) 12px 8px',
           display: 'flex', alignItems: 'center', gap: 8,
           transform: heroVisible ? 'translateY(-100%)' : 'translateY(0)',
           transition: 'transform 200ms ease',
@@ -846,6 +893,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                   priceStr={ePriceStr}
                   onListingType={setEListingType}
                   onPriceStr={setEPriceStr}
+                  ratePeriod={eRatePeriod}
+                  onRatePeriod={setERatePeriod}
                 />
               )}
             </EditFieldRow>
@@ -864,16 +913,11 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           )}
 
           <EditFieldRow label="Category">
-            <select
+            <CategorySelect
               value={eCategory}
-              onChange={e => setECategory(e.target.value)}
-              className="inline-edit inline-edit--pill"
-              aria-label="Category"
-            >
-              {CATEGORIES.filter(c => c.id !== 'all').map(c => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
+              onChange={setECategory}
+              fallbackLabel={item.category}
+            />
           </EditFieldRow>
 
           {isRequestPost && (
@@ -1704,17 +1748,12 @@ function DesktopLayout({
           )}
 
           {canManage ? (
-            <select
+            <CategorySelect
               value={eCategory}
-              onChange={e => setECategory(e.target.value)}
-              className="inline-edit inline-edit--pill"
-              aria-label="Category"
+              onChange={setECategory}
+              fallbackLabel={item.category}
               style={{ alignSelf: 'flex-start' }}
-            >
-              {CATEGORIES.filter(c => c.id !== 'all').map(c => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
+            />
           ) : (
             <div style={{
               display: 'inline-flex', alignSelf: 'flex-start',
@@ -1782,6 +1821,8 @@ function DesktopLayout({
                   priceStr={ePriceStr}
                   onListingType={setEListingType}
                   onPriceStr={setEPriceStr}
+                  ratePeriod={eRatePeriod}
+                  onRatePeriod={setERatePeriod}
                 />
               )
             ) : (
@@ -2253,24 +2294,76 @@ function OwnerCompEditor({
   );
 }
 
+/* The category picker.
+ *
+ * The fallback <option> is the entire point of this component. A <select>
+ * whose value matches none of its options does not go blank and does not
+ * complain — it quietly displays its FIRST option instead. That option is
+ * Electronics. So any listing whose category the running bundle cannot
+ * resolve read as "Electronics": the owner would correct it, the save would
+ * succeed, they would reopen the post, and it would say Electronics again.
+ * Nothing was broken in the database and nothing reported an error, which is
+ * why it looked unfixable from the outside.
+ *
+ * Rendering the unresolved value as its own option keeps the control honest.
+ * It shows the real label where we have one, so the fallback reads as the
+ * category the post is actually in rather than as a stray id — and an empty
+ * category asks to be filled rather than impersonating a filled one.
+ */
+function CategorySelect({ value, onChange, fallbackLabel, style }: {
+  value: string;
+  onChange: (v: string) => void;
+  /** Human label for a value this build has no option for. */
+  fallbackLabel?: string;
+  style?: React.CSSProperties;
+}) {
+  /* CATEGORIES is mockData's re-export, which prepends the All *filter* — not
+     a category, nothing can be posted into it, so it never belongs here. */
+  const options = CATEGORIES.filter(c => c.id !== 'all');
+  const known = options.some(c => c.id === value);
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="inline-edit inline-edit--pill"
+      aria-label="Category"
+      style={style}
+    >
+      {!known && (
+        <option value={value}>
+          {value ? (fallbackLabel || value) : 'Pick a category'}
+        </option>
+      )}
+      {options.map(c => (
+        <option key={c.id} value={c.id}>{c.label}</option>
+      ))}
+    </select>
+  );
+}
+
 /* Listing-type segmented switch + optional price input. Used in the title
  * row when the owner is editing a sell/free/borrow/swap post. */
 function OwnerPriceEditor({
-  listingType, priceStr, onListingType, onPriceStr,
+  listingType, priceStr, onListingType, onPriceStr, ratePeriod, onRatePeriod,
 }: {
   listingType: 'free' | 'sell' | 'borrow' | 'swap';
   priceStr: string;
   onListingType: (v: 'free' | 'sell' | 'borrow' | 'swap') => void;
   onPriceStr: (v: string) => void;
+  ratePeriod?: RatePeriod;
+  onRatePeriod: (v: RatePeriod) => void;
 }) {
-  const isSell = listingType === 'sell';
-  /* Segmented chips — bigger, clearer hit targets than a dropdown. */
-  const TYPES: { id: 'free' | 'sell' | 'borrow' | 'swap'; label: string }[] = [
-    { id: 'free',   label: 'Free' },
-    { id: 'sell',   label: 'Sell' },
-    { id: 'borrow', label: 'Borrow' },
-    { id: 'swap',   label: 'Swap' },
-  ];
+  const deal = fromListingType(listingType);
+  const isRent = deal === 'rent';
+  /* Rent needs the money box as much as sell does — it is where the RATE goes.
+     Hiding it here was why a rental could be created with a rate and then never
+     have that rate corrected. */
+  const wantsPrice = deal === 'sell' || isRent;
+  /* Segmented chips — bigger, clearer hit targets than a dropdown. Labels come
+     from DEAL_TYPES so this reads in the product's words: the column stores
+     `borrow` for historical reasons, but nobody rents out a drill by calling it
+     borrowing, and the rest of the app already says Rent. */
+  const TYPES = DEAL_TYPES.map(d => ({ id: toListingType(d.id), label: d.label }));
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="listing-type-segmented" role="radiogroup" aria-label="Listing type">
@@ -2288,20 +2381,35 @@ function OwnerPriceEditor({
           </button>
         ))}
       </div>
-      {isSell && (
-        <label className="price-input-wrap">
-          <IndianRupee size={14} strokeWidth={2.2} />
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={priceStr}
-            onChange={e => onPriceStr(e.target.value)}
-            placeholder="Set a price (or leave empty for 'Selling')"
-            className="inline-edit inline-edit--price-input"
-            aria-label="Price in rupees"
-          />
-        </label>
+      {wantsPrice && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label className="price-input-wrap" style={{ flex: 1, minWidth: 0 }}>
+            <IndianRupee size={14} strokeWidth={2.2} />
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={priceStr}
+              onChange={e => onPriceStr(e.target.value)}
+              placeholder={isRent ? 'Rate' : "Set a price (or leave empty for 'Selling')"}
+              className="inline-edit inline-edit--price-input"
+              aria-label={isRent ? 'Rate in rupees' : 'Price in rupees'}
+            />
+          </label>
+          {isRent && (
+            <select
+              value={ratePeriod ?? DEFAULT_RENT_PERIOD}
+              onChange={e => onRatePeriod(e.target.value as RatePeriod)}
+              className="inline-edit inline-edit--pill"
+              aria-label="Per"
+              style={{ flexShrink: 0 }}
+            >
+              {RENT_PERIODS.map(p => (
+                <option key={p.id} value={p.id}>/ {p.label}</option>
+              ))}
+            </select>
+          )}
+        </div>
       )}
     </div>
   );

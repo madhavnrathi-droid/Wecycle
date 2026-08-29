@@ -344,12 +344,38 @@ export default function WecycleApp() {
     if (main) main.scrollTop = 0;
   }, [isDesktop, openItem, openEvent, openStorefront, subScreen, registerEvent, insightsEvent]);
 
-  /* Service worker */
+  /* Service worker.
+   *
+   * The reload is the important half. A worker that takes over mid-session is
+   * a NEW worker, which means the page is still running whatever the OLD one
+   * served — and the old one cached /_next/ with stale-while-revalidate under
+   * a VERSION that never moved, so "whatever it served" could be code from a
+   * build we replaced weeks ago. A device in that state can't be talked out of
+   * it: the app looks fine, it is simply an older app, disagreeing with the
+   * database about things like which categories exist. Reloading once on
+   * handover is what lets such a device heal itself instead of waiting for
+   * someone to know to clear their cache.
+   *
+   * Guarded twice over, because a reload loop is worse than a stale bundle:
+   * `controllerchange` also fires on the very first install (when there was no
+   * previous controller and nothing is stale), and the session flag means even
+   * an unforeseen repeat handover can only ever cost one reload per tab. */
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+    const hadController = !!navigator.serviceWorker.controller;
+    const onChange = () => {
+      if (!hadController) return;
+      try {
+        if (sessionStorage.getItem('wecycle.swreload')) return;
+        sessionStorage.setItem('wecycle.swreload', '1');
+      } catch { /* private mode — the hadController guard still holds */ }
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', onChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onChange);
   }, []);
 
   /* On app open, fire one-time janitors that drop past-dated events and
