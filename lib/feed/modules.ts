@@ -73,6 +73,15 @@ export interface ModulePools {
 
 /** A seller as the homepage shows them.
  *
+ *  NOT CURRENTLY PLACED. The Student Businesses row was removed from the module
+ *  library by request; summariseSellers, SellerCard and the 'businesses'
+ *  renderer are all still here and still wired, so restoring it is one entry in
+ *  MODULES. Kept rather than deleted because the aggregation is the only piece
+ *  of this that took any thought.
+ */
+
+/** A seller as the homepage shows them.
+ *
  *  Aggregated from listings rather than read from a businesses table, because
  *  there is no businesses table yet. A student running an actual venture is
  *  currently indistinguishable in the schema from someone selling their old
@@ -195,15 +204,9 @@ export const MODULES: ModuleSpec[] = [
   },
   {
     id: 'services', kind: 'services', zone: 3, priority: 75, min: 1, mobility: 1, layout: 'list',
-    title: 'Hire a classmate 💼', sub: 'Skills, gigs and services on campus',
+    title: 'Services', sub: 'Skills and gigs from people on campus',
     affinity: { service: 40, business: 10 },
     build: p => take(p.opportunities),
-  },
-  {
-    id: 'student_businesses', kind: 'businesses', zone: 3, priority: 72, min: 2, mobility: 1,
-    title: 'Student businesses 🏪', sub: 'Ventures run by people on your campus',
-    affinity: { business: 40, service: 15 },
-    build: p => take(p.sellers, 10),
   },
   {
     id: 'events', kind: 'events', zone: 3, priority: 50, min: 1, mobility: 0, variant: 'wide',

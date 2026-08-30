@@ -3839,8 +3839,8 @@ img[src*="/storage/v1/object/public/"] {
  * "negative" set went unused: a mask has no colour to invert. */
 .nav-ico {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 27px;
+  height: 27px;
   background-color: currentColor;
   -webkit-mask-image: var(--ico);
           mask-image: var(--ico);
@@ -3858,7 +3858,7 @@ img[src*="/storage/v1/object/public/"] {
      the pill finishes and the two read as one gesture rather than two. */
   transition: transform 260ms cubic-bezier(0.3, 1.7, 0.5, 1);
 }
-.nav-ico--plus { --ico: url(/icons/nav/plus.png); width: 26px; height: 26px; }
+.nav-ico--plus { --ico: url(/icons/nav/plus.png); width: 28px; height: 28px; }
 
 .bottom-nav-btn {
   position: relative;
@@ -3870,7 +3870,7 @@ img[src*="/storage/v1/object/public/"] {
   grid-row: 1;
   width: 100%;
   min-width: 0;
-  height: 46px;                /* comfortably past the 44px touch minimum */
+  height: 50px;                /* comfortably past the 44px touch minimum */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3912,7 +3912,7 @@ img[src*="/storage/v1/object/public/"] {
   grid-column: 1;
   align-self: center;
   width: 100%;
-  height: 38px;
+  height: 44px;
   opacity: 0;
   transform: translateX(calc(var(--nav-i, 0) * 100%));
   /* Snappy then bouncy: most of the distance is covered early, then the pill
@@ -3954,7 +3954,7 @@ img[src*="/storage/v1/object/public/"] {
   top: 0;
   bottom: 0;
   left: 50%;
-  width: min(calc(100% - 16px), 54px);
+  width: min(calc(100% - 12px), 62px);
   transform: translateX(-50%);
   border-radius: 999px;
   background: var(--nav-mint);
@@ -3969,9 +3969,15 @@ img[src*="/storage/v1/object/public/"] {
   justify-self: center;
   align-self: center;
   z-index: 2;
-  box-shadow: 0 4px 12px rgba(10, 92, 42, 0.28);
-  width: 50px;
-  height: 50px;
+  /* A tight contact shadow, not a halo.
+     0 4px 12px at 28% read as a green glow bleeding out of the button — soft
+     enough that the circle's edge went indistinct, which is the opposite of
+     what a primary action wants. Half the blur, half the spread, slightly
+     deeper: the button still sits above the bar, but its edge is a clean line
+     and the whole thing reads as snappier. */
+  box-shadow: 0 2px 5px rgba(10, 92, 42, 0.30);
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: var(--nav-ink);
   color: var(--nav-mint);
@@ -4020,11 +4026,11 @@ img[src*="/storage/v1/object/public/"] {
      middle on any screen 768px and up — a phone turned sideways included.
      There is no label to clip any more, but the warning is worth keeping in
      view of whoever brings one back.) */
-  .bottom-nav-btn   { height: 42px; }
-  .bottom-nav-slider { height: 36px; }
-  .bottom-nav-post  { width: 46px; height: 46px; }
-  .nav-ico          { width: 24px; height: 24px; }
-  .nav-ico--plus    { width: 24px; height: 24px; }
+  .bottom-nav-btn   { height: 46px; }
+  .bottom-nav-slider { height: 40px; }
+  .bottom-nav-post  { width: 50px; height: 50px; }
+  .nav-ico          { width: 25px; height: 25px; }
+  .nav-ico--plus    { width: 26px; height: 26px; }
 }
 
 /* Desktop: compact dock — small and unobtrusive (Apple-Dock-like) */
@@ -4039,11 +4045,11 @@ img[src*="/storage/v1/object/public/"] {
       0 12px 30px rgba(0, 0, 0, 0.10),
       0 4px 12px rgba(0, 0, 0, 0.06);
   }
-  .bottom-nav-btn   { height: 40px; }
-  .bottom-nav-slider { height: 34px; }
-  .bottom-nav-post  { width: 42px; height: 42px; }
-  .nav-ico          { width: 22px; height: 22px; }
-  .nav-ico--plus    { width: 22px; height: 22px; }
+  .bottom-nav-btn   { height: 44px; }
+  .bottom-nav-slider { height: 38px; }
+  .bottom-nav-post  { width: 46px; height: 46px; }
+  .nav-ico          { width: 23px; height: 23px; }
+  .nav-ico--plus    { width: 24px; height: 24px; }
   /* Hover affordance for mouse users. Gated to inactive so it doesn't fight
      the mint pill, and expressed as ink rather than a background — a grey box
      appearing behind one icon reads as a second, competing selection. */
@@ -5209,7 +5215,13 @@ textarea:focus-visible {
  * this work in one line of arithmetic. */
 .rail-track {
   --rail-gap: 12px;
-  --rail-cards: 2.3;
+  /* 2.15, up from 2.3. The first pass cut the card from 44% of the viewport to
+     27% and went slightly past the point of diminishing returns — the photo had
+     stopped being the thing you look at, and two-line titles were tight. This
+     gives back about 14px of width without giving back the problem: the peek
+     stays inside the 12–20% band and a card is still barely a quarter of the
+     screen. */
+  --rail-cards: 2.15;
   display: flex;
   gap: var(--rail-gap);
   overflow-x: auto;
@@ -5229,7 +5241,7 @@ textarea:focus-visible {
 }
 /* Past tablet the count rises rather than the cards inflating — the brief's
    "consistent density, not proportional enlargement". */
-@media (min-width: 700px)  { .rail-track { --rail-cards: 3.4; } }
+@media (min-width: 700px)  { .rail-track { --rail-cards: 3.2; } }
 @media (min-width: 1024px) { .rail-track { --rail-cards: 4.4; } }
 @media (min-width: 1440px) { .rail-track { --rail-cards: 5.4; } }
 
@@ -5260,15 +5272,24 @@ textarea:focus-visible {
 .rail--micro {
   --pcard-ar: 1 / 1;
 }
-/* 2.9, not 3.2. At 3.2 the card came out 104px on a 390px phone — narrow
-   enough that a title clipped after two words, which makes a dense row
-   unreadable rather than dense. 2.9 lands ~115px and keeps the title useful. */
-.rail--micro .rail-track { --rail-cards: 2.9; }
-.rail--micro .pcard-body { min-height: 56px; padding: 6px 8px 8px; }
-.rail--micro .pcard-title { font-size: 12.5px; -webkit-line-clamp: 1; }
-.rail--micro .pcard-meta { display: none; }
-@media (min-width: 700px)  { .rail--micro .rail-track { --rail-cards: 4.6; } }
-@media (min-width: 1024px) { .rail--micro .rail-track { --rail-cards: 6.2; } }
+/* 2.6, up from 2.9. At 2.9 the card was ~115px and the photo — which is the
+   whole reason a "most looked at" row exists — had shrunk to a thumbnail, with
+   the title clipped to one line and the location suppressed entirely. Dense
+   should mean "more per screen", not "too small to read".
+
+   Not 2.35 either, which was the first correction: that landed at 145px against
+   the standard card's 160px, and two variants 15px apart are one variant with
+   extra configuration. 2.6 gives ~130px — visibly the denser row, and big
+   enough to carry a two-line title and a location again. */
+.rail--micro .rail-track { --rail-cards: 2.6; }
+.rail--micro .pcard-body { min-height: 66px; padding: 7px 9px 9px; }
+.rail--micro .pcard-title { font-size: 13px; }
+/* The location line is back. Suppressing it was a concession to a card that had
+   become too narrow to hold it, and a marketplace card without a place on it
+   makes the reader open the post to learn the one thing that decides whether
+   the walk is worth it. */
+@media (min-width: 700px)  { .rail--micro .rail-track { --rail-cards: 3.6; } }
+@media (min-width: 1024px) { .rail--micro .rail-track { --rail-cards: 4.8; } }
 
 /* Wide: landscape art (event posters, service banners) gets a landscape frame
    instead of being cropped to a portrait. */
