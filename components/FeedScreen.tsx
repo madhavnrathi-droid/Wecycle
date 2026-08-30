@@ -2,7 +2,7 @@
 
 import CategoryIcon from '../components/CategoryIcon';
 import { CATEGORIES as CATEGORY_LIST, normalizeCategory } from '../lib/categories';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
 import { Wordmark } from './Brand';
 import {
@@ -31,6 +31,15 @@ import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
 import FitImage from './FitImage';
 import { priceChip, fromListingType, DEAL_BY_ID } from '../lib/dealTypes';
+import { useFeedEngine } from '../lib/feed/useFeedEngine';
+import { useTap } from '../lib/useTap';
+import { withViewTransition, transitionStyle } from '../lib/viewTransition';
+import { shareLink } from '../lib/share';
+import { shareUrl } from '../lib/shareUrl';
+import type { SellerSummary, PlacedModule, ModuleId, CardVariant } from '../lib/feed/modules';
+import SellerCard from './SellerCard';
+import CompactRow from './CompactRow';
+import CardMenu, { useLongPress } from './CardMenu';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -143,6 +152,9 @@ export default function FeedScreen({
      stale saves from the server side, this resync keeps the heart in
      step). */
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  /* Which card's long-press sheet is open. One at a time, held here rather than
+     inside the card so opening a second closes the first for free. */
+  const [menuItem, setMenuItem] = useState<MarketplaceItem | null>(null);
 
   /* Settings: hide-prices toggle (Settings → Marketplace). We subscribe so
      flipping the switch updates every card on the feed live, without reload. */
@@ -252,8 +264,16 @@ export default function FeedScreen({
     if (!user && !isDemoMode()) { onRequireAuth?.(); return; }
     const wasSaved = savedIds.has(listingId);
     /* Saving feels rewarding (success pop); un-saving is a quieter tick. */
-    if (wasSaved) haptics.selection(); else haptics.success();
+    haptics.favorite(!wasSaved);
     track(EVT.save_toggled, { post_id: listingId, saved: !wasSaved });
+    if (!wasSaved) {
+      const it = [...items, ...requests, ...opportunities].find(i => i.id === listingId);
+      if (it) engine.note('save', {
+        itemId: it.id, sellerId: it.user?.id,
+        categoryId: it.categoryId ?? normalizeCategory(it.category),
+        price: it.price ?? null,
+      });
+    }
     setSavedIds(prev => {
       const next = new Set(prev);
       if (next.has(listingId)) next.delete(listingId);
@@ -299,6 +319,7 @@ export default function FeedScreen({
     return () => clearTimeout(t);
   }, [query, mounted]);
 
+
   /* The active tab decides which pool the GRID view renders (the storefront
      rails on the All tab ignore this and pull from every pool directly):
        - 'requests' → open requests only
@@ -319,6 +340,37 @@ export default function FeedScreen({
      run. Leaving it below meant every render threw ReferenceError before the
      feed could paint — and TypeScript does not catch this one. */
   const myCollege = (profile as { college?: string | null } | null)?.college ?? null;
+
+  /* ── The ranking + orchestration engine ──
+     Everything it needs is already in this component's state; it returns an
+     ordered list of modules and the callbacks that let it learn. The homepage
+     below renders whatever it is handed and does not decide the order. */
+  /* Memoised, and it matters: an object literal here would be a new reference
+     on every render, so the engine's `useMemo` would see changed inputs every
+     single time and re-rank the whole catalogue on each keystroke. */
+  const viewer = useMemo(
+    () => (user ? { id: user.id, college: myCollege, location: null } : null),
+    [user?.id, myCollege],
+  );
+  const engine = useFeedEngine({
+    items, requests, opportunities, events, lostFound, blocked,
+    viewer,
+    ready: mounted,
+  });
+  /* Feed the search to the ranker, debounced longer than the query itself.
+     A search is the single strongest intent signal the app gets — it is the one
+     moment someone says out loud what they came for — but recording every
+     keystroke would make "photographer" read as nine separate searches, five of
+     which are prefixes that mean nothing. 700ms is long enough that only
+     finished words land. Deliberately outside the effect above, which returns
+     early in demo mode and without Supabase; intent has to work in both. */
+  useEffect(() => {
+    if (!mounted) return;
+    const trimmed = query.trim();
+    if (trimmed.length < 3) return;
+    const t = setTimeout(() => engine.noteSearch(trimmed), 700);
+    return () => clearTimeout(t);
+  }, [query, mounted, engine]);
 
   const filtered = (() => {
     const base = source.filter(item => {
@@ -398,77 +450,30 @@ export default function FeedScreen({
      late — the flash a member sees is one frame of a true sentence. */
   const showValueProp = !mounted || !user;
 
-  /* ── Storefront rails (the "All" home view) ─────────────────────────
-     Segregate the mixed feed into themed, horizontally-scrolling rows —
-     an e-commerce storefront rather than a Pinterest wall. Each rail is
-     computed from the already-loaded pools, filtered for blocks + closed
-     posts, and only rendered when it has enough to fill a row. */
-  const liveItems    = items.filter(it => !blocked.has(it.user.id) && !it.isClosed);
-  const freshItems   = useMemo(
-    () => [...liveItems].sort((a, b) => a.postedDaysAgo - b.postedDaysAgo).slice(0, 12),
-    [liveItems],
-  );
-  const freeItems    = liveItems.filter(it => it.listingType === 'free').slice(0, 12);
+  /* ── What the modules draw from ─────────────────────────
+     The themed rows themselves — fresh, popular, budget, college, free,
+     requests, services, events, lost & found — used to be computed here, one
+     `const` per row, and rendered in that order. They live in
+     lib/feed/modules.ts now, so all that survives here is what the CATEGORY
+     rails need: those are generated from the taxonomy rather than declared,
+     so the component still owns them. */
+  /* The ENGINE's pool, not a second filter built here. Computing eligibility
+     twice is how a "not interested" item kept appearing: the engine dropped it
+     from every module it owns, and these rails — which the screen builds from
+     the taxonomy — never heard about it. One source of truth. */
+  const liveItems = engine.items;
 
-  /* ── Rails that always have something in them ─────────────────────────────
-   *
-   * "Just dropped" is every live item sorted by date, so with a young
-   * catalogue it swallowed the lot and every other row went dark: free
-   * listings are 0, requests 1, services 1, and 17 items spread over 8
-   * categories leaves almost none with the two a rail needs. The page looked
-   * empty while holding everything it had.
-   *
-   * The fix is not more thresholds, it is merchandising on axes the data
-   * cannot be missing. Price and view count exist on every listing, so these
-   * two rows populate on day one and keep populating.
-   *
-   * Overlap between rows is deliberate and normal — a shop shows the same
-   * product under New, under Popular and in its category. What was wrong was
-   * one row holding everything while the rest showed nothing, not an item
-   * appearing twice. */
-
-  /* Social proof. The strongest merchandising signal a marketplace has, and
-     the one a new visitor trusts most: other people already looked at this. */
-  const popularItems = useMemo(
-    () => [...liveItems]
-      .filter(it => (it.viewCount ?? 0) > 0)
-      .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
-      .slice(0, 12),
-    [liveItems],
-  );
-
-  /* Price anchoring. Students sort by cost before anything else, and a
-     budget row is the one every marketplace opens with. Free counts as under
-     the cap rather than being excluded on a technicality. */
-  const budgetItems = liveItems
-    .filter(it => it.listingType === 'free' || (typeof it.price === 'number' && it.price > 0 && it.price <= 500))
-    .slice(0, 12);
-
-  /* Proximity beats everything else in a campus marketplace: the same desk is
-     worth more three buildings away than across town. Only for signed-in
-     members, because it needs a college to compare against, and only when it
-     is not simply the whole catalogue rebadged. */
-  const collegeItems = myCollege
-    ? liveItems.filter(it => (it.user as { college?: string | null }).college === myCollege).slice(0, 12)
-    : [];
-  const openRequests = requests.filter(it => !blocked.has(it.user.id) && !it.isClosed).slice(0, 12);
-  const services     = opportunities.filter(it => !blocked.has(it.user.id) && !it.isClosed).slice(0, 12);
-  const upcoming     = events.filter(ev => !blocked.has(ev.organizer.id)).slice(0, 12);
-  const lostItems    = lostFound.filter(lf => !blocked.has(lf.user.id) && lf.status === 'lost');
-  const foundItems   = lostFound.filter(lf => !blocked.has(lf.user.id) && lf.status === 'found').slice(0, 12);
   /* Match on the category ID, not the display label. `item.category` carries
      the LABEL, so this compared "art" against "art & stationery" and every
      multi-word category silently produced an empty rail — which is why only
      Electronics and Fashion had one, those being the two whose label happens to
      equal its id. normalizeCategory covers rows that predate the id. */
-  const itemsByCat   = (cat: string) =>
+  const itemsByCat = (cat: string) =>
     liveItems.filter(it => (it.categoryId ?? normalizeCategory(it.category)) === cat).slice(0, 12);
 
   /* Category rails, generated from the taxonomy rather than a hand-picked
-     subset of it. The old list named six categories inline, so the other six —
-     including every one added since — could never get a row however much was
-     posted into them. Now a category that fills up earns a rail automatically,
-     which is what makes the storefront keep working as people post.
+     subset of it. A category that fills up earns a rail automatically, which is
+     what makes the storefront keep working as people post.
 
      Two is still the floor: a rail holding one card reads as broken. */
   const categoryRails = CATEGORY_LIST
@@ -478,13 +483,6 @@ export default function FeedScreen({
   /* Storefront when nothing is narrowing the view; a product grid the
      moment a category, a type tab, or a search takes over. */
   const showStorefront = activeType === 'all' && activeCategory === 'all' && !query.trim();
-  const railCount =
-    (lostItems.length ? 1 : 0) + (foundItems.length ? 1 : 0) +
-    (freshItems.length >= 3 ? 1 : 0) + (freeItems.length >= 2 ? 1 : 0) +
-    (popularItems.length >= 3 ? 1 : 0) + (budgetItems.length >= 2 ? 1 : 0) +
-    (collegeItems.length >= 2 ? 1 : 0) +
-    categoryRails.length + (openRequests.length ? 1 : 0) +
-    (services.length ? 1 : 0) + (upcoming.length ? 1 : 0);
 
   /* One card renderer for every marketplace-shaped post (item / request /
      opportunity), so rails and the grid stay visually identical. */
@@ -501,9 +499,270 @@ export default function FeedScreen({
       hidePrice={hidePrice}
       badgeKind={badgeKind}
       onToggleSave={() => handleToggleSave(it.id)}
-      onClick={() => { trackPostOpened('item', it.id, { source, is_request: !!it.isRequest }); onOpenItem(it); }}
+      onLongPress={() => setMenuItem(it)}
+      onClick={() => {
+        trackPostOpened('item', it.id, { source, is_request: !!it.isRequest });
+        /* The strongest per-item signal the feed gets. Opening a listing is
+           what teaches category affinity and the price band. */
+        engine.note('click', {
+          itemId: it.id, sellerId: it.user?.id,
+          /* normalizeCategory, not the raw field. categoryId is absent on any
+             item that did not come from the listings mapper — demo fixtures,
+             cached rows predating the column — and passing null there meant
+             category affinity never accumulated at all: the profile stayed
+             permanently cold and "Picked for you" could never unlock. The
+             label is always present, and normalising it is what the rest of
+             this file already does to find a category. */
+          categoryId: it.categoryId ?? normalizeCategory(it.category),
+          price: it.price ?? null,
+        });
+        if (it.kind === 'opportunity') engine.noteSignal('service_view');
+        /* The photo the reader just tapped becomes the detail hero rather than
+           being replaced by it. Falls straight through to onOpenItem where the
+           browser has no View Transitions support. */
+        withViewTransition(() => onOpenItem(it));
+      }}
     />
   );
+
+  /* A rail cell that also reports itself as seen. The observer lives in the
+     engine; this only hands it the node. */
+  const railCell = (it: MarketplaceItem, node: React.ReactNode, key?: string) => (
+    <div
+      className="rail-item"
+      key={key ?? it.id}
+      ref={el => engine.observe(el, it.id, it.user?.id ?? '')}
+    >
+      {node}
+    </div>
+  );
+
+  /* ── Where each row's "See all" goes ──
+     A rail's heading is a promise and the tap has to keep it: "Under ₹500"
+     must not open the whole catalogue. Kept as a table beside the modules so a
+     new row cannot quietly ship without one. */
+  const seeAllFor: Partial<Record<ModuleId, () => void>> = {
+    fresh:          () => openRail('fresh'),
+    just_listed:    () => openRail('fresh'),
+    trending:       () => openRail('popular'),
+    around_campus:  () => openRail('college'),
+    under_500:      () => openRail('budget'),
+    free_stuff:     () => openRail('free'),
+    requests:       () => setActiveType('requests'),
+    services:       () => setActiveType('services'),
+    events:         () => onBannerAction?.('events'),
+    lost_found:     () => onBannerAction?.('lost-found'),
+    picked_for_you: () => { setActiveType('shared'); setRailFilter(null); },
+    needs_a_home:   () => { setActiveType('shared'); setRailFilter(null); },
+    wildcard:       () => { setActiveType('shared'); setRailFilter(null); },
+  };
+
+  /* ── Module renderer ──
+     The orchestrator decides WHICH rows appear and in WHAT ORDER; this decides
+     only how each kind looks. That separation is the point of the rewrite:
+     adding a row is now a table entry in lib/feed/modules.ts, and reordering
+     the page touches no JSX at all. */
+  const renderModule = (m: PlacedModule): React.ReactNode => {
+    const { spec, content } = m;
+    const seeAll = seeAllFor[spec.id];
+
+    if (spec.kind === 'categories') {
+      /* One module, many rails — the taxonomy decides how many. */
+      /* One module, many rails — the taxonomy decides how many, so the UI
+         budget upstream sees a single entry and cannot break up the run. Left
+         alone that produced five identical standard rails in a row, which is
+         exactly the monotony the budget exists to prevent. Alternating here is
+         where that rhythm has to come from. */
+      return (
+        <Fragment key={spec.id}>
+          {categoryRails.map((r, i) => (
+            <Rail key={`cat-${r.id}`} title={r.title} sub={r.sub}
+                  variant={i % 2 === 0 ? 'standard' : 'micro'}
+                  onSeeAll={() => { setActiveCategory(r.id); track(EVT.category_filter_changed, { category: r.id }); }}>
+              {r.list.map(it => railCell(it, renderProduct(it, `feed_cat_${r.id}`), `${r.id}-${it.id}`))}
+            </Rail>
+          ))}
+        </Fragment>
+      );
+    }
+
+    if (spec.kind === 'businesses') {
+      return (
+        <Rail key={spec.id} title={spec.title} sub={spec.sub} variant="business">
+          {(content as SellerSummary[]).map(sel => (
+            <div className="rail-item" key={sel.user.id}>
+              <SellerCard
+                seller={sel}
+                onClick={() => {
+                  engine.noteSignal('storefront_view');
+                  track(EVT.user_card_opened, { user_id: sel.user.id, source: 'feed_businesses' });
+                  onOpenUser?.(sel.user.id);
+                }}
+              />
+            </div>
+          ))}
+        </Rail>
+      );
+    }
+
+    if (spec.kind === 'events') {
+      return (
+        <Rail key={spec.id} title={spec.title} sub={spec.sub} variant={spec.variant} onSeeAll={seeAll}>
+          {(content as CommunityEvent[]).map(ev => (
+            <div className="rail-item" key={ev.id}>
+              <EventCard event={ev} onClick={() => { trackPostOpened('event', ev.id, { source: 'feed_events_rail' }); onOpenEvent?.(ev); }} />
+            </div>
+          ))}
+        </Rail>
+      );
+    }
+
+    if (spec.kind === 'lostfound') {
+      /* A list, not a wall of large photographs.
+         The question a reader is answering here is "is that mine", and that is
+         settled by a name and a place — so the row leads with those and keeps
+         the photo at 88px. It also halves the height each entry costs, which
+         matters for a section nobody wants to scroll past twice. */
+      const lf = content as LostItem[];
+      const lost = lf.filter(l => l.status === 'lost');
+      const found = lf.filter(l => l.status === 'found');
+      const openLF = (l: LostItem, source: string) => {
+        trackPostOpened('lostfound', l.id, { source, lf_status: l.status });
+        onOpenLF?.(l);
+      };
+      /* Both sections are already single-status, so the word "Lost" was landing
+         three times on one row: in the heading, in the title the poster typed,
+         and again as the bold line. Strip the prefix and drop the status line —
+         what a reader actually needs next is WHERE, which is now the line that
+         gets the weight. The status still reaches assistive tech through the
+         label. */
+      const strip = (t: string) => t.replace(/^\s*(lost|found)\s*[:\u2013-]\s*/i, '');
+      const row = (l: LostItem, source: string) => (
+        <CompactRow
+          key={l.id}
+          title={strip(l.title)}
+          lead={l.lastSeen || undefined}
+          leadTone={l.status === 'lost' ? 'lost' : 'found'}
+          /* lastSeen is free text the poster wrote, and they often put the time
+             in it — "Drawing Hall, 3 days ago". Repeating our own "3d ago"
+             beside it reads as a stutter, so the post age is dropped when they
+             have already said it. */
+          meta={/\bago\b/i.test(l.lastSeen ?? '') ? undefined : l.timeAgo}
+          imageUrl={getLostFoundPhoto(l.id, l.photoIcon, l.photoUrls)}
+          fallbackIcon={l.photoIcon}
+          fallbackTint={tintFor(l.photoColor)}
+          onClick={() => openLF(l, source)}
+          ariaLabel={`${l.status === 'lost' ? 'Lost' : 'Found'}: ${strip(l.title)}`}
+        />
+      );
+      return (
+        <Fragment key={spec.id}>
+          {lost.length > 0 && (
+            <section className="rail">
+              <div className="rail-head">
+                <div style={{ minWidth: 0 }}>
+                  <h2 className="rail-title">Lost on campus 👀</h2>
+                  <p className="rail-sub">Anything here look like yours?</p>
+                </div>
+                <button type="button" className="rail-seeall" onClick={() => onBannerAction?.('lost-found')}>
+                  All lost <ChevronRight size={14} strokeWidth={2.2} />
+                </button>
+              </div>
+              <div className="crow-list">{lost.slice(0, 4).map(l => row(l, 'feed_lost_list'))}</div>
+            </section>
+          )}
+          {found.length > 0 && (
+            <section className="rail">
+              <div className="rail-head">
+                <div style={{ minWidth: 0 }}>
+                  <h2 className="rail-title">Found &amp; waiting 🙌</h2>
+                  <p className="rail-sub">Someone’s looking for these — is one yours?</p>
+                </div>
+                {seeAll && (
+                  <button type="button" className="rail-seeall" onClick={seeAll}>
+                    See all <ChevronRight size={14} strokeWidth={2.2} />
+                  </button>
+                )}
+              </div>
+              <div className="crow-list">{found.slice(0, 4).map(l => row(l, 'feed_found_list'))}</div>
+            </section>
+          )}
+        </Fragment>
+      );
+    }
+
+    if (spec.layout === 'list') {
+      /* Services. A gig rarely photographs as a "thing", so the big image well
+         a product card reserves gets filled with a banner, an avatar or
+         nothing at all — and three of them cost a whole screen. */
+      return (
+        <section className="rail" key={spec.id}>
+          <div className="rail-head">
+            <div style={{ minWidth: 0 }}>
+              <h2 className="rail-title">{spec.title}</h2>
+              <p className="rail-sub">{spec.sub}</p>
+            </div>
+            {seeAll && (
+              <button type="button" className="rail-seeall" onClick={seeAll}>
+                See all <ChevronRight size={14} strokeWidth={2.2} />
+              </button>
+            )}
+          </div>
+          <div className="crow-list">
+            {(content as MarketplaceItem[]).slice(0, 5).map(it => (
+              <div key={it.id} ref={el => engine.observe(el, it.id, it.user?.id ?? '')}>
+                <CompactRow
+                  title={it.title}
+                  lead={opportunityCompLabel(it)}
+                  location={it.location || undefined}
+                  meta={it.user?.name ? `by ${it.user.name}` : undefined}
+                  /* The provider's face, not a stock photo of nothing.
+                     A service usually has no product to photograph, so the
+                     media resolver fell back to a category image — and every
+                     one of the five rows came out carrying the SAME picture,
+                     which is worse than no picture at all. Only a genuinely
+                     uploaded photo is shown; otherwise this is the person you
+                     would be hiring, which is the useful thing anyway. */
+                  portrait={!it.photoUrls?.length}
+                  imageUrl={it.photoUrls?.length
+                    ? coverImage(it).url ?? null
+                    : getAvatar(it.user?.id || it.user?.name || it.id, 96)}
+                  fallbackIcon={it.photoIcon}
+                  fallbackTint={tintFor(it.photoColor)}
+                  onClick={() => {
+                    trackPostOpened('item', it.id, { source: `feed_${spec.id}`, is_request: false });
+                    engine.note('click', {
+                      itemId: it.id, sellerId: it.user?.id,
+                      categoryId: it.categoryId ?? normalizeCategory(it.category),
+                      price: it.price ?? null,
+                    });
+                    engine.noteSignal('service_view');
+                    onOpenItem(it);
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      );
+    }
+
+    /* products + services */
+    const badge = spec.id === 'requests' ? 'request'
+      : spec.kind === 'services' ? 'opportunity'
+      : spec.id === 'free_stuff' ? 'free'
+      : undefined;
+    /* The card format is the MODULE's decision, taken in lib/feed/modules.ts
+       and already passed through the UI budget — which rations featured rows
+       and breaks up runs of the same shape. The component only renders what it
+       is handed. */
+    return (
+      <Rail key={spec.id} title={spec.title} sub={spec.sub} variant={spec.variant} onSeeAll={seeAll}>
+        {(content as MarketplaceItem[]).map(it =>
+          railCell(it, renderProduct(it, `feed_${spec.id}`, badge), `${spec.id}-${it.id}`))}
+      </Rail>
+    );
+  };
 
   /* Grid renderer for a mixed All-tab entry (used when a filter narrows the
      storefront into a product grid). */
@@ -647,7 +906,7 @@ export default function FeedScreen({
             aria-label="Your profile"
             onClick={onOpenAccount}
             style={{
-              width: 34, height: 34, borderRadius: '50%',
+              width: 44, height: 44, borderRadius: '50%',
               background: 'var(--bg-inset)',
               border: 'none', cursor: 'pointer',
               padding: 0, overflow: 'hidden',
@@ -911,132 +1170,36 @@ export default function FeedScreen({
       {showStorefront ? (
         /* ══ STOREFRONT: themed rails ══ */
         <div className="storefront">
-          {loading && railCount === 0 && (
+          {loading && engine.modules.length === 0 && (
             <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
               Setting up the storefront…
             </div>
           )}
 
-          {/* JUST DROPPED — the hero shelf, so it gets the biggest cards */}
-          {freshItems.length >= 3 && (
-            <Rail title="Just dropped ✨" sub="Fresh off your batch, before anyone else" variant="featured" onSeeAll={() => openRail('fresh')}>
-              {freshItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_fresh')}</div>)}
-            </Rail>
-          )}
+          {/* ── The page, as decided by the orchestrator ──
+              Every row below used to be written out here in a fixed order, so
+              every visitor got the same one forever and changing it meant
+              editing this file. The sequence now comes from lib/feed/modules.ts:
+              zones hold the information hierarchy steady while order inside
+              them responds to what this person is actually doing.
 
-          {/* MOST LOOKED AT — social proof is what a stranger reads first, and
-              unlike Free it is never empty. */}
-          {popularItems.length >= 3 && (
-            <Rail title="Most looked at 👀" sub="What everyone's been opening this week" onSeeAll={() => openRail('popular')}>
-              {popularItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_popular')}</div>)}
-            </Rail>
-          )}
-
-          {/* UNDER ₹500 — students sort by price before anything else. */}
-          {budgetItems.length >= 2 && (
-            <Rail title="Under ₹500 💸" sub="Cheaper than a night out" onSeeAll={() => openRail('budget')}>
-              {budgetItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_budget')}</div>)}
-            </Rail>
-          )}
-
-          {/* FROM YOUR COLLEGE — proximity, the strongest signal on a campus. */}
-          {collegeItems.length >= 2 && (
-            <Rail title="From your college 🎓" sub="Same campus, shorter walk" onSeeAll={() => openRail('college')}>
-              {collegeItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_college')}</div>)}
-            </Rail>
-          )}
-
-          {/* LOST + FOUND, moved down deliberately.
-              They used to open the page, which meant the first thing a
-              marketplace showed was other people's lost property — and on a
-              phone that pushed every purchasable item off the first screen
-              entirely. They are a real service but a secondary one: lead with
-              what someone came for, keep this where it is still easy to reach. */}
-          {/* LOST — slow auto-scrolling loop so it takes zero effort to spot yours */}
-          {lostItems.length > 0 && (
-            <section className="rail">
-              <div className="rail-head">
-                <div style={{ minWidth: 0 }}>
-                  <h2 className="rail-title">Lost on campus 👀</h2>
-                  <p className="rail-sub">No effort needed — just glance as it drifts by</p>
-                </div>
-                <button type="button" className="rail-seeall" onClick={() => onBannerAction?.('lost-found')}>
-                  All lost <ChevronRight size={14} strokeWidth={2.2} />
-                </button>
-              </div>
-              <LostMarquee
-                items={lostItems}
-                onOpen={lf => { trackPostOpened('lostfound', lf.id, { source: 'feed_lost_marquee', lf_status: lf.status }); onOpenLF?.(lf); }}
-              />
-            </section>
-          )}
-
-          {/* FOUND — its own row */}
-          {foundItems.length > 0 && (
-            <Rail title="Found & waiting 🙌" sub="Someone’s looking for these — is one yours?" onSeeAll={() => onBannerAction?.('lost-found')}>
-              {foundItems.map(lf => (
-                <div className="rail-item" key={lf.id}>
-                  <LostFoundCard lf={lf} onClick={() => { trackPostOpened('lostfound', lf.id, { source: 'feed_found_rail', lf_status: lf.status }); onOpenLF?.(lf); }} />
-                </div>
-              ))}
-            </Rail>
-          )}
-
-          {/* FREE */}
-          {freeItems.length >= 2 && (
-            <Rail title="Free & up for grabs 🎁" sub="₹0. Yes, really." onSeeAll={() => openRail('free')}>
-              {freeItems.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_free', 'free')}</div>)}
-            </Rail>
-          )}
-
-          {/* ── MID-PAGE CTA ──
-             Sits here on purpose: it interrupts the longest stretch of
-             identical rails, and the board it points at (Services) is the
-             thinnest one, so it's the board that most needs a doorway. */}
-          <StorefrontCTA onPostJob={() => { track(EVT.marketing_banner_tapped, { slide: 'post_job_cta' }); (onPostService ?? onPost)(); }} />
-
-          {/* CATEGORY RAILS */}
-          {categoryRails.map(r => (
-            <Rail key={r.id} title={r.title} sub={r.sub} onSeeAll={() => { setActiveCategory(r.id); track(EVT.category_filter_changed, { category: r.id }); }}>
-              {r.list.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, `feed_cat_${r.id}`)}</div>)}
-            </Rail>
+              The CTA is injected after the third row rather than being a module
+              of its own — it is an interruption by design, and its job is to
+              break the longest run of identical rails wherever that run
+              happens to fall today. */}
+          {engine.modules.map((m, idx) => (
+            <Fragment key={`mod-${m.spec.id}`}>
+              {renderModule(m)}
+              {idx === 2 && (
+                <StorefrontCTA onPostJob={() => {
+                  track(EVT.marketing_banner_tapped, { slide: 'post_job_cta' });
+                  (onPostService ?? onPost)();
+                }} />
+              )}
+            </Fragment>
           ))}
 
-          {/* WANTED (requests) */}
-          {openRequests.length > 0 && (
-            <Rail title="Wanted on campus 🙋" sub="Got one gathering dust? Make someone’s week." onSeeAll={() => setActiveType('requests')}>
-              {openRequests.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_requests', 'request')}</div>)}
-            </Rail>
-          )}
-
-          {/* WORK — jobs AND services in ONE rail.
-              Two rails ("Jobs" + "Services") would crowd the homepage and, at
-              today's volume, leave both nearly empty. Information-dense apps
-              solve this with one entry point on home and faceted filtering on
-              the dedicated screen — so the badges (Hiring / Offering) separate
-              the two directions here, and the Jobs & gigs tab carries the
-              Hiring / Offering filter for the full board.
-              Landscape cards: work posts rarely have a photo of a "thing", so a
-              wide frame carries a banner or a person better than a portrait
-              crop, and it breaks the portrait rhythm. */}
-          {services.length > 0 && (
-            <Rail title="Work on campus 💼" sub="Jobs, gigs and skills for hire" variant="wide" onSeeAll={() => setActiveType('services')}>
-              {services.map(it => <div className="rail-item" key={it.id}>{renderProduct(it, 'feed_services', 'opportunity')}</div>)}
-            </Rail>
-          )}
-
-          {/* EVENTS — poster art is landscape, so give it a landscape frame */}
-          {upcoming.length > 0 && (
-            <Rail title="Happening soon 📅" sub="RSVP in a tap" variant="wide" onSeeAll={() => onBannerAction?.('events')}>
-              {upcoming.map(ev => (
-                <div className="rail-item" key={ev.id}>
-                  <EventCard event={ev} onClick={() => { trackPostOpened('event', ev.id, { source: 'feed_events_rail' }); onOpenEvent?.(ev); }} />
-                </div>
-              ))}
-            </Rail>
-          )}
-
-          {!loading && railCount === 0 && (
+          {!loading && engine.modules.length === 0 && (
             <EmptyState
               prompt="Looks like the feed's just sprouting. Be the first to share something!"
               sub="Post a free find, a borrow request, or an event — your community's waiting."
@@ -1116,6 +1279,40 @@ export default function FeedScreen({
           })()}
         </section>
       )}
+
+      {/* The long-press sheet. Mounted once at the screen root rather than per
+          card: one sheet can only ever be open, and a card that scrolls out of
+          view cannot take its own menu with it. */}
+      {menuItem && (
+        <CardMenu
+          title={menuItem.title}
+          sellerName={menuItem.user?.name}
+          onClose={() => setMenuItem(null)}
+          onNotInterested={() => {
+            engine.noteNotInterested({
+              itemId: menuItem.id,
+              sellerId: menuItem.user?.id,
+              categoryId: menuItem.categoryId ?? normalizeCategory(menuItem.category),
+              scope: 'item',
+            });
+            haptics.selection();
+            track(EVT.feed_tab_changed, { tab: 'not_interested', post_id: menuItem.id });
+          }}
+          onHideSeller={menuItem.user?.id ? () => {
+            engine.noteNotInterested({
+              itemId: menuItem.id,
+              sellerId: menuItem.user?.id,
+              categoryId: null,
+              scope: 'seller',
+            });
+            haptics.selection();
+          } : undefined}
+          onShare={() => {
+            track(EVT.share_clicked, { post_id: menuItem.id, source: 'card_menu' });
+            void shareLink({ title: menuItem.title, url: shareUrl(menuItem.id) });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1133,11 +1330,13 @@ function Rail({
   title: string;
   sub: string;
   onSeeAll?: () => void;
-  variant?: 'featured' | 'wide';
+  /** Card format, chosen by the module. 'standard' is the default and needs no
+   *  class of its own. */
+  variant?: CardVariant;
   children: React.ReactNode;
 }) {
   return (
-    <section className={`rail${variant ? ` rail--${variant}` : ''}`}>
+    <section className={`rail${variant && variant !== 'standard' ? ` rail--${variant}` : ''}`}>
       <div className="rail-head">
         <div style={{ minWidth: 0 }}>
           <h2 className="rail-title">{title}</h2>
@@ -1251,12 +1450,15 @@ function LostMarquee({ items, onOpen }: { items: LostItem[]; onOpen: (lf: LostIt
    the e-commerce shape, not the Pinterest photo-with-overlay. Handles
    items, requests and service opportunities (the price line + badge adapt). */
 function ProductCard({
-  item, isSaved, onToggleSave, onClick, hidePrice, badgeKind,
+  item, isSaved, onToggleSave, onClick, onLongPress, hidePrice, badgeKind,
 }: {
   item: MarketplaceItem;
   isSaved: boolean;
   onToggleSave: () => void;
   onClick: () => void;
+  /** Opens the contextual sheet. Optional: cards outside the feed (search
+   *  results, a storefront) have no ranker to teach. */
+  onLongPress?: () => void;
   hidePrice: boolean;
   /** Small corner badge, shown when the card sits in a mixed context (the
    *  grid, or a rail whose theme isn't already the answer). */
@@ -1304,10 +1506,30 @@ function ProductCard({
   const closedLabel = item.isClosed ? closedLabelFor(item) : null;
   const cut = cover.url ? isCutoutUrl(cover.url) : false;
 
+  /* Not onClick. A click fires whenever a press and a release land on this
+     button, including at the end of a drag and when a finger stops a coasting
+     page — which is how scrolling the feed came to open listings. See
+     lib/useTap.ts; the press state drives the visual feedback too, so a card
+     no longer lights up while it is merely being scrolled past. */
+  const press = useLongPress(() => onLongPress?.(), !!onLongPress);
+  /* A press that has already opened the sheet must not also navigate on
+     release — otherwise the menu appears and the detail page opens behind it. */
+  const tap = useTap(() => { if (press.consumed()) { press.reset(); return; } onClick(); });
+
   return (
-    <article className="pcard" data-closed={item.isClosed || undefined}>
-      <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open ${item.title}`}>
-        <span className="pcard-media">
+    <article className="pcard" data-closed={item.isClosed || undefined} data-pressed={tap.pressed || undefined}>
+      <button
+        type="button"
+        className="pcard-open"
+        aria-label={`Open ${item.title}`}
+        onPointerDown={e => { tap.onPointerDown(e); press.handlers.onPointerDown?.(e); }}
+        onPointerMove={e => { tap.onPointerMove(e); press.handlers.onPointerMove?.(e); }}
+        onPointerUp={e => { tap.onPointerUp(e); press.handlers.onPointerUp?.(); }}
+        onPointerCancel={() => { tap.onPointerCancel(); press.handlers.onPointerCancel?.(); }}
+        onContextMenu={press.handlers.onContextMenu}
+        onClick={tap.onClick}
+      >
+        <span className="pcard-media" style={transitionStyle(item.id)}>
           {cover.url
             ? <FitImage src={cover.url} cutout={cut} />
             : <span className="pcard-ph" style={{ background: tintFor(item.photoColor) }} aria-hidden="true">{item.photoIcon || '📦'}</span>}
@@ -1317,7 +1539,7 @@ function ProductCard({
           <span className="pcard-price" data-tone={priceTone}>{priceLabel}</span>
           {!item.isRequest && item.location && (
             <span className="pcard-meta">
-              <MapPin size={10} strokeWidth={2} />
+              <MapPin size={11} strokeWidth={2} />
               <span className="pcard-meta-text">{item.location}</span>
             </span>
           )}
@@ -1334,7 +1556,7 @@ function ProductCard({
         aria-pressed={isSaved}
         onClick={e => { e.stopPropagation(); onToggleSave(); }}
       >
-        <Heart size={14} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+        <Heart size={17} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
       </button>
 
       {closedLabel && <span className="pcard-closed"><span>{closedLabel}</span></span>}

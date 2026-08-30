@@ -86,7 +86,23 @@ function fire(style: HapticStyle) {
   /* 3. Unsupported (desktop, iOS Safari without Expo shell) → no-op. */
 }
 
-/* Public semantic API — call sites read like intent, not implementation. */
+/* ── The rule that matters most: browsing is silent ────────────────────────
+ *
+ * Nothing in the scroll–look–open loop fires a haptic. Not opening a card, not
+ * scrolling a rail, not landing on a detail page. That is the single most
+ * frequent thing anyone does in this app, and a buzz on every one of them turns
+ * the phone into a noisy object people put down — Android's own guidance is
+ * blunt that less is more, and Apple's is that a haptic needs a clear cause.
+ *
+ * Feedback is reserved for moments where something CHANGED and the change is
+ * worth confirming without looking: a save landed, a post went up, an action
+ * failed. If a new call site is about navigation or browsing, the correct
+ * haptic is none.
+ *
+ * The names below are intents, not intensities. Call sites should say what
+ * happened — `haptics.favorite()` — rather than how hard to buzz, so the
+ * strength of any one moment can be retuned here without hunting through
+ * components. */
 export const haptics = {
   /** Tab switches, segmented controls, toggles, slider detents. */
   selection: () => fire('selection'),
@@ -96,10 +112,23 @@ export const haptics = {
   medium: () => fire('medium'),
   /** Destructive confirmations (delete). */
   heavy: () => fire('heavy'),
-  /** Post created, item saved, RSVP confirmed. */
+  /** Post created, RSVP confirmed, transaction done — a real completion. */
   success: () => fire('success'),
   /** Form validation problem, soft block. */
   warning: () => fire('warning'),
   /** A request that failed. */
   error: () => fire('error'),
+
+  /* ── Intent-named events ── */
+
+  /** Hearting a listing. Deliberately NOT success: a save is a bookmark, not
+   *  an achievement, and the two-pulse success pattern made tapping a heart
+   *  feel like completing a purchase. Un-hearting is quieter still. */
+  favorite: (on = true) => fire(on ? 'light' : 'selection'),
+  /** Crossing the pull-to-refresh threshold — the tick that says "let go now". */
+  refresh: () => fire('selection'),
+  /** A bottom sheet snapping to a detent. */
+  snap: () => fire('light'),
+  /** A long-press opening a contextual menu. */
+  longPress: () => fire('light'),
 };

@@ -1326,7 +1326,16 @@ section.mobile-only { display: block; }
 .marketing-banner-compact .marketing-banner-dots { bottom: 5px; }
 .marketing-banner-wide    .marketing-banner-dots { bottom: 10px; }
 
+/* A 5px dot with a 24px reach.
+ *
+ * These measured 5 × 5 — a target most thumbs cannot hit, and the misses land
+ * on the banner behind and navigate somewhere. Making the dot itself bigger
+ * would turn a quiet position indicator into a row of buttons, so the DOT
+ * stays 5px and ::after carries a 24px hit area over it. 24 is WCAG 2.5.8 AA;
+ * 44 would make six of them overlap, and the carousel can also just be swiped,
+ * which is the primary way anyone moves it. */
 .marketing-banner-dot {
+  position: relative;
   width: 5px;
   height: 5px;
   border-radius: 999px;
@@ -1335,6 +1344,15 @@ section.mobile-only { display: block; }
   padding: 0;
   cursor: pointer;
   transition: width 220ms ease, background 220ms ease;
+}
+.marketing-banner-dot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
 }
 .marketing-banner-wide .marketing-banner-dot { width: 6px; height: 6px; }
 .marketing-banner-dot[data-active] {
@@ -2283,8 +2301,12 @@ section.mobile-only { display: block; }
 
 .theme-toggle {
   position: relative;
-  width: 38px;
-  height: 38px;
+  /* 44, not 38. This class carries the menu button, the back chevrons and
+     several other icon-only controls, all of which were below both Apple's
+     44pt and Android's 48dp minimums. The icon inside is unchanged — only the
+     reach grows. */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: transparent;
   border: none;
@@ -3320,6 +3342,11 @@ img[src*="/storage/v1/object/public/"] {
   gap: 0;
 }
 .segmented button {
+  /* 39.5px tall before this, just under both platform minimums. These are the
+     app's primary filter, tapped constantly, and a miss changes what the whole
+     page is showing. */
+  min-height: 44px;
+  min-width: 44px;
   padding: 10px 12px;
   background: transparent;
   border: none;
@@ -4025,6 +4052,343 @@ img[src*="/storage/v1/object/public/"] {
 }
 
 /* ═══════════════════════════════════════════════
+   VIEW TRANSITIONS
+   The card→detail image carry. See lib/viewTransition.ts.
+   ═══════════════════════════════════════════════ */
+
+/* The default cross-fade for everything that is NOT the carried image. Kept
+   short: this is routine navigation, not a moment, and Apple's own guidance is
+   that motion should explain a relationship and then get out of the way. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+/* The image itself moves and resizes rather than cross-fading, which is what
+   makes it read as one object travelling instead of two pictures swapping. */
+::view-transition-group(*) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Someone who asked for less motion gets the cut. lib/viewTransition.ts also
+   declines to start a transition at all under this setting — this is the
+   belt-and-braces half, covering transitions started anywhere else. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   CARD CONTEXT MENU
+   Long-press sheet. See components/CardMenu.tsx.
+   ═══════════════════════════════════════════════ */
+
+.cardmenu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(10, 10, 6, 0.4);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: fade-in 160ms var(--ease-smooth);
+}
+
+.cardmenu {
+  position: fixed;
+  z-index: 301;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+  padding: 10px 10px calc(14px + env(safe-area-inset-bottom, 10px));
+  background: var(--bg-surface);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.22);
+  animation: slide-up 240ms var(--ease-spring);
+  outline: none;
+}
+@media (min-width: 700px) {
+  .cardmenu {
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 20px;
+    max-width: 360px;
+    animation: scale-in 180ms var(--ease-spring);
+  }
+}
+
+.cardmenu-title {
+  margin: 4px 12px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  /* Every row clears 44px without being asked — a destructive-adjacent menu is
+     the last place to make people aim. */
+  min-height: 52px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background 120ms ease-out;
+}
+.cardmenu-item:active { background: var(--bg-inset); }
+@media (hover: hover) { .cardmenu-item:hover { background: var(--bg-inset); } }
+.cardmenu-item > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cardmenu-sub {
+  font-size: 12.5px;
+  font-weight: 450;
+  color: var(--text-muted);
+}
+.cardmenu-item--danger { color: var(--accent-rose); }
+
+.cardmenu-cancel {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 14px;
+  background: var(--bg-inset);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════════
+   COMPACT ROW
+   88px thumbnail, text beside it, stacked vertically. See
+   components/CompactRow.tsx for why some content is better as a list than a
+   card — and note it is also the largest hit target in the app, 104px against
+   a 44px floor.
+   ═══════════════════════════════════════════════ */
+
+.crow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 16px;
+}
+
+.crow {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 14px;
+  cursor: pointer;
+  /* No border and no card surface. A list of bordered boxes is the "card
+     within card" the layout is trying to get away from — separation here comes
+     from the thumbnail and the spacing, and the row only paints a background
+     when it is actually being pressed. */
+  background: transparent;
+  transition: background 140ms ease-out, transform 120ms var(--ease-smooth);
+}
+.crow[data-pressed] { transform: scale(0.99); background: var(--bg-inset); }
+@media (hover: hover) { .crow:hover { background: var(--bg-inset); } }
+
+.crow-media {
+  position: relative;
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-inset);
+  display: grid;
+  place-items: center;
+}
+.crow-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.crow-ph { font-size: 30px; }
+
+/* A person, not a product. Round and slightly smaller, so a services list
+   reads as a list of people you could hire rather than a shelf of goods. */
+.crow-media[data-portrait] {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  margin: 8px;
+}
+
+.crow-badge {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(23, 21, 15, 0.9);
+}
+.crow-badge[data-kind="lost"]  { background: rgba(237, 46, 80, 0.94); }
+.crow-badge[data-kind="found"] { background: rgba(34, 197, 94, 0.94); }
+
+.crow-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.crow-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Same rule as the card: the money is heavier than the name it belongs to. */
+.crow-lead {
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+.crow-lead[data-tone="free"]   { color: var(--success); }
+.crow-lead[data-tone="wanted"] { color: var(--color-request); }
+/* Lost & Found lead a place, not a price, so they take the weight down a step —
+   a building name set like money reads as shouting. */
+.crow-lead[data-tone="lost"],
+.crow-lead[data-tone="found"] {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+.crow-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.crow-meta-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════
+   SELLER / BUSINESS CARD
+   A person, not a product — see components/SellerCard.tsx for why the visual
+   language inverts rather than reusing the product card.
+   ═══════════════════════════════════════════════ */
+
+.seller-card {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Fills its rail cell rather than declaring a fixed 232px. Rail cells are now
+     derived from how many cards should be visible, so a hardcoded width
+     overflowed the cell and clipped the first card against the screen edge. The
+     ROW below sets how wide the cell is; the card just fills it. */
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: var(--radius-xl, 18px);
+  background: var(--bg-surface);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  transition: transform 0.18s var(--ease-spring), box-shadow 0.18s ease-out;
+}
+.seller-card:active { transform: scale(0.97); }
+@media (hover: hover) {
+  .seller-card:hover { box-shadow: inset 0 0 0 1px var(--border-default), 0 6px 18px rgba(0,0,0,0.08); }
+}
+
+/* The tinted edge that replaces a product photo. It is what makes the card
+   readable as "not an item" before any text is parsed. */
+.seller-card-band {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #0A5C2A, #2E9B63);
+}
+
+.seller-card-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: var(--bg-inset);
+}
+
+.seller-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.seller-card-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seller-card-trade {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seller-card-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════
    DRAWER (left side menu)
    ═══════════════════════════════════════════════ */
 
@@ -4672,10 +5036,9 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 7px;
-  /* 72, not 62: the labels grew when the taxonomy did. Fixed rather than auto
-     so the icon squares stay on a rhythm instead of jittering to the width of
-     whatever word sits under them. */
+  gap: 5px;
+  /* Fixed rather than auto so the icon squares stay on a rhythm instead of
+     jittering to the width of whatever word sits under them. */
   width: 72px;
   padding: 0;
   background: none;
@@ -4684,13 +5047,15 @@ textarea:focus-visible {
   font-family: inherit;
 }
 .cat-tile-ico {
-  /* 64 around a 56 icon. The plate used to be exactly the icon's size, so the
-     selected state had no padding and read as a swatch stuck behind the art
-     rather than a container holding it. 4px on every side is what makes it a
-     highlight. */
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
+  /* 54 around a 46 icon, down from 64 around 56.
+     The strip measured 110px tall — 13% of the viewport spent on a filter
+     nobody has asked for yet, and it pushed the first actual product to y=694
+     on an 844px screen, so a shopper saw a sliver of one photo above the fold.
+     The 4px of breathing room on each side that makes the selected state read
+     as a container rather than a swatch is preserved; only the scale drops. */
+  width: 54px;
+  height: 54px;
+  border-radius: 17px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4711,12 +5076,12 @@ textarea:focus-visible {
    faces — so nearest-neighbour scaling would chew the edges it is meant to
    protect. Smooth downscaling is what keeps them clean. */
 .cat-tile-ico img {
-  /* Fills the 56px box edge to edge. The art is exported with no internal
-     margin, so this is the size the ILLUSTRATION renders at rather than the
-     size of a box containing a smaller illustration. Nothing clips: each icon
-     is fitted into its square, so the long axis touches the edge and the short
-     one leaves the transparent gap the shape itself implies. */
-  width: 56px;
+  /* Fills the box edge to edge. The art is exported with no internal margin,
+     so this is the size the ILLUSTRATION renders at rather than the size of a
+     box containing a smaller illustration. Nothing clips: each icon is fitted
+     into its square, so the long axis touches the edge and the short one
+     leaves the transparent gap the shape itself implies. */
+  width: 46px;
   height: 56px;
   display: block;
   object-fit: contain;
@@ -4756,7 +5121,10 @@ textarea:focus-visible {
   box-shadow: none;
 }
 .cat-tile-label {
-  font-size: 11px;
+  /* Raised to the 12px floor even while the strip shrank. The tile got smaller
+     by losing plate, not by losing legibility — shrinking a label already
+     under every readable minimum would have been the wrong 10px to save. */
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-secondary);
@@ -4811,56 +5179,106 @@ textarea:focus-visible {
   color: var(--text-secondary);
   white-space: nowrap;
   transition: color 0.15s;
+  /* 26.8px tall as written — the smallest control on the page, sitting one
+     thumb-width from a scroll surface, so a miss scrolled the feed instead.
+     The text stays where it is; the reach grows around it. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-left: 8px;
 }
 .rail-seeall:hover { color: var(--text-primary); }
 
+/* ── Rails: sized by how many cards should be VISIBLE ─────────────────────
+ *
+ * The card width is derived from the count, not the other way round. This is
+ * the fix for two problems at once.
+ *
+ * A fixed 190px card showed 1.5 cards on a 390px phone — measured — so the
+ * next card was always cut at an ambiguous place and one card filled 44% of
+ * the viewport height. Every glance was a commitment to a single object, which
+ * is what made the feed read as a stack of posters rather than a shop.
+ *
+ * Deriving from a COUNT gives a deliberate peek at every width instead: 2.3
+ * cards means two whole ones plus ~30% of a third, which is inside the 12–20%
+ * band that reads as "this scrolls" without looking broken or clipped. And it
+ * scales — a 320px phone and a 430px phone both show 2.3 cards, so density
+ * stays constant instead of the cards growing with the screen.
+ *
+ * The percentage resolves against the track's content box, which is what makes
+ * this work in one line of arithmetic. */
 .rail-track {
+  --rail-gap: 12px;
+  --rail-cards: 2.3;
   display: flex;
-  gap: 12px;
+  gap: var(--rail-gap);
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   padding: 2px 16px 6px;
   -webkit-overflow-scrolling: touch;
+  /* Keeps a fast horizontal flick from turning into a vertical page scroll
+     halfway through. */
+  overscroll-behavior-x: contain;
 }
 .rail-track::-webkit-scrollbar { display: none; }
 .rail-item {
   flex: 0 0 auto;
-  /* One knob for card size, overridden per rail variant below. The image is
-     the point of these cards, so "bigger card" means "bigger photo" — the
-     caption height barely moves. */
-  width: var(--card-w, 190px);
+  width: calc((100% - (var(--rail-cards) - 1) * var(--rail-gap)) / var(--rail-cards));
   scroll-snap-align: start;
 }
-@media (min-width: 700px)  { .rail-item { width: var(--card-w-md, 210px); } }
-@media (min-width: 1280px) { .rail-item { width: var(--card-w-lg, 232px); } }
+/* Past tablet the count rises rather than the cards inflating — the brief's
+   "consistent density, not proportional enlargement". */
+@media (min-width: 700px)  { .rail-track { --rail-cards: 3.4; } }
+@media (min-width: 1024px) { .rail-track { --rail-cards: 4.4; } }
+@media (min-width: 1440px) { .rail-track { --rail-cards: 5.4; } }
 
 /* ── Rail variants — the rhythm ──────────────────────
    Rails alternate card shape so the page doesn't read as one template
-   repeated nine times. Set only the size/aspect knobs; everything else is
-   inherited, so all variants stay the same card language. */
+   repeated nine times. Each variant sets only the visible-count and the image
+   aspect; everything else is inherited, so all variants stay one card
+   language. */
 
-/* Featured: the hero row. Biggest cards, tallest photo. */
+/* Featured: the hero row, and deliberately SCARCE. If every row is large then
+   nothing is, so the orchestrator grants this to one module per page. */
 .rail--featured {
-  --card-w: 240px;
-  --card-w-md: 268px;
-  --card-w-lg: 300px;
   --pcard-ar: 4 / 5;
 }
+.rail--featured .rail-track { --rail-cards: 1.75; }
+@media (min-width: 700px)  { .rail--featured .rail-track { --rail-cards: 2.6; } }
+@media (min-width: 1024px) { .rail--featured .rail-track { --rail-cards: 3.4; } }
 
-/* Wide: landscape art (event posters, service banners) gets a landscape
-   frame instead of being cropped to a portrait. 3:2 rather than 16:10 — at
-   this width 16:10 left the photo only ~68% of the card, and the photo is
-   supposed to dominate in every variant, landscape included. */
+/* Businesses: wider cells than products, because the card is a name and two
+   lines of text rather than a photograph — at 2.3 across the name truncated
+   after one word. */
+.rail--business .rail-track { --rail-cards: 1.6; }
+@media (min-width: 700px)  { .rail--business .rail-track { --rail-cards: 2.4; } }
+@media (min-width: 1024px) { .rail--business .rail-track { --rail-cards: 3.2; } }
+
+/* Micro: dense discovery. Square, small, many at once — for rows where the
+   job is "scan a lot", not "consider each one". */
+.rail--micro {
+  --pcard-ar: 1 / 1;
+}
+/* 2.9, not 3.2. At 3.2 the card came out 104px on a 390px phone — narrow
+   enough that a title clipped after two words, which makes a dense row
+   unreadable rather than dense. 2.9 lands ~115px and keeps the title useful. */
+.rail--micro .rail-track { --rail-cards: 2.9; }
+.rail--micro .pcard-body { min-height: 56px; padding: 6px 8px 8px; }
+.rail--micro .pcard-title { font-size: 12.5px; -webkit-line-clamp: 1; }
+.rail--micro .pcard-meta { display: none; }
+@media (min-width: 700px)  { .rail--micro .rail-track { --rail-cards: 4.6; } }
+@media (min-width: 1024px) { .rail--micro .rail-track { --rail-cards: 6.2; } }
+
+/* Wide: landscape art (event posters, service banners) gets a landscape frame
+   instead of being cropped to a portrait. */
 .rail--wide {
-  --card-w: 268px;
-  --card-w-md: 300px;
-  --card-w-lg: 324px;
   --pcard-ar: 3 / 2;
 }
-/* Wide cards fit most titles on one line, so they don't need the two-line
-   slot the narrow cards reserve. */
+.rail--wide .rail-track { --rail-cards: 1.5; }
 .rail--wide .pcard-body { min-height: 64px; }
+@media (min-width: 700px)  { .rail--wide .rail-track { --rail-cards: 2.3; } }
+@media (min-width: 1024px) { .rail--wide .rail-track { --rail-cards: 3.2; } }
 
 /* ── Product card ───────────────────────────────────── */
 .pcard {
@@ -4871,9 +5289,15 @@ textarea:focus-visible {
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
   overflow: hidden;
-  transition: transform 0.16s var(--ease-smooth), box-shadow 0.16s var(--ease-smooth);
+  transition: transform 120ms var(--ease-smooth), box-shadow 0.16s var(--ease-smooth);
 }
-.pcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+@media (hover: hover) {
+  .pcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+}
+/* Driven by the tap guard's own press state, never :active — :active lights up
+   the moment a finger lands, including on the finger that is about to scroll,
+   so the feed used to flicker as it moved. 0.985 and ~120ms: felt, not seen. */
+.pcard[data-pressed] { transform: scale(0.985); }
 
 .pcard-open {
   display: flex;
@@ -4891,9 +5315,14 @@ textarea:focus-visible {
   position: relative;
   display: block;
   width: 100%;
-  /* Portrait by default: the photo is the product, so it gets the room. At
-     4:5 with a ~52px caption the image is roughly 82% of the card. */
-  aspect-ratio: var(--pcard-ar, 4 / 5);
+  /* Square by default, portrait only where a variant asks for it.
+     The IMAGE is square; the CARD is not — image plus caption comes out near
+     4:5 overall, which is the shape that fits a title, a price and a location
+     without the photo swallowing the viewport. A 4:5 image made the whole card
+     nearer 2:3 and a single one filled 44% of the screen.
+     The ratio is declared here, before the image loads, so a slow photo can
+     never resize the card underneath a reader's thumb. */
+  aspect-ratio: var(--pcard-ar, 1 / 1);
   background: var(--bg-inset);
   overflow: hidden;
 }
@@ -4930,10 +5359,13 @@ textarea:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* The money outranks the name. A shopper scans prices and reads titles only
+   for the ones that pass, so the price is the larger and heavier of the two —
+   at 14px against a 13px semibold title the two used to compete. */
 .pcard-price {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 15.5px;
+  font-weight: 750;
+  letter-spacing: -0.015em;
   color: var(--text-primary);
 }
 .pcard-price[data-tone="free"]   { color: var(--success); }
@@ -4949,7 +5381,11 @@ textarea:focus-visible {
   gap: 4px;
   min-width: 0;
   margin-top: auto;      /* pinned to the caption's baseline row */
-  font-size: 10.5px;
+  /* 12px floor. Metadata sat at 10.5px, below every platform's readable
+     minimum and the first thing to disappear when someone turns text size up.
+     Location is not decoration — it is how a buyer decides whether the walk is
+     worth it. */
+  font-size: 12px;
   color: var(--text-muted);
 }
 .pcard-meta-text {
@@ -4959,26 +5395,41 @@ textarea:focus-visible {
 }
 .pcard-meta--dim { opacity: 0.8; }
 
+/* Save: a 44px touch target wearing a 32px chip.
+ *
+ * It was 30 × 30 — under Apple's 44pt and Android's 48dp minimums, and small
+ * enough that half the misses landed on the card behind it and opened the
+ * listing. Growing the visible chip to 44 would have made the heart shout on
+ * a card this size, so the TARGET grows and the chip does not: the button is
+ * 44 × 44 and transparent, and ::before paints the circle the eye sees. */
 .pcard-save {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 0;
+  right: 0;
   z-index: 3;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.92);
-  color: #17150F;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: none;
   border: none;
+  padding: 0;
+  color: #17150F;
   cursor: pointer;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.16);
   transition: transform 0.12s var(--ease-spring), color 0.15s;
 }
-.pcard-save:hover { transform: scale(1.08); }
-.pcard-save:active { transform: scale(0.86); }
+.pcard-save::before {
+  content: '';
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.16);
+}
+.pcard-save > * { position: relative; }
+@media (hover: hover) { .pcard-save:hover { transform: scale(1.08); } }
+.pcard-save:active { transform: scale(0.88); }
 .pcard-save[data-saved] { color: var(--accent-rose); }
 
 .pcard-badge {
@@ -5146,6 +5597,7 @@ textarea:focus-visible {
 .sf-cta-btn {
   flex: 0 0 auto;
   align-self: center;
+  min-height: 44px;
   padding: 11px 20px;
   border-radius: 999px;
   border: none;

@@ -94,12 +94,16 @@ export function buildContactLinks(args: BuildArgs): ContactLink[] {
 export function actionLabel(action: ContactAction): string {
   switch (action) {
     case 'borrow':  return 'Request to borrow';
-    case 'buy':     return 'Contact seller';
+    /* "Message seller", not "Contact seller". Contact is a category of action;
+       message is the thing that is about to happen, and naming the outcome is
+       what makes a primary button feel safe to press. */
+    case 'buy':     return 'Message seller';
     case 'free':    return "I'll take it";
     case 'swap':    return 'Offer a swap';
     case 'request': return 'Respond to request';
     case 'event':   return 'Message organizer';
-    case 'hire':    return 'Contact provider';
+    /* A paid service is booked, not enquired about. */
+    case 'hire':    return 'Request booking';
     case 'help':    return 'Get in touch';
     case 'volunteer': return 'Sign up to help';
     case 'general': return 'Send a message';

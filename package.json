@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "test": "node --experimental-strip-types --import ./scripts/register-ts.mjs --test \"lib/**/*.test.ts\"",
     "build": "next build",
     "start": "next start",
     "build:cap": "bash scripts/build-cap.sh",

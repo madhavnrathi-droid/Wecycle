@@ -37,6 +37,7 @@ import { normalizeCategory, categoryLabel } from '../lib/categories';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
+import { transitionStyle } from '../lib/viewTransition';
 import { Logomark } from './Brand';
 import { WA_FILL, WA_INK } from '../lib/whatsapp';
 import {
@@ -788,6 +789,10 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             borderRadius: 24,
             overflow: 'hidden',
             background: 'var(--bg-inset)',
+            /* The other end of the card→detail transition. The card's photo
+               interpolates into this frame instead of the page cutting, so the
+               thing that was tapped is visibly the thing that opened. */
+            ...transitionStyle(item.id),
           }}>
             <PhotoCarousel
               photos={displayPhotos}

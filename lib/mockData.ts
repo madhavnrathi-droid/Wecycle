@@ -132,6 +132,13 @@ export interface MarketplaceItem {
   saved: boolean;
   responses: number;
   postedDaysAgo: number;
+  /** Raw ISO posted_at, when the row came from the database.
+   *
+   *  postedDaysAgo cannot express the first day — everything posted in the last
+   *  24 hours is 0 — and the first day is exactly where a new listing's
+   *  discovery boost lives. Optional because mock fixtures carry only the day
+   *  count; the ranker falls back to it. */
+  postedAt?: string;
   tags: string[];
   /* Real media from Supabase (absent on mock items, which fall back to the
      hardcoded Unsplash sets keyed by id in lib/photos.ts). */
