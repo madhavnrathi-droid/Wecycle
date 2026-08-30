@@ -3735,7 +3735,9 @@ img[src*="/storage/v1/object/public/"] {
      columns put the post button exactly on the midline at any width. */
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  align-items: end;
+  /* center, not end. `end` existed to sit icons on top of their labels; with
+     the labels gone it just pushed the row against the safe-area padding. */
+  align-items: center;
   position: relative;
   gap: 0;
   /* Mobile: edge-to-edge dock flush to the bottom. The surface fills down past
@@ -3767,127 +3769,185 @@ img[src*="/storage/v1/object/public/"] {
     0 -1px 4px rgba(0, 0, 0, 0.06),
     0 -6px 22px rgba(0, 0, 0, 0.12);
 }
-/* Pill-expanding nav button — borrowed from the Karya app.
- * The button stays icon-only until it becomes active, at which point it
- * expands into a horizontal pill and reveals its label next to the icon.
+/* ── The nav palette ───────────────────────────────────────────────────────
  *
- * Animation design notes:
- *   - 280ms with a slight spring-overshoot easing makes the pill feel
- *     "snappy" instead of "linear". The same curve drives padding, gap,
- *     and the label's max-width so the three move as one shape.
- *   - Background + color flip on a separate, shorter timing (180ms ease)
- *     so the colour change reads as instant even while the pill grows.
- *   - The label is rendered always (max-width:0, opacity:0 when inactive)
- *     so React doesn't mount/unmount it on every nav change — that would
- *     reset the transition and cause the first paint to flash.
- */
+ * One mint, everywhere. The bar used to recolour itself per section — green on
+ * Home, purple on Events, orange on Lost & Found, amber on Inventory — and now
+ * carries a single pill, which changes what the colour is DOING: four colours
+ * identified the section, one colour identifies the selection. The icon says
+ * where you are.
+ *
+ *   --nav-mint  on the white bar ......... 1.26:1
+ *   --nav-ink   on --nav-mint ............ 6.47:1
+ *   --nav-ink   on the white bar ......... 8.15:1
+ *   --nav-rest  on the white bar ......... 5.58:1
+ *
+ * KNOWN, AND DELIBERATE: the pill is a plain fill with no rim, by request. No
+ * mint that is still recognisably mint clears WCAG 1.4.11's 3:1 for a state
+ * indicator — the lightest one that does has stopped being mint, exactly as
+ * this file's old amber note recorded for yellow — and the rim that used to
+ * carry that boundary has been removed for the cleaner shape. So the selected
+ * state rests on the fill plus the ink shift, not on a measured boundary.
+ * Darkening the mint does not fix this; it only costs the colour (#A8E4C1, well
+ * past mint, still only reaches 1.45:1). The way back, if a reviewer ever asks,
+ * is one line: restore `box-shadow: inset 0 0 0 1.25px #1E8F55` on the pill,
+ * which measured 4.11:1 against the bar.
+ *
+ * --nav-rest is a green-tinted grey rather than the neutral --text-muted, so a
+ * resting icon reads as the active one dimmed rather than as a second palette
+ * sitting next to it. */
+.bottom-nav {
+  --nav-mint: #C4EFD6;
+  --nav-ink:  #0A5C2A;
+  --nav-rest: #5F6B62;
+}
+
+/* ── The icons ──
+ * Alpha masks, not pictures. The artwork arrived as five black glyphs baked
+ * into one 2173×725 sprite sheet inside an SVG that cropped a window onto it —
+ * 340KB per "icon", flat raster, and the black was not a colour anything could
+ * change. Cut out and kept as masks they are ~4KB each and take their colour
+ * from `currentColor`, so resting-to-active is a colour transition on one
+ * element rather than a swap between two files. It is also why the white
+ * "negative" set went unused: a mask has no colour to invert. */
+.nav-ico {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background-color: currentColor;
+  -webkit-mask-image: var(--ico);
+          mask-image: var(--ico);
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+          mask-position: center;
+  /* contain, not cover: every glyph was composed onto one square canvas at a
+     single shared scale, so the set already balances. Letting each one fill its
+     own box would re-scale them independently and the stroke weights — the
+     thing that makes them read as one family — would stop matching. */
+  -webkit-mask-size: contain;
+          mask-size: contain;
+  /* The icon pops on the same bounce, a touch quicker, so it lands just before
+     the pill finishes and the two read as one gesture rather than two. */
+  transition: transform 260ms cubic-bezier(0.3, 1.7, 0.5, 1);
+}
+.nav-ico--plus { --ico: url(/icons/nav/plus.png); width: 26px; height: 26px; }
+
 .bottom-nav-btn {
   position: relative;
-  z-index: 1;                  /* above the sliding indicator */
+  z-index: 1;                  /* above the sliding pill */
+  /* Every child is placed explicitly on row 1. Without this the buttons
+     auto-flow into a row of their own and the pill ends up floating above them
+     instead of behind the icon — they must share one cell, one in front of the
+     other. */
+  grid-row: 1;
   width: 100%;
   min-width: 0;
-  height: auto;
-  padding: 7px 2px 5px;
+  height: 46px;                /* comfortably past the 44px touch minimum */
   display: inline-flex;
-  flex-direction: column;      /* icon over label, as in the references */
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  padding: 0;
   background: transparent;
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  color: var(--text-muted);
-  /* Snappy spring — light overshoot at the end of the curve. */
+  color: var(--nav-rest);
   transition:
-    padding 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    gap 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 200ms ease-out,
-    color 180ms ease-out,
+    color 200ms ease-out,
     transform 0.15s var(--ease-spring);
-  /* SVG should never grow on its own — anchor it left so the layout
-     shifts feel like the pill is opening outward from the icon. */
-  flex-shrink: 0;
 }
 .bottom-nav-btn[data-active] {
-  /* The pill itself is the sliding indicator behind this button, so the button
-     only takes the ink colour. Painting a background here too would double up
-     and kill the slide. */
+  /* The pill behind the button is the background; painting one here too would
+     double up and kill the slide. The button only takes the ink. */
   background: transparent;
-  color: var(--bg-base);
+  color: var(--nav-ink);
 }
-
-/* ── The sliding indicator ──
-   One element that moves between grid columns, so it reads as a single object
-   travelling along the bar rather than four pills taking turns. It is placed by
-   `gridColumn` from the component and animates via the grid's own layout, which
-   keeps it pixel-locked to the column it lands on at every width. */
-/* Every child is placed explicitly on row 1. Auto-flow put the slider in a
-   cell of its own, which made six items compete for five columns and pushed
-   Inventory onto a second row. The slider and the active button must occupy
-   the SAME cell — one behind the other — not sit side by side. */
-.bottom-nav-inner > button { grid-row: 1; }
-.bottom-nav-inner > button:nth-of-type(1) { grid-column: 1; }
-.bottom-nav-inner > button:nth-of-type(2) { grid-column: 2; }
-.bottom-nav-inner > button:nth-of-type(3) { grid-column: 3; }  /* post */
-.bottom-nav-inner > button:nth-of-type(4) { grid-column: 4; }
-.bottom-nav-inner > button:nth-of-type(5) { grid-column: 5; }
-
-.bottom-nav-slider {
-  grid-row: 1;
-  align-self: stretch;
-  margin: 2px 4px;
-  border-radius: 16px;
-  /* Painted inline by BottomNav — this is only the resting colour for the
-     first frame before hydration. */
-  background: var(--text-primary);
-  /* Inventory's amber cannot reach 3:1 against a white bar on fill alone, so
-     that section supplies a darker rim and the boundary comes from the rim
-     instead — permitted by WCAG 1.4.11. Every other section sets it
-     transparent, where the fill already clears 3:1 on its own. */
-
-  transition:
-    background-color 260ms ease-out,
-    box-shadow 260ms ease-out;
-  pointer-events: none;
-}
+/* A small lift as the pill arrives, so selection is legible as motion and not
+   only as colour — which matters more now that the labels are gone. */
+.bottom-nav-btn[data-active] .nav-ico { transform: scale(1.12); }
 .bottom-nav-btn:active { transform: scale(0.92); }
 
-.bottom-nav-btn-label {
-  display: block;
-  max-width: none;
-  opacity: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: 10.5px;
-  line-height: 1.1;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: inherit;
-  /* Label fades in on a slight delay so the pill begins expanding before
-     text appears — keeps the motion crisp. */
+/* ── The sliding pill ──
+   It lives permanently in grid column 1 and moves by translating whole
+   multiples of its own width — which, in a five-equal-column grid, is exactly
+   one column. That identity is the whole mechanism, so the element must stay
+   full-column width: the visible inset comes from ::before, NOT from narrowing
+   this box, or every translate would be short by the difference.
+
+   The version this replaced re-assigned `grid-column` on each tab change.
+   grid-column is not an animatable property, so the indicator documented as
+   "travelling along the bar" was in fact teleporting. A transform animates, and
+   composites on the GPU. */
+.bottom-nav-slider {
+  position: relative;
+  grid-row: 1;
+  grid-column: 1;
+  align-self: center;
+  width: 100%;
+  height: 38px;
+  opacity: 0;
+  transform: translateX(calc(var(--nav-i, 0) * 100%));
+  /* Snappy then bouncy: most of the distance is covered early, then the pill
+     runs a little past its column and settles back. 340ms is short enough to
+     feel immediate and long enough for the overshoot to be seen rather than
+     smeared.
+
+     THE CONTROL POINT IS CAPPED BY GEOMETRY, not taste. Overshoot is a
+     percentage of distance travelled, and the longest trip — Home to Inventory
+     — ends at the last column, where the pill has only about 8px of clearance
+     before it runs past the bar's padding on a 375px phone. Measured on the
+     full Home→Inventory move:
+
+         cubic-bezier(0.3, 1.62, …)  → 37.5px   off the screen entirely
+         cubic-bezier(0.2, 1.35, …)  → 13.2px   over the edge on most phones
+         cubic-bezier(0.25, 1.3,  …) →  9.7px   over on a 375px screen
+         cubic-bezier(0.3, 1.25, …)  →  6.5px   clears at every width  ✓
+
+     So the bounce you can see is the biggest one that stays inside the bar.
+     Raising 1.25 makes the pill visibly shoot out of the dock on the widest
+     move; if more life is wanted, add it to the icon pop below, which has no
+     edge to hit. */
   transition:
-    max-width 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 180ms ease-out 60ms;
+    transform 340ms cubic-bezier(0.3, 1.25, 0.45, 1),
+    opacity 180ms ease-out;
+  pointer-events: none;
 }
-.bottom-nav-btn[data-active] .bottom-nav-btn-label { font-weight: 700; }
+/* Unlit on Account / Impact / Activity — the pill fades out where it stands
+   rather than sliding to a column that means nothing. */
+.bottom-nav-slider[data-lit] { opacity: 1; }
+/* The visible pill. Capped and centred HERE rather than by narrowing the
+   slider, because the slider's width is the unit the translate counts in — it
+   must stay exactly one column or every step lands short. Capping keeps the
+   pill hugging the icon on a wide phone instead of stretching into a slab as
+   the columns grow. */
+.bottom-nav-slider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(calc(100% - 16px), 54px);
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--nav-mint);
+}
 
 .bottom-nav-post {
   /* In line with the other slots, not lifted proud of the bar. justify-self
      centres it inside its own grid column — the middle one — so it sits on the
-     exact midline at any width. It carries no label by design: the four
-     destinations are labelled because they need naming, while a plus is
-     already unambiguous, and giving it a word would make it read as a fifth
-     destination rather than an action. */
+     exact midline at any width. */
+  grid-row: 1;
+  grid-column: 3;
   justify-self: center;
   align-self: center;
   z-index: 2;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 12px rgba(10, 92, 42, 0.28);
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: var(--text-primary);
-  color: var(--bg-base);
+  background: var(--nav-ink);
+  color: var(--nav-mint);
   border: none;
   cursor: pointer;
   display: inline-flex;
@@ -3897,6 +3957,16 @@ img[src*="/storage/v1/object/public/"] {
   flex-shrink: 0;
 }
 .bottom-nav-post:active { transform: scale(0.92); }
+
+/* The pill travelling the width of the bar is a large moving object. Someone
+   who has asked for less motion should get the state change without the
+   journey — the colour and the lift still tell them what happened. */
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-slider { transition: opacity 120ms linear; }
+  .nav-ico,
+  .bottom-nav-btn,
+  .bottom-nav-post { transition: none; }
+}
 
 /* Tablet: slightly tighter pill, similar mobile feel */
 @media (min-width: 768px) {
@@ -3917,17 +3987,17 @@ img[src*="/storage/v1/object/public/"] {
       0 8px 28px rgba(0, 0, 0, 0.14),
       0 2px 8px rgba(0, 0, 0, 0.08);
   }
-  /* min-width, not width, so inactive icons stay compact while the active
-     button expands into a pill.
-
-     min-height, NOT height. These overrides were written when the bar was
-     icon-only; the redesign put a permanent label under every icon, and a
-     fixed 40px could not hold an icon plus a line of text — so on any screen
-     at least 768px wide, which includes a phone turned sideways, "Inventory"
-     was sliced through the middle. A column that sizes to its content cannot
-     clip it. */
-  .bottom-nav-btn  { min-width: 40px; height: auto; min-height: 40px; }
-  .bottom-nav-post { width: 46px; height: 46px; }
+  /* Back to a fixed height now that the row is icon-only again. (The note that
+     stood here warned against exactly that, because a permanent label under
+     every icon could not fit in 40px and "Inventory" got sliced through the
+     middle on any screen 768px and up — a phone turned sideways included.
+     There is no label to clip any more, but the warning is worth keeping in
+     view of whoever brings one back.) */
+  .bottom-nav-btn   { height: 42px; }
+  .bottom-nav-slider { height: 36px; }
+  .bottom-nav-post  { width: 46px; height: 46px; }
+  .nav-ico          { width: 24px; height: 24px; }
+  .nav-ico--plus    { width: 24px; height: 24px; }
 }
 
 /* Desktop: compact dock — small and unobtrusive (Apple-Dock-like) */
@@ -3942,13 +4012,15 @@ img[src*="/storage/v1/object/public/"] {
       0 12px 30px rgba(0, 0, 0, 0.10),
       0 4px 12px rgba(0, 0, 0, 0.06);
   }
-  .bottom-nav-btn  { min-width: 38px; height: auto; min-height: 38px; }
-  .bottom-nav-post { width: 42px; height: 42px; }
-  .bottom-nav-btn  svg { width: 18px; height: 18px; }
-  .bottom-nav-post svg { width: 18px; height: 18px; }
-  /* Hover affordance for mouse users — gated to inactive so it doesn't
-     fight the active pill's solid white background. */
-  .bottom-nav-btn:not([data-active]):hover { background: var(--bg-inset); }
+  .bottom-nav-btn   { height: 40px; }
+  .bottom-nav-slider { height: 34px; }
+  .bottom-nav-post  { width: 42px; height: 42px; }
+  .nav-ico          { width: 22px; height: 22px; }
+  .nav-ico--plus    { width: 22px; height: 22px; }
+  /* Hover affordance for mouse users. Gated to inactive so it doesn't fight
+     the mint pill, and expressed as ink rather than a background — a grey box
+     appearing behind one icon reads as a second, competing selection. */
+  .bottom-nav-btn:not([data-active]):hover { color: var(--nav-ink); }
   .bottom-nav-post:hover { transform: scale(1.05); }
 }
 
@@ -4352,18 +4424,10 @@ textarea:focus-visible {
   --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Nav: the pill no longer expands, so padding/gap/max-width are no longer
-   animated — the indicator slides and the ink cross-fades instead. Leaving the
-   old property list here would have kept animating properties that never
-   change while leaving the ones that do un-eased. */
-.bottom-nav-btn {
-  transition:
-    color 220ms ease-out,
-    transform 0.24s var(--ease-spring);
-}
-.bottom-nav-btn-label {
-  transition: color 220ms ease-out;
-}
+/* Nav: the press scale is a touch softer here than the base rule. The button's
+   own colour/transform easing is declared with the rest of the bar; repeating
+   it here only created two places to keep in step, and the label rule that sat
+   alongside it outlived the label itself. */
 .bottom-nav-btn:active,
 .bottom-nav-post:active { transform: scale(0.94); }
 
