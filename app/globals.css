@@ -917,9 +917,11 @@ section.mobile-only { display: block; }
   border-radius: 16px;
   overflow: hidden;
   isolation: isolate;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    0 8px 24px -10px rgba(0, 0, 0, 0.22);
+  /* No shadow, and no surface either.
+     The slides are transparent cut-outs now, so a drop shadow here is a card
+     edge drawn around a card that is not there — a shadow cast by nothing,
+     with the page's own cream visible inside the outline it draws. The
+     artwork sits directly on the page. */
 }
 
 /* COMPACT — phone-shape pill next to the greeting (currently unused on
@@ -1008,13 +1010,17 @@ section.mobile-only { display: block; }
   text-align: left;
   color: #fff;
   font: inherit;
+  /* Transparent by design — the art slides carry no panel behind them now, so
+     the page surface IS the banner's background. */
   background: transparent;
   overflow: hidden;
   transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
   display: flex;
 }
 .marketing-banner-slide:focus-visible {
-  outline: 2px solid #fff;
+  /* Was white, for a white ring on a coloured panel. With the panel gone a
+     white ring on cream is invisible. */
+  outline: 2px solid var(--text-primary);
   outline-offset: -3px;
 }
 .marketing-banner-slide:active { transform: scale(0.99); }
@@ -1043,36 +1049,7 @@ section.mobile-only { display: block; }
    .marketing-banner-text sets position:relative 120 lines further down the
    file, which beat an equally-specific override on source order alone. Scoping
    to the slide raises specificity above both and states the order outright. */
-.marketing-banner-slide[data-art] .marketing-banner-gradient { z-index: 0; }
-.marketing-banner-slide[data-art] .marketing-banner-art      { position: relative; z-index: 1; }
-.marketing-banner-slide[data-art] .marketing-banner-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  /* Bottom-weighted: the scenes are busiest through the middle and quietest
-     along the ground line, so the darkening buys legibility where the type sits
-     without dulling the illustration where it matters. */
-  background: linear-gradient(
-    to top,
-    rgba(12, 16, 12, 0.66) 0%,
-    rgba(12, 16, 12, 0.36) 24%,
-    rgba(12, 16, 12, 0) 50%
-  );
-}
-.marketing-banner-slide[data-art] .marketing-banner-text--over {
-  position: absolute;
-  z-index: 3;
-  left: 16px;
-  right: 52px;
-  /* Clears the pagination dots, which occupy the bottom 16px of the card. At
-     12px the subtitle and the dots were measurably on top of each other. */
-  bottom: 26px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-}
+.marketing-banner-slide[data-art] .marketing-banner-art { position: relative; z-index: 1; }
 .marketing-banner-slide[data-art] .marketing-banner-arrow { z-index: 4; }
 
 /* Compact slide layout: vertical, text bottom-anchored. */
@@ -1282,8 +1259,10 @@ section.mobile-only { display: block; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.94);
-  color: #0E0E08;
+  /* Inverted with everything else: a near-white chip on a coloured panel read
+     as a button, and the same chip on cream reads as nothing. */
+  background: rgba(23, 21, 15, 0.88);
+  color: #FFFFFF;
   border-radius: 50%;
   opacity: 0;
   transition: opacity 240ms ease, transform 240ms ease;
@@ -1339,7 +1318,9 @@ section.mobile-only { display: block; }
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.5);
+  /* Ink, not white. These were white for a white dot on a coloured panel; with
+     the panel gone that is a white dot on cream, which is no dot at all. */
+  background: rgba(23, 21, 15, 0.28);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -1357,10 +1338,10 @@ section.mobile-only { display: block; }
 .marketing-banner-wide .marketing-banner-dot { width: 6px; height: 6px; }
 .marketing-banner-dot[data-active] {
   width: 16px;
-  background: #fff;
+  background: var(--text-primary);
 }
 .marketing-banner-wide .marketing-banner-dot[data-active] { width: 20px; }
-.marketing-banner-dot:hover { background: rgba(255, 255, 255, 0.9); }
+.marketing-banner-dot:hover { background: rgba(23, 21, 15, 0.6); }
 
 /* Reduced motion — every animation off. */
 @media (prefers-reduced-motion: reduce) {
