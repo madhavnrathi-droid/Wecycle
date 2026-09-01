@@ -23,6 +23,7 @@ import { ChevronLeft, ChevronRight, MapPin, Search } from 'lucide-react';
 import { closedLabelFor, type MarketplaceItem, type LostItem } from '../lib/mockData';
 import { opportunityCompLabel } from '../lib/opportunity';
 import { resolveItemMedia } from '../lib/photos';
+import NoPhoto from './NoPhoto';
 
 export type RailCard =
   | { kind: 'listing'; item: MarketplaceItem; onClick: () => void }
@@ -255,15 +256,7 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
             decoding="async"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
-        ) : (
-          <div style={{
-            width: '100%', height: '100%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 40,
-          }}>
-            {item.photoIcon || '📦'}
-          </div>
-        )}
+        ) : <NoPhoto />}
         {/* Type/status badge */}
         {(item.isRequest || item.listingType === 'free' || item.kind === 'opportunity' || closed) && (
           <span style={{

@@ -5,7 +5,8 @@ import { Menu, Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 
 import { Wordmark } from './Brand';
 import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem } from '../lib/mockData';
 import { opportunityCompLabel } from '../lib/opportunity';
-import { resolveItemMedia, getEventPhoto, getAvatar, getLostFoundPhoto } from '../lib/photos';
+import { resolveItemMedia, getEventPhoto, getAvatar, resolveLostFoundPhoto } from '../lib/photos';
+import NoPhoto from './NoPhoto';
 import { useAuth } from '../lib/AuthContext';
 import { getEventMetrics } from '../lib/metrics';
 import { isDemoMode } from '../lib/demoMode';
@@ -729,7 +730,9 @@ function InventoryEventCard({
           style={{ aspectRatio: ar, padding: 0, border: 'none', background: 'transparent', width: '100%', height: '100%' }}
           aria-label={`Open event ${event.title}`}
         >
-          <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+          {photo
+            ? <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+            : <NoPhoto />}
 
           <span style={{
             position: 'absolute', top: 10, left: 10,
@@ -771,7 +774,7 @@ function InventoryLostFoundCard({
   completeLabel?: string;
   onComplete?: () => void | Promise<void>;
 }) {
-  const photo = getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls);
+  const photo = resolveLostFoundPhoto(lf.id, lf.photoUrls);
   const isLost = lf.status === 'lost';
   const ar = tall ? '0.72' : '0.92';
   return (
@@ -787,7 +790,9 @@ function InventoryLostFoundCard({
           style={{ aspectRatio: ar, padding: 0, border: 'none', background: 'transparent', width: '100%', height: '100%' }}
           aria-label={`Open ${lf.title}`}
         >
-          <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+          {photo
+            ? <img src={photo} alt="" className="feed-card-img" loading="lazy" />
+            : <NoPhoto />}
 
           <span style={{
             position: 'absolute', top: 10, left: 10,
@@ -801,7 +806,7 @@ function InventoryLostFoundCard({
             {lf.status}
           </span>
 
-          <div className="feed-card-overlay">
+          <div className="feed-card-overlay" data-light={!photo || undefined}>
             <p className="feed-card-title">{lf.title}</p>
             <div className="feed-card-meta" style={{ gap: 10 }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>

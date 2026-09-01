@@ -9,6 +9,7 @@ import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchEvents, onPostsChanged } from '../lib/liveData';
 import EmptyState from './EmptyState';
 import { resolveEventPhoto, getAvatar } from '../lib/photos';
+import NoPhoto from './NoPhoto';
 import FitImage from './FitImage';
 import { useAuth } from '../lib/AuthContext';
 
@@ -372,7 +373,7 @@ function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; 
         aria-label={`Open ${event.title}`}
         style={{ border: 'none', padding: 0, cursor: onOpen ? 'pointer' : 'default', background: 'var(--bg-inset)' }}
       >
-        <img src={photo} alt="" loading="lazy" />
+        {photo ? <img src={photo} alt="" loading="lazy" /> : <NoPhoto />}
         <div className="rsvp-card-overlay" />
         <span className="rsvp-card-going">
           <Check size={11} strokeWidth={2.5} />
@@ -433,12 +434,14 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
         aspectRatio: '5 / 4',
         background: 'var(--bg-inset)',
       }}>
-        <img
-          src={photo}
-          alt=""
-          loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
+        {photo ? (
+          <img
+            src={photo}
+            alt=""
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : <NoPhoto />}
         <div style={{
           position: 'absolute', top: 12, left: 12,
           background: 'rgba(0,0,0,0.55)', color: '#fff',
@@ -556,7 +559,7 @@ function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEve
         className="ev-row-open"
       >
         <span className="ev-row-poster">
-          <FitImage src={photo} />
+          {photo ? <FitImage src={photo} /> : <NoPhoto small />}
         </span>
 
         <span className="ev-row-body">

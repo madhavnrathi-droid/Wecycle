@@ -9,7 +9,8 @@ import {
   MARKETPLACE_ITEMS, OPPORTUNITIES, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
   type MarketplaceItem, type CommunityEvent, type LostItem,
 } from '../lib/mockData';
-import { resolveItemMedia, getAvatar, resolveEventPhoto, getLostFoundPhoto } from '../lib/photos';
+import { resolveItemMedia, getAvatar, resolveEventPhoto, resolveLostFoundPhoto } from '../lib/photos';
+import NoPhoto from './NoPhoto';
 import { opportunityCompLabel, oppRoleBadge } from '../lib/opportunity';
 import SavedSearchBar from './SavedSearchBar';
 import { useAuth } from '../lib/AuthContext';
@@ -648,8 +649,7 @@ export default function FeedScreen({
              beside it reads as a stutter, so the post age is dropped when they
              have already said it. */
           meta={/\bago\b/i.test(l.lastSeen ?? '') ? undefined : l.timeAgo}
-          imageUrl={getLostFoundPhoto(l.id, l.photoIcon, l.photoUrls)}
-          fallbackIcon={l.photoIcon}
+          imageUrl={resolveLostFoundPhoto(l.id, l.photoUrls)}
           fallbackTint={tintFor(l.photoColor)}
           onClick={() => openLF(l, source)}
           ariaLabel={`${l.status === 'lost' ? 'Lost' : 'Found'}: ${strip(l.title)}`}
@@ -727,7 +727,6 @@ export default function FeedScreen({
                   imageUrl={it.photoUrls?.length
                     ? coverImage(it).url ?? null
                     : getAvatar(it.user?.id || it.user?.name || it.id, 96)}
-                  fallbackIcon={it.photoIcon}
                   fallbackTint={tintFor(it.photoColor)}
                   onClick={() => {
                     trackPostOpened('item', it.id, { source: `feed_${spec.id}`, is_request: false });
@@ -1532,7 +1531,7 @@ function ProductCard({
         <span className="pcard-media" style={transitionStyle(item.id)}>
           {cover.url
             ? <FitImage src={cover.url} cutout={cut} />
-            : <span className="pcard-ph" style={{ background: tintFor(item.photoColor) }} aria-hidden="true">{item.photoIcon || '📦'}</span>}
+            : <NoPhoto tint={tintFor(item.photoColor)} />}
         </span>
         <span className="pcard-body">
           <span className="pcard-title">{item.title}</span>
@@ -1568,14 +1567,14 @@ function ProductCard({
    Same shell as ProductCard, with a status badge (rose = lost, green =
    found) and last-seen / time meta instead of a price. */
 function LostFoundCard({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
-  const photo = getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls);
+  const photo = resolveLostFoundPhoto(lf.id, lf.photoUrls);
   const isLost = lf.status === 'lost';
   const cut = isCutoutUrl(photo);
   return (
     <article className="pcard">
       <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open ${lf.title}`}>
         <span className="pcard-media">
-          <FitImage src={photo} cutout={cut} />
+          {photo ? <FitImage src={photo} cutout={cut} /> : <NoPhoto tint={tintFor(lf.photoColor)} />}
         </span>
         <span className="pcard-body">
           <span className="pcard-title">{lf.title}</span>
@@ -1610,7 +1609,7 @@ function EventCard({ event, onClick }: { event: CommunityEvent; onClick: () => v
     <article className="pcard">
       <button type="button" className="pcard-open" onClick={onClick} aria-label={`Open event ${event.title}`}>
         <span className="pcard-media">
-          <FitImage src={photo} cutout={cut} />
+          {photo ? <FitImage src={photo} cutout={cut} /> : <NoPhoto />}
         </span>
         <span className="pcard-body">
           <span className="pcard-title">{event.title}</span>

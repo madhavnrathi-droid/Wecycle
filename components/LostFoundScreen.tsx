@@ -31,7 +31,8 @@ import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
-import { getAvatar, getLostFoundPhoto } from '../lib/photos';
+import { getAvatar, resolveLostFoundPhoto } from '../lib/photos';
+import NoPhoto from './NoPhoto';
 import OnlineBadge from './OnlineBadge';
 import { Z_LAYER, zPanel } from '../lib/zLayers';
 import { shareUrl } from '../lib/shareUrl';
@@ -325,6 +326,7 @@ function LostFoundCard({
   const isLost = item.status === 'lost';
   const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
   const bg = isLost ? 'rgba(237,46,80,0.10)' : 'rgba(34,197,94,0.10)';
+  const photo = resolveLostFoundPhoto(item.id, item.photoUrls);
   return (
     <button
       type="button"
@@ -334,18 +336,22 @@ function LostFoundCard({
       aria-label={`Open ${item.title}`}
     >
       {/* Real photo hero — same Marketplace card look. The lower gradient is
-          baked into .feed-card-overlay so titles stay legible. */}
-      <img
-        src={getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls)}
-        alt=""
-        loading="lazy"
-        style={{
-          position: 'absolute', inset: 0,
-          width: '100%', height: '100%',
-          objectFit: 'cover',
-          display: 'block',
-        }}
-      />
+          baked into .feed-card-overlay so titles stay legible.
+          No photo means the placeholder, never a stock shot of a different
+          object: on this board in particular, a photo IS the claim. */}
+      {photo ? (
+        <img
+          src={photo}
+          alt=""
+          loading="lazy"
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+        />
+      ) : <NoPhoto />}
       <span style={{
         position: 'absolute', top: 8, left: 8,
         background: bg,
@@ -370,7 +376,7 @@ function LostFoundCard({
           <CheckCircle size={12} strokeWidth={2.5} />
         </span>
       )}
-      <div className="feed-card-overlay">
+      <div className="feed-card-overlay" data-light={!photo || undefined}>
         <p className="feed-card-title">{item.title}</p>
         <div className="feed-card-meta">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
@@ -435,7 +441,7 @@ export function LostFoundDetailSheet({
   const currentPhotoUrls: string[] = (item as { photoUrls?: string[] }).photoUrls ?? [];
   const displayPhotoUrl: string | undefined =
     (localPhotoUrls !== null ? localPhotoUrls[0] : undefined) ??
-    getLostFoundPhoto(item.id, item.photoIcon, item.photoUrls);
+    resolveLostFoundPhoto(item.id, item.photoUrls) ?? undefined;
   const handleSaveLFPhotos = async (photoUrls: string[]) => {
     await updateLostFoundMedia(item.id, photoUrls);
     setLocalPhotoUrls(photoUrls);

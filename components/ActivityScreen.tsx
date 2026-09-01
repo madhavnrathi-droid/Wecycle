@@ -10,7 +10,8 @@ import {
   MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS,
   type MarketplaceItem, type CommunityEvent,
 } from '../lib/mockData';
-import { getItemPhoto, resolveEventPhoto, getCategoryPhoto, getAvatar } from '../lib/photos';
+import { resolveItemMedia, resolveEventPhoto, getAvatar } from '../lib/photos';
+import NoPhoto from './NoPhoto';
 import { useAuth } from '../lib/AuthContext';
 import {
   listAlerts, subscribeAlerts, timeRemaining,
@@ -305,7 +306,12 @@ function MiniMetric({
 
 function PostMetricsRow({ item }: { item: MarketplaceItem }) {
   const m = getPostMetrics(item.id);
-  const photo = getItemPhoto(item.id) ?? getCategoryPhoto(item.category);
+  /* resolveItemMedia is the same resolver the feed uses, so this row and the
+     card it reports on can no longer disagree about what the post looks like.
+     It returns nothing for a real listing with no upload — where this used to
+     substitute a stock photo of the category. */
+  const first = resolveItemMedia(item)[0];
+  const photo = typeof first === 'string' ? first : first?.poster ?? first?.src;
   return (
     <div style={{
       display: 'flex', gap: 12,
@@ -316,8 +322,11 @@ function PostMetricsRow({ item }: { item: MarketplaceItem }) {
         width: 56, height: 56, borderRadius: 12,
         background: 'var(--bg-inset)',
         overflow: 'hidden', flexShrink: 0,
+        position: 'relative',
       }}>
-        <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        {photo
+          ? <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <NoPhoto small />}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
@@ -366,7 +375,9 @@ function EventMetricsRow({ event }: { event: CommunityEvent }) {
         overflow: 'hidden', flexShrink: 0,
         position: 'relative',
       }}>
-        <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        {photo
+          ? <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <NoPhoto small />}
         <span style={{
           position: 'absolute', top: 4, left: 4,
           width: 18, height: 18, borderRadius: 6,

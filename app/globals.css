@@ -3649,13 +3649,13 @@ img[src*="/storage/v1/object/public/"] {
   color: #fff;
   pointer-events: none;
 }
-/* Background-removed (transparent .png) products float on a white base, so the
-   dark photo-scrim looks muddy and the product's lower edge tangles with the
-   white title/price — the bug where "the words are behind the image". Give
-   these cards a clean, opaque-WHITE footer with DARK text instead: the caption
-   always sits on a defined surface, the way a product-catalogue card reads, and
-   the product fades gently into it rather than colliding. */
-.feed-card-overlay[data-cut] {
+/* A pale bed under the caption — a background-removed product, or the "no
+   photo" placeholder — makes the dark photo-scrim look like a smudge and drags
+   white text down into illegibility. These cards get a clean, opaque-WHITE
+   footer with DARK text instead: the caption sits on a defined surface, the way
+   a product-catalogue card reads, and the art fades into it rather than
+   colliding with it. */
+.feed-card-overlay[data-light] {
   background: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0) 0%,
@@ -3666,9 +3666,9 @@ img[src*="/storage/v1/object/public/"] {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.feed-card-overlay[data-cut] .feed-card-title { color: var(--text-primary); }
-.feed-card-overlay[data-cut] .feed-card-meta  { color: var(--text-muted); }
-.feed-card-overlay[data-cut] .feed-card-price { color: var(--text-primary); }
+.feed-card-overlay[data-light] .feed-card-title { color: var(--text-primary); }
+.feed-card-overlay[data-light] .feed-card-meta  { color: var(--text-muted); }
+.feed-card-overlay[data-light] .feed-card-price { color: var(--text-primary); }
 .feed-card-title {
   margin: 0;
   font-size: 13px;
@@ -4218,7 +4218,6 @@ img[src*="/storage/v1/object/public/"] {
   object-fit: cover;
   display: block;
 }
-.crow-ph { font-size: 30px; }
 
 /* A person, not a product. Round and slightly smaller, so a services list
    reads as a list of people you could hire rather than a shelf of goods. */
@@ -5331,14 +5330,6 @@ textarea:focus-visible {
 /* Media inside a card is a FitImage (two layers, contained). Hover zooms only
    the real image; the blurred bed stays put so the seam can't show. */
 .pcard:hover .pcard-media .fit-img-fg { transform: scale(1.04); }
-.pcard-ph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 38px;
-}
 /* The caption is deliberately the small half of the card. A fixed min-height
    keeps every card in a rail the same height (ragged card bottoms are the
    giveaway of a hand-rolled rail) without truncating two-line titles. */
@@ -5894,4 +5885,85 @@ details[open] > summary .details-chevron { transform: rotate(90deg); }
 summary::-webkit-details-marker { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .details-chevron { transition: none; }
+}
+
+/* ── The "no photo" placeholder ────────────────────────────────────────────
+ *
+ * One illustration, used wherever a post has no uploaded image. It replaced a
+ * set of stock photographs chosen by category, event type and emoji — see
+ * components/NoPhoto.tsx for why a plausible-looking wrong photo is worse than
+ * an obviously-empty box.
+ *
+ * Deliberately NOT full-bleed. The art sits at a fraction of its box with the
+ * surface showing around it, which is the whole reason it cannot be mistaken
+ * for a photograph of the item. Filling the tile would undo the point.
+ */
+.nophoto {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-inset);
+  /* The tint a card passes in is a 13%-alpha wash, so it needs a bed under it
+     or it composites against whatever is behind the card. */
+  background-color: var(--bg-inset);
+}
+.nophoto img {
+  /* Percentage of the SHORT side, so the art keeps its margin in a 1:1 card
+     and in a 2:1 event banner alike. */
+  width: 58%;
+  max-width: 148px;
+  height: auto;
+  /* Never let a wide-but-short box (an event cover) blow the art past the
+     top and bottom edges. */
+  max-height: 76%;
+  object-fit: contain;
+  display: block;
+  /* Sits a touch back from real content — it is furniture, not the subject. */
+  opacity: 0.9;
+}
+/* Thumbnails and compact rows: the full illustration turns to mush below about
+   90px, so show it larger within a smaller box and drop the detail-heavy
+   margin. */
+.nophoto--sm img {
+  width: 74%;
+  max-width: 64px;
+  max-height: 74%;
+  opacity: 0.85;
+}
+
+/* The "use the address we built for you" chip, shown only once the email box
+   has been typed over by hand and the composed address is still available.
+   Full width and wrapping, because the thing it offers is a 38-character
+   address and truncating it would defeat the point of showing it. */
+.auth-email-suggest {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  /* 44px floor for the tap target even though the text is small. */
+  min-height: 44px;
+}
+.auth-email-suggest b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.auth-email-suggest svg { flex-shrink: 0; }
+@media (hover: hover) {
+  .auth-email-suggest:hover { background: var(--border-subtle); }
 }

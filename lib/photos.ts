@@ -87,32 +87,31 @@ export function getItemPhoto(id: string): string | undefined {
   return ITEM_PHOTO_SETS[id]?.[0] ?? ITEM_PHOTOS[id];
 }
 
-/* Lost & Found cards used to render an emoji on a coloured square; now they
-   use real Unsplash imagery just like Marketplace. Falls back through the
-   keyed map → category-by-emoji guess → a generic L&F shot. */
-const LF_EMOJI_FALLBACKS: Record<string, string> = {
-  /* keyed by the seed emoji we used on the LostItem record so unseeded items
-     still pick a reasonable photo */
-  '🔌': u('1583394838336-acd977736f90'),  // charger
-  '⌚': u('1542496658-e33a6d0d50f6'),     // watch
-  '🎧': u('1606220945770-b5b6c2c55bf1'),  // earphones
-  '👜': u('1627123424574-724758594e93'),  // wallet/bag
-  '🎒': u('1581605405669-fcdf81165afa'),  // backpack
-  '🔑': u('1572021335469-31706a17aaef'),  // keys
-  '📱': u('1592899677977-9c10ca588bbd'),  // phone
-  '👓': u('1577803645773-f96470509666'),  // glasses
-  '💼': u('1606312619070-d48b4c652a52'),  // laptop case
-};
-
-export function getLostFoundPhoto(id: string, photoIcon?: string, photoUrls?: string[] | null): string {
-  /* Real uploaded photo wins; then the keyed mock map; then an emoji-based
-     guess; finally a generic lost-stuff fallback. */
+/* ── Lost & Found artwork ───────────────────────────────────────────────────
+ *
+ * Returns null when there is no honest image, and the caller renders the
+ * placeholder. It used to always return a URL, which is how a real post with
+ * no photo came to show a stranger's stock charger.
+ *
+ * Two fallbacks were removed, and both were the same mistake:
+ *
+ *   THE EMOJI GUESS mapped the seed emoji to a stock photo — pick 🔑 and the
+ *   card showed a photograph of somebody else's keys. On a board whose entire
+ *   purpose is "is that one mine?", answering with a picture of a different
+ *   object is the worst thing the screen can do.
+ *
+ *   THE GENERIC FALLBACK showed a USB-C charger for anything unmatched, so the
+ *   most common card on a fresh board was a charger nobody had lost.
+ *
+ * The keyed map survives because those entries are demo items whose photos were
+ * chosen to match them (lf1 IS the charger). Curated is fine; guessed is not.
+ */
+export function resolveLostFoundPhoto(
+  id: string,
+  photoUrls?: string[] | null,
+): string | null {
   if (photoUrls && photoUrls.length) return photoUrls[0];
-  return (
-    ITEM_PHOTOS[id]              ??
-    (photoIcon ? LF_EMOJI_FALLBACKS[photoIcon] : undefined) ??
-    u('1583394838336-acd977736f90')   // generic lost-stuff fallback
-  );
+  return ITEM_PHOTOS[id] ?? null;
 }
 
 /* Returns 1+ photo URLs for an item.
@@ -274,17 +273,21 @@ export function getEventPhotos(id: string, type?: string): string[] {
  * inventory, while the home feed (the one place that checked photoUrls) showed
  * the real thing. Same event, two different images.
  *
- * Uploaded art wins. A real event that uploaded nothing gets the type cover as
- * a last resort, because unlike a listing an event tile is never text-only.
+ * Uploaded art wins. A real event that uploaded nothing now returns null and
+ * the caller draws the placeholder — the old "type cover as a last resort" was
+ * the same lie in a different costume, since eventType is a category and a
+ * category cannot be photographed. Every swap showed the same clothing rack.
  */
 export function resolveEventPhoto(event: {
   id: string;
   eventType?: string;
   photoUrls?: string[] | null;
-}): string {
+}): string | null {
   const uploaded = event.photoUrls?.[0];
   if (uploaded) return uploaded;
-  return getEventPhoto(event.id, event.eventType);
+  /* Demo events keep their curated covers — those photos were picked FOR those
+     events. A real event falls through to null and gets the placeholder. */
+  return EVENT_PHOTO_SETS[event.id]?.[0] ?? EVENT_PHOTOS[event.id] ?? null;
 }
 
 /** Gallery variant of resolveEventPhoto — every uploaded photo, else the
@@ -296,7 +299,9 @@ export function resolveEventPhotos(event: {
 }): string[] {
   const uploaded = event.photoUrls ?? [];
   if (uploaded.length) return uploaded;
-  return getEventPhotos(event.id, event.eventType);
+  if (EVENT_PHOTO_SETS[event.id]) return EVENT_PHOTO_SETS[event.id];
+  if (EVENT_PHOTOS[event.id])     return [EVENT_PHOTOS[event.id]];
+  return [];
 }
 
 /* Stable avatar URLs (DiceBear) — deterministic from a seed */

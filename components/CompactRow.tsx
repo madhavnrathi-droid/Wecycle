@@ -28,6 +28,7 @@
 
 import { MapPin } from 'lucide-react';
 import { useTap } from '../lib/useTap';
+import NoPhoto from './NoPhoto';
 
 export interface CompactRowProps {
   title: string;
@@ -40,8 +41,8 @@ export interface CompactRowProps {
   /** Anything else worth one short phrase: a time, an author, a rate period. */
   meta?: string;
   imageUrl?: string | null;
-  /** Fallback when there is no photo — the emoji the post already carries. */
-  fallbackIcon?: string;
+  /** Tint behind the placeholder, so a list of photo-less rows is not a column
+   *  of identical grey squares. */
   fallbackTint?: string;
   /** Small status word, top-left of the thumbnail. */
   badge?: string;
@@ -56,7 +57,7 @@ export interface CompactRowProps {
 
 export default function CompactRow({
   title, lead, leadTone, location, meta,
-  imageUrl, fallbackIcon, fallbackTint, badge, badgeTone, portrait, onClick, ariaLabel,
+  imageUrl, fallbackTint, badge, badgeTone, portrait, onClick, ariaLabel,
 }: CompactRowProps) {
   const tap = useTap(onClick);
   return (
@@ -78,7 +79,7 @@ export default function CompactRow({
       >
         {imageUrl
           ? <img src={imageUrl} alt="" loading="lazy" decoding="async" />
-          : <span className="crow-ph" aria-hidden="true">{fallbackIcon || '📦'}</span>}
+          : <NoPhoto small />}
         {badge && <span className="crow-badge" data-kind={badgeTone}>{badge}</span>}
       </span>
 

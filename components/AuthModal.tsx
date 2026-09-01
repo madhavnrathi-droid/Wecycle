@@ -40,7 +40,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Mail, User, ArrowLeft, KeyRound, Loader2, Phone, Lock, Eye, EyeOff,
-  GraduationCap, LifeBuoy, MailWarning,
+  GraduationCap, LifeBuoy, MailWarning, Wand2,
 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
@@ -205,14 +205,33 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     && localPartOf(email).trim().length > 0
     && !hasCompleteDomain(email);
 
+  /* The address this form would build from the answers given so far. Empty
+     until there is enough to build a whole one — a half-composed address is
+     worse than none, because it looks finished. */
+  const composedEmail = composeEmail(
+    composeLocalPart({ fullName: name, college, joiningYear, domain: emailDomain }),
+    emailDomain,
+  );
+
   /* Autofill writes the COMPLETE address into `email` — the same single value
-     the field displays, the form validates, and a password manager reads. */
+     the field displays, the form validates, and a password manager reads.
+     Runs whenever the box is not something the student wrote themselves. */
   useEffect(() => {
     if (!buildingEmail || emailEdited.current) return;
-    const local = composeLocalPart({ fullName: name, college, joiningYear, domain: emailDomain });
-    setEmail(composeEmail(local, emailDomain));
+    setEmail(composedEmail);
     setEmailChecked(false);
-  }, [buildingEmail, name, college, joiningYear, emailDomain]);
+  }, [buildingEmail, composedEmail]);
+
+  /* The composed address is available and the box does not hold it. Offered as
+     a one-tap chip rather than applied, because overwriting what somebody just
+     typed is the one thing autofill must never do — but leaving them to
+     transcribe 38 characters they can see on screen is what actually happened,
+     so it has to be reachable in one tap.
+     Deliberately not conditioned on emailEdited: an EMPTY box also fails this
+     test, which is what puts the address back within reach of someone who
+     cleared the field. */
+  const emailSuggestion =
+    buildingEmail && composedEmail && composedEmail !== email ? composedEmail : null;
 
   /* The dropdown swaps the tail of whatever is in the box. Only needed once the
      address has been hand-edited; before that the effect above recomposes it. */
@@ -230,7 +249,14 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
      the box under someone still mid-word. */
   const changeEmail = (raw: string) => {
     const v = raw.replace(/\s+/g, '').toLowerCase();
-    emailEdited.current = true;
+    /* An EMPTY box is not an edit — it is a request for the default back.
+       This used to be an unconditional `= true`, which meant one stray
+       keystroke in the email field disabled autofill for the rest of the
+       session: pick the college and the intake year afterwards and nothing
+       happened, and clearing the box did not revive it either. The student was
+       then left transcribing the address by hand from the placeholder, which
+       is precisely the work this form exists to remove. */
+    emailEdited.current = v.trim().length > 0;
     setEmail(v);
     setEmailChecked(false);
     const at = v.lastIndexOf('@');
@@ -921,6 +947,22 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                       <option value={FACULTY_DOMAIN}>@{FACULTY_DOMAIN} · faculty</option>
                     </select>
                   </div>
+                  {/* The way back to the built address once it has been typed
+                      over. type="button" is load-bearing inside a form. */}
+                  {emailSuggestion && (
+                    <button
+                      type="button"
+                      className="auth-email-suggest"
+                      onClick={() => {
+                        emailEdited.current = false;
+                        setEmail(emailSuggestion);
+                        setEmailChecked(false);
+                      }}
+                    >
+                      <Wand2 size={12} strokeWidth={2} aria-hidden="true" />
+                      <span>Use <b>{emailSuggestion}</b></span>
+                    </button>
+                  )}
                   <span id="auth-email-help" className="field-hint" style={{ lineHeight: 1.5 }}>
                     {facultyAddress
                       ? 'Faculty addresses are firstname.lastname. Edit it if yours differs.'

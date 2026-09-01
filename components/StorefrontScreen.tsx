@@ -32,7 +32,8 @@ import type {
 import {
   MARKETPLACE_ITEMS, EVENTS, FEED_ITEMS, CATEGORIES, MY_EVENT_IDS,
 } from '../lib/mockData';
-import { getAvatar, resolveItemMedia, resolveEventPhoto, getLostFoundPhoto } from '../lib/photos';
+import { getAvatar, resolveItemMedia, resolveEventPhoto, resolveLostFoundPhoto } from '../lib/photos';
+import NoPhoto from './NoPhoto';
 import { normalizeCollege, collegeName } from '../lib/colleges';
 import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
@@ -616,6 +617,7 @@ function PublicInfoRow({
 /* ── Lost & Found tile (storefront variant) ── */
 function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
   const isLost = lf.status === 'lost';
+  const lfPhoto = resolveLostFoundPhoto(lf.id, lf.photoUrls);
   return (
     <button
       type="button"
@@ -624,10 +626,9 @@ function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
       style={{ aspectRatio: '0.82', padding: 0 }}
       aria-label={`Open ${lf.title}`}
     >
-      <img
-        src={getLostFoundPhoto(lf.id, lf.photoIcon, lf.photoUrls)}
-        alt="" className="feed-card-img" loading="lazy"
-      />
+      {lfPhoto
+        ? <img src={lfPhoto} alt="" className="feed-card-img" loading="lazy" />
+        : <NoPhoto />}
       <span style={{
         position: 'absolute', top: 10, left: 10,
         background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
@@ -636,7 +637,7 @@ function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
         fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
         textTransform: 'uppercase', zIndex: 3,
       }}>{lf.status}</span>
-      <div className="feed-card-overlay">
+      <div className="feed-card-overlay" data-light={!lfPhoto || undefined}>
         <p className="feed-card-title">{lf.title}</p>
         <div className="feed-card-meta">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
@@ -785,9 +786,14 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
       >
         <div style={{
           aspectRatio: '4 / 3', background: 'var(--bg-inset)',
-          backgroundImage: `url(${photo})`,
-          backgroundSize: 'cover', backgroundPosition: 'center',
-        }} />
+          position: 'relative',
+          ...(photo ? {
+            backgroundImage: `url(${photo})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+          } : null),
+        }}>
+          {!photo && <NoPhoto />}
+        </div>
         <div style={{ padding: '12px 14px' }}>
           <h3 style={{
             margin: 0, fontSize: 14, fontWeight: 600,
