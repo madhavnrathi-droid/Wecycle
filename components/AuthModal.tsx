@@ -40,7 +40,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Mail, User, ArrowLeft, KeyRound, Loader2, Phone, Lock, Eye, EyeOff,
-  GraduationCap, LifeBuoy, MailWarning, Wand2,
+  GraduationCap, LifeBuoy, MailWarning, WandSparkles,
 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
@@ -959,7 +959,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                         setEmailChecked(false);
                       }}
                     >
-                      <Wand2 size={12} strokeWidth={2} aria-hidden="true" />
+                      <WandSparkles size={12} strokeWidth={2} aria-hidden="true" />
                       <span>Use <b>{emailSuggestion}</b></span>
                     </button>
                   )}
