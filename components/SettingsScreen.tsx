@@ -410,7 +410,7 @@ export default function SettingsScreen({
         <LinkCard
           icon={<Info size={16} strokeWidth={1.8} />}
           title="About Wecycle"
-          subtitle="Version 1.0 · Built for circulating resources"
+          subtitle={`Version ${process.env.NEXT_PUBLIC_APP_VERSION ?? "1.1"} · Built for circulating resources`}
           onClick={() => window.alert('Wecycle v1.0\nBuilt with love for circulating resources within communities.')}
         />
         <LinkCard
