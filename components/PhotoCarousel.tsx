@@ -306,7 +306,10 @@ export default function PhotoCarousel({
         <div
           className="carousel-dots"
           data-position={dotsPosition}
-          aria-hidden="true"
+          /* Not aria-hidden. These are real, labelled buttons; hiding their
+             container from assistive tech while leaving them in the tab order
+             is the WCAG contradiction where a screen-reader user can focus a
+             control that was never announced. */
         >
           {photos.map((_, i) => (
             <button

@@ -174,6 +174,35 @@ export const DEFAULT_SETTINGS: UserSettings = {
   },
 };
 
+/* ── Has this member been ASKED about notifications? ───────────────────────
+ *
+ * Separate from the settings blob on purpose. The settings say what is on;
+ * this says whether anyone ever put the question. Those are different facts,
+ * and conflating them is how "we defaulted it on and they never objected"
+ * becomes indistinguishable from consent.
+ *
+ * Three states: no entry (never asked), 'on', or 'dismissed'. Both answers are
+ * final — a prompt that returns after you decline is just a slower way of not
+ * taking no for an answer. */
+const NOTIF_ASKED_KEY = 'wecycle.notif-asked.v1';
+
+export type NotifAsk = 'unasked' | 'on' | 'dismissed';
+
+export function notifAskState(): NotifAsk {
+  if (!isBrowser()) return 'on';   /* never render the prompt during SSR */
+  try {
+    const v = localStorage.getItem(NOTIF_ASKED_KEY);
+    return v === 'on' || v === 'dismissed' ? v : 'unasked';
+  } catch {
+    return 'on';
+  }
+}
+
+export function recordNotifAsk(answer: 'on' | 'dismissed') {
+  if (!isBrowser()) return;
+  try { localStorage.setItem(NOTIF_ASKED_KEY, answer); } catch { /* private mode */ }
+}
+
 const STORAGE_KEY = 'wecycle.settings.v1';
 const CHANGE_EVENT = 'wecycle:settings-changed';
 

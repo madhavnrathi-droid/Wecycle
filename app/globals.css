@@ -2816,6 +2816,7 @@ img[src*="/storage/v1/object/public/"] {
 .carousel-dots[data-position="top"]    { top: 10px; bottom: auto; }
 .carousel-dots[data-position="bottom"] { bottom: 10px; top: auto; }
 .carousel-dot {
+  position: relative;
   width: 6px;
   height: 6px;
   border-radius: 999px;
@@ -2826,6 +2827,19 @@ img[src*="/storage/v1/object/public/"] {
   transition: width 0.2s, background 0.2s;
   pointer-events: auto;
   box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.15);
+}
+/* A 6px dot is a 6px target, which is unhittable with a thumb. Expand the hit
+   area to the 24px WCAG 2.5.8 AA floor without growing the dot — the same
+   treatment the marketing-banner dots already use. Not 44px: six of those
+   would overlap each other, and the carousel's primary control is the swipe. */
+.carousel-dot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
 }
 .carousel-dot[data-active] {
   background: #fff;
@@ -3056,7 +3070,7 @@ img[src*="/storage/v1/object/public/"] {
   left: 6px;
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
-  font-size: calc(9px * var(--text-scale));
+  font-size: calc(10px * var(--text-scale));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -3210,7 +3224,7 @@ img[src*="/storage/v1/object/public/"] {
   background: color-mix(in srgb, var(--accent-green, #22c55e) 10%, transparent);
 }
 .photo-bg-toggle-beta {
-  font-size: calc(9px * var(--text-scale));
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -5747,7 +5761,7 @@ textarea:focus-visible {
   background: rgba(139, 92, 246, 0.13);
   padding: 1px 6px;
   border-radius: 999px;
-  font-size: calc(9px * var(--text-scale));
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.03em;
 }
@@ -5759,7 +5773,7 @@ textarea:focus-visible {
   background: rgba(34, 197, 94, 0.14);
   padding: 1px 6px;
   border-radius: 999px;
-  font-size: calc(9px * var(--text-scale));
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
 }
 .ev-row-title {

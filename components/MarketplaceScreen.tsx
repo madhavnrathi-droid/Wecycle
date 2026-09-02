@@ -407,7 +407,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
                   width: 22, height: 22, borderRadius: '50%',
                   background: item.user.color,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 'calc(9px * var(--text-scale))', fontWeight: 800, color: '#fff',
+                  fontSize: 'calc(10px * var(--text-scale))', fontWeight: 800, color: '#fff',
                 }}>
                   {item.user.initials[0]}
                 </div>
@@ -596,7 +596,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
             width: 16, height: 16, borderRadius: '50%',
             background: item.user.color,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 'calc(8px * var(--text-scale))', fontWeight: 800, color: '#fff',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 800, color: '#fff',
           }}>
             {item.user.initials[0]}
           </div>

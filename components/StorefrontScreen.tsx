@@ -814,7 +814,7 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
               <span style={{
                 color: '#8B5CF6', background: 'rgba(139,92,246,0.12)',
                 padding: '1px 7px', borderRadius: 999,
-                fontSize: 'calc(9.5px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase',
+                fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase',
               }}>
                 📋 Register
               </span>

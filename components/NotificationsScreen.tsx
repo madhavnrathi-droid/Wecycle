@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import {
   getSettings, saveSettings, onSettingsChange,
+  notifAskState, recordNotifAsk,
   type UserSettings, type EmailFrequency,
 } from '../lib/settings';
 import { useAuth } from '../lib/AuthContext';
@@ -23,8 +24,12 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(getSettings());
+  /* 'unasked' until the member answers the prompt below, either way. Read once
+     on mount rather than during render — localStorage is not available on the
+     server and this component renders on both. */
+  const [ask, setAsk] = useState<'unasked' | 'on' | 'dismissed'>('on');
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { setMounted(true); setAsk(notifAskState()); }, []);
   useEffect(() => onSettingsChange(setSettings), []);
 
   const hasEmail = useMemo(() => {
@@ -93,6 +98,74 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
         </h1>
         <span style={{ width: 36 }} aria-hidden="true" />
       </header>
+
+      {/* ── The ask ──────────────────────────────────────────────────────────
+          Everything below this arrives switched off for anything that leaves
+          the app, which is the honest default but only half the job: a default
+          answers "what if nobody asks", and somebody still has to ask.
+
+          Both buttons are the same size, the same weight and the same colour.
+          A prompt whose decline is a grey whisper next to a bright Accept is
+          the pattern this was written to remove, only louder. "Not now" is
+          also final — it is recorded, and the prompt does not come back. */}
+      {ask === 'unasked' && (
+        <section style={{ padding: '4px 20px 18px' }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 16,
+            padding: '16px 16px 14px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <Bell size={15} strokeWidth={1.9} aria-hidden="true" />
+              <h2 style={{
+                margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
+                letterSpacing: '-0.01em', color: 'var(--text-primary)',
+              }}>
+                Want to hear from Wecycle?
+              </h2>
+            </div>
+            <p style={{
+              margin: '0 0 14px', fontSize: 'calc(13px * var(--text-scale))',
+              color: 'var(--text-secondary)', lineHeight: 1.5,
+            }}>
+              Email is off. Turn it on and we&apos;ll write when someone messages you about
+              a post, replies to a request, or matches something you lost — nothing else,
+              and you can change it any time on this screen.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setChannels({ email: true });
+                  recordNotifAsk('on');
+                  setAsk('on');
+                }}
+                style={{
+                  flex: 1, minHeight: 44, cursor: 'pointer',
+                  border: '1px solid var(--border-default)', borderRadius: 12,
+                  background: 'var(--bg-inset)', color: 'var(--text-primary)',
+                  font: 'inherit', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
+                }}
+              >
+                Yes, email me
+              </button>
+              <button
+                type="button"
+                onClick={() => { recordNotifAsk('dismissed'); setAsk('dismissed'); }}
+                style={{
+                  flex: 1, minHeight: 44, cursor: 'pointer',
+                  border: '1px solid var(--border-default)', borderRadius: 12,
+                  background: 'var(--bg-inset)', color: 'var(--text-primary)',
+                  font: 'inherit', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
+                }}
+              >
+                No thanks
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── CHANNELS ── */}
       <Section title="Channels" hint="How you'd like Wecycle to reach you.">

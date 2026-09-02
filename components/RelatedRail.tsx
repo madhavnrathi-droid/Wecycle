@@ -79,7 +79,7 @@ export default function RelatedRail({
             {title}
             {sponsored && (
               <span style={{
-                fontSize: 'calc(9px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.06em',
+                fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: 'var(--text-muted)',
                 border: '1px solid var(--border-default)',
