@@ -4676,6 +4676,29 @@ textarea:focus-visible {
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inset);
 }
+
+/* A bottom sheet has THREE edges, not four.
+ *
+ * The rule above is written for a centred dialog and states the full border
+ * and an all-round downward shadow. On mobile the same element is anchored to
+ * `bottom: 0`, so that shorthand quietly undid the base rule's
+ * `border-bottom: none` and painted a 1px white line along the very bottom of
+ * the screen, with a 8px-down / 32px-blur shadow falling off the edge beneath
+ * it. The result is a sheet that reads as hovering slightly above the bottom
+ * of the display rather than sitting on it — reported as "the sign up portal
+ * is floating", and it is the same mistake anywhere a panel is flush to an
+ * edge it still draws.
+ *
+ * A sheet's only visible edge is its top, so that is the only edge that gets
+ * a line and the only direction the shadow travels. */
+@media (max-width: 1023px) {
+  .modal {
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
+    box-shadow: 0 -8px 32px rgba(20, 20, 12, 0.12), var(--glass-inset);
+  }
+}
 .modal-header { border-bottom-color: var(--glass-border); }
 .modal-footer {
   background: transparent;
@@ -4693,7 +4716,12 @@ textarea:focus-visible {
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border-right: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  /* Sideways, not down. The drawer runs the full height of the screen, so its
+     only edge that is actually over the page is the right one — the shared
+     --glass-shadow drops 8px DOWNWARD, which on a full-height panel puts a
+     smudge below the bottom of the screen and none where the panel actually
+     meets the content. Same reasoning as the bottom sheet above. */
+  box-shadow: 8px 0 32px rgba(20, 20, 12, 0.12);
 }
 
 /* ── Segmented control → frosted track ── */
@@ -4765,10 +4793,30 @@ textarea:focus-visible {
   }
 }
 
-/* Spring entrance utility — fade + rise + de-blur. Opt-in via .motion-rise */
+/* Screen entrance — fade + a short rise. Opt-in via .motion-rise.
+ *
+ * It used to also scale from 0.985 and clear a 6px blur, and .motion-rise
+ * wraps the WHOLE screen and replays on every navigation. Scaling an entire
+ * page up on arrival is not a subtle polish: it is the page zooming in, which
+ * is exactly how it was reported ("when I go to inventory, it starts auto
+ * zooming in"). On the feed the imagery hid it; on a dense grid like Inventory
+ * the whole layout visibly grows and sharpens every single time you land.
+ *
+ * Two more reasons the scale and blur had to go, beyond how it looked:
+ *
+ *   `filter` on an ancestor makes that ancestor the containing block for any
+ *   `position: fixed` descendant. Every sticky header and fixed control inside
+ *   a screen was therefore anchored to this wrapper instead of the viewport
+ *   for the first 600ms of every navigation.
+ *
+ *   Blurring a full screen of content is a full-viewport raster on a phone,
+ *   once per navigation, for decoration.
+ *
+ * A fade and 10px of travel say "new screen" without moving anything the
+ * reader is trying to read. */
 @keyframes glass-rise {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(6px); }
-  to   { opacity: 1; transform: none; filter: blur(0); }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
 }
 .motion-rise { animation: glass-rise 0.5s var(--ease-glass) backwards; }
 
@@ -4813,7 +4861,7 @@ textarea:focus-visible {
 .modal-body > *:nth-child(n+6) { animation-delay: 0.30s; }
 
 /* Screen entrance: a touch slower + calmer */
-.motion-rise { animation: glass-rise 0.6s var(--ease-emphasized) backwards; }
+.motion-rise { animation: glass-rise 0.44s var(--ease-emphasized) backwards; }
 
 /* Specular sweep: slower, glossier roll */
 .bottom-nav-post::after { transition: transform 0.85s var(--ease-emphasized); }
