@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Dark mode. Identical to values/styles.xml except for the status-bar
-         icons: in dark mode the strip the web layer paints behind the status
-         bar takes the dark card colour #1C1C1A, so the clock and battery need
-         to be light again. A style override has to restate the whole style,
-         hence the duplication — keep the two in step.
+    <!-- Dark mode was retired: resolveTheme() in lib/settings.ts always returns
+         light, so the app renders its cream and white surfaces whatever the
+         phone is set to. This file used to flip the status bar to LIGHT icons
+         for a dark strip that no longer exists, which drew a white clock and a
+         white battery on the app's white band. On a phone in dark mode the
+         status bar simply could not be read.
 
-         The colour was written here as a CSS custom-property name. XML forbids
-         a double hyphen inside a comment, so aapt2 failed the whole release
-         build on it ("The string is not permitted within comments"). Nothing
-         had caught it because the debug path had not been rebuilt since the
-         comment was written. Do not reintroduce a var() name here. -->
+         Keep this style in step with values/styles.xml. A style override has to
+         restate the whole style, hence the duplication.
+
+         Note for whoever edits this next: XML forbids a double hyphen inside a
+         comment, and aapt2 fails the entire release build on it. A CSS custom
+         property name written here once cost a build. Do not reintroduce one. -->
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 </resources>

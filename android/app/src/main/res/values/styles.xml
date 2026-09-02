@@ -13,12 +13,17 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
-        <!-- The app draws behind the status bar, and the web layer now caps that
-             strip with an opaque light fill (.app-container::before). Without
-             this the system draws the clock and battery in white, which is
-             invisible on it. values-night/ flips this back to white icons for
-             the dark strip. -->
+        <!-- The app is inset by MainActivity and the band behind the status bar
+             is white, so the clock and battery must be drawn dark. -->
         <item name="android:windowLightStatusBar">true</item>
+        <!-- Say what should happen at the camera cutout instead of inheriting
+             a default that changed between platform versions. shortEdges lets
+             the window extend into the cutout on the short edge, which is what
+             makes the cutout appear in the insets MainActivity reads; the
+             WebView is then padded clear of it. Leaving this unset means the
+             behaviour depends on the OS version and the OEM, which is how the
+             wordmark ended up under the camera on some devices and not others. -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
 

@@ -60,6 +60,27 @@
   /* The multiplier behind the "Larger text" setting. 1 normally; html.text-larger
      raises it. Every font-size in the app is calc(Npx * var(--text-scale)), so this
      one value scales all of them — and it must never be undefined. */
+  /* ── Safe area ────────────────────────────────────────────────────────
+   * One name for "how much of this edge belongs to the system", so every rule
+   * below reads the same value on every platform.
+   *
+   * iOS fills these in by itself through env(). ANDROID DOES NOT — the WebView
+   * reports env(safe-area-inset-*) as 0 even while targetSdk 36 lays the app
+   * out behind the status bar and the navigation bar. MainActivity therefore
+   * measures the real insets and overrides these four properties inline on
+   * <html>, which beats this rule and feeds the same arithmetic.
+   *
+   * The earlier fix padded the WebView natively instead. That looked right at
+   * the top and broke the bottom: WebView padding clips what is drawn but does
+   * not move the CSS viewport, so `position: fixed; bottom: 0` still anchored
+   * to the true bottom of the window and the bottom navigation had its icons
+   * sliced off along the padding line. Handing the number to CSS and letting
+   * the layout use it is the only version that works for fixed elements. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
   --text-scale: 1;
 
   --text-xs: 0.6875rem;   /* 11px */
@@ -607,7 +628,7 @@ body {
    every screen at once (they all render inside .scroll-shell). */
 .scroll-shell {
   box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--safe-top);
 }
 /* …but padding on a SCROLL container only sets where content starts. It does
    not clip: scroll down and the content travels up through that strip, so feed
@@ -622,7 +643,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: env(safe-area-inset-top, 0px);
+  height: var(--safe-top);
   background: var(--bg-card);
   z-index: 35;
   pointer-events: none;
@@ -640,8 +661,8 @@ body {
   .app-container { max-width: min(100vw - 96px, 2160px); }
 }
 
-.safe-bottom { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
-.safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: calc(88px + var(--safe-bottom)); }
+.safe-top { padding-top: var(--safe-top); }
 
 /* ── Bottom-nav is now the primary nav on every viewport ──
    No more "hide on desktop" rules; the screen-internal headers
@@ -2200,7 +2221,7 @@ section.mobile-only { display: block; }
   border-bottom: none;
   z-index: 51;
   animation: slide-up 0.35s var(--ease-spring);
-  padding-bottom: env(safe-area-inset-bottom, 16px);
+  padding-bottom: max(16px, var(--safe-bottom));
 }
 
 .sheet-handle {
@@ -2686,7 +2707,7 @@ section.mobile-only { display: block; }
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   border-bottom: none;
   animation: slide-up 0.30s var(--ease-spring);
-  padding-bottom: env(safe-area-inset-bottom, 16px);
+  padding-bottom: max(16px, var(--safe-bottom));
 }
 
 /* Desktop: centered dialog */
@@ -3125,12 +3146,12 @@ img[src*="/storage/v1/object/public/"] {
    down to find the source options after tapping "Add". The sheet
    slides DOWN from the top edge instead of UP from the bottom. */
 .photo-source-sheet {
-  position: fixed; left: 50%; top: env(safe-area-inset-top, 0px);
+  position: fixed; left: 50%; top: var(--safe-top);
   transform: translateX(-50%);
   width: 100%; max-width: 430px;
   background: var(--bg-card);
   border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
-  padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 16px;
+  padding: calc(20px + var(--safe-top)) 16px 16px;
   z-index: 401; /* Z_LAYER.dialogNested panel */
   box-shadow: 0 14px 36px rgba(0,0,0,0.18);
   animation: slide-down 0.22s var(--ease-smooth);
@@ -3799,11 +3820,23 @@ img[src*="/storage/v1/object/public/"] {
      BOTTOM corners use the iPhone screen radius so the dock nests into the
      device's bottom corners; the TOP corners round like a rising panel. */
   margin: 0;
-  /* Tight, even padding around the icon row (same as the original pill). The
-     bottom is CLAMPED so a device that over-reports safe-area-inset-bottom
-     can't inflate the dock into a tall white slab — it stays compact while
-     still clearing a real home indicator. */
-  padding: 10px 12px clamp(12px, env(safe-area-inset-bottom, 12px), 20px);
+  /* Tight, even padding around the icon row (same as the original pill), and
+     the bottom clears the system's own control strip in full.
+     
+     This used to be clamp(12px, <inset>, 20px) — a CEILING, added so a device
+     that over-reports the inset could not inflate the dock into a tall white
+     slab. On iOS that reasoning holds: the home indicator is a thin translucent
+     line drawn OVER the app, and 20px clears it. On Android it is wrong, and
+     visibly so: a three-button navigation bar is an opaque 48dp strip that owns
+     its space, so a 20px cap put the back, home and recents buttons directly on
+     top of this row's icons. Measured on an API 36 emulator — inset 126px at
+     density 2.625, i.e. exactly 48dp, clamped down to 20.
+     
+     max() instead of clamp(): never less than 12px on a device with no inset at
+     all, and never less than whatever the system has actually reserved. The
+     surface still fills past it, so the dock does not grow a white slab — only
+     the icon row moves up, and only by as much as the hardware demands. */
+  padding: 10px 12px max(12px, var(--safe-bottom));
   /* SOLID surface — explicitly opaque, NO backdrop-filter / glass. */
   background: var(--bg-surface);
   background-color: var(--bg-surface);
@@ -4140,7 +4173,7 @@ img[src*="/storage/v1/object/public/"] {
   width: 100%;
   max-width: 420px;
   box-sizing: border-box;
-  padding: 10px 10px calc(14px + env(safe-area-inset-bottom, 10px));
+  padding: 10px 10px calc(14px + max(10px, var(--safe-bottom)));
   background: var(--bg-surface);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.22);
@@ -5002,7 +5035,7 @@ textarea:focus-visible {
   border: 1px solid var(--border-subtle);
   border-bottom: none;
   border-radius: 22px 22px 0 0;
-  padding: 20px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  padding: 20px 20px calc(22px + var(--safe-bottom));
   box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.28);
   animation: slide-up 0.32s var(--ease-emphasized);
 }
@@ -5871,7 +5904,7 @@ textarea:focus-visible {
      the dock isn't rendered here at all (verified: no .bottom-nav in the tree),
      so that 80px was pure dead space and pushed the buttons visibly high up the
      screen with an empty band underneath. */
-  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px calc(14px + var(--safe-bottom));
   background: linear-gradient(to bottom, transparent, var(--bg-base) 35%, var(--bg-base) 100%);
   pointer-events: none;
   z-index: 30;

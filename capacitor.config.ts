@@ -12,6 +12,10 @@ const config: CapacitorConfig = {
   appName: 'Wecycle',
   webDir: 'out',
   android: {
+    /* Back to the app's own base colour. There are no inset bands to match any
+       more — MainActivity reports the insets to CSS instead of padding the
+       WebView, so the web layer paints edge to edge and this shows only during
+       the first frame before it does. */
     backgroundColor: '#FAFAF6',
   },
   ios: {
