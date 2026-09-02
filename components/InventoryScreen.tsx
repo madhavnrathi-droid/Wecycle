@@ -260,7 +260,13 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
 
       {/* ── TABS ── (Events tab only appears once you've posted an event) */}
       <section style={{ padding: '0 16px 16px' }}>
-        <div className="segmented" style={{ gridTemplateColumns: `repeat(${hasEvents ? 5 : 4}, 1fr)` }}>
+        {/* No explicit track list. `repeat(N, 1fr)` capped every tab at a fifth
+            of the row, so "Requested" rendered as "Requ…" while three shorter
+            tabs sat in space they did not need — and Larger text truncated
+            three of the five. The stylesheet sizes tracks to their labels and
+            scrolls if they genuinely cannot fit; a filter has to be readable
+            to be usable. */}
+        <div className="segmented">
           <button
             onClick={() => setActiveTab('all')}
             aria-pressed={activeTab === 'all'}

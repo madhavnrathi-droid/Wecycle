@@ -3345,12 +3345,25 @@ img[src*="/storage/v1/object/public/"] {
 .segmented {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  /* Equal columns (1fr) look tidy right up until one label is longer than a
+     fifth of the row, at which point every tab is capped at the same width and
+     the long one is truncated — Inventory showed "Shar…" and "Requ…" while
+     three short tabs sat in space they did not need. Sizing to content and
+     letting the tracks grow from there keeps the segmented look and stops the
+     ellipsis: minmax(min-content, 1fr) gives each tab AT LEAST its own words
+     and shares the slack evenly. */
+  grid-auto-columns: minmax(min-content, 1fr);
   background: var(--bg-inset);
   padding: 4px;
   border-radius: 999px;
   gap: 0;
+  /* If the labels genuinely cannot fit — a narrow phone, or Larger text on —
+     scroll rather than truncate. A filter you cannot read is a filter you
+     cannot use. */
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.segmented::-webkit-scrollbar { display: none; }
 .segmented button {
   /* 39.5px tall before this, just under both platform minimums. These are the
      app's primary filter, tapped constantly, and a miss changes what the whole
@@ -3371,9 +3384,13 @@ img[src*="/storage/v1/object/public/"] {
      12" / "Requests · 3" / "Events · 1" / "Lost & Found · 2") the words
      would otherwise wrap and force every other tab to grow taller. */
   white-space: nowrap;
-  min-width: 0;
-  text-overflow: ellipsis;
-  overflow: hidden;
+  /* No ellipsis, and no min-width: 0. Both were here to stop a long label
+     overflowing its equal-width grid track, but the cure was the disease: an
+     element with `overflow: hidden` reports a min-content size of ZERO, so the
+     track never grew to fit its own word and "Requested" rendered as "Requ…".
+     The track now sizes to the label (minmax(min-content, 1fr) above) and the
+     row scrolls if the set genuinely will not fit. A tab has to be readable to
+     be tappable. */
   /* Override the global :focus-visible outline — on this control the
      active pill IS the focus indicator (filled black against the inset
      track), and the outer 2px lime ring reads as a "weird stuck" state

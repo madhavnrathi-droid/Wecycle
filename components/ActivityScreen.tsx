@@ -144,7 +144,9 @@ export default function ActivityScreen({
 
       {/* ── TABS ── */}
       <section style={{ padding: '0 16px 16px' }}>
-        <div className="segmented" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        {/* Tracks come from the stylesheet — see InventoryScreen for why a
+            fixed repeat(N, 1fr) truncates the longest label. */}
+        <div className="segmented">
           <button
             onClick={() => setActiveTab('stats')}
             aria-pressed={activeTab === 'stats'}
