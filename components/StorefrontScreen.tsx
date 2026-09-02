@@ -248,7 +248,7 @@ export default function StorefrontScreen({
         </button>
         <h1 style={{
           margin: 0, flex: 1, textAlign: 'center',
-          fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+          fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
           color: 'var(--text-primary)',
         }}>
           {isMe ? 'Your storefront' : `${user.name.split(' ')[0]}'s storefront`}
@@ -299,7 +299,7 @@ export default function StorefrontScreen({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 22, fontWeight: 600,
+              fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.025em',
               color: 'var(--text-primary)',
               lineHeight: 1.15,
@@ -312,7 +312,7 @@ export default function StorefrontScreen({
               <OnlineBadge isOnline={user.isOnline} />
             </div>
             <p style={{
-              margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)',
+              margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
             }}>
               {user.role} · {user.community} · {user.joinedDaysAgo}d on Wecycle
             </p>
@@ -322,7 +322,7 @@ export default function StorefrontScreen({
               }}>
                 {user.badges.slice(0, 4).map(b => (
                   <span key={b} style={{
-                    fontSize: 10, fontWeight: 600,
+                    fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
                     padding: '3px 8px', borderRadius: 999,
                     background: 'var(--bg-inset)',
                     color: 'var(--text-secondary)',
@@ -569,7 +569,7 @@ function PublicInfoSection({
   return (
     <section style={{ padding: '4px 20px 18px' }}>
       <h3 style={{
-        margin: '0 0 10px', fontSize: 11, fontWeight: 700,
+        margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
         letterSpacing: '0.08em', textTransform: 'uppercase',
         color: 'var(--text-muted)',
       }}>
@@ -598,14 +598,14 @@ function PublicInfoRow({
     <>
       <dt style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 12, fontWeight: 500, color: 'var(--text-muted)',
+        fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, color: 'var(--text-muted)',
         whiteSpace: 'nowrap',
       }}>
         {icon}
         {label}
       </dt>
       <dd style={{
-        margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
+        margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
         overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {value}
@@ -634,7 +634,7 @@ function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
         background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
         color: '#fff', borderRadius: 999,
         padding: '4px 10px',
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+        fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
         textTransform: 'uppercase', zIndex: 3,
       }}>{lf.status}</span>
       <div className="feed-card-overlay" data-light={!lfPhoto || undefined}>
@@ -662,13 +662,13 @@ function StatTile({ value, label }: { value: number; label: string }) {
       textAlign: 'center',
     }}>
       <div style={{
-        fontSize: 20, fontWeight: 700,
+        fontSize: 'calc(20px * var(--text-scale))', fontWeight: 700,
         letterSpacing: '-0.025em',
         color: 'var(--text-primary)',
         fontVariantNumeric: 'tabular-nums',
         lineHeight: 1.15,
       }}>{value}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -676,8 +676,8 @@ function StatTile({ value, label }: { value: number; label: string }) {
 function EmptyState({ label }: { label: string }) {
   return (
     <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)' }}>
-      <div style={{ fontSize: 28, marginBottom: 6 }}>🗂️</div>
-      <p style={{ margin: 0, fontSize: 13 }}>{label}</p>
+      <div style={{ fontSize: 'calc(28px * var(--text-scale))', marginBottom: 6 }}>🗂️</div>
+      <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))' }}>{label}</p>
     </div>
   );
 }
@@ -739,26 +739,26 @@ function RequestRow({ feed }: { feed: FeedItem }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{
-          fontSize: 10, fontWeight: 600,
+          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
           padding: '3px 8px', borderRadius: 999,
           background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
           textTransform: 'uppercase', letterSpacing: '0.04em',
         }}>
           Request
         </span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{feed.timeAgo}</span>
+        <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>{feed.timeAgo}</span>
       </div>
       <h3 style={{
-        margin: 0, fontSize: 14, fontWeight: 600,
+        margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
         color: 'var(--text-primary)', letterSpacing: '-0.01em',
       }}>{r.title}</h3>
       <p style={{
-        margin: '4px 0 0', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45,
+        margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.45,
         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
       }}>{r.description}</p>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, marginTop: 8,
-        fontSize: 11, color: 'var(--text-muted)',
+        fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
       }}>
         <MapPin size={11} strokeWidth={1.8} />
         {r.location}
@@ -775,7 +775,7 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
         type="button"
         onClick={onClick}
         style={{
-          all: 'unset', cursor: 'pointer', width: '100%',
+          all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%',
           background: 'var(--bg-card)',
           border: '1px solid var(--border-subtle)',
           borderRadius: 14,
@@ -796,13 +796,13 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
         </div>
         <div style={{ padding: '12px 14px' }}>
           <h3 style={{
-            margin: 0, fontSize: 14, fontWeight: 600,
+            margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
             color: 'var(--text-primary)', letterSpacing: '-0.01em',
             display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>{event.title}</h3>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12, marginTop: 6,
-            fontSize: 11, color: 'var(--text-muted)',
+            fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
           }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
               <Calendar size={11} strokeWidth={1.8} /> {event.date}
@@ -814,7 +814,7 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
               <span style={{
                 color: '#8B5CF6', background: 'rgba(139,92,246,0.12)',
                 padding: '1px 7px', borderRadius: 999,
-                fontSize: 9.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase',
+                fontSize: 'calc(9.5px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase',
               }}>
                 📋 Register
               </span>

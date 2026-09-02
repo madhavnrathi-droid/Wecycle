@@ -88,7 +88,7 @@ export default function SavedSearchBar({ requests, currentQuery = '', onRunSearc
             <Dialog.Content className="ss-content" aria-describedby="ss-desc">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Bell size={16} strokeWidth={2} style={{ color: 'var(--accent-lime-dim)' }} />
-                <Dialog.Title style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+                <Dialog.Title style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
                   Notify me about…
                 </Dialog.Title>
                 <span style={{ flex: 1 }} />
@@ -98,7 +98,7 @@ export default function SavedSearchBar({ requests, currentQuery = '', onRunSearc
                   </button>
                 </Dialog.Close>
               </div>
-              <Dialog.Description id="ss-desc" style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 14px', lineHeight: 1.5 }}>
+              <Dialog.Description id="ss-desc" style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', margin: '0 0 14px', lineHeight: 1.5 }}>
                 Add a keyword and we&rsquo;ll flag it the moment someone posts a matching request — no more refreshing the board.
               </Dialog.Description>
 
@@ -120,7 +120,7 @@ export default function SavedSearchBar({ requests, currentQuery = '', onRunSearc
               </form>
 
               {searches.length === 0 ? (
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0 4px' }}>
+                <p style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0 4px' }}>
                   No alerts yet — add your first keyword above.
                 </p>
               ) : (

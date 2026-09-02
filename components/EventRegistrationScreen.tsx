@@ -103,11 +103,11 @@ export default function EventRegistrationScreen({
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
             {editMode ? 'Your registration' : 'Register'}
           </h1>
           <p style={{
-            margin: '1px 0 0', fontSize: 12, color: 'var(--text-muted)',
+            margin: '1px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {event.title}
@@ -122,7 +122,7 @@ export default function EventRegistrationScreen({
           padding: '14px 16px', marginBottom: 20,
           background: 'var(--bg-inset)',
           borderRadius: 16,
-          fontSize: 12.5, color: 'var(--text-secondary)',
+          fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-secondary)',
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <CalendarDays size={13} strokeWidth={2} /> {event.date} · {event.time}
@@ -134,7 +134,7 @@ export default function EventRegistrationScreen({
               <MapPin size={13} strokeWidth={2} /> {event.location}
             </span>
           )}
-          <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 'calc(11.5px * var(--text-scale))', color: 'var(--text-muted)' }}>
             {editMode
               ? 'Update your answers below — the organizer sees the latest version.'
               : 'The organizer asks everyone to fill this in — your RSVP confirms once you submit.'}
@@ -143,13 +143,13 @@ export default function EventRegistrationScreen({
 
         {/* ── Fields ── */}
         {!loaded ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))' }}>
             Loading the form…
           </div>
         ) : !form || form.fields.length === 0 ? (
           /* The organizer removed the form after this snapshot was loaded —
              don't dead-end the user: confirm the RSVP right here. */
-          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))' }}>
             <p style={{ margin: '0 0 16px' }}>
               This event no longer needs a registration form.
             </p>
@@ -188,7 +188,7 @@ export default function EventRegistrationScreen({
             background: 'rgba(237,46,80,0.10)',
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
-            color: 'var(--accent-rose)', fontSize: 12, fontWeight: 500,
+            color: 'var(--accent-rose)', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {submitError}
           </div>
@@ -221,7 +221,7 @@ export default function EventRegistrationScreen({
                 style={{
                   height: 44, padding: '0 18px', borderRadius: 999, flexShrink: 0,
                   background: 'transparent', border: 'none', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)',
+                  fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
                   fontFamily: 'inherit',
                 }}
               >
@@ -235,7 +235,7 @@ export default function EventRegistrationScreen({
                   flex: 1, height: 44, borderRadius: 999,
                   background: 'var(--text-primary)', color: 'var(--bg-base)',
                   border: 'none', cursor: submitting ? 'wait' : 'pointer',
-                  fontSize: 13.5, fontWeight: 600, letterSpacing: '-0.01em',
+                  fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                   fontFamily: 'inherit',
                 }}
@@ -329,7 +329,7 @@ function FieldInput({
                     background: on ? 'var(--text-primary)' : 'var(--bg-inset)',
                     border: 'none',
                     borderRadius: 14, cursor: 'pointer',
-                    fontSize: 13.5, fontWeight: on ? 600 : 500,
+                    fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: on ? 600 : 500,
                     color: on ? 'var(--bg-base)' : 'var(--text-primary)',
                     fontFamily: 'inherit',
                     transition: 'background 140ms, color 140ms',
@@ -405,7 +405,7 @@ function FieldInput({
             }}>
               <Paperclip size={14} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
               <span style={{
-                flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 500, color: 'var(--text-primary)',
+                flex: 1, minWidth: 0, fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB` : fileAnswerName(existingPath!)}
@@ -430,7 +430,7 @@ function FieldInput({
                 background: 'var(--bg-inset)',
                 border: 'none',
                 borderRadius: 14, cursor: 'pointer',
-                fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
+                fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
               }}
             >
               <Paperclip size={14} strokeWidth={2} /> Attach PDF or image

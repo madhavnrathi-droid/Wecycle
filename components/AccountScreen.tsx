@@ -345,7 +345,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         </button>
         <h1 style={{
           margin: 0, flex: 1, textAlign: 'center',
-          fontSize: 16, fontWeight: 600,
+          fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.02em', color: 'var(--text-primary)',
         }}>
           Account
@@ -361,7 +361,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                shift the header as the label swaps. */
             minWidth: 76, justifyContent: 'flex-end',
             whiteSpace: 'nowrap',
-            fontSize: 12, fontWeight: 500,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
             color:
               saveStatus === 'saved'   ? 'var(--accent-mint, #22C55E)' :
               saveStatus === 'error'   ? 'var(--accent-rose)'          :
@@ -400,21 +400,21 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               width: 64, height: 64, borderRadius: 20,
               background: (profile?.avatar_color ?? '#6C63FF'),
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em',
+              color: '#fff', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em',
               flexShrink: 0,
             }}>
               {profile?.initials ?? 'W'}
             </div>
             <div style={{ minWidth: 0, lineHeight: 1.25 }}>
               <h2 style={{
-                margin: 0, fontSize: 22, fontWeight: 600,
+                margin: 0, fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
                 letterSpacing: '-0.025em', color: 'var(--text-primary)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {name || 'Your name'}
               </h2>
               <p style={{
-                margin: '2px 0 0', fontSize: 13, color: 'var(--text-muted)',
+                margin: '2px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {college || 'No college set'}{collegeId ? ` · ${collegeId}` : ''}
@@ -492,7 +492,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 display: 'inline-flex', alignItems: 'center',
                 padding: '0 12px', borderRadius: 'var(--radius-md)',
                 background: 'var(--bg-inset)', border: '1px solid var(--border-default)',
-                fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
                 whiteSpace: 'nowrap',
               }}>
                 +91
@@ -594,10 +594,10 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                     className="residence-chip"
                     data-active={active || undefined}
                   >
-                    <span style={{ fontSize: 18, marginBottom: 4 }} aria-hidden="true">
+                    <span style={{ fontSize: 'calc(18px * var(--text-scale))', marginBottom: 4 }} aria-hidden="true">
                       {opt === 'day_scholar' ? '🏠' : '🛏️'}
                     </span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {opt === 'day_scholar' ? 'Day scholar' : 'Hosteler'}
                     </span>
                   </button>
@@ -615,7 +615,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {error}
           </div>
@@ -632,7 +632,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               background: 'transparent', border: '1px solid var(--border-default)',
               borderRadius: 999,
               padding: '10px 16px',
-              fontSize: 13, fontWeight: 500,
+              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
               color: 'var(--accent-rose)',
               cursor: 'pointer',
             }}
@@ -658,7 +658,7 @@ function Section({ title, hint, required, children }: {
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <h3 style={{
             margin: 0,
-            fontSize: 11, fontWeight: 700,
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
             letterSpacing: '0.08em', textTransform: 'uppercase',
             color: 'var(--text-secondary)',
           }}>
@@ -666,7 +666,7 @@ function Section({ title, hint, required, children }: {
           </h3>
           {required && (
             <span style={{
-              fontSize: 10, fontWeight: 600,
+              fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
               color: 'var(--accent-rose)',
               letterSpacing: '0.02em',
             }}>
@@ -675,7 +675,7 @@ function Section({ title, hint, required, children }: {
           )}
         </div>
         {hint && (
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
             {hint}
           </p>
         )}

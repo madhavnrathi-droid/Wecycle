@@ -220,7 +220,7 @@ export default function ReportSheet({
         >
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-            <span style={{ flex: 1, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <span style={{ flex: 1, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
               Report
             </span>
             <button
@@ -251,18 +251,18 @@ export default function ReportSheet({
               padding: '24px 0 8px',
               color: 'var(--text-primary)',
             }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
-              <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+              <div style={{ fontSize: 'calc(32px * var(--text-scale))', marginBottom: 12 }}>✅</div>
+              <p style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, marginBottom: 6 }}>
                 Report submitted
               </p>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              <p style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
                 Thanks for keeping Wecycle safe.
               </p>
             </div>
           ) : (
             <>
               {/* Intro */}
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
                 Tell us what&apos;s wrong with {label}. We review reports within 24 hours.
               </p>
 
@@ -290,7 +290,7 @@ export default function ReportSheet({
                         borderRadius: 12,
                         background: checked ? 'var(--bg-inset)' : 'transparent',
                         cursor: 'pointer',
-                        fontSize: 14,
+                        fontSize: 'calc(14px * var(--text-scale))',
                         color: 'var(--text-primary)',
                         textAlign: 'left',
                         transition: 'background 0.15s',
@@ -306,7 +306,7 @@ export default function ReportSheet({
               {/* Details textarea */}
               <div style={{ marginBottom: 18 }}>
                 <label
-                  style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}
+                  style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}
                 >
                   Add details (optional)
                 </label>
@@ -324,13 +324,13 @@ export default function ReportSheet({
                     borderRadius: 12,
                     background: 'var(--bg-inset, var(--bg-card))',
                     color: 'var(--text-primary)',
-                    fontSize: 14,
+                    fontSize: 'calc(14px * var(--text-scale))',
                     resize: 'vertical',
                     fontFamily: 'inherit',
                     outline: 'none',
                   }}
                 />
-                <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                <div style={{ textAlign: 'right', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 4 }}>
                   {details.length}/1000
                 </div>
               </div>
@@ -341,7 +341,7 @@ export default function ReportSheet({
                 <div role="alert" style={{
                   marginBottom: 10, padding: '10px 12px', borderRadius: 12,
                   background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose)',
-                  fontSize: 12.5, fontWeight: 500, lineHeight: 1.45,
+                  fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
                 }}>
                   {actionError}
                 </div>
@@ -358,7 +358,7 @@ export default function ReportSheet({
                     borderRadius: 12,
                     background: 'var(--bg-surface, transparent)',
                     color: 'var(--text-primary)',
-                    fontSize: 14,
+                    fontSize: 'calc(14px * var(--text-scale))',
                     fontWeight: 500,
                     cursor: 'pointer',
                   }}
@@ -375,7 +375,7 @@ export default function ReportSheet({
                     borderRadius: 12,
                     background: selectedReason ? 'var(--text-primary)' : 'var(--border-default)',
                     color: 'var(--bg-base, #fff)',
-                    fontSize: 14,
+                    fontSize: 'calc(14px * var(--text-scale))',
                     fontWeight: 600,
                     cursor: selectedReason ? 'pointer' : 'not-allowed',
                     display: 'flex',
@@ -402,7 +402,7 @@ export default function ReportSheet({
                   }} />
                   {blockConfirm ? (
                     <div style={{ textAlign: 'center' }}>
-                      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>
+                      <p style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', marginBottom: 10 }}>
                         Block? You won&apos;t see their content or messages.
                       </p>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -414,7 +414,7 @@ export default function ReportSheet({
                             borderRadius: 10,
                             background: 'transparent',
                             color: 'var(--text-muted)',
-                            fontSize: 13,
+                            fontSize: 'calc(13px * var(--text-scale))',
                             cursor: 'pointer',
                           }}
                         >
@@ -429,7 +429,7 @@ export default function ReportSheet({
                             borderRadius: 10,
                             background: 'var(--accent-rose)',
                             color: '#fff',
-                            fontSize: 13,
+                            fontSize: 'calc(13px * var(--text-scale))',
                             fontWeight: 600,
                             cursor: blockLoading ? 'not-allowed' : 'pointer',
                             display: 'flex',
@@ -449,7 +449,7 @@ export default function ReportSheet({
                           background: 'none',
                           border: 'none',
                           color: 'var(--accent-rose)',
-                          fontSize: 14,
+                          fontSize: 'calc(14px * var(--text-scale))',
                           cursor: 'pointer',
                           padding: '4px 8px',
                         }}

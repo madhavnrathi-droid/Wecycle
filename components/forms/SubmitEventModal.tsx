@@ -198,7 +198,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         </>
       }
     >
-      <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+      <p style={{ margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
         Events are reviewed by community admins before they go live.
       </p>
 
@@ -243,7 +243,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               gap: 12, minHeight: 32, cursor: 'pointer', userSelect: 'none',
             }}>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>All day</span>
+              <span style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500 }}>All day</span>
               <span className="pill-switch" style={{ width: 42, height: 25 }}>
                 <input
                   type="checkbox"
@@ -277,7 +277,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
                 read "27/08/202". A date input needs ~150px for dd/mm/yyyy plus
                 its picker glyph, so the time column gives the space back. */}
             <div style={{ display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr) auto', gap: '10px 6px', alignItems: 'center' }}>
-              <label htmlFor="ev-start-date" style={{ fontSize: 12.5, color: 'var(--text-secondary, #6B6B60)' }}>
+              <label htmlFor="ev-start-date" style={{ fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-secondary, #6B6B60)' }}>
                 Starts
               </label>
               <input
@@ -299,7 +299,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
                 />
               )}
 
-              <label htmlFor="ev-end-date" style={{ fontSize: 12.5, color: 'var(--text-secondary, #6B6B60)' }}>
+              <label htmlFor="ev-end-date" style={{ fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-secondary, #6B6B60)' }}>
                 Ends
               </label>
               <input
@@ -331,7 +331,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
                 rather than silently corrected. */}
             {durationLabel(form.schedule) && (
               <p aria-live="polite" style={{
-                margin: '10px 0 0', fontSize: 12.5,
+                margin: '10px 0 0', fontSize: 'calc(12.5px * var(--text-scale))',
                 color: 'var(--text-secondary, #6B6B60)',
               }}>
                 {durationLabel(form.schedule)}
@@ -434,12 +434,12 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
               <ClipboardList size={18} strokeWidth={2} />
             </span>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>
+              <span style={{ display: 'block', fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
                 {regFields !== null && regFields.length > 0
                   ? `Registration form · ${regFields.length} question${regFields.length === 1 ? '' : 's'}`
                   : 'Add a registration form'}
               </span>
-              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>
+              <span style={{ display: 'block', fontSize: 'calc(11.5px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 1 }}>
                 {regFields !== null && regFields.length > 0
                   ? 'Tap to edit — people fill it in when they RSVP'
                   : 'Optional — collect names, choices or files when people RSVP'}
@@ -453,7 +453,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
               onClick={() => { haptics.selection(); setRegFields(null); setRegError(null); }}
               style={{
                 marginTop: 6, background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, color: 'var(--accent-rose)', fontFamily: 'inherit',
+                fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--accent-rose)', fontFamily: 'inherit',
               }}
             >
               Remove form
@@ -485,7 +485,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {submitError}
           </div>

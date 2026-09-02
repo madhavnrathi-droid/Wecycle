@@ -72,14 +72,14 @@ export default function RelatedRail({
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={{
-            margin: 0, fontSize: 16, fontWeight: 700,
+            margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 700,
             letterSpacing: '-0.02em', color: 'var(--text-primary)',
             display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
           }}>
             {title}
             {sponsored && (
               <span style={{
-                fontSize: 9, fontWeight: 600, letterSpacing: '0.06em',
+                fontSize: 'calc(9px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: 'var(--text-muted)',
                 border: '1px solid var(--border-default)',
@@ -92,7 +92,7 @@ export default function RelatedRail({
           </h2>
           {subtitle && (
             <p style={{
-              margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)',
+              margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
               letterSpacing: '-0.005em',
             }}>
               {subtitle}
@@ -103,8 +103,8 @@ export default function RelatedRail({
           <button
             onClick={cta.onClick}
             style={{
-              all: 'unset', cursor: 'pointer',
-              fontSize: 13, fontWeight: 500,
+              all: 'unset', boxSizing: 'border-box', cursor: 'pointer',
+              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
               color: 'var(--text-secondary)',
               display: 'inline-flex', alignItems: 'center', gap: 2,
               padding: '4px 4px',
@@ -261,7 +261,7 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
         {(item.isRequest || item.listingType === 'free' || item.kind === 'opportunity' || closed) && (
           <span style={{
             position: 'absolute', top: 8, left: 8,
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
             textTransform: 'uppercase',
             color: '#fff',
             background: closed ? 'rgba(20,20,20,0.7)'
@@ -281,7 +281,7 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
       </div>
 
       <p style={{
-        margin: 0, fontSize: 13, fontWeight: 500,
+        margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
         color: 'var(--text-primary)',
         lineHeight: 1.3,
         display: '-webkit-box',
@@ -296,7 +296,7 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
         {priceLabel && (
           <span style={{
-            fontSize: 13, fontWeight: 700, color: 'var(--text-primary)',
+            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 700, color: 'var(--text-primary)',
             letterSpacing: '-0.01em',
           }}>
             {priceLabel}
@@ -304,7 +304,7 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
         )}
         {item.location && !item.isRequest && (
           <span style={{
-            fontSize: 11, color: 'var(--text-muted)',
+            fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             minWidth: 0,
           }}>
@@ -350,7 +350,7 @@ function LostFoundCard({ item, onClick }: { item: LostItem & { photoUrls?: strin
         )}
         <span style={{
           position: 'absolute', top: 8, left: 8,
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
           textTransform: 'uppercase',
           color: '#fff',
           background: lost ? '#ED2E50' : '#F59E0B',
@@ -363,7 +363,7 @@ function LostFoundCard({ item, onClick }: { item: LostItem & { photoUrls?: strin
       </div>
 
       <p style={{
-        margin: 0, fontSize: 13, fontWeight: 500,
+        margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
         color: 'var(--text-primary)',
         lineHeight: 1.3,
         display: '-webkit-box',
@@ -378,7 +378,7 @@ function LostFoundCard({ item, onClick }: { item: LostItem & { photoUrls?: strin
       {item.lastSeen && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4, marginTop: 4,
-          fontSize: 11, color: 'var(--text-muted)',
+          fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
         }}>
           <MapPin size={11} strokeWidth={1.8} />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

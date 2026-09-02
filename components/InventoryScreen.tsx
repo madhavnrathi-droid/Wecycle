@@ -212,7 +212,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
       <section style={{ padding: '14px 20px 18px' }}>
         <h1 style={{
           margin: 0,
-          fontSize: 26, fontWeight: 600,
+          fontSize: 'calc(26px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.03em',
           color: 'var(--text-primary)',
           lineHeight: 1.15,
@@ -221,7 +221,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
         </h1>
         <p style={{
           margin: '4px 0 0',
-          fontSize: 13, color: 'var(--text-muted)',
+          fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
         }}>
           Manage what you've shared, requested, and saved
         </p>
@@ -443,7 +443,7 @@ function SummaryPill({ icon, label }: { icon: string; label: string }) {
       padding: '6px 12px',
       background: 'var(--bg-inset)',
       borderRadius: 999,
-      fontSize: 12, fontWeight: 500,
+      fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
       color: 'var(--text-secondary)',
     }}>
       <span aria-hidden="true">{icon}</span> {label}
@@ -499,13 +499,13 @@ function InventoryCard({
               color: 'var(--text-secondary)',
               padding: '3px 9px',
               borderRadius: 999,
-              fontSize: 10, fontWeight: 600, letterSpacing: '-0.01em',
+              fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
             }}>
               {item.isRequest ? '🙋 Request' : item.category}
             </span>
             <p style={{
               margin: 0,
-              fontSize: 15, fontWeight: 600, lineHeight: 1.25,
+              fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, lineHeight: 1.25,
               letterSpacing: '-0.015em',
               color: 'var(--text-primary)',
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -514,7 +514,7 @@ function InventoryCard({
             {item.description && (
               <p style={{
                 margin: 0,
-                fontSize: 12, color: 'var(--text-secondary)',
+                fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)',
                 lineHeight: 1.45,
                 display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
@@ -523,7 +523,7 @@ function InventoryCard({
             <div style={{
               marginTop: 'auto',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-              fontSize: 11, color: 'var(--text-muted)',
+              fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
             }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 {item.isRequest ? null : <><MapPin size={10} strokeWidth={2} />{item.location}</>}
@@ -634,7 +634,7 @@ function CompleteButton({
         color: isClosed ? '#fff' : 'var(--text-primary)',
         border: isClosed ? 'none' : '1px solid var(--border-default)',
         borderRadius: 999,
-        fontSize: 11, fontWeight: 600, letterSpacing: '-0.01em',
+        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
         cursor: isClosed ? 'default' : busy ? 'wait' : 'pointer',
         opacity: busy ? 0.65 : 1,
         transition: 'box-shadow 150ms ease',
@@ -686,26 +686,26 @@ function InventoryEventCard({
             <span style={{
               alignSelf: 'flex-start', background: 'var(--bg-inset)',
               color: 'var(--text-secondary)', padding: '3px 9px',
-              borderRadius: 999, fontSize: 10, fontWeight: 600,
+              borderRadius: 999, fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
               display: 'inline-flex', alignItems: 'center', gap: 4,
             }}>
               <CalendarDays size={10} strokeWidth={2} /> Event
             </span>
             <p style={{
-              margin: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.25,
+              margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, lineHeight: 1.25,
               color: 'var(--text-primary)', display: '-webkit-box',
               WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>{event.title}</p>
             {event.description && (
               <p style={{
-                margin: 0, fontSize: 12, color: 'var(--text-secondary)',
+                margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)',
                 lineHeight: 1.45, display: '-webkit-box',
                 WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden',
               }}>{event.description}</p>
             )}
             <div style={{
               marginTop: 'auto', display: 'flex', justifyContent: 'space-between',
-              fontSize: 11, color: 'var(--text-muted)',
+              fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
             }}>
               <span>{event.date.split(' ').slice(0, 3).join(' ')}</span>
               <span style={{ display: 'inline-flex', gap: 8 }}>
@@ -738,7 +738,7 @@ function InventoryEventCard({
             position: 'absolute', top: 10, left: 10,
             background: 'rgba(0,0,0,0.55)', color: '#fff',
             backdropFilter: 'blur(8px)', borderRadius: 999,
-            padding: '4px 9px', fontSize: 10, fontWeight: 500,
+            padding: '4px 9px', fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500,
             display: 'inline-flex', alignItems: 'center', gap: 4, zIndex: 3,
           }}>
             <CalendarDays size={10} strokeWidth={2} />Event
@@ -800,7 +800,7 @@ function InventoryLostFoundCard({
             color: '#fff',
             backdropFilter: 'blur(8px)', borderRadius: 999,
             padding: '4px 10px',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
             zIndex: 3,
           }}>
             {lf.status}

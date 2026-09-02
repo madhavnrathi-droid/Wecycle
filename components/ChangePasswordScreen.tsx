@@ -93,12 +93,12 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
             Password
           </h1>
           {email && (
             <p style={{
-              margin: '1px 0 0', fontSize: 12, color: 'var(--text-muted)',
+              margin: '1px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {email}
@@ -117,10 +117,10 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
             }}>
               <Check size={24} strokeWidth={2.4} />
             </div>
-            <p style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 700, color: 'var(--text-primary)' }}>
               Password updated
             </p>
-            <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 20px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               {isDemo
                 ? 'Demo session — nothing was actually changed.'
                 : 'Use it next time you sign in. You’re still signed in here.'}
@@ -135,7 +135,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
             noValidate
             style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
           >
-            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+            <p style={{ margin: 0, fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.55 }}>
               Choose something you don’t use anywhere else. You stay signed in on this device.
             </p>
 
@@ -152,7 +152,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
                   style={{
                     alignSelf: 'flex-start', marginTop: 6,
                     background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
+                    fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
                     textDecoration: 'underline', textDecorationStyle: 'dotted', fontFamily: 'inherit',
                   }}
                 >
@@ -207,7 +207,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
               <div role="alert" style={{
                 padding: '10px 12px', borderRadius: 12,
                 background: 'rgba(237,46,80,0.10)',
-                color: 'var(--accent-rose)', fontSize: 12.5, fontWeight: 500, lineHeight: 1.45,
+                color: 'var(--accent-rose)', fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
               }}>
                 {error}
               </div>

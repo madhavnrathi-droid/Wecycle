@@ -95,7 +95,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
         </button>
         <h1 style={{
           margin: 0, flex: 1, textAlign: 'center',
-          fontSize: 16, fontWeight: 600,
+          fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.02em', color: 'var(--text-primary)',
         }}>
           Feedback
@@ -110,7 +110,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
           padding: '4px 10px',
           background: 'var(--bg-inset)',
           borderRadius: 999,
-          fontSize: 11, fontWeight: 600,
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
           color: 'var(--text-secondary)',
           letterSpacing: '0.02em',
         }}>
@@ -118,13 +118,13 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
         </div>
         <h2 style={{
           margin: '10px 0 4px',
-          fontSize: 22, fontWeight: 600,
+          fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.025em', color: 'var(--text-primary)',
         }}>
           Help shape Wecycle
         </h2>
         <p style={{
-          margin: 0, fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.5,
+          margin: 0, fontSize: 'calc(14px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5,
         }}>
           Bugs, half-baked ideas, things that confused you — drop them below.
           Your default mail app opens with everything pre-filled; just hit send.
@@ -134,7 +134,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
       {/* ── Tags ── */}
       <section style={{ padding: '14px 20px 4px' }}>
         <div style={{
-          fontSize: 11, fontWeight: 700,
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
           letterSpacing: '0.08em', textTransform: 'uppercase',
           color: 'var(--text-secondary)',
           marginBottom: 8,
@@ -149,10 +149,10 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
                 key={t.id}
                 onClick={() => setTag(active ? '' : t.id)}
                 style={{
-                  all: 'unset', cursor: 'pointer',
+                  all: 'unset', boxSizing: 'border-box', cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '5px 11px',
-                  fontSize: 12, fontWeight: 500,
+                  fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
                   borderRadius: 999,
                   border: '1px solid ' + (active ? 'var(--text-primary)' : 'var(--border-default)'),
                   background: active ? 'var(--text-primary)' : 'transparent',
@@ -183,7 +183,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
             rows={7}
             style={{
               all: 'unset', display: 'block', width: '100%',
-              fontSize: 15, lineHeight: 1.5,
+              fontSize: 'calc(15px * var(--text-scale))', lineHeight: 1.5,
               color: 'var(--text-primary)',
               fontFamily: 'inherit',
               minHeight: 140,
@@ -197,13 +197,13 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
             marginTop: 10, paddingTop: 10,
             borderTop: '1px solid var(--border-default)',
           }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
               {charCount} / {MAX_CHARS}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500,
+                fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)', fontWeight: 500,
               }}>
                 {anonymous ? <EyeOff size={12} /> : <Eye size={12} />}
                 Send anonymously
@@ -214,14 +214,14 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
         </div>
         {!anonymous && (
           <p style={{
-            margin: '8px 4px 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4,
+            margin: '8px 4px 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4,
           }}>
             We'll include your name, contact, and college ID so we can follow up if needed.
           </p>
         )}
         {anonymous && (
           <p style={{
-            margin: '8px 4px 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4,
+            margin: '8px 4px 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4,
           }}>
             Your identity won't be attached — but your default mail app will still show the
             sender as your own email address. Use a private alias if anonymity matters.
@@ -241,7 +241,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
             padding: '14px 20px', borderRadius: 14,
             background: canSend ? 'var(--text-primary)' : 'var(--bg-inset)',
             color: canSend ? 'var(--bg-base)' : 'var(--text-muted)',
-            fontSize: 15, fontWeight: 600,
+            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.01em',
             transition: 'background 0.18s',
           }}
@@ -250,7 +250,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
           {justSent ? 'Mail app opened — hit send to deliver' : 'Open mail to send'}
         </button>
         <p style={{
-          margin: '8px 4px 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4,
+          margin: '8px 4px 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4,
           textAlign: 'center',
         }}>
           Goes to <strong style={{ color: 'var(--text-secondary)' }}>{FEEDBACK_EMAIL}</strong>
@@ -277,13 +277,13 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={{
-              margin: 0, fontSize: 15, fontWeight: 600,
+              margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.015em', color: 'var(--text-primary)',
             }}>
               Thanks for taking the time
             </h3>
             <p style={{
-              margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
+              margin: '6px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5,
             }}>
               Wecycle gets better because people like you tell us when things feel off.
               Every note lands in our inbox and we reply to most within 48 hours.

@@ -16,8 +16,8 @@ export default function ShareRedirect({ to }: { to: string }) {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>Opening Wecycle…</div>
-        <a href={to} style={{ color: '#22C55E', fontSize: 14, marginTop: 10, display: 'inline-block' }}>
+        <div style={{ fontSize: 'calc(18px * var(--text-scale))', fontWeight: 600 }}>Opening Wecycle…</div>
+        <a href={to} style={{ color: '#22C55E', fontSize: 'calc(14px * var(--text-scale))', marginTop: 10, display: 'inline-block' }}>
           Tap here if it doesn’t open
         </a>
       </div>

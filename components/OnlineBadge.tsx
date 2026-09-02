@@ -26,7 +26,7 @@ export default function OnlineBadge({ isOnline, dotOnly, color = '#16A34A' }: On
         display: 'inline-flex',
         alignItems: 'center',
         gap: dotOnly ? 0 : 4,
-        fontSize: 11,
+        fontSize: 'calc(11px * var(--text-scale))',
         fontWeight: 600,
         color,
         letterSpacing: '0.01em',

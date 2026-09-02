@@ -109,7 +109,7 @@ export default function Drawer({
             background: 'var(--bg-inset)',
             overflow: 'hidden', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)',
+            fontSize: 'calc(14px * var(--text-scale))', fontWeight: 700, color: 'var(--text-secondary)',
           }}>
             <img
               src={avatarSrc}
@@ -122,15 +122,15 @@ export default function Drawer({
             {!user && <span style={{ position: 'absolute' }}>{initials}</span>}
           </div>
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p style={{ margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {displayName}
             </p>
             {user
-              ? <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>{profile?.role || 'Member'}</p>
+              ? <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>{profile?.role || 'Member'}</p>
               : (
                 <button onClick={onSignIn} style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  fontSize: 12, fontWeight: 600, color: 'var(--accent-lime-dim)',
+                  fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--accent-lime-dim)',
                 }}>
                   Sign in
                 </button>
@@ -165,11 +165,11 @@ export default function Drawer({
                 >
                   <span className="drawer-icon"><Icon size={17} strokeWidth={1.8} /></span>
                   <span style={{ flex: 1, textAlign: 'left' }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
+                    <span style={{ display: 'block', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>
                       {label}
                     </span>
                     {desc && (
-                      <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                      <span style={{ display: 'block', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 1 }}>
                         {desc}
                       </span>
                     )}

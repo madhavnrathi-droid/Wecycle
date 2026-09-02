@@ -57,6 +57,11 @@
   --error: #DC2626;
 
   /* Typography scale (in px, applied via rem) */
+  /* The multiplier behind the "Larger text" setting. 1 normally; html.text-larger
+     raises it. Every font-size in the app is calc(Npx * var(--text-scale)), so this
+     one value scales all of them — and it must never be undefined. */
+  --text-scale: 1;
+
   --text-xs: 0.6875rem;   /* 11px */
   --text-sm: 0.8125rem;   /* 13px */
   --text-base: 0.9375rem; /* 15px */
@@ -160,17 +165,27 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: 16px; /* rem base — NOT scaled; --text-scale drives type */
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
 
-/* "Larger text" accessibility toggle from Settings. Bumps every rem-relative
-   size and the text-sm/base/lg tokens we use across the app. */
-html.text-larger { font-size: 18px; }
-html.text-larger body { font-size: calc(var(--text-base) * 1.12); }
-html.text-larger .text-body { font-size: calc(var(--text-base) * 1.12); }
-html.text-larger .text-body-sm { font-size: calc(var(--text-sm) * 1.12); }
+/* ── "Larger text" ─────────────────────────────────────────────────────────
+ *
+ * This used to be four rules bumping the root font-size and two utility
+ * classes. It changed almost nothing, and the reason is worth recording: the
+ * app states type in PIXELS — 594 inline `fontSize` values in the components
+ * and 113 more in this file — and a pixel does not care what the root
+ * font-size is. Only the 28 declarations reading a `--text-*` token responded,
+ * so flipping the switch moved about four per cent of the words on screen, and
+ * the setting looked broken because it effectively was.
+ *
+ * Every one of those sizes is now stated as `calc(Npx * var(--text-scale))`,
+ * so the multiplier below is the single place the type scale is set.
+ * `--text-scale` MUST always resolve — an undefined var makes every calc()
+ * invalid and drops each font-size back to inherited — so it is declared on
+ * bare :root and only overridden here. */
+html.text-larger { --text-scale: 1.12; }
 html.text-larger h1, html.text-larger h2, html.text-larger h3 { letter-spacing: -0.02em; }
 
 
@@ -439,7 +454,7 @@ body {
   border: 1.5px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 16px; /* 16px floor: see iOS note below */
+  font-size: calc(16px * var(--text-scale)); /* 16px floor: see iOS note below */
   padding: 12px 16px;
   width: 100%;
   outline: none;
@@ -454,7 +469,7 @@ body {
   border: 1.5px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   color: var(--text-primary);
-  font-size: 16px; /* 16px floor — iOS zoom guard, see note at EOF */
+  font-size: calc(16px * var(--text-scale)); /* 16px floor — iOS zoom guard, see note at EOF */
   padding: 10px 16px 10px 40px;
   width: 100%;
   outline: none;
@@ -712,7 +727,7 @@ section.mobile-only { display: block; }
   position: absolute; top: 10px; right: 10px;
   background: #22C55E; color: #fff;
   padding: 4px 8px; border-radius: 999px;
-  font-size: 10px; font-weight: 600;
+  font-size: calc(10px * var(--text-scale)); font-weight: 600;
   display: inline-flex; align-items: center; gap: 4px;
   letter-spacing: -0.01em;
 }
@@ -722,7 +737,7 @@ section.mobile-only { display: block; }
 }
 .rsvp-card-label {
   margin: 0;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -730,7 +745,7 @@ section.mobile-only { display: block; }
 }
 .rsvp-card-title {
   margin: 2px 0 4px;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.25;
@@ -742,7 +757,7 @@ section.mobile-only { display: block; }
 }
 .rsvp-card-when {
   margin: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 500;
   color: rgba(255, 255, 255, 0.92);
   display: inline-flex;
@@ -803,14 +818,14 @@ section.mobile-only { display: block; }
 .activity-hero-headline { position: relative; }
 .activity-hero-eyebrow {
   margin: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.65;
 }
 .activity-hero-value {
-  font-size: 44px;
+  font-size: calc(44px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
@@ -833,7 +848,7 @@ section.mobile-only { display: block; }
     border-radius: 18px;
   }
   .activity-hero-headline { flex: 0 0 auto; }
-  .activity-hero-value { font-size: 32px; }
+  .activity-hero-value { font-size: calc(32px * var(--text-scale)); }
   .activity-hero-metrics {
     flex: 0 0 auto;
     margin-top: 0;
@@ -881,8 +896,8 @@ section.mobile-only { display: block; }
      mobile layout — on desktop it must shrink to its content so the search
      pill can start right beside the greeting instead of at mid-row. */
   .feed-greeting-text { flex: 0 0 auto !important; }
-  .feed-greeting-text h1 { font-size: 18px !important; }
-  .feed-greeting-text p  { font-size: 12px; }
+  .feed-greeting-text h1 { font-size: calc(18px * var(--text-scale)) !important; }
+  .feed-greeting-text p  { font-size: calc(12px * var(--text-scale)); }
   .feed-greeting-search {
     display: block !important;
     flex: 1 1 auto;
@@ -1198,14 +1213,14 @@ section.mobile-only { display: block; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.marketing-banner-compact .marketing-banner-title { font-size: 12px; }
+.marketing-banner-compact .marketing-banner-title { font-size: calc(12px * var(--text-scale)); }
 .marketing-banner-wide    .marketing-banner-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   letter-spacing: -0.018em;
 }
 @media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-title {
-    font-size: 22px;
+    font-size: calc(22px * var(--text-scale));
     letter-spacing: -0.022em;
   }
 }
@@ -1217,24 +1232,24 @@ section.mobile-only { display: block; }
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .marketing-banner-compact .marketing-banner-subtitle {
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .marketing-banner-wide .marketing-banner-subtitle {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 600;
   opacity: 0.98;
 }
 @media (min-width: 1024px) {
   .marketing-banner-wide .marketing-banner-subtitle {
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
   }
 }
 
 .marketing-banner-detail {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   font-weight: 400;
   opacity: 0.84;
   line-height: 1.4;
@@ -1247,7 +1262,7 @@ section.mobile-only { display: block; }
 }
 @media (min-width: 1024px) {
   .marketing-banner-detail {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     line-height: 1.45;
   }
 }
@@ -1464,7 +1479,7 @@ section.mobile-only { display: block; }
 .user-search-header {
   display: inline-flex; align-items: center; gap: 6px;
   margin-bottom: 8px;
-  font-size: 11px; font-weight: 700;
+  font-size: calc(11px * var(--text-scale)); font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text-secondary);
 }
@@ -1526,7 +1541,7 @@ section.mobile-only { display: block; }
   flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   color: #fff;
-  font-size: 16px; font-weight: 700;
+  font-size: calc(16px * var(--text-scale)); font-weight: 700;
 }
 .user-search-avatar img {
   width: 100%; height: 100%; object-fit: cover; display: block;
@@ -1539,18 +1554,18 @@ section.mobile-only { display: block; }
 }
 .user-search-name {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 14px; font-weight: 600;
+  font-size: calc(14px * var(--text-scale)); font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.01em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .user-search-email {
-  font-size: 12px; font-weight: 500;
+  font-size: calc(12px * var(--text-scale)); font-weight: 500;
   color: var(--text-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .user-search-meta {
-  font-size: 11px; font-weight: 500;
+  font-size: calc(11px * var(--text-scale)); font-weight: 500;
   color: var(--text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -1633,7 +1648,7 @@ section.mobile-only { display: block; }
   z-index: 6;
   background: rgba(12, 12, 10, 0.9);
   color: #fff;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1657,7 +1672,7 @@ section.mobile-only { display: block; }
   backdrop-filter: blur(8px);
   border-radius: 999px;
   padding: 4px 10px;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1732,7 +1747,7 @@ section.mobile-only { display: block; }
 
 /* H1 variant — mobile post title (input rendered AS the title) */
 .inline-edit--h1 {
-  font-size: 22px;
+  font-size: calc(22px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--text-primary);
@@ -1741,7 +1756,7 @@ section.mobile-only { display: block; }
 }
 /* H1 variant — desktop post title (bigger) */
 .inline-edit--h1-desktop {
-  font-size: 28px;
+  font-size: calc(28px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--text-primary);
@@ -1752,7 +1767,7 @@ section.mobile-only { display: block; }
 /* Plain text input — location, single-line meta */
 .inline-edit--input,
 .inline-edit--meta {
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.4;
@@ -1760,14 +1775,14 @@ section.mobile-only { display: block; }
 
 /* Body variant — description textarea */
 .inline-edit--body {
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   color: var(--text-primary);
   line-height: 1.55;
   resize: vertical;
   min-height: 96px;
 }
 .inline-edit--body-desktop {
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   line-height: 1.6;
   min-height: 120px;
 }
@@ -1777,7 +1792,7 @@ section.mobile-only { display: block; }
   display: inline-block;
   width: auto;
   min-width: 160px;
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   font-weight: 600;
   color: var(--text-primary);
   background: var(--edit-bg);
@@ -1812,7 +1827,7 @@ section.mobile-only { display: block; }
   min-width: 0;
   padding: 8px 10px;
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-secondary);
@@ -1863,7 +1878,7 @@ section.mobile-only { display: block; }
   color: var(--accent-amber);
   font-family: inherit;
   font-weight: 700;
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   padding: 0;
   margin: 0;
   outline: none;
@@ -1892,7 +1907,7 @@ section.mobile-only { display: block; }
   border: 1px solid var(--edit-border);
   border-radius: 12px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   font-weight: 500;
   color: var(--text-primary);
   transition: background 160ms ease, border-color 160ms ease;
@@ -1914,17 +1929,17 @@ section.mobile-only { display: block; }
 @media (min-width: 1024px) {
   /* Page titles cap at 24px — Pinterest / Linear-style restraint */
   .screen-transition section > h1 {
-    font-size: 24px !important;
+    font-size: calc(24px * var(--text-scale)) !important;
     letter-spacing: -0.025em;
   }
   /* Section titles in lower-case caps stay small */
-  .screen-transition section h3 { font-size: 11px !important; }
+  .screen-transition section h3 { font-size: calc(11px * var(--text-scale)) !important; }
 
   /* Segmented controls + chip rows constrained */
   .screen-transition .segmented { max-width: 360px; }
 
   /* Search pill stays inline; if free-standing it's a hairline */
-  .search-pill { max-width: none; padding: 10px 14px 10px 38px; font-size: 16px; }
+  .search-pill { max-width: none; padding: 10px 14px 10px 38px; font-size: calc(16px * var(--text-scale)); }
 }
 
 /* Account screen form caps width on desktop so labels stay readable */
@@ -2530,18 +2545,18 @@ section.mobile-only { display: block; }
 }
 
 .field-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: -0.005em;
 }
 .field-label .required { color: var(--accent-rose); margin-left: 2px; }
 .field-hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-muted);
 }
 .field-error {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--accent-rose);
   font-weight: 500;
 }
@@ -2554,7 +2569,7 @@ section.mobile-only { display: block; }
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   padding: 11px 14px;
   outline: none;
   font-family: inherit;
@@ -2700,7 +2715,7 @@ section.mobile-only { display: block; }
 .modal-title {
   margin: 0;
   flex: 1;
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--text-primary);
@@ -2880,7 +2895,7 @@ img[src*="/storage/v1/object/public/"] {
 .photo-preview-makecover {
   position: absolute; top: 12px; left: 12px;
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.01em;
+  font-size: calc(12px * var(--text-scale)); font-weight: 700; letter-spacing: 0.01em;
   padding: 6px 12px; border-radius: 999px;
   backdrop-filter: blur(8px);
 }
@@ -2920,8 +2935,8 @@ img[src*="/storage/v1/object/public/"] {
               background 0.15s var(--ease-smooth), transform 0.15s var(--ease-smooth);
 }
 .photo-empty:hover { border-color: var(--text-primary); color: var(--text-primary); }
-.photo-empty-title { font-size: 15px; font-weight: 600; }
-.photo-empty-hint { font-size: 12px; color: var(--text-muted); }
+.photo-empty-title { font-size: calc(15px * var(--text-scale)); font-weight: 600; }
+.photo-empty-hint { font-size: calc(12px * var(--text-scale)); color: var(--text-muted); }
 
 .photo-actions {
   display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
@@ -2932,7 +2947,7 @@ img[src*="/storage/v1/object/public/"] {
   height: 42px; padding: 0 14px; border-radius: 12px;
   border: 1px solid var(--border-default); background: var(--bg-surface);
   color: var(--text-primary); font-family: inherit;
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-size: calc(13px * var(--text-scale)); font-weight: 600; cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 .photo-actions button:hover:not(:disabled) { border-color: #22C55E; color: #16A34A; }
@@ -3041,7 +3056,7 @@ img[src*="/storage/v1/object/public/"] {
   left: 6px;
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -3123,7 +3138,7 @@ img[src*="/storage/v1/object/public/"] {
 .photo-source-option {
   all: unset; display: flex; align-items: center; gap: 14px;
   width: 100%; padding: 14px 8px; box-sizing: border-box;
-  cursor: pointer; font-size: 15px; font-weight: 500;
+  cursor: pointer; font-size: calc(15px * var(--text-scale)); font-weight: 500;
   color: var(--text-primary); letter-spacing: -0.01em;
 }
 .photo-source-option:hover { background: var(--bg-inset); border-radius: 12px; }
@@ -3131,7 +3146,7 @@ img[src*="/storage/v1/object/public/"] {
 .photo-source-cancel {
   all: unset; display: block; width: 100%; text-align: center;
   padding: 14px; margin-top: 6px; cursor: pointer;
-  font-size: 14px; font-weight: 600;
+  font-size: calc(14px * var(--text-scale)); font-weight: 600;
   color: var(--text-muted);
 }
 
@@ -3143,7 +3158,7 @@ img[src*="/storage/v1/object/public/"] {
 
 /* Compression progress chip — sits above the grid while we crunch images */
 .photo-picker-status {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-muted);
   margin-bottom: 6px;
   display: inline-flex; align-items: center; gap: 6px;
@@ -3177,7 +3192,7 @@ img[src*="/storage/v1/object/public/"] {
   padding: 5px 10px;
   border-radius: 999px;
   border: 1.5px solid var(--border-default);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 500;
   color: var(--text-secondary);
   background: var(--bg-inset);
@@ -3195,7 +3210,7 @@ img[src*="/storage/v1/object/public/"] {
   background: color-mix(in srgb, var(--accent-green, #22c55e) 10%, transparent);
 }
 .photo-bg-toggle-beta {
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -3203,7 +3218,7 @@ img[src*="/storage/v1/object/public/"] {
   margin-left: 2px;
 }
 .photo-bg-toggle-hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-muted);
   line-height: 1.4;
   flex: 1;
@@ -3255,7 +3270,7 @@ img[src*="/storage/v1/object/public/"] {
 
 .otp-input {
   text-align: center;
-  font-size: 22px;
+  font-size: calc(22px * var(--text-scale));
   font-weight: 600;
   letter-spacing: 0.5em;
   padding-left: 16px;
@@ -3273,7 +3288,7 @@ img[src*="/storage/v1/object/public/"] {
   border: 1px solid transparent;
   border-radius: 999px;
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
   padding: 12px 16px 12px 42px;
   outline: none;
   font-family: inherit;
@@ -3333,7 +3348,7 @@ img[src*="/storage/v1/object/public/"] {
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 500;
   color: var(--text-secondary);
   transition: all 0.18s var(--ease-smooth);
@@ -3401,7 +3416,7 @@ img[src*="/storage/v1/object/public/"] {
   background: transparent;
   border: 1px solid var(--border-default);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -3562,7 +3577,7 @@ img[src*="/storage/v1/object/public/"] {
   overflow: hidden;
 }
 .feed-card-text-title {
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale));
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.015em;
@@ -3576,7 +3591,7 @@ img[src*="/storage/v1/object/public/"] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 500;
   color: var(--text-secondary);
   min-width: 0;
@@ -3589,7 +3604,7 @@ img[src*="/storage/v1/object/public/"] {
   justify-content: center;
   overflow: hidden;
   color: #fff;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -3603,7 +3618,7 @@ img[src*="/storage/v1/object/public/"] {
   min-width: 0;
 }
 .feed-card-text-desc {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 400;
   line-height: 1.45;
   color: var(--text-secondary);
@@ -3617,7 +3632,7 @@ img[src*="/storage/v1/object/public/"] {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   color: var(--text-muted);
 }
 .feed-card-text-meta > span {
@@ -3671,7 +3686,7 @@ img[src*="/storage/v1/object/public/"] {
 .feed-card-overlay[data-light] .feed-card-price { color: var(--text-primary); }
 .feed-card-title {
   margin: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.25;
@@ -3688,7 +3703,7 @@ img[src*="/storage/v1/object/public/"] {
   justify-content: space-between;
   gap: 6px;
   margin-top: 4px;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale));
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
 }
@@ -3715,7 +3730,7 @@ img[src*="/storage/v1/object/public/"] {
   white-space: nowrap;
   color: #fff;
   font-weight: 800;
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale));
   letter-spacing: -0.02em;
   line-height: 1;
 }
@@ -4114,7 +4129,7 @@ img[src*="/storage/v1/object/public/"] {
 
 .cardmenu-title {
   margin: 4px 12px 10px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
@@ -4136,7 +4151,7 @@ img[src*="/storage/v1/object/public/"] {
   background: transparent;
   cursor: pointer;
   font-family: inherit;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-weight: 550;
   color: var(--text-primary);
   text-align: left;
@@ -4146,7 +4161,7 @@ img[src*="/storage/v1/object/public/"] {
 @media (hover: hover) { .cardmenu-item:hover { background: var(--bg-inset); } }
 .cardmenu-item > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .cardmenu-sub {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   font-weight: 450;
   color: var(--text-muted);
 }
@@ -4161,7 +4176,7 @@ img[src*="/storage/v1/object/public/"] {
   background: var(--bg-inset);
   cursor: pointer;
   font-family: inherit;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-weight: 650;
   color: var(--text-primary);
 }
@@ -4234,7 +4249,7 @@ img[src*="/storage/v1/object/public/"] {
   left: 5px;
   padding: 2px 7px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -4252,7 +4267,7 @@ img[src*="/storage/v1/object/public/"] {
   flex: 1;
 }
 .crow-title {
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--text-scale));
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -4264,7 +4279,7 @@ img[src*="/storage/v1/object/public/"] {
 }
 /* Same rule as the card: the money is heavier than the name it belongs to. */
 .crow-lead {
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
   font-weight: 750;
   letter-spacing: -0.015em;
   color: var(--text-primary);
@@ -4275,7 +4290,7 @@ img[src*="/storage/v1/object/public/"] {
    a building name set like money reads as shouting. */
 .crow-lead[data-tone="lost"],
 .crow-lead[data-tone="found"] {
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--text-scale));
   font-weight: 650;
   color: var(--text-secondary);
 }
@@ -4284,7 +4299,7 @@ img[src*="/storage/v1/object/public/"] {
   align-items: center;
   gap: 4px;
   min-width: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-muted);
 }
 .crow-meta-text {
@@ -4353,7 +4368,7 @@ img[src*="/storage/v1/object/public/"] {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale));
   font-weight: 650;
   letter-spacing: -0.015em;
   color: var(--text-primary);
@@ -4362,14 +4377,14 @@ img[src*="/storage/v1/object/public/"] {
   text-overflow: ellipsis;
 }
 .seller-card-trade {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .seller-card-meta {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -4436,7 +4451,7 @@ img[src*="/storage/v1/object/public/"] {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   padding: 9px 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -4462,7 +4477,7 @@ img[src*="/storage/v1/object/public/"] {
   color: var(--text-on-accent);
   border-radius: var(--radius-md);
   font-weight: 700;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   text-decoration: none;
   transition: top 0.15s;
 }
@@ -4563,7 +4578,7 @@ textarea:focus-visible {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 500;
   color: var(--text-secondary);
   transition: all 0.15s;
@@ -4854,7 +4869,7 @@ textarea:focus-visible {
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -4867,7 +4882,7 @@ textarea:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   color: var(--accent-lime-dim);
 }
@@ -4881,7 +4896,7 @@ textarea:focus-visible {
   border: 1px solid rgba(168, 221, 0, 0.4);
   background: rgba(168, 221, 0, 0.10);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   cursor: pointer;
 }
@@ -4945,7 +4960,7 @@ textarea:focus-visible {
   border: 1px solid var(--border-default);
   background: var(--bg-base);
   color: var(--text-primary);
-  font-size: 16px;            /* ≥16px-ish avoids iOS zoom; 15 is fine w/ meta */
+  font-size: calc(16px * var(--text-scale));            /* ≥16px-ish avoids iOS zoom; 15 is fine w/ meta */
 }
 .ss-input::placeholder { color: var(--text-muted); }
 
@@ -4973,7 +4988,7 @@ textarea:focus-visible {
   border-radius: 999px;
   background: var(--bg-inset);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
 }
 .ss-chip-x {
@@ -5045,7 +5060,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 25px;
+  font-size: calc(25px * var(--text-scale));
   line-height: 1;
   /* No plate by default. Every tile used to carry a grey rounded square, which
      boxed in twelve illustrations that already have their own silhouette and
@@ -5110,7 +5125,7 @@ textarea:focus-visible {
   /* Raised to the 12px floor even while the strip shrank. The tile got smaller
      by losing plate, not by losing legibility — shrinking a label already
      under every readable minimum would have been the wrong 10px to save. */
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-secondary);
@@ -5138,7 +5153,7 @@ textarea:focus-visible {
 }
 .rail-title {
   margin: 0;
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -5146,7 +5161,7 @@ textarea:focus-visible {
 }
 .rail-sub {
   margin: 3px 0 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 500;
   color: var(--text-muted);
 }
@@ -5160,7 +5175,7 @@ textarea:focus-visible {
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -5263,7 +5278,7 @@ textarea:focus-visible {
    enough to carry a two-line title and a location again. */
 .rail--micro .rail-track { --rail-cards: 2.6; }
 .rail--micro .pcard-body { min-height: 66px; padding: 7px 9px 9px; }
-.rail--micro .pcard-title { font-size: 13px; }
+.rail--micro .pcard-title { font-size: calc(13px * var(--text-scale)); }
 /* The location line is back. Suppressing it was a concession to a card that had
    become too narrow to hold it, and a marketplace card without a place on it
    makes the reader open the post to learn the one thing that decides whether
@@ -5342,7 +5357,7 @@ textarea:focus-visible {
 }
 .pcard-title {
   margin: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -5356,7 +5371,7 @@ textarea:focus-visible {
    for the ones that pass, so the price is the larger and heavier of the two —
    at 14px against a 13px semibold title the two used to compete. */
 .pcard-price {
-  font-size: 15.5px;
+  font-size: calc(15.5px * var(--text-scale));
   font-weight: 750;
   letter-spacing: -0.015em;
   color: var(--text-primary);
@@ -5364,7 +5379,7 @@ textarea:focus-visible {
 .pcard-price[data-tone="free"]   { color: var(--success); }
 .pcard-price[data-tone="wanted"] { color: var(--color-request); }
 .pcard-price--soft {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -5378,7 +5393,7 @@ textarea:focus-visible {
      minimum and the first thing to disappear when someone turns text size up.
      Location is not decoration — it is how a buyer decides whether the walk is
      worth it. */
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   color: var(--text-muted);
 }
 .pcard-meta-text {
@@ -5434,7 +5449,7 @@ textarea:focus-visible {
   align-items: center;
   padding: 3px 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -5472,7 +5487,7 @@ textarea:focus-visible {
   border-radius: 999px;
   background: rgba(14, 14, 8, 0.82);
   color: #fff;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -5567,7 +5582,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: calc(26px * var(--text-scale));
   line-height: 1;
   background: rgba(255, 255, 255, 0.72);
   box-shadow: var(--shadow-sm);
@@ -5575,7 +5590,7 @@ textarea:focus-visible {
 .sf-cta-copy { flex: 1 1 auto; min-width: 0; }
 .sf-cta-title {
   margin: 0;
-  font-size: 16.5px;
+  font-size: calc(16.5px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -5583,7 +5598,7 @@ textarea:focus-visible {
 }
 .sf-cta-sub {
   margin: 4px 0 0;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   line-height: 1.45;
   color: var(--text-secondary);
 }
@@ -5596,7 +5611,7 @@ textarea:focus-visible {
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--bg-base);
@@ -5612,7 +5627,7 @@ textarea:focus-visible {
    never gets squeezed to two lines beside the text. */
 @media (max-width: 460px) {
   .sf-cta { flex-wrap: wrap; gap: 13px; padding: 18px 16px; }
-  .sf-cta-emoji { width: 44px; height: 44px; border-radius: 14px; font-size: 22px; }
+  .sf-cta-emoji { width: 44px; height: 44px; border-radius: 14px; font-size: calc(22px * var(--text-scale)); }
   .sf-cta-copy { flex: 1 1 140px; }
   .sf-cta-btn  { flex: 1 1 100%; width: 100%; }
 }
@@ -5673,7 +5688,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -5684,7 +5699,7 @@ textarea:focus-visible {
   background: rgba(139, 92, 246, 0.13);
   padding: 1px 6px;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale));
   font-weight: 700;
   letter-spacing: 0.03em;
 }
@@ -5696,12 +5711,12 @@ textarea:focus-visible {
   background: rgba(34, 197, 94, 0.14);
   padding: 1px 6px;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale));
   font-weight: 700;
 }
 .ev-row-title {
   margin: 1px 0 2px;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.015em;
   line-height: 1.25;
@@ -5718,7 +5733,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 5px;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale));
   color: var(--text-secondary);
 }
 .ev-row-meta svg { flex-shrink: 0; }
@@ -5730,7 +5745,7 @@ textarea:focus-visible {
 }
 .ev-row-going-count {
   margin-top: 2px;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -5745,7 +5760,7 @@ textarea:focus-visible {
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -5950,7 +5965,7 @@ summary::-webkit-details-marker { display: none; }
   background: var(--bg-inset);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
   line-height: 1.4;
   text-align: left;
   cursor: pointer;

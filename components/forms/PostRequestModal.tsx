@@ -141,7 +141,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
         </>
       }
     >
-      <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+      <p style={{ margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
         Ask your community for what you need.
       </p>
 
@@ -221,8 +221,8 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
               aria-pressed={form.urgency === 'normal'}
               onClick={() => update('urgency', 'normal')}
             >
-              <span style={{ fontSize: 22 }}>🙂</span>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>No rush</span>
+              <span style={{ fontSize: 'calc(22px * var(--text-scale))' }}>🙂</span>
+              <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>No rush</span>
             </button>
             <button
               type="button"
@@ -230,8 +230,8 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
               aria-pressed={form.urgency === 'urgent'}
               onClick={() => update('urgency', 'urgent')}
             >
-              <span style={{ fontSize: 22 }}>⚡</span>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Urgent</span>
+              <span style={{ fontSize: 'calc(22px * var(--text-scale))' }}>⚡</span>
+              <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>Urgent</span>
             </button>
           </div>
         </fieldset>
@@ -249,7 +249,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
           }}>
             <legend className="field-label">Auto-delete after</legend>
             <span style={{
-              fontSize: 13, fontWeight: 700,
+              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 700,
               color: '#A8DD00',
               letterSpacing: '-0.01em',
               fontVariantNumeric: 'tabular-nums',
@@ -284,7 +284,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
           <div style={{
             display: 'flex', justifyContent: 'space-between',
             marginTop: 6,
-            fontSize: 10, fontWeight: 500,
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500,
             color: 'var(--text-muted)',
             letterSpacing: '0.04em', textTransform: 'uppercase',
           }}>
@@ -326,7 +326,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {submitError}
           </div>
@@ -358,7 +358,7 @@ function NotifyToggle({
         cursor: 'pointer', userSelect: 'none',
       }}>
         <Bell size={15} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+        <span style={{ flex: 1, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>
           {label}
         </span>
         <span style={{ position: 'relative', display: 'inline-block', width: 40, height: 22, flexShrink: 0 }}>
@@ -388,7 +388,7 @@ function NotifyToggle({
           }} />
         </span>
       </label>
-      <p style={{ margin: '6px 0 0 25px', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+      <p style={{ margin: '6px 0 0 25px', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>
         {"We'll send a push notification if you've turned that on in Settings, or an email otherwise."}
         {' '}
         <button
@@ -397,7 +397,7 @@ function NotifyToggle({
           style={{
             background: 'none', border: 'none', padding: 0,
             color: 'var(--accent-primary, #A8DD00)',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
             textDecoration: 'underline', textDecorationStyle: 'dotted',
           }}
         >

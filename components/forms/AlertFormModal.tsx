@@ -159,7 +159,7 @@ export default function AlertFormModal({
         </>
       }
     >
-      <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+      <p style={{ margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
         We'll ping you when someone uploads something matching this alert.
         It auto-deletes when the duration runs out.
       </p>
@@ -282,7 +282,7 @@ export default function AlertFormModal({
                 aria-pressed={durationHours === opt.hours}
                 onClick={() => setDurationHours(opt.hours)}
               >
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</span>
+                <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600 }}>{opt.label}</span>
               </button>
             ))}
           </div>
@@ -305,7 +305,7 @@ export default function AlertFormModal({
               style={{ flexDirection: 'column' }}
             >
               <Mail size={18} strokeWidth={1.8} />
-              <span style={{ fontSize: 12, fontWeight: 600 }}>Email</span>
+              <span style={{ fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600 }}>Email</span>
             </button>
             <button
               type="button"
@@ -315,7 +315,7 @@ export default function AlertFormModal({
               style={{ flexDirection: 'column' }}
             >
               <Phone size={18} strokeWidth={1.8} />
-              <span style={{ fontSize: 12, fontWeight: 600 }}>Phone</span>
+              <span style={{ fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600 }}>Phone</span>
             </button>
             <button
               type="button"
@@ -325,7 +325,7 @@ export default function AlertFormModal({
               style={{ flexDirection: 'column' }}
             >
               <Bell size={18} strokeWidth={1.8} />
-              <span style={{ fontSize: 12, fontWeight: 600 }}>Both</span>
+              <span style={{ fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600 }}>Both</span>
             </button>
           </div>
           <p className="field-hint" style={{ marginTop: 6 }}>
@@ -340,7 +340,7 @@ export default function AlertFormModal({
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {error}
           </div>
@@ -358,7 +358,7 @@ export default function AlertFormModal({
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <AlertTriangle size={16} strokeWidth={1.8} style={{ color: 'var(--accent-rose)', flexShrink: 0, marginTop: 2 }} />
-                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                  <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-primary)', lineHeight: 1.5 }}>
                     Delete this alert? You won't be notified about new matches.
                   </p>
                 </div>
@@ -384,7 +384,7 @@ export default function AlertFormModal({
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-                  color: 'var(--accent-rose)', fontSize: 13, fontWeight: 500,
+                  color: 'var(--accent-rose)', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
                 }}
               >
                 <Trash2 size={14} strokeWidth={1.8} />

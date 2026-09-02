@@ -71,7 +71,7 @@ export default function MarketplaceScreen() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <h1 style={{
-            margin: 0, fontSize: 20, fontWeight: 700,
+            margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 700,
             letterSpacing: '-0.025em', color: 'var(--text-primary)', flex: 1,
           }}>
             Market
@@ -154,7 +154,7 @@ export default function MarketplaceScreen() {
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               padding: '12px 16px',
-              fontSize: 12, fontWeight: 800,
+              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 800,
               color: activeType === type.id ? 'var(--text-primary)' : 'var(--text-muted)',
               borderBottom: `2px solid ${activeType === type.id ? 'var(--accent-lime)' : 'transparent'}`,
               whiteSpace: 'nowrap', transition: 'all 0.15s',
@@ -168,13 +168,13 @@ export default function MarketplaceScreen() {
 
       {/* ── RESULTS HEADER ── */}
       <div style={{ padding: '14px 16px 4px', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>
+        <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', flex: 1 }}>
           {filtered.length} items near you
         </span>
         <button style={{
           display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
+          fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, color: 'var(--text-secondary)',
         }}>
           <ArrowUpDown size={12} strokeWidth={1.8} /> Sort
         </button>
@@ -212,7 +212,7 @@ export default function MarketplaceScreen() {
           {/* Section header */}
           <div style={{ padding: '24px 16px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 15, fontWeight: 600,
+              margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.015em', color: 'var(--text-primary)',
             }}>
               All items
@@ -259,19 +259,19 @@ export default function MarketplaceScreen() {
             background: 'radial-gradient(circle at 90% 50%, rgba(255,255,255,0.18), transparent 50%)',
             pointerEvents: 'none',
           }} />
-          <div style={{ fontSize: 36, position: 'relative' }}>📦</div>
+          <div style={{ fontSize: 'calc(36px * var(--text-scale))', position: 'relative' }}>📦</div>
           <div style={{ flex: 1, position: 'relative' }}>
-            <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 900, color: '#0C0C0B', letterSpacing: '-0.02em' }}>
+            <p style={{ margin: '0 0 2px', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 900, color: '#0C0C0B', letterSpacing: '-0.02em' }}>
               Got something to give?
             </p>
-            <p style={{ margin: 0, fontSize: 11, color: 'rgba(0,0,0,0.6)', fontWeight: 600 }}>
+            <p style={{ margin: 0, fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(0,0,0,0.6)', fontWeight: 600 }}>
               Share with your community in 30 seconds
             </p>
           </div>
           <button style={{
             background: '#0C0C0B', color: 'var(--accent-lime)',
             border: 'none', padding: '9px 14px', borderRadius: 'var(--radius-pill)',
-            fontSize: 11, fontWeight: 900, cursor: 'pointer',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 900, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 4,
             position: 'relative', letterSpacing: '0.04em', textTransform: 'uppercase',
             flexShrink: 0,
@@ -290,19 +290,19 @@ export default function MarketplaceScreen() {
             <div style={{ padding: '16px 20px 24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{
-                  margin: 0, fontSize: 20, fontWeight: 900,
+                  margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 900,
                   letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1,
                 }}>
                   Filter
                 </h2>
                 <button
                   onClick={() => { setActiveType('all'); setFilterOpen(false); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}
                 >
                   Reset
                 </button>
               </div>
-              <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <p style={{ margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Listing Type
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
@@ -316,7 +316,7 @@ export default function MarketplaceScreen() {
                       background: activeType === type.id ? 'rgba(168,221,0,0.08)' : 'var(--bg-inset)',
                       border: `1.5px solid ${activeType === type.id ? 'rgba(168,221,0,0.5)' : 'transparent'}`,
                       borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                      cursor: 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 700,
                       color: 'var(--text-primary)',
                     }}
                   >
@@ -351,7 +351,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         height: 360,
         background: item.photoColor,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 110,
+        fontSize: 'calc(110px * var(--text-scale))',
         position: 'relative',
       }}>
         {item.photoIcon}
@@ -369,7 +369,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
           backdropFilter: 'blur(8px)',
           borderRadius: 'var(--radius-pill)',
           padding: '4px 10px',
-          fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '-0.01em',
         }}>
           Featured
         </div>
@@ -397,7 +397,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h3 style={{
-                margin: '0 0 6px', fontSize: 24, fontWeight: 900,
+                margin: '0 0 6px', fontSize: 'calc(24px * var(--text-scale))', fontWeight: 900,
                 color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1,
               }}>
                 {item.title}
@@ -407,23 +407,23 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
                   width: 22, height: 22, borderRadius: '50%',
                   background: item.user.color,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 9, fontWeight: 800, color: '#fff',
+                  fontSize: 'calc(9px * var(--text-scale))', fontWeight: 800, color: '#fff',
                 }}>
                   {item.user.initials[0]}
                 </div>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
+                <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
                   {item.user.name.split(' ')[0]}
                 </span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>·</span>
+                <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(255,255,255,0.4)' }}>·</span>
                 <MapPin size={11} color="rgba(255,255,255,0.6)" strokeWidth={2} />
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
+                <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
                   {item.location}
                 </span>
               </div>
             </div>
             <div style={{
               background: tc.bg, color: tc.color,
-              fontSize: 14, fontWeight: 900,
+              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 900,
               padding: '8px 14px', borderRadius: 'var(--radius-pill)',
               letterSpacing: '-0.01em', flexShrink: 0,
               backdropFilter: 'blur(8px)',
@@ -442,18 +442,18 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         borderBottom: '1px solid var(--border-subtle)',
       }}>
         <span style={{
-          fontSize: 11, fontWeight: 800,
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800,
           color: item.condition === 'like_new' ? 'var(--accent-lime-dim)' : 'var(--text-muted)',
         }}>
           {CONDITION_LABEL[item.condition]}
         </span>
         <span className="ticker-dot" style={{ color: 'var(--text-muted)' }} />
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 600 }}>
           <Clock size={11} strokeWidth={2} /> {item.postedDaysAgo === 0 ? 'today' : `${item.postedDaysAgo}d ago`}
         </span>
         <div style={{ flex: 1 }} />
         {item.responses > 0 && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 600 }}>
             <MessageCircle size={11} strokeWidth={2} /> {item.responses} interested
           </span>
         )}
@@ -477,7 +477,7 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         aspectRatio: '1 / 1.15',
         background: item.photoColor,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 56, position: 'relative',
+        fontSize: 'calc(56px * var(--text-scale))', position: 'relative',
         borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
         marginBottom: 8,
@@ -503,7 +503,7 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         <div style={{
           position: 'absolute', bottom: 8, left: 8,
           background: tc.bg, color: tc.color,
-          fontSize: 10, fontWeight: 900,
+          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 900,
           padding: '4px 9px', borderRadius: 'var(--radius-pill)',
           letterSpacing: '-0.01em',
           backdropFilter: 'blur(6px)',
@@ -514,7 +514,7 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
 
       {/* Caption */}
       <h3 style={{
-        margin: '0 0 4px', fontSize: 13, fontWeight: 800,
+        margin: '0 0 4px', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 800,
         color: 'var(--text-primary)', letterSpacing: '-0.01em',
         display: '-webkit-box', WebkitLineClamp: 1,
         WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -524,12 +524,12 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
       </h3>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+        <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, color: 'var(--text-muted)' }}>
           {item.user.name.split(' ')[0]}
         </span>
         <span className="ticker-dot" style={{ color: 'var(--text-muted)' }} />
         <span style={{
-          fontSize: 11, fontWeight: 600,
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
           color: item.condition === 'like_new' ? 'var(--accent-lime-dim)' : 'var(--text-muted)',
         }}>
           {item.condition === 'like_new' ? '✦ New' : item.condition === 'good' ? 'Good' : 'Fair'}
@@ -558,7 +558,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         width: 96, height: 96, borderRadius: 'var(--radius-md)',
         background: item.photoColor,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 38, flexShrink: 0, position: 'relative', overflow: 'hidden',
+        fontSize: 'calc(38px * var(--text-scale))', flexShrink: 0, position: 'relative', overflow: 'hidden',
       }}>
         {item.photoIcon}
       </div>
@@ -566,7 +566,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
           <h3 style={{
-            margin: 0, fontSize: 14, fontWeight: 800,
+            margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 800,
             color: 'var(--text-primary)', letterSpacing: '-0.01em', flex: 1,
             display: '-webkit-box', WebkitLineClamp: 1,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -575,7 +575,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
           </h3>
           <span style={{
             background: tc.bg, color: tc.color,
-            fontSize: 11, fontWeight: 900,
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 900,
             padding: '3px 9px', borderRadius: 'var(--radius-pill)', flexShrink: 0,
           }}>
             {priceLabel}
@@ -583,7 +583,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         </div>
 
         <p style={{
-          margin: '0 0 6px', fontSize: 12,
+          margin: '0 0 6px', fontSize: 'calc(12px * var(--text-scale))',
           color: 'var(--text-secondary)', lineHeight: 1.4,
           display: '-webkit-box', WebkitLineClamp: 1,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -596,15 +596,15 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
             width: 16, height: 16, borderRadius: '50%',
             background: item.user.color,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 8, fontWeight: 800, color: '#fff',
+            fontSize: 'calc(8px * var(--text-scale))', fontWeight: 800, color: '#fff',
           }}>
             {item.user.initials[0]}
           </div>
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
+          <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-secondary)', fontWeight: 600 }}>
             {item.user.name.split(' ')[0]}
           </span>
           <span className="ticker-dot" style={{ color: 'var(--text-muted)' }} />
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
             <MapPin size={10} strokeWidth={2} /> {item.location}
           </span>
           <div style={{ flex: 1 }} />

@@ -942,7 +942,7 @@ export default function FeedScreen({
           <div style={{ minWidth: 0, flexShrink: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <h1 style={{
               margin: 0,
-              fontSize: 26, fontWeight: 600,
+              fontSize: 'calc(26px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.03em',
               color: 'var(--text-primary)',
               lineHeight: 1.15,
@@ -953,7 +953,7 @@ export default function FeedScreen({
             </h1>
             <p style={{
               margin: '4px 0 0',
-              fontSize: 13, color: 'var(--text-muted)',
+              fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
             }} suppressHydrationWarning>
               {showValueProp
                 ? 'Free to use, no commission — just verified Manipal students.'
@@ -1096,13 +1096,13 @@ export default function FeedScreen({
               minHeight: 36, padding: '7px 12px 7px 14px',
               borderRadius: 999, border: 'none', cursor: 'pointer',
               background: 'var(--text-primary)', color: '#fff',
-              fontSize: 13, fontWeight: 600,
+              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
             }}
           >
             {RAIL_FILTERS[railFilter].label}
             <X size={14} strokeWidth={2.6} aria-hidden="true" />
           </button>
-          <span style={{ marginLeft: 10, fontSize: 12.5, color: 'var(--text-muted)' }}>
+          <span style={{ marginLeft: 10, fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)' }}>
             {filtered.length} {filtered.length === 1 ? 'item' : 'items'}
           </span>
         </section>
@@ -1170,7 +1170,7 @@ export default function FeedScreen({
         /* ══ STOREFRONT: themed rails ══ */
         <div className="storefront">
           {loading && engine.modules.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))' }}>
               Setting up the storefront…
             </div>
           )}
@@ -1229,7 +1229,7 @@ export default function FeedScreen({
 
             if (loading && visibleCount === 0) {
               return (
-                <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
+                <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))' }}>
                   Loading the feed…
                 </div>
               );

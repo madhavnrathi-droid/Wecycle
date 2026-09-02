@@ -47,7 +47,7 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
       }}
     >
       {icon ? (
-        <div style={{ fontSize: compact ? 30 : 40, lineHeight: 1, opacity: 0.92 }} aria-hidden="true">
+        <div style={{ fontSize: `calc(${compact ? 30 : 40}px * var(--text-scale))`, lineHeight: 1, opacity: 0.92 }} aria-hidden="true">
           {icon}
         </div>
       ) : (
@@ -55,12 +55,12 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
           src="/animations/bloom.json"
           size={compact ? 72 : 104}
           aria-label="Nothing here yet"
-          fallback={<span style={{ fontSize: compact ? 30 : 40, lineHeight: 1 }} aria-hidden="true">✨</span>}
+          fallback={<span style={{ fontSize: `calc(${compact ? 30 : 40}px * var(--text-scale))`, lineHeight: 1 }} aria-hidden="true">✨</span>}
         />
       )}
       <p style={{
         margin: 0,
-        fontSize: compact ? 14 : 15,
+        fontSize: `calc(${compact ? 14 : 15}px * var(--text-scale))`,
         fontWeight: 600,
         color: 'var(--text-primary)',
         letterSpacing: '-0.01em',
@@ -72,7 +72,7 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
       {sub && (
         <p style={{
           margin: 0,
-          fontSize: 12,
+          fontSize: 'calc(12px * var(--text-scale))',
           color: 'var(--text-muted)',
           maxWidth: 360,
           lineHeight: 1.45,
@@ -91,7 +91,7 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
             border: 'none',
             borderRadius: 999,
             padding: '10px 18px',
-            fontSize: 13,
+            fontSize: 'calc(13px * var(--text-scale))',
             fontWeight: 600,
             letterSpacing: '-0.01em',
             cursor: 'pointer',

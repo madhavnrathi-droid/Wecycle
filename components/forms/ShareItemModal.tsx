@@ -320,9 +320,9 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                   aria-pressed={form.oppRole === r}
                   onClick={() => update('oppRole', r)}
                 >
-                  <span style={{ fontSize: 20 }} aria-hidden="true">{OPP_ROLE_META[r].emoji}</span>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{OPP_ROLE_META[r].label}</span>
-                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
+                  <span style={{ fontSize: 'calc(20px * var(--text-scale))' }} aria-hidden="true">{OPP_ROLE_META[r].emoji}</span>
+                  <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>{OPP_ROLE_META[r].label}</span>
+                  <span style={{ fontSize: 'calc(10.5px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
                     {OPP_ROLE_META[r].blurb}
                   </span>
                 </button>
@@ -343,9 +343,9 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                   aria-pressed={form.comp === c}
                   onClick={() => update('comp', c)}
                 >
-                  <span style={{ fontSize: 20 }} aria-hidden="true">{COMP_META[c].emoji}</span>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{COMP_META[c].label}</span>
-                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>{COMP_META[c].blurb}</span>
+                  <span style={{ fontSize: 'calc(20px * var(--text-scale))' }} aria-hidden="true">{COMP_META[c].emoji}</span>
+                  <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>{COMP_META[c].label}</span>
+                  <span style={{ fontSize: 'calc(10.5px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>{COMP_META[c].blurb}</span>
                 </button>
               ))}
             </div>
@@ -407,7 +407,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                   {form.ratePeriod === 'project' ? 'Budget' : 'How much'}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span aria-hidden="true" style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0 }}>₹</span>
+                  <span aria-hidden="true" style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0 }}>₹</span>
                   <input
                     id="si-price"
                     type="number" inputMode="numeric" min="0"
@@ -441,7 +441,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                 <div style={{
                   marginTop: 12, paddingTop: 10,
                   borderTop: '1px solid var(--border-subtle)',
-                  fontSize: 12, color: 'var(--text-muted)',
+                  fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
                 }}>
                   Shows on your post as{' '}
                   <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
@@ -478,9 +478,9 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                   aria-pressed={form.deal === d.id}
                   onClick={() => { haptics.selection(); update('deal', d.id); }}
                 >
-                  <span style={{ fontSize: 20 }} aria-hidden="true">{d.emoji}</span>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{d.label}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
+                  <span style={{ fontSize: 'calc(20px * var(--text-scale))' }} aria-hidden="true">{d.emoji}</span>
+                  <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>{d.label}</span>
+                  <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
                     {d.blurb}
                   </span>
                 </button>
@@ -525,7 +525,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                       onChange={e => update('price', Number(e.target.value) || undefined)}
                       style={{ minWidth: 0 }}
                     />
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>per</span>
+                    <span style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)' }}>per</span>
                     <select
                       aria-label="Rental period"
                       className="form-select"
@@ -630,12 +630,12 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
           <summary style={{
             display: 'flex', alignItems: 'center', gap: 8,
             minHeight: 44, cursor: 'pointer', listStyle: 'none',
-            fontSize: 13.5, fontWeight: 600, color: 'var(--text-secondary)',
+            fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
             userSelect: 'none',
           }}>
             <ChevronRight size={15} strokeWidth={2.2} className="details-chevron" aria-hidden="true" />
             Add more details
-            <span style={{ fontWeight: 400, fontSize: 12.5, color: 'var(--text-muted)' }}>
+            <span style={{ fontWeight: 400, fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)' }}>
               condition, pickup, link
             </span>
           </summary>
@@ -727,9 +727,9 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
                   transition: 'left 160ms ease',
                 }} />
               </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
+              <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
                 Open the link when the photo is tapped
-                <span style={{ display: 'block', fontSize: 11.5, fontWeight: 400, color: 'var(--text-muted)' }}>
+                <span style={{ display: 'block', fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 400, color: 'var(--text-muted)' }}>
                   The photo gets a {linkPreviewHost} badge so people know before they tap.
                 </span>
               </span>
@@ -755,7 +755,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {submitError}
           </div>
@@ -792,7 +792,7 @@ function NotifyToggle({
         cursor: 'pointer', userSelect: 'none',
       }}>
         <Bell size={15} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+        <span style={{ flex: 1, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>
           {label}
         </span>
         {/* Pill toggle — CSS-only, no JS beyond the onChange */}
@@ -825,7 +825,7 @@ function NotifyToggle({
       </label>
 
       {/* Hint */}
-      <p style={{ margin: '6px 0 0 25px', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+      <p style={{ margin: '6px 0 0 25px', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>
         {"We'll send a push notification if you've turned that on in Settings, or an email otherwise."}
         {' '}
         <button
@@ -834,7 +834,7 @@ function NotifyToggle({
           style={{
             background: 'none', border: 'none', padding: 0,
             color: 'var(--accent-primary, #A8DD00)',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
             textDecoration: 'underline', textDecorationStyle: 'dotted',
           }}
         >
@@ -871,13 +871,13 @@ function ConditionSlider({
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             transition: 'left 200ms cubic-bezier(.2,.8,.2,1), transform 240ms',
             transform: `translateY(${bump ? -2 : 0}px) scale(${bump ? 1.18 : 1})`,
-            fontSize: 22, lineHeight: 1, userSelect: 'none',
+            fontSize: 'calc(22px * var(--text-scale))', lineHeight: 1, userSelect: 'none',
             pointerEvents: 'none',
           }}
         >
           <span>{stop.emoji}</span>
           <span style={{
-            fontSize: 10, fontWeight: 700, marginTop: 2,
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, marginTop: 2,
             color: stop.color, letterSpacing: '-0.01em',
           }}>{stop.label}</span>
         </div>

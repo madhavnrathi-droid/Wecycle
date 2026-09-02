@@ -76,7 +76,7 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
               textTransform: 'uppercase', color: 'var(--text-muted)',
             }}>
               Add a question
@@ -106,11 +106,11 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
                   background: 'var(--bg-inset)',
                   border: 'none', borderRadius: 999,
                   cursor: 'pointer',
-                  fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
+                  fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
                   fontFamily: 'inherit',
                 }}
               >
-                <span aria-hidden="true" style={{ fontSize: 13 }}>{FIELD_TYPE_META[t].icon}</span>
+                <span aria-hidden="true" style={{ fontSize: 'calc(13px * var(--text-scale))' }}>{FIELD_TYPE_META[t].icon}</span>
                 {FIELD_TYPE_META[t].label}
               </button>
             ))}
@@ -128,7 +128,7 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
             background: 'var(--bg-card)',
             border: 'none', borderRadius: 999,
             boxShadow: PILL_SHADOW,
-            cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
             color: 'var(--text-primary)', fontFamily: 'inherit',
           }}
         >
@@ -173,10 +173,10 @@ function FieldCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+          fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
           color: 'var(--text-muted)',
         }}>
-          <span aria-hidden="true" style={{ fontSize: 12 }}>{meta.icon}</span> {meta.label}
+          <span aria-hidden="true" style={{ fontSize: 'calc(12px * var(--text-scale))' }}>{meta.icon}</span> {meta.label}
         </span>
         <span style={{ flex: 1 }} />
         <GhostBtn label={`Move question ${index + 1} up`} disabled={index === 0} onClick={onMoveUp}>
@@ -210,7 +210,7 @@ function FieldCard({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {options.map((opt, oi) => (
             <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 12, width: 18, textAlign: 'center', flexShrink: 0 }}>
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 'calc(12px * var(--text-scale))', width: 18, textAlign: 'center', flexShrink: 0 }}>
                 {field.type === 'checkboxes' ? '☐' : field.type === 'dropdown' ? `${oi + 1}.` : '○'}
               </span>
               <input
@@ -241,7 +241,7 @@ function FieldCard({
               alignSelf: 'flex-start',
               display: 'inline-flex', alignItems: 'center', gap: 5,
               background: 'none', border: 'none', padding: '4px 2px 0 24px',
-              cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600,
               color: 'var(--text-secondary)', fontFamily: 'inherit',
             }}
           >
@@ -256,7 +256,7 @@ function FieldCard({
       <label style={{
         display: 'flex', alignItems: 'center', gap: 8,
         marginTop: 12, cursor: 'pointer', userSelect: 'none',
-        fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)',
+        fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, color: 'var(--text-secondary)',
       }}>
         <span className="pill-switch" style={{ width: 34, height: 20 }}>
           <input

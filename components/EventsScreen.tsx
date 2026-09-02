@@ -189,7 +189,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
         <div>
           <h1 style={{
             margin: 0,
-            fontSize: 26, fontWeight: 600,
+            fontSize: 'calc(26px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.03em',
             color: 'var(--text-primary)',
             lineHeight: 1.15,
@@ -198,7 +198,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
           </h1>
           <p style={{
             margin: '4px 0 0',
-            fontSize: 13, color: 'var(--text-muted)',
+            fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
           }}>
             Swaps, repair cafés, workshops & more
           </p>
@@ -211,7 +211,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
             background: 'var(--text-primary)', color: 'var(--bg-base)',
             border: 'none', borderRadius: 999,
             padding: '8px 14px',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
             letterSpacing: '-0.01em', flexShrink: 0,
           }}
         >
@@ -285,7 +285,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
       {upcomingRsvps.length > 0 && (
         <section style={{ padding: '8px 20px 8px' }}>
           <h3 style={{
-            margin: 0, fontSize: 13, fontWeight: 600,
+            margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '0.04em', textTransform: 'uppercase',
             color: 'var(--text-muted)',
           }}>
@@ -315,7 +315,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
         <>
           <section style={{ padding: '18px 20px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 13, fontWeight: 600,
+              margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '0.04em', textTransform: 'uppercase',
               color: 'var(--text-muted)',
             }}>
@@ -393,7 +393,7 @@ function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; 
         {event.location && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, color: 'var(--text-muted)',
+            fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
           }}>
             <MapPin size={11} strokeWidth={1.8} />
             {event.location}
@@ -403,7 +403,7 @@ function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; 
           onClick={onCancel}
           style={{
             background: 'transparent', border: 'none', cursor: 'pointer',
-            color: 'var(--text-muted)', fontSize: 11, fontWeight: 500,
+            color: 'var(--text-muted)', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
             padding: 0,
           }}
         >
@@ -448,7 +448,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
           backdropFilter: 'blur(8px)',
           borderRadius: 999,
           padding: '5px 10px',
-          fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '-0.01em',
         }}>
           {labelForType(event.eventType)}
         </div>
@@ -457,7 +457,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
             position: 'absolute', top: 12, right: 12,
             background: '#22C55E', color: '#fff',
             borderRadius: 999, padding: '5px 10px',
-            fontSize: 11, fontWeight: 600,
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
             display: 'inline-flex', alignItems: 'center', gap: 4,
           }}>
             <Check size={11} strokeWidth={2.5} /> Going
@@ -468,7 +468,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
       {/* Body */}
       <div style={{ padding: '16px 16px' }}>
         <h2 style={{
-          margin: 0, fontSize: 18, fontWeight: 600,
+          margin: 0, fontSize: 'calc(18px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.02em', color: 'var(--text-primary)',
           lineHeight: 1.25,
         }}>
@@ -476,7 +476,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
         </h2>
         <div style={{
           marginTop: 8, display: 'flex', alignItems: 'center', gap: 12,
-          fontSize: 12, color: 'var(--text-secondary)',
+          fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)',
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <CalendarDays size={12} strokeWidth={1.8} />
@@ -486,7 +486,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
         {event.location && (
           <div style={{
             marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 12, color: 'var(--text-muted)',
+            fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
           }}>
             <MapPin size={12} strokeWidth={1.8} />
             {event.location}
@@ -496,12 +496,12 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
         {/* Attendance bar */}
         <div style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)' }}>
               <strong style={{ color: 'var(--text-primary)' }}>{event.attendees}</strong>
               {event.maxAttendees ? ` / ${event.maxAttendees} going` : ' going'}
             </span>
             {event.maxAttendees && (
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{Math.round(pct)}% full</span>
+              <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>{Math.round(pct)}% full</span>
             )}
           </div>
           <div style={{ height: 3, background: 'var(--border-subtle)', borderRadius: 99, overflow: 'hidden' }}>
@@ -523,7 +523,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
             border: isRsvpd ? '1px solid var(--border-default)' : 'none',
             borderRadius: 999,
             padding: '12px',
-            fontSize: 14, fontWeight: 600,
+            fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
             cursor: 'pointer', letterSpacing: '-0.01em',
           }}
         >

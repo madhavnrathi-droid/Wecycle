@@ -86,7 +86,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
         </button>
         <h1 style={{
           margin: 0, flex: 1, textAlign: 'center',
-          fontSize: 16, fontWeight: 600,
+          fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.02em', color: 'var(--text-primary)',
         }}>
           Notifications
@@ -177,7 +177,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
                   aria-checked={settings.notifications.emailFrequency === o.v}
                   onClick={() => setEmailFreq(o.v)}
                   style={{
-                    all: 'unset', cursor: 'pointer', width: '100%',
+                    all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%',
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 12px', borderRadius: 10,
                     background: settings.notifications.emailFrequency === o.v ? 'var(--bg-inset)' : 'transparent',
@@ -194,8 +194,8 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
                     )}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{o.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{o.hint}</div>
+                    <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>{o.label}</div>
+                    <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>{o.hint}</div>
                   </div>
                 </button>
               ))}
@@ -300,29 +300,29 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
               <Divider />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>From</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Start of quiet window</div>
+                  <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>From</div>
+                  <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>Start of quiet window</div>
                 </div>
                 <input
                   type="time"
                   value={qh.from}
                   onChange={(e) => setQuiet({ from: e.target.value })}
                   className="form-input"
-                  style={{ width: 104, padding: '6px 8px', fontSize: 13 }}
+                  style={{ width: 104, padding: '6px 8px', fontSize: 'calc(13px * var(--text-scale))' }}
                 />
               </div>
               <Divider />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>To</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>End of quiet window</div>
+                  <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>To</div>
+                  <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>End of quiet window</div>
                 </div>
                 <input
                   type="time"
                   value={qh.to}
                   onChange={(e) => setQuiet({ to: e.target.value })}
                   className="form-input"
-                  style={{ width: 104, padding: '6px 8px', fontSize: 13 }}
+                  style={{ width: 104, padding: '6px 8px', fontSize: 'calc(13px * var(--text-scale))' }}
                 />
               </div>
             </>
@@ -339,13 +339,13 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
             border: '1px dashed var(--border-default)',
           }}>
             <Info size={14} strokeWidth={1.8} color="var(--text-secondary)" style={{ flexShrink: 0, marginTop: 2 }} />
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.45 }}>
               Add {[!hasEmail && 'an email', !hasPhone && 'a phone number'].filter(Boolean).join(' and ')}
               {' '}in your Account to unlock {!hasEmail && !hasPhone ? 'email and SMS' : !hasEmail ? 'email' : 'SMS'} notifications.
               <button
                 onClick={onOpenAccount}
                 style={{
-                  all: 'unset', cursor: 'pointer', marginLeft: 6,
+                  all: 'unset', boxSizing: 'border-box', cursor: 'pointer', marginLeft: 6,
                   color: 'var(--text-primary)', fontWeight: 600,
                   textDecoration: 'underline',
                 }}
@@ -379,14 +379,14 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     <section style={{ padding: '4px 20px 18px' }}>
       <div style={{ marginBottom: 10 }}>
         <h3 style={{
-          margin: 0, fontSize: 11, fontWeight: 700,
+          margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
           letterSpacing: '0.08em', textTransform: 'uppercase',
           color: 'var(--text-secondary)',
         }}>
           {title}
         </h3>
         {hint && (
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
             {hint}
           </p>
         )}
@@ -419,11 +419,11 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: 52 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
           {label}
         </div>
         {hint && (
-          <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+          <p style={{ margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.35 }}>
             {hint}
           </p>
         )}
@@ -459,11 +459,11 @@ function ChannelRow({ icon, title, subtitle, on, onChange, disabled, disabledHin
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
           {title}
         </div>
         {subtitle && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>
             {disabled && disabledHint ? disabledHint : subtitle}
           </div>
         )}
@@ -506,11 +506,11 @@ function CategoryRow({ icon, title, subtitle, on, onChange }: {
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
           {title}
         </div>
         {subtitle && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>
             {subtitle}
           </div>
         )}

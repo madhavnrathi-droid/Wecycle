@@ -130,14 +130,14 @@ export default function ActivityScreen({
       <section style={{ padding: '14px 20px 14px' }}>
         <h1 style={{
           margin: 0,
-          fontSize: 26, fontWeight: 600,
+          fontSize: 'calc(26px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.03em',
           color: 'var(--text-primary)',
           lineHeight: 1.15,
         }}>
           Activity
         </h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+        <p style={{ margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
           Track your impact, alerts and inbox
         </p>
       </section>
@@ -199,7 +199,7 @@ function StatsTab({
               <span className="activity-hero-value">
                 {summary.totalViews.toLocaleString()}
               </span>
-              <span style={{ fontSize: 14, opacity: 0.7 }}>views</span>
+              <span style={{ fontSize: 'calc(14px * var(--text-scale))', opacity: 0.7 }}>views</span>
             </div>
           </div>
 
@@ -213,7 +213,7 @@ function StatsTab({
 
       {/* Summary line */}
       <section style={{ padding: '0 20px 14px' }}>
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
           Across <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
             {summary.itemCount} {summary.itemCount === 1 ? 'item' : 'items'}
           </strong> and <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -233,7 +233,7 @@ function StatsTab({
         <>
           <section style={{ padding: '6px 20px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 11, fontWeight: 700,
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
               letterSpacing: '0.08em', textTransform: 'uppercase',
               color: 'var(--text-secondary)',
             }}>
@@ -254,7 +254,7 @@ function StatsTab({
         <>
           <section style={{ padding: '16px 20px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 11, fontWeight: 700,
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
               letterSpacing: '0.08em', textTransform: 'uppercase',
               color: 'var(--text-secondary)',
             }}>
@@ -272,11 +272,11 @@ function StatsTab({
 
       {myItems.length === 0 && myEvents.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: 'calc(32px * var(--text-scale))', marginBottom: 8 }}>📦</div>
+          <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
             Nothing posted yet
           </p>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
             Share an item or host an event to see metrics here.
           </p>
         </div>
@@ -290,12 +290,12 @@ function MiniMetric({
 }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: 0.7, fontSize: 11 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: 0.7, fontSize: 'calc(11px * var(--text-scale))' }}>
         {icon}
         <span>{label}</span>
       </div>
       <p style={{
-        margin: '2px 0 0', fontSize: 20, fontWeight: 600,
+        margin: '2px 0 0', fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
         letterSpacing: '-0.025em', fontVariantNumeric: 'tabular-nums',
       }}>
         {value.toLocaleString()}
@@ -330,7 +330,7 @@ function PostMetricsRow({ item }: { item: MarketplaceItem }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
-          margin: 0, fontSize: 13, fontWeight: 600,
+          margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
           color: 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           letterSpacing: '-0.01em',
@@ -340,7 +340,7 @@ function PostMetricsRow({ item }: { item: MarketplaceItem }) {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
           marginTop: 6,
-          fontSize: 11, color: 'var(--text-muted)',
+          fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
             <Eye size={11} strokeWidth={1.8} /> {m.views}
@@ -391,7 +391,7 @@ function EventMetricsRow({ event }: { event: CommunityEvent }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
-          margin: 0, fontSize: 13, fontWeight: 600,
+          margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
           color: 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           letterSpacing: '-0.01em',
@@ -399,14 +399,14 @@ function EventMetricsRow({ event }: { event: CommunityEvent }) {
           {event.title}
         </p>
         <p style={{
-          margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)',
+          margin: '2px 0 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
         }}>
           {event.date}
         </p>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
           marginTop: 6,
-          fontSize: 11, color: 'var(--text-muted)',
+          fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
             <Eye size={11} strokeWidth={1.8} /> {m.views}
@@ -460,10 +460,10 @@ function AlertsTab({
             <Bell size={18} strokeWidth={1.8} />
           </div>
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
               Catch the next match
             </p>
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
               We'll ping you when someone posts what you need.
             </p>
           </div>
@@ -474,7 +474,7 @@ function AlertsTab({
               background: 'var(--text-primary)', color: 'var(--bg-base)',
               border: 'none', borderRadius: 999,
               padding: '8px 14px',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 5,
               letterSpacing: '-0.01em', flexShrink: 0,
             }}
@@ -489,7 +489,7 @@ function AlertsTab({
         <>
           <section style={{ padding: '4px 20px 10px' }}>
             <h3 style={{
-              margin: 0, fontSize: 11, fontWeight: 700,
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
               letterSpacing: '0.08em', textTransform: 'uppercase',
               color: 'var(--text-secondary)',
             }}>
@@ -502,11 +502,11 @@ function AlertsTab({
         </>
       ) : (
         <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: 'calc(32px * var(--text-scale))', marginBottom: 8 }}>🔔</div>
+          <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
             No active alerts
           </p>
-          <p style={{ margin: '4px 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 16px', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
             Create one to be the first to know when someone uploads it.
           </p>
           <button
@@ -524,7 +524,7 @@ function AlertsTab({
         <>
           <section style={{ padding: '24px 20px 10px' }}>
             <h3 style={{
-              margin: 0, fontSize: 11, fontWeight: 700,
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
               letterSpacing: '0.08em', textTransform: 'uppercase',
               color: 'var(--text-muted)',
             }}>
@@ -564,26 +564,26 @@ function AlertCard({
               background: isExpired ? 'var(--bg-inset)' : 'rgba(168,221,0,0.15)',
               color: isExpired ? 'var(--text-muted)' : 'var(--accent-lime-dim)',
               borderRadius: 999,
-              fontSize: 10, fontWeight: 600, letterSpacing: '-0.01em',
+              fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
             }}>
               <Clock size={10} strokeWidth={2} />
               {isExpired ? 'Expired' : remaining}
             </span>
             <span style={{
-              fontSize: 10, color: 'var(--text-muted)', fontWeight: 500,
+              fontSize: 'calc(10px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 500,
             }}>
               · {alert.category}
             </span>
           </div>
           <h4 style={{
-            margin: 0, fontSize: 15, fontWeight: 600,
+            margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.015em', color: 'var(--text-primary)',
             lineHeight: 1.25,
           }}>
             {alert.title}
           </h4>
           <p style={{
-            margin: '4px 0 0', fontSize: 12, color: 'var(--text-secondary)',
+            margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)',
             lineHeight: 1.4,
             display: '-webkit-box', WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -592,7 +592,7 @@ function AlertCard({
           </p>
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: 10,
-            marginTop: 8, fontSize: 11, color: 'var(--text-muted)',
+            marginTop: 8, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
           }}>
             {alert.maxPrice && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
@@ -693,11 +693,11 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
   if (inbox.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: 'calc(32px * var(--text-scale))', marginBottom: 8 }}>📭</div>
+        <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
           Inbox is quiet
         </p>
-        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+        <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
           Notifications about matches, saves and messages show up here.
         </p>
       </div>
@@ -726,12 +726,12 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
             width: 36, height: 36, borderRadius: 10,
             background: 'var(--bg-inset)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 17, flexShrink: 0,
+            fontSize: 'calc(17px * var(--text-scale))', flexShrink: 0,
           }}>
             {n.emoji}
           </div>
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.4 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
               {n.title}
               {n.unread && (
                 <span style={{
@@ -742,10 +742,10 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
                 }} aria-hidden="true" />
               )}
             </p>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)' }}>
               {n.body}
             </p>
-            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+            <p style={{ margin: '4px 0 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
               {n.timeAgo}
             </p>
           </div>

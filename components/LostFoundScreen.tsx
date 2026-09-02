@@ -131,7 +131,7 @@ export default function LostFoundScreen({
           </button>
           <h1 style={{
             margin: 0, flex: 1, textAlign: 'center',
-            fontSize: 15, fontWeight: 600,
+            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.01em', color: 'var(--text-primary)',
           }}>
             Lost &amp; Found
@@ -154,7 +154,7 @@ export default function LostFoundScreen({
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             ) : (
-              <span style={{ fontSize: 14 }}>·</span>
+              <span style={{ fontSize: 'calc(14px * var(--text-scale))' }}>·</span>
             )}
           </button>
         </div>
@@ -164,12 +164,12 @@ export default function LostFoundScreen({
       <section className="feed-greeting-row" style={{ padding: '14px 20px 14px' }}>
         <div style={{ minWidth: 0 }}>
           <h2 style={{
-            margin: 0, fontSize: 22, fontWeight: 600,
+            margin: 0, fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.025em', color: 'var(--text-primary)',
           }}>
             Reunite lost things
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
             {counts.lost} lost · {counts.found} found in your community
           </p>
         </div>
@@ -219,7 +219,7 @@ export default function LostFoundScreen({
             color: 'var(--accent-rose)',
             border: '1px solid rgba(237,46,80,0.22)',
             cursor: 'pointer',
-            fontSize: 13, fontWeight: 600,
+            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.01em',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
@@ -235,7 +235,7 @@ export default function LostFoundScreen({
             color: '#16A34A',
             border: '1px solid rgba(34,197,94,0.22)',
             cursor: 'pointer',
-            fontSize: 13, fontWeight: 600,
+            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.01em',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
@@ -356,7 +356,7 @@ function LostFoundCard({
         position: 'absolute', top: 8, left: 8,
         background: bg,
         color: accent,
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+        fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
         textTransform: 'uppercase',
         padding: '4px 10px',
         borderRadius: 999,
@@ -630,7 +630,7 @@ export function LostFoundDetailSheet({
                 }}
               >
                 <ImagePlus size={36} strokeWidth={1.4} />
-                <span style={{ fontSize: 13, fontWeight: 600 }}>+ Add photo</span>
+                <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600 }}>+ Add photo</span>
               </button>
             ) : null}
             {displayPhotoUrl && (
@@ -687,13 +687,13 @@ export function LostFoundDetailSheet({
           <span style={{
             background: isLost ? 'rgba(237,46,80,0.12)' : 'rgba(34,197,94,0.12)',
             color: accent,
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
             textTransform: 'uppercase',
             padding: '4px 10px', borderRadius: 999,
           }}>{isOwner ? eStatus : item.status}</span>
           {!isOwner && (
             <h2 style={{
-              margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 600,
+              margin: 0, fontSize: `calc(${isDesktop ? 22 : 18}px * var(--text-scale))`, fontWeight: 600,
               letterSpacing: '-0.025em', color: 'var(--text-primary)',
               flex: 1, minWidth: 0,
             }}>{item.title}</h2>
@@ -737,7 +737,7 @@ export function LostFoundDetailSheet({
                 }}
               >
                 <ImagePlus size={28} strokeWidth={1.5} />
-                <span style={{ fontSize: 12, fontWeight: 600 }}>+ Add photo</span>
+                <span style={{ fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600 }}>+ Add photo</span>
               </button>
             ) : null}
             {displayPhotoUrl && (
@@ -835,7 +835,7 @@ export function LostFoundDetailSheet({
           </div>
         ) : (
           <p style={{
-            margin: '0 0 14px', fontSize: 14, lineHeight: 1.55, color: 'var(--text-secondary)',
+            margin: '0 0 14px', fontSize: 'calc(14px * var(--text-scale))', lineHeight: 1.55, color: 'var(--text-secondary)',
             whiteSpace: 'pre-wrap',
           }}>{item.description}</p>
         )}
@@ -863,18 +863,18 @@ export function LostFoundDetailSheet({
                 type="button"
                 onClick={() => onOpenStorefront?.(item.user)}
                 style={{
-                  all: 'unset', cursor: onOpenStorefront ? 'pointer' : 'default',
+                  all: 'unset', boxSizing: 'border-box', cursor: onOpenStorefront ? 'pointer' : 'default',
                   flex: 1, minWidth: 0,
                 }}
               >
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
                 }}>
                   <span>{item.user.name}</span>
                   <OnlineBadge isOnline={item.user.isOnline} />
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
                   <MapPin size={11} strokeWidth={1.8} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />
                   {item.lastSeen} · {item.timeAgo}
                 </div>
@@ -882,7 +882,7 @@ export function LostFoundDetailSheet({
               {item.reward && (
                 <span style={{
                   background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
-                  padding: '4px 10px', borderRadius: 999, fontWeight: 600, fontSize: 12,
+                  padding: '4px 10px', borderRadius: 999, fontWeight: 600, fontSize: 'calc(12px * var(--text-scale))',
                 }}>
                   {item.reward}
                 </span>
@@ -891,7 +891,7 @@ export function LostFoundDetailSheet({
 
             <p style={{
               margin: '0 0 12px',
-              fontSize: 13, lineHeight: 1.5,
+              fontSize: 'calc(13px * var(--text-scale))', lineHeight: 1.5,
               color: 'var(--text-secondary)',
               letterSpacing: '-0.005em',
             }}>
@@ -908,7 +908,7 @@ export function LostFoundDetailSheet({
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 10,
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500, textAlign: 'center',
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, textAlign: 'center',
           }}>{saveError}</div>
         )}
 
@@ -941,7 +941,7 @@ export function LostFoundDetailSheet({
                     background: 'var(--bg-surface)', color: 'var(--text-primary)',
                     border: '1px solid var(--border-default)',
                     cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 14, fontWeight: 600,
+                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
@@ -958,7 +958,7 @@ export function LostFoundDetailSheet({
                     background: 'var(--text-primary)', color: 'var(--bg-base)',
                     border: 'none',
                     cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 14, fontWeight: 600,
+                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
@@ -977,7 +977,7 @@ export function LostFoundDetailSheet({
                   flex: 1, height: 48, padding: '0 18px', borderRadius: 14,
                   background: 'transparent', color: 'var(--accent-rose)',
                   border: '1px solid var(--accent-rose)', cursor: 'pointer',
-                  fontSize: 14, fontWeight: 600,
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >
@@ -1008,7 +1008,7 @@ export function LostFoundDetailSheet({
                       height: 48, borderRadius: 14,
                       background: 'var(--text-primary)', color: 'var(--bg-base)',
                       border: 'none', cursor: 'pointer',
-                      fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                      fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -1021,7 +1021,7 @@ export function LostFoundDetailSheet({
                 <p style={{
                   margin: 0, padding: 12,
                   background: 'var(--bg-inset)', borderRadius: 12,
-                  fontSize: 12, color: 'var(--text-muted)',
+                  fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
                   width: '100%',
                 }}>
                   This reporter hasn't enabled any contact channel yet.
@@ -1048,7 +1048,7 @@ export function LostFoundDetailSheet({
                     background: isWa ? WA_FILL : 'var(--text-primary)',
                     color: isWa ? WA_INK : 'var(--bg-base)',
                     border: 'none', cursor: 'pointer',
-                    fontSize: 14, fontWeight: 600,
+                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                     letterSpacing: '-0.01em',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}
@@ -1090,7 +1090,7 @@ function LFEditField({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <span style={{
         display: 'inline-flex', alignItems: 'center',
-        fontSize: 11, fontWeight: 700,
+        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
         letterSpacing: '0.08em', textTransform: 'uppercase',
         color: 'var(--text-secondary)',
       }}>{label}</span>

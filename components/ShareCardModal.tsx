@@ -207,7 +207,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
             display: 'flex', flexDirection: 'column', gap: 16,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
                 Share card
               </span>
               <Dialog.Close asChild>
@@ -243,7 +243,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
                   position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
                   background: 'rgba(12,14,18,0.86)', color: '#fff',
                   padding: '8px 14px', borderRadius: 999,
-                  fontSize: 12.5, fontWeight: 600,
+                  fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 600,
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   whiteSpace: 'nowrap',
                 }}>
@@ -283,7 +283,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
                         background: on ? 'var(--text-primary)' : 'var(--bg-inset)',
                         color: on ? '#fff' : 'var(--text-secondary)',
                         border: 'none',
-                        fontSize: 13, fontWeight: 600,
+                        fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
                         transition: 'background 160ms',
                       }}
                     >
@@ -311,7 +311,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
                 style={{
                   flex: 1, height: 50, borderRadius: 14, border: 'none',
                   background: 'var(--accent-lime, #C4F649)', color: '#0C1B0C',
-                  fontSize: 14.5, fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
+                  fontSize: 'calc(14.5px * var(--text-scale))', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   opacity: busy ? 0.6 : 1,
                 }}

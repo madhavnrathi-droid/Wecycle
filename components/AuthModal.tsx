@@ -778,7 +778,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                       borderRadius: 8,
                       border: 'none',
                       cursor: 'pointer',
-                      fontSize: 13,
+                      fontSize: 'calc(13px * var(--text-scale))',
                       fontWeight: 600,
                       transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
                       background: mode === m ? 'var(--bg-surface)' : 'transparent',
@@ -792,7 +792,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
               </div>
             )}
 
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               {resetting
                 ? 'Enter your Manipal email and we’ll send a code. Once it’s confirmed you can pick a new password.'
                 : mode === 'signin'
@@ -817,7 +817,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 }}>
                   <GraduationCap size={16} strokeWidth={1.9} />
                 </span>
-                <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
                   <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Manipal students &amp; staff only.</strong>{' '}
                   Sign up with your Manipal address — <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@learner.manipal.edu</span>{' '}
                   or <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@manipal.edu</span>. Personal
@@ -941,7 +941,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                       className="form-input"
                       value={emailDomain}
                       onChange={e => changeDomain(e.target.value as ManipalDomain)}
-                      style={{ width: 'auto', maxWidth: '100%', fontSize: 12, padding: '6px 8px', height: 'auto' }}
+                      style={{ width: 'auto', maxWidth: '100%', fontSize: 'calc(12px * var(--text-scale))', padding: '6px 8px', height: 'auto' }}
                     >
                       <option value={LEARNER_DOMAIN}>@{LEARNER_DOMAIN} · student</option>
                       <option value={FACULTY_DOMAIN}>@{FACULTY_DOMAIN} · faculty</option>
@@ -1022,7 +1022,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                         border: 'none', cursor: 'pointer',
                         borderRadius: 999, padding: '6px 11px',
                         background: 'var(--bg-inset)', color: 'var(--text-secondary)',
-                        fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em',
+                        fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                       }}
                     >
@@ -1101,7 +1101,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                     style={{
                       alignSelf: 'flex-start', marginTop: 6,
                       background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                      fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
+                      fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
                       textDecoration: 'underline', textDecorationStyle: 'dotted',
                       fontFamily: 'inherit',
                     }}
@@ -1139,7 +1139,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                     display: 'inline-flex', alignItems: 'center',
                     padding: '0 12px', borderRadius: 'var(--radius-md)',
                     background: 'var(--bg-inset)', border: '1px solid var(--border-default)',
-                    fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
                     whiteSpace: 'nowrap',
                   }}>
                     +91
@@ -1190,7 +1190,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   style={{ marginTop: 2, accentColor: 'var(--color-lime, #5C7A00)', flexShrink: 0 }}
                   required
                 />
-                <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
                   <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                     I’ve checked that{' '}
                     {emailOk && domainOk ? email.trim().toLowerCase() : 'my email above'}{' '}
@@ -1206,7 +1206,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
             {mode === 'signup' && !resetting && (
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10,
-                cursor: 'pointer', fontSize: 12.5, lineHeight: 1.5,
+                cursor: 'pointer', fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5,
                 color: 'var(--text-secondary)',
               }}>
                 <input
@@ -1244,7 +1244,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 type="button"
                 onClick={() => { setResetting(false); setError(null); setInfo(null); }}
                 className="btn btn-ghost"
-                style={{ alignSelf: 'flex-start', fontSize: 13, padding: '6px 10px' }}
+                style={{ alignSelf: 'flex-start', fontSize: 'calc(13px * var(--text-scale))', padding: '6px 10px' }}
               >
                 <ArrowLeft size={13} strokeWidth={1.8} style={{ marginRight: 4, verticalAlign: '-2px' }} />
                 Back to sign in
@@ -1255,7 +1255,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
 
         {step === 'confirm' && (
           <>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               Check{' '}
               <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{email}</span>{' '}
               for the code and enter it below.
@@ -1284,7 +1284,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 }
                 style={{
                   textAlign: 'center',
-                  fontSize: 20, fontWeight: 600,
+                  fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
                   letterSpacing: '0.22em',
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                 }}
@@ -1303,7 +1303,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   setError(null); setInfo(null);
                 }}
                 className="btn btn-ghost"
-                style={{ fontSize: 13, padding: '6px 10px' }}
+                style={{ fontSize: 'calc(13px * var(--text-scale))', padding: '6px 10px' }}
               >
                 <ArrowLeft size={13} strokeWidth={1.8} style={{ marginRight: 4, verticalAlign: '-2px' }} />
                 Change email
@@ -1315,7 +1315,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 disabled={resendSecs > 0 || submitting}
                 className="btn btn-ghost"
                 style={{
-                  fontSize: 13, padding: '6px 10px',
+                  fontSize: 'calc(13px * var(--text-scale))', padding: '6px 10px',
                   opacity: resendSecs > 0 ? 0.6 : 1,
                   cursor: resendSecs > 0 ? 'not-allowed' : 'pointer',
                 }}
@@ -1335,14 +1335,14 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 background: 'var(--bg-inset)', lineHeight: 1.55,
               }}>
                 <p style={{
-                  margin: '0 0 6px', fontSize: 13, fontWeight: 600,
+                  margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
                   color: 'var(--text-primary)',
                   display: 'flex', alignItems: 'center', gap: 6,
                 }}>
                   <MailWarning size={14} strokeWidth={2} aria-hidden="true" />
                   Still no code?
                 </p>
-                <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--text-muted)' }}>
+                <p style={{ margin: '0 0 8px', fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)' }}>
                   Check your spam or Junk folder first — campus mail often files it there.
                   {pending === 'reset'
                     /* Don't assert the mailbox is at fault here. On a reset the
@@ -1354,7 +1354,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 </p>
                 <ul style={{
                   margin: '0 0 10px', paddingLeft: 18,
-                  fontSize: 12.5, color: 'var(--text-muted)',
+                  fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)',
                 }}>
                   {pending === 'reset' && (
                     <li style={{ marginBottom: 3 }}>
@@ -1388,7 +1388,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                         background: 'none', border: 'none', padding: 0, cursor: 'pointer',
                         fontFamily: 'inherit',
                         display: 'inline-flex', alignItems: 'center', gap: 6,
-                        fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
+                        fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
                         textDecoration: 'underline', textDecorationStyle: 'dotted',
                       }}
                     >
@@ -1408,7 +1408,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                     )}`}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 6,
-                      fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
+                      fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
                       textDecoration: 'underline', textDecorationStyle: 'dotted',
                     }}
                   >
@@ -1423,7 +1423,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
 
         {step === 'newpassword' && (
           <>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               Pick a password for{' '}
               <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{email}</span>.
               You&apos;ll use it to sign in from now on.
@@ -1471,7 +1471,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
             background: 'rgba(34,197,94,0.10)',
             border: '1px solid rgba(34,197,94,0.22)',
             color: '#16A34A',
-            fontSize: 12, fontWeight: 500, lineHeight: 1.45,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
           }}>
             {info}
           </div>
@@ -1482,7 +1482,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
             background: 'rgba(237,46,80,0.10)',
             border: '1px solid rgba(237,46,80,0.22)',
             color: 'var(--accent-rose)',
-            fontSize: 12, fontWeight: 500, lineHeight: 1.45,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
           }}>
             {error}
           </div>
@@ -1501,7 +1501,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
             borderRadius: 999,
             background: 'var(--bg-inset)',
             color: 'var(--text-secondary)',
-            fontSize: 12, fontWeight: 600,
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600,
             textDecoration: 'none',
           }}
         >

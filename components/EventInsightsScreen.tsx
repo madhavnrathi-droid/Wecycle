@@ -126,11 +126,11 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
             Insights
           </h1>
           <p style={{
-            margin: '1px 0 0', fontSize: 12, color: 'var(--text-muted)',
+            margin: '1px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {event.title}
@@ -146,7 +146,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
               background: 'var(--bg-inset)',
               border: 'none',
               borderRadius: 999, cursor: 'pointer',
-              fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
+              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
             }}
           >
             <Download size={13} strokeWidth={2} /> CSV
@@ -192,7 +192,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
         </div>
 
         {!loaded ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))' }}>
             Loading insights…
           </div>
         ) : tab === 'attendees' ? (
@@ -213,7 +213,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
               ))}
             </div>
             {responses.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))' }}>
                 No responses yet — they&rsquo;ll appear here the moment someone registers.
               </div>
             ) : view === 'summary' ? (
@@ -255,9 +255,9 @@ function StatTile({ icon, value, label }: { icon: React.ReactNode; value: number
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', marginBottom: 6 }}>
         {icon}
-        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</span>
+        <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ fontSize: 'calc(22px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
         {value.toLocaleString('en-IN')}
       </div>
     </div>
@@ -269,7 +269,7 @@ function StatTile({ icon, value, label }: { icon: React.ReactNode; value: number
 function AttendeeList({ attendees, onOpenUser }: { attendees: EventAttendee[]; onOpenUser?: (u: User) => void }) {
   if (!attendees.length) {
     return (
-      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))' }}>
         No RSVPs yet — share the event to get the word out.
       </div>
     );
@@ -302,15 +302,15 @@ function AttendeeList({ attendees, onOpenUser }: { attendees: EventAttendee[]; o
             <img src={getAvatar(a.user.id)} alt="" width={36} height={36} draggable={false} />
           </span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <span style={{ display: 'block', fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
               {a.user.name}
             </span>
-            <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)' }}>
+            <span style={{ display: 'block', fontSize: 'calc(11.5px * var(--text-scale))', color: 'var(--text-muted)' }}>
               {a.user.role ? `${a.user.role} · ` : ''}RSVP&rsquo;d {formatWhen(a.rsvpedAt)}
             </span>
           </span>
           <span style={{
-            fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+            fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
             color: '#16A34A', background: 'rgba(34,197,94,0.12)',
             padding: '3px 8px', borderRadius: 999, flexShrink: 0,
           }}>
@@ -378,11 +378,11 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
       boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-        <span aria-hidden="true" style={{ fontSize: 13 }}>{meta.icon}</span>
-        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <span aria-hidden="true" style={{ fontSize: 'calc(13px * var(--text-scale))' }}>{meta.icon}</span>
+        <span style={{ flex: 1, fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
           {field.label || meta.label}
         </span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+        <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
           {answered.length} answer{answered.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -393,7 +393,7 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
             const pct = answered.length ? Math.round((n / answered.length) * 100) : 0;
             return (
               <div key={opt}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'calc(12px * var(--text-scale))', marginBottom: 3 }}>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{opt}</span>
                   <span style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{n} · {pct}%</span>
                 </div>
@@ -416,14 +416,14 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
             {(expanded ? answered : answered.slice(0, 5)).map(r => (
               <div key={r.id} style={{
                 padding: '8px 10px', borderRadius: 10,
-                background: 'var(--bg-inset)', fontSize: 12.5, lineHeight: 1.45,
+                background: 'var(--bg-inset)', fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.45,
               }}>
                 <span style={{ color: 'var(--text-primary)' }}>{String(r.answers[field.id])}</span>
                 <span style={{ color: 'var(--text-muted)' }}> — {r.user.name}</span>
               </div>
             ))}
             {answered.length === 0 && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No answers yet.</span>
+              <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>No answers yet.</span>
             )}
           </div>
           {answered.length > 5 && (
@@ -433,7 +433,7 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
               style={{
                 marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
                 background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'inherit',
+                fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'inherit',
               }}
             >
               <ChevronDown size={13} strokeWidth={2} style={{ transform: expanded ? 'rotate(180deg)' : undefined }} />
@@ -457,7 +457,7 @@ function FileAnswerList({ field, responses }: { field: FormField; responses: For
     setOpening(null);
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
-  if (!responses.length) return <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No files yet.</span>;
+  if (!responses.length) return <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>No files yet.</span>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {responses.map(r => {
@@ -477,12 +477,12 @@ function FileAnswerList({ field, responses }: { field: FormField; responses: For
           >
             <Paperclip size={13} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             <span style={{
-              flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 500, color: 'var(--text-primary)',
+              flex: 1, minWidth: 0, fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {opening === path ? 'Opening…' : fileAnswerName(path)}
             </span>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{r.user.name}</span>
+            <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>{r.user.name}</span>
           </button>
         );
       })}
@@ -521,8 +521,8 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
                 <img src={getAvatar(r.user.id)} alt="" width={30} height={30} draggable={false} />
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{r.user.name}</span>
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>{r.submittedAt}</span>
+                <span style={{ display: 'block', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{r.user.name}</span>
+                <span style={{ display: 'block', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>{r.submittedAt}</span>
               </span>
             </button>
             {onDelete && (
@@ -547,8 +547,8 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
               const a = r.answers[f.id];
               const empty = a == null || (Array.isArray(a) ? a.length === 0 : a === '');
               return (
-                <div key={f.id} style={{ fontSize: 12.5, lineHeight: 1.45 }}>
-                  <span style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>
+                <div key={f.id} style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.45 }}>
+                  <span style={{ display: 'block', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>
                     {f.label || FIELD_TYPE_META[f.type].label}
                   </span>
                   {empty ? (

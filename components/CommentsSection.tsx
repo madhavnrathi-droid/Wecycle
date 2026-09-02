@@ -207,7 +207,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
     }}>
       <h2 style={{
         margin: '0 0 14px',
-        fontSize: 14, fontWeight: 600,
+        fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
         color: 'var(--text-primary)',
         letterSpacing: '-0.01em',
         display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -217,7 +217,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
       </h2>
 
       {tops.length === 0 ? (
-        <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--text-muted)' }}>
+        <p style={{ margin: '0 0 14px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
           No comments yet — be the first to start the conversation.
         </p>
       ) : (
@@ -265,7 +265,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
             padding: '4px 10px', marginBottom: 8,
             background: 'var(--bg-inset)',
             borderRadius: 999,
-            fontSize: 11, color: 'var(--text-secondary)',
+            fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-secondary)',
           }}>
             <CornerDownRight size={11} strokeWidth={2} />
             Replying to <strong style={{ color: 'var(--text-primary)' }}>{replyTo.author.name}</strong>
@@ -275,7 +275,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 color: 'var(--text-muted)', padding: 0, marginLeft: 4,
-                fontSize: 11, fontWeight: 600,
+                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
               }}
             >
               Cancel
@@ -307,7 +307,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
               <div style={{
                 width: '100%', height: '100%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontSize: 12, fontWeight: 700,
+                color: '#fff', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 700,
               }}>?</div>
             )}
           </div>
@@ -321,8 +321,8 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
             placeholder={user ? 'Add a comment…' : 'Sign in to comment'}
             rows={1}
             style={{
-              all: 'unset', flex: 1, minWidth: 0,
-              fontSize: 14, lineHeight: 1.45,
+              all: 'unset', boxSizing: 'border-box', flex: 1, minWidth: 0,
+              fontSize: 'calc(14px * var(--text-scale))', lineHeight: 1.45,
               color: 'var(--text-primary)',
               fontFamily: 'inherit',
               resize: 'none',
@@ -337,7 +337,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
             disabled={!draft.trim()}
             aria-label="Post comment"
             style={{
-              all: 'unset', cursor: draft.trim() ? 'pointer' : 'not-allowed',
+              all: 'unset', boxSizing: 'border-box', cursor: draft.trim() ? 'pointer' : 'not-allowed',
               width: 34, height: 34, borderRadius: '50%',
               background: draft.trim() ? 'var(--text-primary)' : 'var(--bg-inset)',
               color: draft.trim() ? 'var(--bg-base)' : 'var(--text-muted)',
@@ -351,7 +351,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
         {postError && (
           <p role="alert" style={{
             margin: '8px 4px 0',
-            fontSize: 12.5,
+            fontSize: 'calc(12.5px * var(--text-scale))',
             lineHeight: 1.45,
             color: 'var(--accent-rose)',
           }}>
@@ -360,7 +360,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
         )}
 
         <p style={{
-          margin: '8px 4px 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.45,
+          margin: '8px 4px 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.45,
         }}>
           Your name + photo show next to every comment — anonymous posts aren't allowed for safety.
         </p>
@@ -404,7 +404,7 @@ function CommentRow({
         onClick={av}
         aria-label={`View ${comment.author.name}'s profile`}
         style={{
-          all: 'unset', cursor: av ? 'pointer' : 'default',
+          all: 'unset', boxSizing: 'border-box', cursor: av ? 'pointer' : 'default',
           width: compact ? 26 : 30, height: compact ? 26 : 30,
           borderRadius: '50%', overflow: 'hidden',
           background: comment.author.color,
@@ -427,24 +427,24 @@ function CommentRow({
             type="button"
             onClick={av}
             style={{
-              all: 'unset', cursor: av ? 'pointer' : 'default',
-              fontSize: compact ? 12 : 13, fontWeight: 600,
+              all: 'unset', boxSizing: 'border-box', cursor: av ? 'pointer' : 'default',
+              fontSize: `calc(${compact ? 12 : 13}px * var(--text-scale))`, fontWeight: 600,
               color: 'var(--text-primary)',
               letterSpacing: '-0.01em',
             }}
           >
             {comment.author.name}
           </button>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
             {comment.author.role}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
             · {timeAgo(comment.createdAt)}
           </span>
         </div>
         <p style={{
           margin: '2px 0 0',
-          fontSize: compact ? 13 : 14, lineHeight: 1.45,
+          fontSize: `calc(${compact ? 13 : 14}px * var(--text-scale))`, lineHeight: 1.45,
           color: 'var(--text-secondary)',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
@@ -456,8 +456,8 @@ function CommentRow({
             type="button"
             onClick={() => onReply(comment)}
             style={{
-              all: 'unset', cursor: 'pointer',
-              fontSize: 11, fontWeight: 600,
+              all: 'unset', boxSizing: 'border-box', cursor: 'pointer',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
               color: 'var(--text-muted)',
               letterSpacing: '0.01em',
             }}
@@ -470,8 +470,8 @@ function CommentRow({
               onClick={onDelete}
               aria-label="Admin: delete comment"
               style={{
-                all: 'unset', cursor: 'pointer',
-                fontSize: 11, fontWeight: 600,
+                all: 'unset', boxSizing: 'border-box', cursor: 'pointer',
+                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
                 color: '#ED2E50',
                 display: 'inline-flex', alignItems: 'center', gap: 3,
               }}
@@ -485,7 +485,7 @@ function CommentRow({
               onClick={onReport}
               aria-label="Report comment"
               style={{
-                all: 'unset', cursor: 'pointer',
+                all: 'unset', boxSizing: 'border-box', cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center',
                 color: 'var(--text-muted)',
                 padding: '4px',

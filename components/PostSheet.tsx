@@ -64,7 +64,7 @@ export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
         <div className="modal-header">
           <div style={{ flex: 1 }}>
             <h2 id="post-sheet-title" className="modal-title">Create a post</h2>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
               What would you like to do?
             </p>
           </div>
@@ -92,19 +92,19 @@ export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
                 width: 44, height: 44, borderRadius: 'var(--radius-md)',
                 background: `${opt.color}1A`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22, flexShrink: 0,
+                fontSize: 'calc(22px * var(--text-scale))', flexShrink: 0,
               }} aria-hidden="true">
                 {opt.icon}
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
                   {opt.label}
                 </p>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
+                <p style={{ margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)' }}>
                   {opt.desc}
                 </p>
               </div>
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 18 }}>›</span>
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 'calc(18px * var(--text-scale))' }}>›</span>
             </button>
           ))}
         </div>

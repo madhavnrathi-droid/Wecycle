@@ -669,7 +669,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <span style={{
-          fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
+          fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
           letterSpacing: '-0.01em',
         }}>
           {item.category}
@@ -721,7 +721,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         <span
           aria-current="page"
           style={{
-            fontSize: 14, fontWeight: 600,
+            fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
             color: 'var(--text-primary)',
             letterSpacing: '-0.01em',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -734,7 +734,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         {item.isClosed ? (
           <span style={{
             flexShrink: 0,
-            fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.06em',
             textTransform: 'uppercase',
             color: '#fff', background: 'var(--text-primary)',
             padding: '4px 10px', borderRadius: 999,
@@ -745,7 +745,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           <span style={{
             flexShrink: 0,
             display: 'inline-flex', alignItems: 'center', gap: 1,
-            fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em',
+            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
             color: 'var(--text-primary)',
           }}>
             {isPriced && <IndianRupee size={12} strokeWidth={2.3} />}
@@ -845,7 +845,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             }}
           >
             <ImagePlus size={32} strokeWidth={1.5} />
-            <span style={{ fontSize: 14, fontWeight: 600 }}>+ Add photo</span>
+            <span style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600 }}>+ Add photo</span>
           </button>
         </section>
       ) : null}
@@ -861,7 +861,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           {isOpportunity && (
             <div style={{
               display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
               textTransform: 'uppercase',
               color: '#fff', background: '#8B5CF6',
               padding: '4px 10px', borderRadius: 999,
@@ -944,7 +944,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               marginBottom: 10,
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
               textTransform: 'uppercase',
               color: '#fff', background: '#8B5CF6',
               padding: '4px 10px', borderRadius: 999,
@@ -958,7 +958,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             <h1 style={{
               margin: 0,
-              fontSize: 22, fontWeight: 600,
+              fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.025em',
               color: 'var(--text-primary)',
               lineHeight: 1.2,
@@ -979,14 +979,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13, minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--text-scale))', minWidth: 0, flex: 1 }}>
               <MapPin size={14} strokeWidth={1.8} />
               <span>{item.location}</span>
             </div>
             {item.isClosed ? (
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                fontSize: 13, fontWeight: 800, letterSpacing: '0.06em',
+                fontSize: 'calc(13px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: '#fff', background: 'var(--text-primary)',
                 padding: '6px 14px', borderRadius: 999,
@@ -997,7 +997,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               /* Price — bold black, no bounding box (reads like a real price). */
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 1,
-                fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em',
+                fontSize: 'calc(19px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
                 color: 'var(--text-primary)',
               }}>
                 {isPriced && <IndianRupee size={16} strokeWidth={2.4} />}
@@ -1029,7 +1029,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 never from HTML — the text is member-written. */}
             <LinkedText text={desc} style={{
               margin: 0,
-              fontSize: 14,
+              fontSize: 'calc(14px * var(--text-scale))',
               color: 'var(--text-secondary)',
               lineHeight: 1.55,
               whiteSpace: 'pre-wrap',
@@ -1045,7 +1045,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                   marginTop: 6,
                   background: 'none', border: 'none', padding: 0,
                   cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600,
+                  fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
                   color: 'var(--text-primary)',
                 }}
               >
@@ -1065,7 +1065,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             padding: '8px 12px',
             background: 'var(--bg-inset)',
             borderRadius: 10,
-            fontSize: 12, color: 'var(--text-muted)',
+            fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
             fontStyle: 'italic',
           }}>
             No price set — contact the seller for more info.
@@ -1100,7 +1100,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             overflow: 'hidden',
             background: item.user.color,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 600, fontSize: 13,
+            color: '#fff', fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))',
             flexShrink: 0,
           }}>
             <img
@@ -1114,14 +1114,14 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
             <p style={{
               margin: 0, display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
             }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {item.user.name}
               </span>
               <OnlineBadge isOnline={item.user.isOnline} />
             </p>
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+            <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
               {item.user.role} · View profile
             </p>
           </div>
@@ -1138,7 +1138,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         {ownerContact.email && (
           <p style={{
             margin: '8px 4px 0',
-            fontSize: 12, color: 'var(--text-muted)',
+            fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
             display: 'flex', alignItems: 'center', gap: 6,
             userSelect: 'text',
           }}>
@@ -1188,7 +1188,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 8,
             color: 'var(--accent-rose)',
-            fontSize: 11, fontWeight: 500, textAlign: 'center',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, textAlign: 'center',
           }}>
             {saveError}
           </div>
@@ -1231,7 +1231,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                     background: 'var(--bg-surface)', color: 'var(--text-primary)',
                     border: '1px solid var(--border-default)',
                     cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
@@ -1248,7 +1248,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                     background: 'var(--text-primary)', color: 'var(--bg-base)',
                     border: 'none',
                     cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
@@ -1269,7 +1269,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                     background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
                     color: confirmDelete ? '#fff' : 'var(--accent-rose)',
                     border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
-                    cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                    cursor: 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
@@ -1310,7 +1310,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 background: link.channel === 'whatsapp' ? WA_FILL : 'var(--text-primary)',
                 color: link.channel === 'whatsapp' ? WA_INK : 'var(--bg-base)',
                 border: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: 600,
+                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                 letterSpacing: '-0.01em',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
@@ -1331,7 +1331,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 flex: 1, height: 52, borderRadius: 999,
                 background: 'var(--text-primary)', color: 'var(--bg-base)',
                 border: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
@@ -1349,7 +1349,7 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
                 flex: 1, height: 52, borderRadius: 999,
                 background: 'var(--text-primary)', color: 'var(--bg-base)',
                 border: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
@@ -1530,7 +1530,7 @@ function DesktopLayout({
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         {/* Breadcrumb — always visible */}
-        <span style={{ fontSize: 13, color: 'var(--text-muted)', flexShrink: 0 }}>
+        <span style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
           Marketplace
           <span style={{ margin: '0 6px', opacity: 0.5 }}>›</span>
           <span style={{ color: 'var(--text-secondary)' }}>{item.category}</span>
@@ -1540,7 +1540,7 @@ function DesktopLayout({
           aria-current="page"
           style={{
             flex: 1, minWidth: 0,
-            fontSize: 14, fontWeight: 600,
+            fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
             color: 'var(--text-primary)',
             letterSpacing: '-0.01em',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -1556,7 +1556,7 @@ function DesktopLayout({
             {item.isClosed ? (
               <span style={{
                 flexShrink: 0,
-                fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: '#fff', background: 'var(--text-primary)',
                 padding: '4px 10px', borderRadius: 999,
@@ -1567,7 +1567,7 @@ function DesktopLayout({
               <span style={{
                 flexShrink: 0,
                 display: 'inline-flex', alignItems: 'center', gap: 1,
-                fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em',
+                fontSize: 'calc(16px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
                 color: 'var(--text-primary)',
               }}>
                 {isPriced && <IndianRupee size={13} strokeWidth={2.3} />}
@@ -1686,7 +1686,7 @@ function DesktopLayout({
                       <span style={{
                         position: 'absolute', inset: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'rgba(0,0,0,0.25)', color: '#fff', fontSize: 16,
+                        background: 'rgba(0,0,0,0.25)', color: '#fff', fontSize: 'calc(16px * var(--text-scale))',
                       }} aria-hidden="true">▶</span>
                     )}
                   </div>
@@ -1718,7 +1718,7 @@ function DesktopLayout({
               }}
             >
               <ImagePlus size={36} strokeWidth={1.4} />
-              <span style={{ fontSize: 15, fontWeight: 600 }}>+ Add photo</span>
+              <span style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600 }}>+ Add photo</span>
             </button>
           </div>
         ) : null}
@@ -1743,7 +1743,7 @@ function DesktopLayout({
           {isOpportunity && (
             <div style={{
               display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
               textTransform: 'uppercase',
               color: '#fff', background: '#8B5CF6',
               padding: '4px 10px', borderRadius: 999,
@@ -1764,7 +1764,7 @@ function DesktopLayout({
               display: 'inline-flex', alignSelf: 'flex-start',
               padding: '4px 10px',
               background: 'var(--bg-inset)', borderRadius: 999,
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.02em',
               color: 'var(--text-secondary)',
             }}>
               {item.category}
@@ -1782,7 +1782,7 @@ function DesktopLayout({
           ) : (
             <h1 style={{
               margin: 0,
-              fontSize: 30, fontWeight: 600,
+              fontSize: 'calc(30px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.025em',
               color: 'var(--text-primary)',
               lineHeight: 1.18,
@@ -1794,7 +1794,7 @@ function DesktopLayout({
           <div style={{
             display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 'calc(14px * var(--text-scale))' }}>
               <MapPin size={14} strokeWidth={1.8} />
               {canManage && !isRequestPost ? (
                 <input
@@ -1834,7 +1834,7 @@ function DesktopLayout({
               /* Price — bold black, no bounding box. */
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 2,
-                fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em',
+                fontSize: 'calc(22px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
                 color: 'var(--text-primary)',
               }}>
                 {isPriced && <IndianRupee size={18} strokeWidth={2.4} />}
@@ -1842,7 +1842,7 @@ function DesktopLayout({
               </div>
             )}
             {canManage && isRequestPost && (
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)' }}>
                 <input type="checkbox" checked={eUrgent} onChange={e => setEUrgent(e.target.checked)} />
                 Urgent
               </label>
@@ -1853,7 +1853,7 @@ function DesktopLayout({
             <div>
               <h2 style={{
                 margin: '0 0 8px',
-                fontSize: 11, fontWeight: 700,
+                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
                 letterSpacing: '0.08em', textTransform: 'uppercase',
                 color: 'var(--text-secondary)',
               }}>{isOpportunity ? 'About this opportunity' : 'About this item'}</h2>
@@ -1870,7 +1870,7 @@ function DesktopLayout({
                 <>
                   <LinkedText text={desc} style={{
                     margin: 0,
-                    fontSize: 15,
+                    fontSize: 'calc(15px * var(--text-scale))',
                     color: 'var(--text-secondary)',
                     lineHeight: 1.6,
                     whiteSpace: 'pre-wrap',
@@ -1886,7 +1886,7 @@ function DesktopLayout({
                         marginTop: 6,
                         background: 'none', border: 'none', padding: 0,
                         cursor: 'pointer',
-                        fontSize: 13, fontWeight: 600,
+                        fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
                         color: 'var(--text-primary)',
                       }}
                     >
@@ -1909,7 +1909,7 @@ function DesktopLayout({
             onClick={() => onOpenStorefront?.(item.user)}
             aria-label={`View ${item.user.name}'s profile`}
             style={{
-              all: 'unset', cursor: onOpenStorefront ? 'pointer' : 'default',
+              all: 'unset', boxSizing: 'border-box', cursor: onOpenStorefront ? 'pointer' : 'default',
               display: 'flex', alignItems: 'center', gap: 14,
               padding: '14px 16px',
               background: 'var(--bg-card)',
@@ -1933,14 +1933,14 @@ function DesktopLayout({
             <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
               <p style={{
                 margin: 0, display: 'flex', alignItems: 'center', gap: 8,
-                fontSize: 15, fontWeight: 600, color: 'var(--text-primary)',
+                fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
               }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.user.name}
                 </span>
                 <OnlineBadge isOnline={item.user.isOnline} />
               </p>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+              <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
                 {item.user.role} · View profile
               </p>
             </div>
@@ -1956,7 +1956,7 @@ function DesktopLayout({
               border: '1px solid rgba(237,46,80,0.25)',
               borderRadius: 10,
               color: 'var(--accent-rose)',
-              fontSize: 12, fontWeight: 500,
+              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
             }}>{saveError}</div>
           )}
           <div style={{
@@ -1974,7 +1974,7 @@ function DesktopLayout({
                       flex: '0 0 auto', height: 52, padding: '0 14px', borderRadius: 14,
                       background: 'var(--bg-surface)', color: 'var(--text-secondary)',
                       border: '1px solid var(--border-subtle)',
-                      cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600,
+                      cursor: saving ? 'not-allowed' : 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                     }}
                   >
@@ -1988,7 +1988,7 @@ function DesktopLayout({
                       flex: 1, minWidth: 140, height: 52, borderRadius: 14,
                       background: 'var(--bg-surface)', color: 'var(--text-primary)',
                       border: '1px solid var(--border-default)',
-                      cursor: saving ? 'wait' : 'pointer', fontSize: 15, fontWeight: 600,
+                      cursor: saving ? 'wait' : 'pointer', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -2004,7 +2004,7 @@ function DesktopLayout({
                       flex: 1, minWidth: 140, height: 52, borderRadius: 14,
                       background: 'var(--text-primary)', color: 'var(--bg-base)',
                       border: 'none',
-                      cursor: saving ? 'wait' : 'pointer', fontSize: 15, fontWeight: 600,
+                      cursor: saving ? 'wait' : 'pointer', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -2024,7 +2024,7 @@ function DesktopLayout({
                       flex: 1, height: 52, padding: '0 18px', borderRadius: 14,
                       background: 'transparent', color: 'var(--accent-rose)',
                       border: '1px solid var(--accent-rose)', cursor: 'pointer',
-                      fontSize: 15, fontWeight: 600,
+                      fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -2040,7 +2040,7 @@ function DesktopLayout({
                   flex: 1, height: 52, borderRadius: 14,
                   background: 'var(--text-primary)', color: 'var(--bg-base)',
                   border: 'none', cursor: 'pointer',
-                  fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+                  fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >
@@ -2058,7 +2058,7 @@ function DesktopLayout({
                       background: link.channel === 'whatsapp' ? WA_FILL : 'var(--text-primary)',
                       color: link.channel === 'whatsapp' ? WA_INK : 'var(--bg-base)',
                       border: 'none', cursor: 'pointer',
-                      fontSize: 15, fontWeight: 600,
+                      fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
                       letterSpacing: '-0.01em',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
@@ -2075,7 +2075,7 @@ function DesktopLayout({
                       flex: 1, height: 52, borderRadius: 14,
                       background: 'var(--text-primary)', color: 'var(--bg-base)',
                       border: 'none', cursor: 'pointer',
-                      fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+                      fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -2091,7 +2091,7 @@ function DesktopLayout({
                       flex: 1, height: 52, borderRadius: 14,
                       background: 'var(--text-primary)', color: 'var(--bg-base)',
                       border: 'none', cursor: 'pointer',
-                      fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+                      fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -2210,7 +2210,7 @@ function EditFieldRow({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 11, fontWeight: 700,
+        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
         letterSpacing: '0.08em', textTransform: 'uppercase',
         color: 'var(--text-secondary)',
       }}>

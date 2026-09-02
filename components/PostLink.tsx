@@ -32,7 +32,7 @@ export function LinkChip({ url, onOpen }: { url: string; onOpen?: () => void }) 
         background: 'var(--bg-inset)',
         color: 'var(--text-primary)',
         textDecoration: 'none',
-        fontSize: 13, fontWeight: 600,
+        fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
         letterSpacing: '-0.01em',
       }}
     >
@@ -87,7 +87,7 @@ export function PhotoLinkBadge({ url }: { url: string }) {
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
         color: '#FFFFFF',
-        fontSize: 11.5, fontWeight: 600, letterSpacing: '-0.01em',
+        fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
         pointerEvents: 'none',
       }}
     >

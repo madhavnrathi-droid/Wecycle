@@ -499,7 +499,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
         <div role="alert" style={{
           marginTop: 8, padding: '8px 12px', borderRadius: 10,
           background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose)',
-          fontSize: 12, fontWeight: 500,
+          fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
         }}>
           {error}
         </div>
@@ -515,17 +515,17 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
               <Camera size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div>Camera</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Take a photo or record a video right now</div>
+                <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>Take a photo or record a video right now</div>
               </div>
             </button>
             <button type="button" className="photo-source-option" onClick={openLibrary}>
               <ImagePlus size={20} strokeWidth={1.8} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div>Upload from library</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pick {allowVideo ? 'photos or a video' : 'photos'} you've already saved</div>
+                <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>Pick {allowVideo ? 'photos or a video' : 'photos'} you've already saved</div>
               </div>
             </button>
-            <p style={{ margin: '6px 12px 0', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
+            <p style={{ margin: '6px 12px 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
               {allowVideo
                 ? 'Photo or video must be under 5 MB. We compress on upload to save your data.'
                 : 'Photos must be under 5 MB each. We compress on upload to save your data.'}

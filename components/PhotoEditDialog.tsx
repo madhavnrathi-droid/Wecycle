@@ -147,7 +147,7 @@ export default function PhotoEditDialog({
 
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
               Edit photos
             </span>
             <button
@@ -179,7 +179,7 @@ export default function PhotoEditDialog({
               border: '1px solid rgba(237,46,80,0.25)',
               borderRadius: 10,
               color: 'var(--accent-rose)',
-              fontSize: 12, fontWeight: 500,
+              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
             }}>{error}</div>
           )}
 
@@ -194,7 +194,7 @@ export default function PhotoEditDialog({
                 background: 'var(--bg-surface)', color: 'var(--text-secondary)',
                 border: '1px solid var(--border-subtle)',
                 cursor: saving ? 'not-allowed' : 'pointer',
-                fontSize: 14, fontWeight: 600,
+                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
               }}
             >
               Cancel
@@ -208,7 +208,7 @@ export default function PhotoEditDialog({
                 background: 'var(--text-primary)', color: 'var(--bg-base)',
                 border: 'none',
                 cursor: saving ? 'wait' : 'pointer',
-                fontSize: 14, fontWeight: 600,
+                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >

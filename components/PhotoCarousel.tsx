@@ -465,7 +465,7 @@ export function PhotoViewer({
               position: 'absolute',
               bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
               left: '50%', transform: 'translateX(-50%)',
-              color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600,
+              color: 'rgba(255,255,255,0.8)', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '0.02em',
             }}
           >

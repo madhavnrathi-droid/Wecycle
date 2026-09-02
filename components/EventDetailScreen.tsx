@@ -398,7 +398,7 @@ export default function EventDetailScreen({
         </button>
         <span style={{
           flex: 1, textAlign: 'center',
-          fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
+          fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
           letterSpacing: '-0.01em',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           padding: '0 12px',
@@ -475,7 +475,7 @@ export default function EventDetailScreen({
                       backdropFilter: 'blur(8px)',
                       borderRadius: 999,
                       padding: '5px 11px',
-                      fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
+                      fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '-0.01em',
                       zIndex: 4,
                     }}>
                       {eventTypeText(event.eventType)}
@@ -496,7 +496,7 @@ export default function EventDetailScreen({
                         position: 'absolute', top: 60, right: 14,
                         background: '#22C55E', color: '#fff',
                         borderRadius: 999, padding: '5px 11px',
-                        fontSize: 11, fontWeight: 600,
+                        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         zIndex: 4,
                       }}>
@@ -549,7 +549,7 @@ export default function EventDetailScreen({
               }}
             >
               <ImagePlus size={32} strokeWidth={1.5} />
-              <span style={{ fontSize: 14, fontWeight: 600 }}>+ Add photo</span>
+              <span style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600 }}>+ Add photo</span>
             </button>
           </section>
         ) : null}
@@ -563,7 +563,7 @@ export default function EventDetailScreen({
               border: '1px solid rgba(237,46,80,0.25)',
               borderRadius: 8,
               color: 'var(--accent-rose)',
-              fontSize: 11, fontWeight: 500, textAlign: 'center',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, textAlign: 'center',
             }}>{saveError}</div>
           )}
         <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto', flexWrap: 'wrap' }}>
@@ -599,7 +599,7 @@ export default function EventDetailScreen({
                     background: 'var(--text-primary)', color: 'var(--bg-base)',
                     border: 'none',
                     cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}
                 >
@@ -617,7 +617,7 @@ export default function EventDetailScreen({
                       flex: 1, minWidth: 130, height: 52, padding: '0 16px', borderRadius: 999,
                       background: 'var(--text-primary)', color: 'var(--bg-base)',
                       border: 'none', cursor: 'pointer',
-                      fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+                      fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -675,7 +675,7 @@ export default function EventDetailScreen({
               border: isRsvpd ? '1px solid var(--border-default)' : 'none',
               boxShadow: isRsvpd ? 'none' : '0 6px 20px rgba(139, 92, 246, 0.34)',
               cursor: 'pointer',
-              fontSize: 14, fontWeight: 600,
+              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.01em',
             }}
           >
@@ -782,7 +782,7 @@ export default function EventDetailScreen({
             style={{
               alignSelf: 'center',
               background: 'none', border: 'none', padding: '2px 4px',
-              cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600,
               color: 'var(--text-secondary)', fontFamily: 'inherit',
               textDecoration: 'underline', textDecorationStyle: 'dotted',
               pointerEvents: 'auto',
@@ -884,7 +884,7 @@ export default function EventDetailScreen({
               )}
             </div>
             {durationLabel(eSched) && (
-              <p aria-live="polite" style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-secondary, #6B6B60)' }}>
+              <p aria-live="polite" style={{ margin: '2px 0 0', fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-secondary, #6B6B60)' }}>
                 {durationLabel(eSched)}
               </p>
             )}
@@ -916,7 +916,7 @@ export default function EventDetailScreen({
           <>
             <h1 style={{
               margin: 0,
-              fontSize: 22, fontWeight: 600,
+              fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.025em',
               color: 'var(--text-primary)',
               lineHeight: 1.2,
@@ -990,7 +990,7 @@ export default function EventDetailScreen({
           <>
             <h3 style={{
               margin: '0 0 10px',
-              fontSize: 11, fontWeight: 700,
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
               letterSpacing: '0.08em', textTransform: 'uppercase',
               color: 'var(--text-muted)',
             }}>
@@ -998,7 +998,7 @@ export default function EventDetailScreen({
             </h3>
             <p style={{
               margin: 0,
-              fontSize: 14, color: 'var(--text-secondary)',
+              fontSize: 'calc(14px * var(--text-scale))', color: 'var(--text-secondary)',
               lineHeight: 1.6,
               whiteSpace: 'pre-wrap',
               display: shouldClamp && !expanded ? '-webkit-box' : 'block',
@@ -1015,7 +1015,7 @@ export default function EventDetailScreen({
                   marginTop: 6,
                   background: 'none', border: 'none', padding: 0,
                   cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600,
+                  fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
                   color: 'var(--text-primary)',
                 }}
               >
@@ -1031,7 +1031,7 @@ export default function EventDetailScreen({
         <section style={{ padding: '20px 20px 0' }}>
           <h3 style={{
             margin: '0 0 10px',
-            fontSize: 11, fontWeight: 700,
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
             letterSpacing: '0.08em', textTransform: 'uppercase',
             color: 'var(--text-muted)',
           }}>
@@ -1047,7 +1047,7 @@ export default function EventDetailScreen({
                   color: 'var(--text-secondary)',
                   padding: '4px 10px',
                   borderRadius: 999,
-                  fontSize: 11, fontWeight: 500,
+                  fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
                 }}
               >
                 <Tag size={9} strokeWidth={2} />
@@ -1062,7 +1062,7 @@ export default function EventDetailScreen({
       <section style={{ padding: '24px 20px 0' }}>
         <h3 style={{
           margin: '0 0 10px',
-          fontSize: 11, fontWeight: 700,
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
           letterSpacing: '0.08em', textTransform: 'uppercase',
           color: 'var(--text-muted)',
         }}>
@@ -1099,14 +1099,14 @@ export default function EventDetailScreen({
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
             <p style={{
               margin: 0, display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
             }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {event.organizer.name}
               </span>
               <OnlineBadge isOnline={event.organizer.isOnline} />
             </p>
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+            <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
               {event.organizer.role} · View profile
             </p>
           </div>
@@ -1171,7 +1171,7 @@ function EventEditField({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 11, fontWeight: 700,
+        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
         letterSpacing: '0.08em', textTransform: 'uppercase',
         color: 'var(--text-secondary)',
       }}>
@@ -1196,10 +1196,10 @@ function FactRow({
       }}>
         {icon}
       </span>
-      <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)', fontWeight: trailing ? 500 : 500 }}>
+      <span style={{ flex: 1, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-primary)', fontWeight: trailing ? 500 : 500 }}>
         {label}
       </span>
-      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+      <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
         {value}
       </span>
     </div>

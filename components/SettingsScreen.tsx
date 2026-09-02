@@ -198,7 +198,7 @@ export default function SettingsScreen({
         </button>
         <h1 style={{
           margin: 0, flex: 1, textAlign: 'center',
-          fontSize: 16, fontWeight: 600,
+          fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600,
           letterSpacing: '-0.02em', color: 'var(--text-primary)',
         }}>
           Settings
@@ -297,7 +297,7 @@ export default function SettingsScreen({
           {blockedUsers.length === 0 ? (
             <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <UserX size={15} strokeWidth={1.8} color="var(--text-muted)" />
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
                 You haven&rsquo;t blocked anyone.
               </span>
             </div>
@@ -447,12 +447,12 @@ export default function SettingsScreen({
         <Card>
           <div style={{ padding: '14px 16px' }}>
             <p style={{
-              margin: '0 0 8px', fontSize: 13, fontWeight: 600,
+              margin: '0 0 8px', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
               color: 'var(--accent-rose)', letterSpacing: '-0.01em',
             }}>
               Danger zone
             </p>
-            <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
               Deleting your account removes your listings, RSVPs, and saved alerts.
               You can't undo this.
             </p>
@@ -494,14 +494,14 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     <section style={{ padding: '4px 20px 18px' }}>
       <div style={{ marginBottom: 10 }}>
         <h3 style={{
-          margin: 0, fontSize: 11, fontWeight: 700,
+          margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
           letterSpacing: '0.08em', textTransform: 'uppercase',
           color: 'var(--text-secondary)',
         }}>
           {title}
         </h3>
         {hint && (
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
             {hint}
           </p>
         )}
@@ -541,14 +541,14 @@ function Row({ label, hint, icon, children }: {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
+          fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
           letterSpacing: '-0.01em',
         }}>
           {icon}
           {label}
         </div>
         {hint && (
-          <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+          <p style={{ margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.35 }}>
             {hint}
           </p>
         )}
@@ -565,7 +565,7 @@ function LinkCard({ icon, title, subtitle, onClick }: {
     <button
       onClick={onClick}
       style={{
-        all: 'unset', cursor: 'pointer', width: '100%',
+        all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%',
         background: 'var(--bg-card)',
         border: '1px solid var(--border-default)',
         borderRadius: 16, padding: '14px 16px',
@@ -581,11 +581,11 @@ function LinkCard({ icon, title, subtitle, onClick }: {
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
           {title}
         </div>
         {subtitle && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>
             {subtitle}
           </div>
         )}
@@ -609,7 +609,7 @@ export function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: 
       disabled={disabled}
       onClick={() => !disabled && onChange(!on)}
       style={{
-        all: 'unset', cursor: disabled ? 'not-allowed' : 'pointer',
+        all: 'unset', boxSizing: 'border-box', cursor: disabled ? 'not-allowed' : 'pointer',
         width: 40, height: 24, borderRadius: 999,
         position: 'relative',
         background: on ? 'var(--text-primary)' : 'var(--border-default)',
@@ -633,7 +633,7 @@ function FooterStamp() {
   return (
     <div style={{
       textAlign: 'center', padding: '20px 20px 30px',
-      fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.01em',
+      fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', letterSpacing: '-0.01em',
     }}>
       Wecycle · v1.0 · Made for circulating resources
     </div>

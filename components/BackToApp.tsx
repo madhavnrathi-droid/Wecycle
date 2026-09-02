@@ -78,7 +78,7 @@ export default function BackToApp() {
         background: 'rgba(92, 122, 0, 0.08)',
         color: '#4A6300',
         textDecoration: 'none',
-        fontSize: 15,
+        fontSize: 'calc(15px * var(--text-scale))',
         fontWeight: 600,
         lineHeight: 1,
         WebkitTapHighlightColor: 'transparent',

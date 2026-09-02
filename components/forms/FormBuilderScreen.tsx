@@ -118,12 +118,12 @@ export default function FormBuilderScreen({
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
             Registration form
           </h1>
           {subtitle && (
             <p style={{
-              margin: '1px 0 0', fontSize: 12, color: 'var(--text-muted)',
+              margin: '1px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {subtitle}
@@ -135,7 +135,7 @@ export default function FormBuilderScreen({
       {/* ── Scrollable canvas ── */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ maxWidth: 620, margin: '0 auto', padding: '20px 20px 140px' }}>
-          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+          <p style={{ margin: '0 0 18px', fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.55 }}>
             People answer these questions when they RSVP — their responses land
             in your event&rsquo;s Insights.
           </p>
@@ -145,7 +145,7 @@ export default function FormBuilderScreen({
               padding: '10px 14px', marginBottom: 16,
               background: 'rgba(245,132,0,0.10)',
               borderRadius: 14,
-              fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-primary)',
+              fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5, color: 'var(--text-primary)',
             }}>
               ⚠️ {responseCount} response{responseCount === 1 ? '' : 's'} already collected.
               Existing answers keep their values — edits apply to future submissions.
@@ -155,7 +155,7 @@ export default function FormBuilderScreen({
           {loading ? (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              padding: '48px 0', color: 'var(--text-muted)', fontSize: 13,
+              padding: '48px 0', color: 'var(--text-muted)', fontSize: 'calc(13px * var(--text-scale))',
             }}>
               <Loader2 size={15} strokeWidth={2.2} className="spin" /> Loading your form…
             </div>
@@ -168,7 +168,7 @@ export default function FormBuilderScreen({
               marginTop: 16, padding: '10px 14px',
               background: 'rgba(237,46,80,0.10)',
               borderRadius: 14,
-              color: 'var(--accent-rose)', fontSize: 12.5, fontWeight: 500,
+              color: 'var(--accent-rose)', fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500,
             }}>
               {error}
             </div>
@@ -212,7 +212,7 @@ export default function FormBuilderScreen({
           )}
           <span style={{
             flex: 1, paddingLeft: onRemove ? 2 : 14,
-            fontSize: 12.5, color: 'var(--text-muted)', fontWeight: 500,
+            fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 500,
           }}>
             {fields.length} question{fields.length === 1 ? '' : 's'}
           </span>
@@ -224,7 +224,7 @@ export default function FormBuilderScreen({
               height: 44, padding: '0 22px', borderRadius: 999,
               background: 'var(--text-primary)', color: 'var(--bg-base)',
               border: 'none', cursor: saving ? 'wait' : 'pointer',
-              fontSize: 13.5, fontWeight: 600, letterSpacing: '-0.01em',
+              fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
               display: 'inline-flex', alignItems: 'center', gap: 7,
               fontFamily: 'inherit',
             }}

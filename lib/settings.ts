@@ -104,8 +104,43 @@ export const DEFAULT_SETTINGS: UserSettings = {
     showPhone: false,
     hideListingsFromSearch: false,
   },
+  /* ── Notification defaults are OPT-IN for anything that leaves the app ──
+   *
+   * These used to arrive with email on, a chime on, and all ten categories
+   * including the weekly digest set to true. Nobody was asked. Signing up was
+   * consent to be emailed about comments, messages, matches, events, lost &
+   * found, marketplace activity and a weekly recap — which is a decision the
+   * member never made, taken on their behalf, in their favour only by
+   * coincidence. That is the definition of the pattern, and the fact that it
+   * was all switchable afterwards is exactly the excuse the pattern relies on.
+   *
+   * The line drawn here is INTERRUPTION, not information:
+   *
+   *   inApp stays ON. It is the Activity tab — a place the member chooses to
+   *   open, not something that arrives. Defaulting it off would ship an app
+   *   whose own activity feed is empty until you find a setting, which is a
+   *   broken app rather than a private one.
+   *
+   *   sound goes OFF. A chime nobody asked for is an interruption.
+   *
+   *   email goes OFF. It reaches them where they live, hours later, and it is
+   *   the channel the pattern was really about. It is now a thing you turn on.
+   *
+   *   digest goes OFF. A weekly recap email is marketing wearing a summary's
+   *   clothes, and it is the one category with no triggering event at all.
+   *
+   * accountSecurity stays on because sign-in and password-change alerts are
+   * transactional — telling someone their account was accessed is not
+   * marketing, and suppressing it by default would be the unsafe choice.
+   *
+   * Existing members are unaffected either way: getSettings() merges stored
+   * values over these, so anyone who already made a choice keeps it, and
+   * anyone who never opened Settings gets the honest default retroactively.
+   *
+   * See the opt-in prompt in NotificationsScreen — the defaults answer "what
+   * happens if we are never asked", the prompt is what does the asking. */
   notifications: {
-    channels: { inApp: true, sound: true, email: true, sms: false },
+    channels: { inApp: true, sound: false, email: false, sms: false },
     categories: {
       comments: true,
       requestReplies: true,
@@ -116,9 +151,11 @@ export const DEFAULT_SETTINGS: UserSettings = {
       marketplace: true,
       community: true,
       accountSecurity: true,
-      digest: true,
+      digest: false,
     },
-    emailFrequency: 'realtime',
+    /* Only meaningful once email is switched on, and 'daily' is the gentler
+       thing to switch on TO. Realtime is one tap away for anyone who wants it. */
+    emailFrequency: 'daily',
     quietHours: { enabled: false, from: '22:00', to: '07:00' },
   },
   data: {
