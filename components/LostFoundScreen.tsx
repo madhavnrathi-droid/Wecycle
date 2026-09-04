@@ -632,7 +632,7 @@ export function LostFoundDetailSheet({
                 <ImagePlus size={36} strokeWidth={1.4} />
                 <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600 }}>+ Add photo</span>
               </button>
-            ) : null}
+            ) : <NoPhoto />}
             {displayPhotoUrl && (
               <span aria-hidden="true" style={{
                 position: 'absolute', top: 14, right: 14, zIndex: 6,
@@ -739,7 +739,16 @@ export function LostFoundDetailSheet({
                 <ImagePlus size={28} strokeWidth={1.5} />
                 <span style={{ fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600 }}>+ Add photo</span>
               </button>
-            ) : null}
+            ) : (
+              /* A viewer with no photo used to get NOTHING here — a bare grey
+                 box, while the card they tapped through from showed the
+                 placeholder. Same post, two different answers to "is there a
+                 picture", and the emptier one appeared on the screen where
+                 someone is deciding whether the wallet is theirs. The owner
+                 still gets the "+ Add photo" affordance above; everyone else
+                 gets the same illustration the card shows. */
+              <NoPhoto />
+            )}
             {displayPhotoUrl && (
               <span aria-hidden="true" style={{
                 position: 'absolute', top: 10, right: 10, zIndex: 6,

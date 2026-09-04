@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { fetchContact } from './liveData';
@@ -108,14 +108,41 @@ function demoToProfile(d: DemoSession): Profile {
   } as unknown as Profile;
 }
 
+/* ── Loading the profile of an account that was created a moment ago ────────
+ *
+ * signUp() hands back a session the instant the auth.users row is written, and
+ * onAuthStateChange fires immediately — so the very first select of the
+ * profiles row is a race it can lose. The row is created by the
+ * handle_new_auth_user trigger, and supabase-js may still be presenting the
+ * previous (anon) token when the request goes out, either of which returns
+ * nothing.
+ *
+ * One miss used to be PERMANENT. The failure path logged and returned without
+ * ever calling setProfile, so `profile` stayed null for the rest of the
+ * session: the member landed on an Account screen with every field blank and
+ * typed their name, college and phone in again — reported as "on sign up my
+ * details didn't appear on my profile, I had to re-enter it". The data was
+ * never lost; checked in production, every signup has its name and college on
+ * both the metadata and the profile row. It just was not read back.
+ *
+ * So: retry, briefly and with backoff. Five attempts over about four seconds
+ * covers the race without hammering a genuinely missing row. */
+const PROFILE_LOAD_ATTEMPTS = 5;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  /* Bumped on every fresh load and on reset, so in-flight retries can tell
+     whether they are still the current request. */
+  const loadGenRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
-
-  const loadRealProfile = async (uid: string) => {
+  const loadRealProfile = async (uid: string, attempt = 0, gen?: number) => {
+    /* Generation guard: a sign-out, or a different user signing in, bumps the
+       counter so any retry still in flight abandons instead of writing a stale
+       profile over the new one. */
+    const myGen = gen ?? ++loadGenRef.current;
     /* email/phone are column-locked at the DB; select every other column
        explicitly (a bare `*` would hit the revoked columns and 400), then
        hydrate the OWN row's contact via the get_contact RPC so the rest of the
@@ -138,9 +165,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        from a signed-in user who simply has no name: the greeting quietly falls
        back to the email local-part and every profile-driven preference reverts
        to its default. Say so, or the next person to hit this has nothing to go on. */
+    if (loadGenRef.current !== myGen) return;   /* superseded while awaiting */
+
     if (!data) {
+      if (attempt + 1 < PROFILE_LOAD_ATTEMPTS) {
+        const delay = 250 * 2 ** attempt;      /* 250ms → 2s, ~3.75s total */
+        setTimeout(() => {
+          if (loadGenRef.current !== myGen) return;
+          void loadRealProfile(uid, attempt + 1, myGen);
+        }, delay);
+        return;
+      }
+      /* Out of attempts. Say so — a silent failure here is indistinguishable
+         from a signed-in member who simply has no name, and every
+         profile-driven preference quietly reverts to its default. */
       // eslint-disable-next-line no-console
-      console.error('[wecycle] profile load failed for', uid, error);
+      console.error('[wecycle] profile load failed for', uid, 'after',
+        PROFILE_LOAD_ATTEMPTS, 'attempts', error);
       return;
     }
     setProfile({
@@ -163,6 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const reset = () => {
+    loadGenRef.current++;   /* abandon any profile retry still pending */
     setIsDemo(false);
     setUser(null);
     setProfile(null);
@@ -198,7 +240,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         setSession(data.session);
         setUser(data.session?.user ?? null);
-        if (data.session?.user) loadRealProfile(data.session.user.id);
+        /* Safe to call directly: this is the getSession() promise, not the
+           onAuthStateChange callback, so no auth lock is held. */
+        if (data.session?.user) void loadRealProfile(data.session.user.id);
         setLoading(false);
       });
     }
@@ -210,7 +254,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
-        loadRealProfile(newSession.user.id);
+        /* Deferred out of the callback ON PURPOSE, not for tidiness.
+         *
+         * supabase-js holds its auth lock for the duration of this callback,
+         * and calling another supabase method from inside it can block on that
+         * lock or go out carrying the previous token. Supabase's own guidance
+         * is to never await other client calls here. This was called inline —
+         * which is the likeliest reason the first profile read after signUp
+         * came back empty, and why a brand-new member saw an Account screen
+         * with every field blank and retyped details that were already saved.
+         *
+         * A zero timeout is enough: it lets the auth event finish and the lock
+         * release before the query is issued. */
+        const uid = newSession.user.id;
+        setTimeout(() => { void loadRealProfile(uid); }, 0);
       } else {
         setProfile(null);
       }
