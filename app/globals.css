@@ -185,6 +185,43 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Double-tap zoom ───────────────────────────────────────────────────────
+ *
+ * "It just keeps hyperzooming into things for no reason with no preceding
+ * action." The app was not scaling anything — checked, no transform runs on
+ * its own. It is the BROWSER's double-tap-to-zoom, which `touch-action: auto`
+ * (the default) reserves on every element you can tap.
+ *
+ * Two taps in quick succession on the same card is that gesture, and this app
+ * makes them easy to produce by accident: lib/useTap.ts deliberately rejects a
+ * tap that was really a drag, or that stopped a coasting list. A rejected tap
+ * does nothing visible, so the natural response is to tap again — and the
+ * browser reads the pair as "zoom in on this". A dense grid of image cards you
+ * scroll and tap through, like Inventory, is the worst case for it.
+ *
+ * `manipulation` removes ONLY the double-tap-zoom and the 300ms click delay
+ * that comes with it. Pinch-to-zoom is untouched, and so is the viewport meta,
+ * which deliberately does not set user-scalable=no — a member who needs to
+ * magnify the page still can, which WCAG 1.4.4 requires. Scoped to things you
+ * press rather than the whole document, so double-tapping ordinary content
+ * still behaves as the platform intends. */
+button,
+a,
+select,
+label,
+summary,
+[role="button"],
+[role="tab"],
+[role="switch"],
+.feed-card,
+.pcard,
+.crow,
+.inventory-card,
+.bottom-nav-btn,
+.bottom-nav-post {
+  touch-action: manipulation;
+}
+
 html {
   font-size: 16px; /* rem base — NOT scaled; --text-scale drives type */
   -webkit-text-size-adjust: 100%;
@@ -3119,7 +3156,9 @@ img[src*="/storage/v1/object/public/"] {
   backdrop-filter: blur(4px);
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.photo-picker-cut:hover { background: rgba(0, 0, 0, 0.78); transform: scale(1.05); }
+@media (hover: hover) {
+  .photo-picker-cut:hover { background: rgba(0, 0, 0, 0.78); transform: scale(1.05); }
+}
 .photo-picker-cut:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* Drag handle indicators — only visible while a photo is being dragged. */
@@ -5456,7 +5495,9 @@ textarea:focus-visible {
 }
 /* Media inside a card is a FitImage (two layers, contained). Hover zooms only
    the real image; the blurred bed stays put so the seam can't show. */
-.pcard:hover .pcard-media .fit-img-fg { transform: scale(1.04); }
+@media (hover: hover) {
+  .pcard:hover .pcard-media .fit-img-fg { transform: scale(1.04); }
+}
 /* The caption is deliberately the small half of the card. A fixed min-height
    keeps every card in a rail the same height (ragged card bottoms are the
    giveaway of a hand-rolled rail) without truncating two-line titles. */
