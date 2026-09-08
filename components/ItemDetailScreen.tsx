@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Save, Loader2, Flag, Camera, ImagePlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Save, Loader2, Flag, Camera, ImagePlus, Pencil } from 'lucide-react';
 import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
@@ -105,7 +105,8 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
  * These live on the SAME ROW as the product name now, NOT in the sticky bar —
  * the bottom bar is reserved for contacting the seller (email / WhatsApp). */
 function EngagementActions({
-  saved, onToggleSave, onShare, showReport, onReport, showAdminDelete, onAdminDelete, size = 40,
+  saved, onToggleSave, onShare, showReport, onReport, showAdminDelete, onAdminDelete,
+  showAdminEdit, onAdminEdit, size = 40,
 }: {
   saved: boolean;
   onToggleSave: () => void;
@@ -114,6 +115,9 @@ function EngagementActions({
   onReport: () => void;
   showAdminDelete: boolean;
   onAdminDelete: () => void;
+  /** Moderator editing is OPT-IN — see the note on canManage. */
+  showAdminEdit?: boolean;
+  onAdminEdit?: () => void;
   size?: number;
 }) {
   const base: React.CSSProperties = {
@@ -135,6 +139,12 @@ function EngagementActions({
       {showReport && (
         <button onClick={onReport} aria-label="Report this post" style={{ ...base, color: 'var(--text-muted)' }}>
           <Flag size={icon} strokeWidth={1.8} />
+        </button>
+      )}
+      {showAdminEdit && onAdminEdit && (
+        <button onClick={onAdminEdit} aria-label="Edit this post as admin"
+          style={{ ...base, color: 'var(--text-secondary)' }}>
+          <Pencil size={icon} strokeWidth={1.8} />
         </button>
       )}
       {showAdminDelete && (
@@ -160,7 +170,25 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
      post meant removing it outright when fixing a line would have done. onDelete
      is still required: the parent only passes it to someone allowed to act, so
      this cannot grant more than the parent already decided. */
-  const canManage = (!!isOwner || !!isAdmin) && !!onDelete;
+  /* ── Who sees the EDITOR, and who sees the post ──
+   *
+   * The owner's post detail IS the editor: every field is an input, in place,
+   * with no Edit button. That is deliberate and stays.
+   *
+   * An admin is not the owner, and this used to read `isOwner || isAdmin`.
+   * Because the admin allow-list includes the people who run Wecycle, every
+   * listing in the app opened as a form for them — dashed "+ Add photo" tiles
+   * over other students' posts, the compact title-and-meta strip replaced by
+   * one input per row. They could not see what their own users see, which is
+   * the single worst thing to be unable to see, and it made every listing look
+   * broken on the account most likely to be showing the app to somebody.
+   *
+   * So moderator editing is opt-in: an admin gets the ordinary post, plus a
+   * pencil beside the moderation bin. One tap and the editor appears, with the
+   * same powers as before — nothing is taken away, it just is not the default
+   * way an admin reads the app. */
+  const [adminEditOn, setAdminEditOn] = useState(false);
+  const canManage = (!!isOwner || (!!isAdmin && adminEditOn)) && !!onDelete;
   const photos = resolveItemMedia(item);
 
   /* Photo editing — owner can open a picker dialog to add/remove/replace. */
@@ -613,6 +641,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         canManage={canManage}
         onDelete={onDelete}
         isAdmin={isAdmin}
+        showAdminEdit={!!isAdmin && !isOwner && !adminEditOn}
+        onAdminEdit={() => setAdminEditOn(true)}
+        onAdminDelete={handleAdminDelete}
         isOwner={isOwner}
         heroSentinelRef={heroSentinelRef}
         heroVisible={heroVisible}
@@ -973,6 +1004,8 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               showReport={!isOwner}
               onReport={() => setReportOpen(true)}
               showAdminDelete={!!isAdmin && !isOwner}
+              showAdminEdit={!!isAdmin && !isOwner && !adminEditOn}
+              onAdminEdit={() => setAdminEditOn(true)}
               onAdminDelete={handleAdminDelete}
               size={40}
             />
@@ -1443,6 +1476,10 @@ interface DesktopLayoutProps {
   onDelete?: () => void | Promise<void>;
   isAdmin?: boolean;
   isOwner?: boolean;
+  /** Moderator controls, mirroring the mobile layout's EngagementActions. */
+  showAdminEdit?: boolean;
+  onAdminEdit?: () => void;
+  onAdminDelete?: () => void;
   heroSentinelRef: React.RefObject<HTMLDivElement>;
   heroVisible: boolean;
   editState: EditState;
@@ -1455,8 +1492,8 @@ function DesktopLayout({
   onOpenItem, onOpenLF,
   contactLinks, gate, primaryActionLabel, handleContactClick, hasBoth,
   canManage, onDelete, isAdmin, isOwner, heroSentinelRef, heroVisible, editState,
+  showAdminEdit, onAdminEdit, onAdminDelete,
 }: DesktopLayoutProps) {
-  void isAdmin;
   void primaryActionLabel;
   void hasBoth;
   const isOpportunity = item.kind === 'opportunity';
@@ -2149,6 +2186,45 @@ function DesktopLayout({
                 }}
               >
                 <Flag size={18} strokeWidth={1.8} />
+              </button>
+            )}
+            {/* Moderator controls. Previously the desktop layout took `void
+                isAdmin` and relied on canManage for both, which is why an
+                admin's only route to either was to have the whole page open as
+                a form. Now the pencil turns the editor on and the bin removes
+                the post, and neither changes how the page reads until used. */}
+            {showAdminEdit && onAdminEdit && (
+              <button
+                aria-label="Edit this post as admin"
+                onClick={onAdminEdit}
+                style={{
+                  width: 52, height: 52, borderRadius: 14,
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                <Pencil size={18} strokeWidth={1.8} />
+              </button>
+            )}
+            {!!isAdmin && !isOwner && onAdminDelete && (
+              <button
+                aria-label="Admin delete"
+                onClick={onAdminDelete}
+                style={{
+                  width: 52, height: 52, borderRadius: 14,
+                  background: 'var(--bg-surface)',
+                  border: '1px solid rgba(237,46,80,0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#ED2E50',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 size={18} strokeWidth={1.8} />
               </button>
             )}
           </div>

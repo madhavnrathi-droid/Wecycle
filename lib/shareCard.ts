@@ -96,6 +96,18 @@ export interface PartnerBrand {
   logoUrl?: string;
   /** Aspect ratio (w/h) of that logo, so it can be sized without a load race. */
   logoAspect?: number;
+  /**
+   * Source rect, in the asset's own pixels, when only PART of the supplied
+   * artwork is the logo.
+   *
+   * Partners send a combination mark: their symbol and wordmark, then a
+   * strapline, then often the dates and the city, all in one PNG. Drawn whole
+   * at lockup size the strapline lands about three pixels tall and turns into
+   * a grey smear next to a clean Wecycle wordmark — and it repeats what the
+   * poster underneath already says. Crop to the symbol and wordmark, which is
+   * the logo; the rest is layout somebody else did.
+   */
+  logoCrop?: { x: number; y: number; w: number; h: number };
 }
 
 export interface ShareCardSpec {
@@ -1172,7 +1184,204 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
      entirely — cover, avatar on the seam, bio, stats — so it renders on its
      own path rather than through a pile of conditionals. */
   if (spec.kind === 'storefront') return renderStorefrontCard(spec);
+  /* A co-branded offer is not an event with different colours. It has two
+     brands to introduce, somebody else's artwork to respect, and exactly one
+     number that matters — so it renders on its own path too, rather than as
+     five more conditionals inside a layout built for a listing. */
+  if (spec.partner && spec.offer) return renderPartnerCard(spec);
   return CARD_LAYOUT === 'classic' ? renderClassicCard(spec) : renderSpotlightCard(spec);
+}
+
+/* ── The co-branded offer card ──────────────────────────────────────────────
+ *
+ * Three bands: a partnership lockup, the partner's own poster, and the offer.
+ * Everything about it follows from one decision — THE POSTER ALREADY SPEAKS.
+ *
+ * UXINDIA's artwork carries the event name in hand-lettering, the dates, the
+ * venue and their logo. The generic card re-set all four of those in system
+ * type underneath it, which is how a co-branded card ends up looking like a
+ * press release: the same facts twice, once beautifully and once in Helvetica.
+ * So this card states only what the poster cannot — that Wecycle members pay
+ * less — and gives the rest of its space back to the picture.
+ *
+ * WHY THE POSTER IS FRAMED AND NOT BLED. `coverDraw` would fill the canvas and
+ * crop, and a poster is composed art: cropping it cuts somebody's lettering in
+ * half. It is contained instead, on the ember, which also reads better — a
+ * cream print floating on near-black looks like a print, where a full bleed
+ * just looks like a background.
+ *
+ * WHY THE LOCKUP IS GROUPED, NOT SPLIT. Two marks at opposite corners read as
+ * two logos on the same page. "Wecycle × UXINDIA", set together with the cross
+ * between them, reads as a partnership — which is the actual claim.
+ */
+async function renderPartnerCard(spec: ShareCardSpec): Promise<RenderedCard> {
+  const partner = spec.partner!;
+  const offer = spec.offer!;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
+  const ctx = canvas.getContext('2d')!;
+
+  const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
+  const [wordmark, partnerLogo, partnerMark, poster] = await Promise.all([
+    loadImage('/brand/wordmark.png', false),
+    partner.logoUrl ? loadImage(partner.logoUrl, false) : Promise.resolve(null),
+    loadImage('/brand/uxindia-shield-white.png', false),
+    urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
+  ]);
+
+  /* ── Geometry ──
+     The poster is square, so its box is square too and the contain has
+     nothing to letterbox. A non-square poster still fits — containDraw
+     centres it and the ember shows through, which is a deliberate frame
+     rather than a gap. */
+  const GUT = 64;                        // page margin
+  const LOCK_Y = 76;                     // centre of the lockup row
+  const ART_Y = 156;
+  /* 840, not the full 952 the margin allows. The gradient is half the brief —
+     "orange and black" — and at 952 the ember survived only as a thin border
+     round the poster, which reads as a frame rather than as a ground. Giving
+     it another 56px a side is the difference between a card that is orange and
+     a card with an orange edge. */
+  const ART_W = 840;
+  const ART_X = Math.round((CARD_W - ART_W) / 2);
+  const ART_H = ART_W;
+  const ART_R = 26;
+  const ART_BOTTOM = ART_Y + ART_H;      // 996
+
+  const paint = () => {
+    ctx.clearRect(0, 0, CARD_W, CARD_H);
+
+    /* Black into orange, the same four stops as the offer panel and the feed
+       spotlight so all three read as one object seen from three angles. */
+    paintWash(ctx, CARD_W, CARD_H, partner.colors);
+    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
+
+    /* ── Band 1: the partnership lockup ── */
+    ctx.textBaseline = 'middle';
+    let lx = GUT;
+    if (wordmark) {
+      const h = 34;
+      const w = Math.round(h * (wordmark.width / wordmark.height));
+      /* The wordmark art is dark; on this ground it has to be white. */
+      ctx.drawImage(tintImage(wordmark, w, h, '#FFFFFF'), lx, LOCK_Y - h / 2, w, h);
+      lx += w + 22;
+    }
+    ctx.font = `400 27px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.46)';
+    ctx.fillText('\u00D7', lx, LOCK_Y + 1);
+    lx += ctx.measureText('\u00D7').width + 22;
+    if (partnerLogo) {
+      /* Already white artwork — tinting it would be a no-op that costs a
+         canvas, so it is drawn as it is. */
+      const crop = partner.logoCrop
+        ?? { x: 0, y: 0, w: partnerLogo.width, h: partnerLogo.height };
+      const h = 32;
+      const w = Math.round(h * (crop.w / crop.h));
+      ctx.drawImage(partnerLogo, crop.x, crop.y, crop.w, crop.h, lx, LOCK_Y - h / 2, w, h);
+    } else {
+      ctx.font = `800 25px ${FONT}`;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(partner.label.toUpperCase(), lx, LOCK_Y + 1);
+    }
+    ctx.textBaseline = 'alphabetic';
+
+    /* ── Band 2: the poster ── */
+    ctx.save();
+    roundRect(ctx, ART_X, ART_Y, ART_W, ART_H, ART_R);
+    ctx.clip();
+    if (poster) {
+      /* A wash behind it, so a poster that is not square letterboxes onto
+         something intentional instead of onto whatever the gradient is doing
+         at that height. */
+      ctx.fillStyle = 'rgba(12,6,3,0.55)';
+      ctx.fillRect(ART_X, ART_Y, ART_W, ART_H);
+      containDraw(ctx, poster, ART_X, ART_Y, ART_W, ART_H);
+    } else {
+      /* No artwork: the partner's mark on a quieter panel, rather than an
+         empty rectangle or a stock photo of a conference. */
+      ctx.fillStyle = 'rgba(12,6,3,0.5)';
+      ctx.fillRect(ART_X, ART_Y, ART_W, ART_H);
+      if (partnerMark) {
+        const h = Math.round(ART_H * 0.3);
+        const w = Math.round(h * (partnerMark.width / partnerMark.height));
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(partnerMark, ART_X + (ART_W - w) / 2, ART_Y + (ART_H - h) / 2, w, h);
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+    /* A hairline, not a border. The poster's own ground is cream and the ember
+       behind it is near-black, so the edge is already obvious — this only
+       stops the rounded corners looking soft where the two meet. */
+    ctx.save();
+    roundRect(ctx, ART_X + 0.5, ART_Y + 0.5, ART_W - 1, ART_H - 1, ART_R);
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    /* ── Band 3: the offer ──
+       The one thing on this card that is not already on the poster, so it gets
+       the largest type on the card and the only pure white. */
+    ctx.textBaseline = 'top';
+
+    const EYEBROW_Y = ART_BOTTOM + 54;   // 1050
+    ctx.font = `800 23px ${FONT}`;
+    /* The wash accent is chosen to sit on the LIGHTEST stop of the gradient;
+       up here the ground is near-black and it comes out muddy. A step lighter
+       reads as the same orange and actually carries. */
+    ctx.fillStyle = '#FDBA74';
+    ctx.save();
+    /* Tracked out by hand — canvas has no letter-spacing. */
+    let ex = GUT;
+    for (const ch of 'EXCLUSIVE ON WECYCLE') {
+      ctx.fillText(ch, ex, EYEBROW_Y);
+      ex += ctx.measureText(ch).width + 3.4;
+    }
+    ctx.restore();
+
+    /* The number. Auto-fit so a future "30% off" or a longer qualifier cannot
+       run off the edge. */
+    const HEAD_Y = ART_BOTTOM + 112;     // 1108
+    let headSize = 112;
+    for (const size of [112, 96, 84, 72]) {
+      ctx.font = `800 ${size}px ${FONT}`;
+      headSize = size;
+      if (ctx.measureText(offer.headline).width <= CARD_W - GUT * 2 - 300) break;
+    }
+    ctx.font = `800 ${headSize}px ${FONT}`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(offer.headline, GUT, HEAD_Y);
+    const headW = ctx.measureText(offer.headline).width;
+
+    /* The qualifier sits on the number's baseline, not under it — stacked, it
+       reads as a second headline competing with the first. */
+    ctx.font = `600 33px ${FONT}`;
+    const qualW = ctx.measureText(offer.qualifier).width;
+    if (headW + 22 + qualW <= CARD_W - GUT * 2) {
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.fillText(offer.qualifier, GUT + headW + 22, HEAD_Y + headSize - 52);
+    }
+
+    /* The order of operations, which is the one thing people get wrong: the
+       code is free but it has to be collected here BEFORE booking, and getting
+       that backwards means paying full price and blaming us. */
+    ctx.font = `600 28px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.66)';
+    /* 262 puts the last line's descenders 64px off the bottom edge — the same
+       64 as the side margin, so the type block sits in an even frame. */
+    ctx.fillText('Get your code on wecycle.page, then book', GUT, ART_BOTTOM + 262);
+
+    ctx.textBaseline = 'alphabetic';
+  };
+
+  paint();
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const blob = await new Promise<Blob | null>(res => canvas.toBlob(b => res(b), 'image/png'));
+  return { blob, dataUrl };
 }
 
 /**

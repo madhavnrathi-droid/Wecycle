@@ -383,6 +383,14 @@ export default function EventDetailScreen({
         accent: '#FB923C',
         logoUrl: '/brand/uxindia-white.png',
         logoAspect: 5.85,
+        /* The supplied PNG is 1287x220 and holds three things: the shield and
+           "UXINDIA" on top, "26-27 SEPT | BENGALURU" beneath it, and a
+           "Design Leadership Week 2026" block to the right of both. Measured
+           from the alpha channel: the right-hand block starts at x=916, and
+           the sub-line starts at y=164. So (0,0,916,140) is exactly the
+           shield and the wordmark, which is the logo — and the dates and the
+           city are on the poster directly below in UXINDIA's own lettering. */
+        logoCrop: { x: 0, y: 0, w: 916, h: 140 },
       },
       partnerMessage: uxIndiaShareMessage(shareUrl(event.id)),
       /* The discount, in the slot where a listing shows its price. Without it
