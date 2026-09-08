@@ -890,7 +890,7 @@ export function LostFoundDetailSheet({
               </button>
               {item.reward && (
                 <span style={{
-                  background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
+                  background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber-ink)',
                   padding: '4px 10px', borderRadius: 999, fontWeight: 600, fontSize: 'calc(12px * var(--text-scale))',
                 }}>
                   {item.reward}

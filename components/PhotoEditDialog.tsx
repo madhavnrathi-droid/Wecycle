@@ -178,7 +178,7 @@ export default function PhotoEditDialog({
               background: 'rgba(237,46,80,0.10)',
               border: '1px solid rgba(237,46,80,0.25)',
               borderRadius: 10,
-              color: 'var(--accent-rose)',
+              color: 'var(--accent-rose-ink)',
               fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
             }}>{error}</div>
           )}

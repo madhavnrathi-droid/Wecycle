@@ -1211,8 +1211,24 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
       <section style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 430,
-        padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
-        background: 'linear-gradient(to bottom, transparent, var(--bg-base) 40%, var(--bg-base) 100%)',
+        /* ── Give the scrim room to actually be a scrim ──
+         *
+         * 44px of top padding, not 12. The bar floats over the description and
+         * the gradient is what stops that reading as damage — but the ramp only
+         * had 12px to work in before the opaque button began, so a line of text
+         * went from fully legible to sliced by a black pill inside about ten
+         * pixels. "IKEA Linnmon table top (100x6" and then nothing.
+         *
+         * At 44px the text dissolves over roughly two line-heights and meets
+         * the button already gone. The gradient's solid stop moves with it: 40%
+         * of the old 76px height was 30px, which is now 44px of a ~110px box,
+         * i.e. exactly where the button starts. */
+        padding: '44px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
+        background: 'linear-gradient(to bottom, transparent 0%, var(--bg-base) 40%, var(--bg-base) 100%)',
+        /* The scrim is decoration; only the button inside it should take taps.
+           At 12px the dead zone was invisible, at 44px it would swallow a tap
+           aimed at the last line of the description. */
+        pointerEvents: 'none',
       }}>
         {canManage && saveError && (
           <div role="alert" style={{
@@ -1220,14 +1236,18 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
             background: 'rgba(237,46,80,0.1)',
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 8,
-            color: 'var(--accent-rose)',
+            color: 'var(--accent-rose-ink)',
             fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, textAlign: 'center',
+            /* The scrim above is pointer-events:none; anything real inside it
+               has to opt back in. */
+            pointerEvents: 'auto',
           }}>
             {saveError}
           </div>
         )}
         <div style={{
           display: 'flex', gap: 8, flexWrap: 'wrap',
+          pointerEvents: 'auto',
         }}>
           {/* OWNER VIEW —
              Clean state → Delete only, full width
@@ -1992,7 +2012,7 @@ function DesktopLayout({
               background: 'rgba(237,46,80,0.1)',
               border: '1px solid rgba(237,46,80,0.25)',
               borderRadius: 10,
-              color: 'var(--accent-rose)',
+              color: 'var(--accent-rose-ink)',
               fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
             }}>{saveError}</div>
           )}
@@ -2059,7 +2079,7 @@ function DesktopLayout({
                     }}
                     style={{
                       flex: 1, height: 52, padding: '0 18px', borderRadius: 14,
-                      background: 'transparent', color: 'var(--accent-rose)',
+                      background: 'transparent', color: 'var(--accent-rose-ink)',
                       border: '1px solid var(--accent-rose)', cursor: 'pointer',
                       fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,

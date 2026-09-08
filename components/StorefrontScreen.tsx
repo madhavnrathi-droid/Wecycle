@@ -741,7 +741,7 @@ function RequestRow({ feed }: { feed: FeedItem }) {
         <span style={{
           fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
           padding: '3px 8px', borderRadius: 999,
-          background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber)',
+          background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber-ink)',
           textTransform: 'uppercase', letterSpacing: '0.04em',
         }}>
           Request

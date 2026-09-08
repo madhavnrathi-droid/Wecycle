@@ -271,7 +271,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
             width: 38, height: 38, borderRadius: 12,
             background: 'color-mix(in oklab, var(--accent-rose) 18%, var(--bg-card))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--accent-rose)', flexShrink: 0,
+            color: 'var(--accent-rose-ink)', flexShrink: 0,
           }}>
             <Heart size={18} strokeWidth={2} />
           </div>

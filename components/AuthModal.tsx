@@ -1034,7 +1034,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
               {/* Rejected domain (or a near-miss typo) — shown the moment the
                   address is well-formed, long before any send. */}
               {domainProblem ? (
-                <span id="auth-email-problem" className="field-hint" style={{ color: 'var(--accent-rose)' }}>
+                <span id="auth-email-problem" className="field-hint" style={{ color: 'var(--accent-rose-ink)' }}>
                   {domainProblem}
                 </span>
               ) : emailOk && isManipalEmail(email) && mode === 'signup' && !resetting
@@ -1160,7 +1160,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   />
                 </div>
                 {phone !== '' && !phoneOk && (
-                  <span className="field-hint" style={{ color: 'var(--accent-rose)' }}>
+                  <span className="field-hint" style={{ color: 'var(--accent-rose-ink)' }}>
                     Enter a 10-digit mobile number (without +91).
                   </span>
                 )}
@@ -1481,7 +1481,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
             padding: '8px 12px', borderRadius: 10,
             background: 'rgba(237,46,80,0.10)',
             border: '1px solid rgba(237,46,80,0.22)',
-            color: 'var(--accent-rose)',
+            color: 'var(--accent-rose-ink)',
             fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
           }}>
             {error}
@@ -1557,7 +1557,7 @@ function ConfirmPasswordField({
         required
       />
       {mismatch && (
-        <span className="field-hint" style={{ color: 'var(--accent-rose)' }}>
+        <span className="field-hint" style={{ color: 'var(--accent-rose-ink)' }}>
           Those don&apos;t match yet.
         </span>
       )}

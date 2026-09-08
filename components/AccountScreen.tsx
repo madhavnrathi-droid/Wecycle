@@ -614,7 +614,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
             background: 'rgba(237,46,80,0.10)',
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
-            color: 'var(--accent-rose)',
+            color: 'var(--accent-rose-ink)',
             fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {error}
@@ -633,7 +633,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               borderRadius: 999,
               padding: '10px 16px',
               fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
-              color: 'var(--accent-rose)',
+              color: 'var(--accent-rose-ink)',
               cursor: 'pointer',
             }}
           >
@@ -667,7 +667,7 @@ function Section({ title, hint, required, children }: {
           {required && (
             <span style={{
               fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
-              color: 'var(--accent-rose)',
+              color: 'var(--accent-rose-ink)',
               letterSpacing: '0.02em',
             }}>
               required

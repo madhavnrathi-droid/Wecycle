@@ -188,7 +188,7 @@ export default function EventRegistrationScreen({
             background: 'rgba(237,46,80,0.10)',
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 'var(--radius-md)',
-            color: 'var(--accent-rose)', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
+            color: 'var(--accent-rose-ink)', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
           }}>
             {submitError}
           </div>

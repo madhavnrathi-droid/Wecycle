@@ -481,9 +481,9 @@ function CommunityMetricRow({ metric }: { metric: ImpactMetric }) {
 
 function InventoryTab() {
   const STATUS_CONFIG = {
-    available:   { label: 'Available',   color: '#22C55E' },
-    borrowed:    { label: 'Borrowed',    color: 'var(--accent-amber)' },
-    maintenance: { label: 'Service',     color: 'var(--accent-rose)' },
+    available:   { label: 'Available',   color: 'var(--status-free)' },
+    borrowed:    { label: 'Borrowed',    color: 'var(--accent-amber-ink)' },
+    maintenance: { label: 'Service',     color: 'var(--accent-rose-ink)' },
   };
 
   const counts = {
@@ -502,8 +502,8 @@ function InventoryTab() {
       }}>
         {[
           { label: 'Available', value: counts.available, color: '#22C55E' },
-          { label: 'Borrowed',  value: counts.borrowed,  color: 'var(--accent-amber)' },
-          { label: 'Service',   value: counts.maint,     color: 'var(--accent-rose)' },
+          { label: 'Borrowed',  value: counts.borrowed,  color: 'var(--accent-amber-ink)' },
+          { label: 'Service',   value: counts.maint,     color: 'var(--accent-rose-ink)' },
         ].map(({ label, value }, i) => (
           <div key={label} style={{
             paddingRight: i < 2 ? 12 : 0,

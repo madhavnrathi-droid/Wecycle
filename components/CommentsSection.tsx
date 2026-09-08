@@ -353,7 +353,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
             margin: '8px 4px 0',
             fontSize: 'calc(12.5px * var(--text-scale))',
             lineHeight: 1.45,
-            color: 'var(--accent-rose)',
+            color: 'var(--accent-rose-ink)',
           }}>
             {postError}
           </p>
@@ -510,7 +510,7 @@ function Body({ text }: { text: string }) {
           ? <span
               key={i}
               style={{
-                color: 'var(--accent-amber)',
+                color: 'var(--accent-amber-ink)',
                 fontWeight: 600,
               }}
             >{p}</span>

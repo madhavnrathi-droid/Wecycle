@@ -535,7 +535,7 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   width: 30, height: 30, flexShrink: 0,
                   background: 'transparent', border: 'none',
-                  borderRadius: 999, cursor: 'pointer', color: 'var(--accent-rose)',
+                  borderRadius: 999, cursor: 'pointer', color: 'var(--accent-rose-ink)',
                 }}
               >
                 <Trash2 size={13} strokeWidth={2} />

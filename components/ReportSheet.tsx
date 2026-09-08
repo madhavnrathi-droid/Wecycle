@@ -340,7 +340,7 @@ export default function ReportSheet({
               {actionError && (
                 <div role="alert" style={{
                   marginBottom: 10, padding: '10px 12px', borderRadius: 12,
-                  background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose)',
+                  background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose-ink)',
                   fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
                 }}>
                   {actionError}
@@ -448,7 +448,7 @@ export default function ReportSheet({
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: 'var(--accent-rose)',
+                          color: 'var(--accent-rose-ink)',
                           fontSize: 'calc(14px * var(--text-scale))',
                           cursor: 'pointer',
                           padding: '4px 8px',

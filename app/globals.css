@@ -62,6 +62,10 @@
      pass a glance and not close enough to pass 4.5, which is how "Danger zone"
      and "Delete account" ended up as the least readable words in Settings. */
   --accent-rose-ink: #D01234;   /* inset 4.82 · base 5.26 */
+  /* Amber completes the set. #F58400 is 2.25:1 on an inset and it was the
+     colour of "Borrowed", pending-state chips and comment warnings — 11px
+     text at a quarter of the required contrast. */
+  --accent-amber-ink: #A45800;  /* inset 4.63 · base 5.05 · amber tint 4.66 */
   --accent-cyan: #00B8DA;
   --accent-cyan-surface: #D8F5FB;
   --accent-amber: #F58400;
@@ -238,6 +242,7 @@
   --focus-ring: #A0CC3D;
   --accent-lime-ink: #A0CC3D;
   --accent-rose-ink: #FF6B80;
+  --accent-amber-ink: #FF9A40;
   --accent-cyan: #3DD6F5;
   --accent-cyan-surface: rgba(61, 214, 245, 0.10);
   --accent-amber: #FF9A40;
@@ -461,7 +466,7 @@ body {
 .text-muted { color: var(--text-muted); }
 .text-lime { color: var(--accent-lime); }
 .text-cyan { color: var(--accent-cyan); }
-.text-amber { color: var(--accent-amber); }
+.text-amber { color: var(--accent-amber-ink); }
 .text-rose { color: var(--accent-rose); }
 
 .border-default { border-color: var(--border-default); }
@@ -588,7 +593,7 @@ body {
 
 .badge-lime { background: var(--accent-lime-surface); color: var(--accent-lime-ink); }
 .badge-cyan { background: var(--accent-cyan-surface); color: var(--accent-cyan); }
-.badge-amber { background: var(--accent-amber-surface); color: var(--accent-amber); }
+.badge-amber { background: var(--accent-amber-surface); color: var(--accent-amber-ink); }
 .badge-rose { background: var(--accent-rose-surface); color: var(--accent-rose); }
 .badge-purple { background: rgba(168, 85, 247, 0.12); color: #A855F7; }
 .badge-green { background: rgba(34, 197, 94, 0.12); color: var(--color-donate); }
@@ -2019,7 +2024,7 @@ section.mobile-only { display: block; }
   border: 1px solid var(--edit-border);
   border-radius: 12px;
   padding: 10px 14px;
-  color: var(--accent-amber);
+  color: var(--accent-amber-ink);
   font-weight: 700;
   transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -2034,7 +2039,7 @@ section.mobile-only { display: block; }
   width: 100%;
   background: transparent;
   border: none;
-  color: var(--accent-amber);
+  color: var(--accent-amber-ink);
   font-family: inherit;
   font-weight: 700;
   font-size: calc(16px * var(--text-scale));

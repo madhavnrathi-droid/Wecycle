@@ -604,7 +604,7 @@ export default function EventDetailScreen({
               background: 'rgba(237,46,80,0.1)',
               border: '1px solid rgba(237,46,80,0.25)',
               borderRadius: 8,
-              color: 'var(--accent-rose)',
+              color: 'var(--accent-rose-ink)',
               fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, textAlign: 'center',
             }}>{saveError}</div>
           )}
@@ -692,7 +692,7 @@ export default function EventDetailScreen({
                     title="Delete event"
                     style={{
                       width: 52, height: 52, borderRadius: 999,
-                      background: 'transparent', color: 'var(--accent-rose)',
+                      background: 'transparent', color: 'var(--accent-rose-ink)',
                       border: '1px solid var(--accent-rose)', cursor: 'pointer',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}

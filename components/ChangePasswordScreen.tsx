@@ -197,7 +197,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
                 placeholder="Type it again" invalid={confirm.length > 0 && !matches}
               />
               {confirm.length > 0 && !matches && (
-                <span className="field-hint" style={{ color: 'var(--accent-rose)' }}>
+                <span className="field-hint" style={{ color: 'var(--accent-rose-ink)' }}>
                   Those don’t match yet.
                 </span>
               )}
@@ -207,7 +207,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
               <div role="alert" style={{
                 padding: '10px 12px', borderRadius: 12,
                 background: 'rgba(237,46,80,0.10)',
-                color: 'var(--accent-rose)', fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
+                color: 'var(--accent-rose-ink)', fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, lineHeight: 1.45,
               }}>
                 {error}
               </div>

@@ -498,7 +498,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
       {error && (
         <div role="alert" style={{
           marginTop: 8, padding: '8px 12px', borderRadius: 10,
-          background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose)',
+          background: 'rgba(237,46,80,0.10)', color: 'var(--accent-rose-ink)',
           fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
         }}>
           {error}
