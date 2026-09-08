@@ -6135,3 +6135,273 @@ summary::-webkit-details-marker { display: none; }
 @media (hover: hover) {
   .auth-email-suggest:hover { background: var(--border-subtle); }
 }
+
+/* ═══════════════════════════════════════════════
+   PARTNER OFFER — UXINDIA 2026
+   ───────────────────────────────────────────────
+   Orange on near-black, and only here. This is the
+   one place in Wecycle that is not cream-and-green,
+   because it is not Wecycle's own content: it is a
+   partner's, and a member should be able to tell at
+   a glance that the discount belongs to a different
+   organisation. Borrowed brand colour used for one
+   bounded surface is a signal; used app-wide it
+   would just be a second theme fighting the first.
+
+   Values are the app's existing "Ember" share-card
+   palette (lib/shareCard.ts), so the promo card, the
+   scratch foil and the shared image are provably the
+   same orange rather than three hand-picked ones.
+   ═══════════════════════════════════════════════ */
+:root {
+  --uxi-flame: #F59E0B;
+  --uxi-orange: #EA580C;
+  --uxi-rust: #9A3412;
+  --uxi-char: #1A0F06;
+  --uxi-ink: #FFFFFF;
+  --uxi-ink-dim: rgba(255, 255, 255, 0.66);
+  /* Checked, not guessed: #FB923C on #141210 clears 8.9:1, so it can carry
+     small text and still be the brightest thing on the card. */
+  --uxi-accent: #FB923C;
+  --uxi-panel: #141210;
+}
+
+/* ── Scratch card ── */
+.scratch-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.scratch {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 74px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--uxi-panel);
+  /* The tilt is a 3D rotation, so the element needs its own 3D context or the
+     rotation flattens to a skew. */
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.scratch-code {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 10px;
+  text-align: center;
+}
+.scratch-label {
+  font-size: calc(10px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--uxi-accent);
+}
+.scratch-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: calc(17px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--uxi-ink);
+  /* A code is read character by character and typed into another site, so it
+     must never be clipped to an ellipsis. */
+  overflow-wrap: anywhere;
+}
+.scratch-foil {
+  position: absolute;
+  inset: 0;
+  display: block;
+  cursor: grab;
+  /* The whole point is to drag on it, so the browser must not claim the
+     gesture for panning. */
+  touch-action: none;
+}
+.scratch-foil:active { cursor: grabbing; }
+
+.scratch-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* Same height as the card beside it, and past the 44px floor. */
+  min-width: 92px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 14px;
+  background: var(--uxi-accent);
+  color: var(--uxi-char);
+  font: inherit;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease-spring), filter 0.16s ease;
+}
+.scratch-btn:active { transform: scale(0.96); }
+@media (hover: hover) {
+  .scratch-btn:hover { filter: brightness(1.06); }
+}
+
+/* ── Partner offer panel ── */
+.uxi-panel {
+  /* One dark object on a cream page. The radius matches the app's cards so it
+     belongs to the same furniture, and the colour says it is somebody else's
+     content. */
+  border-radius: 18px;
+  padding: 18px 16px 16px;
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(245, 158, 11, 0.22) 0%, transparent 58%),
+    linear-gradient(155deg, #241407 0%, var(--uxi-panel) 55%, #0D0B09 100%);
+  color: var(--uxi-ink);
+  /* No border: the panel is dark enough to define its own edge, and a hairline
+     on a near-black surface only ever reads as a rendering artefact. */
+  overflow: hidden;
+}
+.uxi-head { margin-bottom: 14px; }
+.uxi-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(251, 146, 60, 0.16);
+  color: var(--uxi-accent);
+  font-size: calc(10px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.uxi-title {
+  margin: 0;
+  font-size: calc(19px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--uxi-ink);
+}
+.uxi-sub {
+  margin: 5px 0 0;
+  font-size: calc(12.5px * var(--text-scale));
+  line-height: 1.45;
+  color: var(--uxi-ink-dim);
+}
+
+/* Signed-out: the size of the prize, and the way in. */
+.uxi-locked {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 74px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(251, 146, 60, 0.42);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--uxi-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uxi-locked-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(251, 146, 60, 0.18);
+  color: var(--uxi-accent);
+}
+.uxi-locked-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.uxi-locked-text strong {
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.uxi-locked-text span {
+  font-size: calc(12px * var(--text-scale));
+  color: var(--uxi-ink-dim);
+  line-height: 1.4;
+}
+
+.uxi-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  min-height: 46px;
+  border-radius: 13px;
+  background: var(--uxi-ink);
+  color: var(--uxi-char);
+  font-size: calc(13.5px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.uxi-cta:active { transform: scale(0.985); }
+
+/* SIGCHI: below a rule, quieter, and never competing with the members' code. */
+.uxi-sigchi {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+}
+.uxi-sigchi-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: calc(12.5px * var(--text-scale));
+  line-height: 1.5;
+  color: var(--uxi-ink-dim);
+}
+.uxi-sigchi-line svg { flex-shrink: 0; margin-top: 2px; color: var(--uxi-accent); }
+.uxi-sigchi-line strong { color: var(--uxi-ink); font-weight: 700; }
+.uxi-sigchi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--uxi-ink);
+  font: inherit;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .uxi-sigchi-btn:hover { background: rgba(255, 255, 255, 0.07); }
+}
+.uxi-sigchi-note {
+  margin: 8px 0 0;
+  font-size: calc(11.5px * var(--text-scale));
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.48);
+}
+/* Once the code is revealed the foil is only finishing its exit — it must not
+   intercept the tap that follows. */
+.scratch-foil[data-spent] { pointer-events: none; }
+/* Pre-reveal alternative: equal in size and reachability, quieter in voice. */
+.scratch-btn--ghost {
+  background: transparent;
+  color: var(--uxi-ink);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+@media (hover: hover) {
+  .scratch-btn--ghost:hover { background: rgba(255, 255, 255, 0.07); filter: none; }
+}

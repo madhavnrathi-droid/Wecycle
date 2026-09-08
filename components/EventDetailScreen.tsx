@@ -12,6 +12,8 @@ import OnlineBadge from './OnlineBadge';
 import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
+import PartnerOfferPanel from './PartnerOfferPanel';
+import { hasPartnerOffer } from '../lib/eventOffer';
 import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import { useBreakpoint } from '../lib/useBreakpoint';
@@ -971,6 +973,23 @@ export default function EventDetailScreen({
           </div>
         )}
       </section>
+
+      {/* ── PARTNER OFFER ──
+          Above the description on purpose. The discount is the reason a member
+          opens this particular event, so burying it under five lines of blurb
+          would put the payoff below the fold on a phone. Renders for exactly
+          one event; every other event page is unchanged. */}
+      {hasPartnerOffer(event.id) && (
+        <section style={{ padding: '20px 20px 0' }}>
+          <PartnerOfferPanel
+            isSignedIn={!!user}
+            memberName={profile?.full_name ?? null}
+            memberEmail={(profile as { email?: string } | null)?.email
+              ?? (user as { email?: string } | null)?.email ?? null}
+            onRequireAuth={onRequireAuth}
+          />
+        </section>
+      )}
 
       {/* ── DESCRIPTION ── */}
       <section style={{ padding: '24px 20px 0' }}>

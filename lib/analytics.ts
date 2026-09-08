@@ -133,6 +133,16 @@ export const EVT = {
    *  under the description from a tap on the photo itself — which of the two
    *  people actually use decides whether the photo affordance earns its keep. */
   post_link_opened:         'post_link_opened',
+
+  /* ── Partner offers ───
+   * The funnel the UXINDIA partnership is judged on: how many members see a
+   * code, how many take it away, and how many actually go to the ticket page.
+   * `revealed` minus `copied` is the interesting gap — a code that is uncovered
+   * and never copied was browsed, not used. */
+  offer_code_revealed:      'offer_code_revealed',
+  offer_code_copied:        'offer_code_copied',
+  offer_tickets_opened:     'offer_tickets_opened',
+  offer_sigchi_applied:     'offer_sigchi_applied',
 } as const;
 
 export type EventName = typeof EVT[keyof typeof EVT];
