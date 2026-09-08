@@ -130,7 +130,7 @@ export default function Drawer({
               : (
                 <button onClick={onSignIn} style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--accent-lime-dim)',
+                  fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--accent-lime-ink)',
                 }}>
                   Sign in
                 </button>

@@ -28,7 +28,14 @@
  *   and gets it without argument.
  */
 
-type StartViewTransition = (cb: () => void) => { finished: Promise<void> };
+interface ViewTransitionHandle {
+  /* Both of these REJECT when a transition is abandoned, and both must be
+     handled — see withViewTransition. */
+  finished: Promise<void>;
+  ready?: Promise<void>;
+  updateCallbackDone?: Promise<void>;
+}
+type StartViewTransition = (cb: () => void) => ViewTransitionHandle;
 
 function supported(): boolean {
   if (typeof document === 'undefined') return false;
@@ -51,10 +58,36 @@ export function withViewTransition(update: () => void): void {
   if (!supported()) { update(); return; }
   const doc = document as Document & { startViewTransition?: StartViewTransition };
   try {
-    doc.startViewTransition!(() => { update(); });
+    const t = doc.startViewTransition!(() => { update(); });
+
+    /* ── Swallow the rejections, or they surface as uncaught ──
+     *
+     * The try/catch above only ever caught a SYNCHRONOUS throw, and
+     * startViewTransition almost never throws synchronously. What it does is
+     * return promises that reject when the transition is abandoned — and a
+     * transition is abandoned routinely, by design: tapping a second card
+     * before the first has settled skips the running one, and so does the tab
+     * going to the background mid-navigation.
+     *
+     * Unhandled, each of those became
+     *   Uncaught (in promise) InvalidStateError: Transition was aborted
+     *      because of invalid state
+     * in the console — three of them in one ordinary sweep of the app. They
+     * were harmless to the navigation, which had already happened inside the
+     * callback, but an uncaught rejection is not free: it is noise that hides
+     * real errors during debugging, and anything wired to
+     * `unhandledrejection` reports it as a crash the user never experienced.
+     *
+     * So both promises get a no-op catch. Nothing is being suppressed that we
+     * would otherwise act on — an abandoned decoration needs no recovery, and
+     * the state change is not waiting on it. */
+    t?.finished?.catch(() => {});
+    t?.ready?.catch(() => {});
+    t?.updateCallbackDone?.catch(() => {});
   } catch {
-    /* A transition already running, or the document is hidden. The navigation
-       matters and the animation does not. */
+    /* Kept for the genuinely synchronous failures — an unsupported call shape,
+       or a document that refuses outright. The navigation matters and the
+       animation does not. */
     update();
   }
 }

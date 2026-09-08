@@ -448,7 +448,7 @@ export default function SettingsScreen({
           <div style={{ padding: '14px 16px' }}>
             <p style={{
               margin: '0 0 8px', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-              color: 'var(--accent-rose)', letterSpacing: '-0.01em',
+              color: 'var(--accent-rose-ink)', letterSpacing: '-0.01em',
             }}>
               Danger zone
             </p>
@@ -476,7 +476,7 @@ export default function SettingsScreen({
         .settings-btn-danger {
           display: inline-flex; align-items: center; gap: 6px;
           background: transparent; border: 1px solid var(--accent-rose);
-          color: var(--accent-rose); border-radius: 999px;
+          color: var(--accent-rose-ink); border-radius: 999px;
           padding: 8px 14px; font-size: 12px; font-weight: 600;
           cursor: pointer;
         }

@@ -457,7 +457,7 @@ function AlertsTab({
             width: 40, height: 40, borderRadius: 12,
             background: 'rgba(168,221,0,0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--accent-lime-dim)', flexShrink: 0,
+            color: 'var(--accent-lime-ink)', flexShrink: 0,
           }}>
             <Bell size={18} strokeWidth={1.8} />
           </div>
@@ -564,7 +564,7 @@ function AlertCard({
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '3px 8px',
               background: isExpired ? 'var(--bg-inset)' : 'rgba(168,221,0,0.15)',
-              color: isExpired ? 'var(--text-muted)' : 'var(--accent-lime-dim)',
+              color: isExpired ? 'var(--text-muted)' : 'var(--accent-lime-ink)',
               borderRadius: 999,
               fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
             }}>

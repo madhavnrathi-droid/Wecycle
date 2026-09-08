@@ -263,11 +263,16 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
             position: 'absolute', top: 8, left: 8,
             fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
             textTransform: 'uppercase',
-            color: '#fff',
-            background: closed ? 'rgba(20,20,20,0.7)'
-              : item.isRequest ? 'var(--accent-blue, #3B82F6)'
-              : item.kind === 'opportunity' ? '#8B5CF6'
-              : 'var(--accent-green, #14B86C)',
+            /* The status tokens, not a second set of hexes.
+               This rail carried its own palette — #3B82F6, #8B5CF6, #14B86C —
+               for the same three states the feed cards render with #FF8C00,
+               #A855F7 and #16A34A. Two divergent copies of one system, and the
+               rail's copy failed contrast worse than the feed's. */
+            color: item.isRequest ? 'var(--status-on-bright)' : '#fff',
+            background: closed ? 'rgba(20,20,20,0.78)'
+              : item.isRequest ? 'var(--status-request)'
+              : item.kind === 'opportunity' ? 'var(--status-opportunity)'
+              : 'var(--status-free)',
             padding: '3px 8px',
             borderRadius: 999,
             backdropFilter: 'blur(6px)',
@@ -352,8 +357,8 @@ function LostFoundCard({ item, onClick }: { item: LostItem & { photoUrls?: strin
           position: 'absolute', top: 8, left: 8,
           fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
           textTransform: 'uppercase',
-          color: '#fff',
-          background: lost ? '#ED2E50' : '#F59E0B',
+          color: lost ? '#fff' : 'var(--status-on-bright)',
+          background: lost ? 'var(--status-lost)' : 'var(--status-found)',
           padding: '3px 8px',
           borderRadius: 999,
           boxShadow: '0 2px 8px rgba(0,0,0,0.18)',

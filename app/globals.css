@@ -35,6 +35,33 @@
   --accent-lime: #A8DD00;
   --accent-lime-dim: #7FA600;
   --accent-lime-surface: #F0FFB8;
+  /* ── The keyboard focus ring ────────────────────────────────────────
+   * Its own token, deliberately not --accent-lime-dim.
+   *
+   * A focus indicator is a non-text UI component: WCAG 1.4.11 asks for
+   * 3:1 against what it sits on. The ring reused --accent-lime-dim, which
+   * measures 2.85:1 on a white card, 2.73:1 on the page and 2.50:1 on an
+   * inset — failing on every light surface in the product, which is every
+   * surface a keyboard user actually tabs across.
+   *
+   * Splitting it off rather than darkening --accent-lime-dim: that token is
+   * also the brand lime in about twenty-five places, and moving it to satisfy
+   * a ring would drag the hover state of the primary button and a dozen
+   * accent labels along with it. */
+  --focus-ring: #6F9100;   /* 3.50 on base · 3.67 on white · 3.21 on inset */
+  /* ── The lime as TEXT ───────────────────────────────────────────────
+   * --accent-lime-dim is a fill and a border colour; used as text it is
+   * 2.85:1 on white, and it was being used as text in about nine places
+   * (the drawer's "Sign in", activity timestamps, the like-new condition
+   * label, impact figures). Same rule as the status colours above: the
+   * value is chosen against --bg-inset, the darkest light surface, and
+   * additionally against --accent-lime-surface, because .badge-lime puts
+   * this colour on that tint. */
+  --accent-lime-ink: #5A7500;   /* inset 4.62 · white 5.28 · lime tint 4.95 */
+  /* The rose, as text. --accent-rose is 4.11:1 on the page — close enough to
+     pass a glance and not close enough to pass 4.5, which is how "Danger zone"
+     and "Delete account" ended up as the least readable words in Settings. */
+  --accent-rose-ink: #D01234;   /* inset 4.82 · base 5.26 */
   --accent-cyan: #00B8DA;
   --accent-cyan-surface: #D8F5FB;
   --accent-amber: #F58400;
@@ -55,6 +82,60 @@
   --success: #16A34A;
   --warning: #D97706;
   --error: #DC2626;
+
+  /* ── Status colours ───────────────────────────────────────────────────
+   *
+   * The badges on every card, and the price line under every title. These
+   * were picked as hues and then used in two different jobs — as a chip with
+   * white text on it, and as text on the white card — and a single mid-tone
+   * hue cannot pass 4.5:1 in both. Measured before this block existed:
+   *
+   *     white on request  #FF8C00   2.33:1     white on found   #F59E0B  2.15:1
+   *     white on free     #16A34A   3.30:1     white on event   #A855F7  3.96:1
+   *     #FF8C00 on white            2.33:1     white on lost    #ED2E50  4.11:1
+   *
+   * Every one of those fails WCAG 1.4.3 AA, on the most repeated text in the
+   * product, read outdoors on a phone — which is the actual context: a campus
+   * marketplace used while walking between buildings.
+   *
+   * Two ideas, kept apart:
+   *
+   *   -chip  the background. White sits on it, so it is dark enough for
+   *          4.8:1 — 4.8 rather than 4.5 because the chip is drawn at 94%
+   *          over a photograph and the last 6% can only lighten it.
+   *   -ink   the same status used AS text on a light surface.
+   *
+   * For most hues one value does both, because the other party is white
+   * either way and contrast is symmetric. ORANGE AND AMBER ARE THE
+   * EXCEPTION: dark enough for white text, they are brown. So they keep
+   * their hue and flip the ink instead, which is both more legible
+   * (8.05:1 and 8.74:1) and the convention every mature system uses for
+   * yellow — Material, Carbon and Polaris all put dark text on amber.
+   */
+  --status-lost:        #E11338;   /* 4.81:1 with white */
+  --status-event:       #9B3CF6;   /* 4.80:1 */
+  --status-opportunity: #6258FF;   /* 4.80:1 */
+  --status-hiring:      #2563EB;   /* 5.17:1 — already passed, kept as-is */
+  --status-free:        #12843C;   /* 4.80:1 both as chip and as ink */
+
+  /* Bright chips that carry DARK text rather than white. */
+  --status-request:     #FF8C00;   /* 8.05:1 with --status-on-bright */
+  --status-found:       #F59E0B;   /* 8.74:1 with --status-on-bright */
+  --status-on-bright:   #12120E;
+
+  /* ── The -ink values: a status used AS TEXT on a light surface ─────────
+   *
+   * Measured against --bg-inset (#F1F0EA), not white. Inset is the darkest of
+   * the light surfaces, so a colour that clears 4.8:1 there clears it on every
+   * lighter one too — and these get used on tinted pills, tinted rows and the
+   * plain card without anyone checking which. Picking against white instead is
+   * exactly how "Report found" ended up at 2.89:1: #16A34A passes on white and
+   * fails the moment the same text sits on a soft tint.
+   */
+  --status-request-ink: #B45309;   /* inset 4.86  base 5.29 */
+  --status-found-ink:   #B45309;
+  --status-free-ink:    #107937;   /* inset 4.82  base 5.26 */
+  --status-lost-ink:    var(--accent-rose-ink);
 
   /* Typography scale (in px, applied via rem) */
   /* The multiplier behind the "Larger text" setting. 1 normally; html.text-larger
@@ -152,6 +233,11 @@
   --accent-lime: #C8FF4D;
   --accent-lime-dim: #A0CC3D;
   --accent-lime-surface: rgba(200, 255, 77, 0.12);
+  /* On near-black the bright lime is already well past 3:1, so the ring
+     brightens here instead of darkening. */
+  --focus-ring: #A0CC3D;
+  --accent-lime-ink: #A0CC3D;
+  --accent-rose-ink: #FF6B80;
   --accent-cyan: #3DD6F5;
   --accent-cyan-surface: rgba(61, 214, 245, 0.10);
   --accent-amber: #FF9A40;
@@ -500,7 +586,7 @@ body {
   white-space: nowrap;
 }
 
-.badge-lime { background: var(--accent-lime-surface); color: var(--accent-lime-dim); }
+.badge-lime { background: var(--accent-lime-surface); color: var(--accent-lime-ink); }
 .badge-cyan { background: var(--accent-cyan-surface); color: var(--accent-cyan); }
 .badge-amber { background: var(--accent-amber-surface); color: var(--accent-amber); }
 .badge-rose { background: var(--accent-rose-surface); color: var(--accent-rose); }
@@ -1455,7 +1541,7 @@ section.mobile-only { display: block; }
   opacity: 0; margin: 0; cursor: pointer;
 }
 .pill-switch input:focus-visible ~ .pill-switch-track {
-  outline: 2px solid var(--accent-lime-dim, #A8DD00);
+  outline: 2px solid var(--focus-ring, #6F9100);
   outline-offset: 2px;
 }
 
@@ -2149,7 +2235,7 @@ section.mobile-only { display: block; }
 .section-action {
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--accent-lime-dim);
+  color: var(--accent-lime-ink);
   cursor: pointer;
 }
 
@@ -2658,7 +2744,7 @@ section.mobile-only { display: block; }
 .form-input:focus,
 .form-select:focus,
 .form-textarea:focus {
-  border-color: var(--accent-lime-dim);
+  border-color: var(--accent-lime-ink);
   background: var(--bg-surface);
 }
 .form-input::placeholder,
@@ -2702,7 +2788,7 @@ section.mobile-only { display: block; }
 .option-card[aria-pressed="true"],
 .option-card.selected {
   background: rgba(168, 221, 0, 0.10);
-  border-color: var(--accent-lime-dim);
+  border-color: var(--accent-lime-ink);
   color: var(--text-primary);
 }
 
@@ -2722,7 +2808,7 @@ section.mobile-only { display: block; }
   color: var(--text-secondary);
 }
 .dropzone:hover {
-  border-color: var(--accent-lime-dim);
+  border-color: var(--accent-lime-ink);
   background: rgba(168, 221, 0, 0.04);
 }
 
@@ -3474,7 +3560,7 @@ img[src*="/storage/v1/object/public/"] {
   outline: none;
 }
 .segmented button:focus-visible {
-  outline: 2px solid var(--accent-lime-dim);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 0;
   /* Inset offset so the ring sits inside the rounded pill instead of
      leaking past the container's border-radius. */
@@ -4610,7 +4696,7 @@ img[src*="/storage/v1/object/public/"] {
    ═══════════════════════════════════════════════ */
 
 :focus-visible {
-  outline: 2px solid var(--accent-lime-dim);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -4619,7 +4705,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--accent-lime-dim);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -5050,7 +5136,7 @@ textarea:focus-visible {
   gap: 5px;
   font-size: calc(12px * var(--text-scale));
   font-weight: 600;
-  color: var(--accent-lime-dim);
+  color: var(--accent-lime-ink);
 }
 
 .ss-match-chip {
@@ -5178,7 +5264,7 @@ textarea:focus-visible {
 .ss-add:focus-visible,
 .ss-chip-x:focus-visible,
 .ss-input:focus-visible {
-  outline: 2px solid var(--accent-lime-dim);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -5544,8 +5630,9 @@ textarea:focus-visible {
   letter-spacing: -0.015em;
   color: var(--text-primary);
 }
-.pcard-price[data-tone="free"]   { color: var(--success); }
-.pcard-price[data-tone="wanted"] { color: var(--color-request); }
+/* The -ink pair, not the chip pair — this is text on the white card. */
+.pcard-price[data-tone="free"]   { color: var(--status-free); }
+.pcard-price[data-tone="wanted"] { color: var(--status-request-ink); }
 .pcard-price--soft {
   font-size: calc(12.5px * var(--text-scale));
   font-weight: 600;
@@ -5622,20 +5709,31 @@ textarea:focus-visible {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #fff;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* Opaque, and no backdrop-filter. Both were there to make the chip feel like
+     glass, but at 94% over an arbitrary photograph the last 6% is whatever the
+     picture happens to be — which is exactly the amount of contrast a 10px
+     uppercase label cannot spare. A blur behind an opaque fill also renders
+     nothing while still costing a compositor layer on every card in the feed. */
+  background-clip: padding-box;
 }
 .pcard-badge--second { top: 34px; }
-.pcard-badge[data-kind="lost"]        { background: rgba(237, 46, 80, 0.94); }
-.pcard-badge[data-kind="found"]       { background: rgba(34, 197, 94, 0.94); }
-.pcard-badge[data-kind="event"]       { background: rgba(168, 85, 247, 0.94); }
-.pcard-badge[data-kind="request"]     { background: rgba(255, 140, 0, 0.94); }
-.pcard-badge[data-kind="opportunity"] { background: rgba(108, 99, 255, 0.94); }
+/* FOUND is amber, not a second green.
+   It used to be #22C55E while FREE was #16A34A — two greens four percent
+   apart, on 10px uppercase type, over a photograph. On a Lost & Found card
+   they were indistinguishable, so the badge told you a colour and not a fact.
+   Amber also matches what the related-items rail already used for the same
+   idea, which is how the divergence was found. Green now means FREE and
+   nothing else. */
+.pcard-badge[data-kind="lost"]        { background: var(--status-lost); }
+.pcard-badge[data-kind="found"]       { background: var(--status-found); color: var(--status-on-bright); }
+.pcard-badge[data-kind="event"]       { background: var(--status-event); }
+.pcard-badge[data-kind="request"]     { background: var(--status-request); color: var(--status-on-bright); }
+.pcard-badge[data-kind="opportunity"] { background: var(--status-opportunity); }
 /* Hiring reads as a different KIND of post from a service offer, so it gets its
    own colour — the two directions must be separable at a glance now that they
    share one rail. */
-.pcard-badge[data-kind="hiring"]       { background: rgba(37, 99, 235, 0.95); }
-.pcard-badge[data-kind="free"]        { background: rgba(22, 163, 74, 0.95); }
+.pcard-badge[data-kind="hiring"]       { background: var(--status-hiring); }
+.pcard-badge[data-kind="free"]        { background: var(--status-free); }
 
 .pcard[data-closed] .pcard-media .fit-img-fg { filter: grayscale(0.7); opacity: 0.7; }
 .pcard[data-closed] .pcard-media .fit-img-bg { filter: blur(16px) grayscale(0.8); opacity: 0.35; }
@@ -6029,7 +6127,7 @@ textarea:focus-visible {
 /* Drag-and-drop target state for the photo picker (desktop). The box already
    looks droppable; this confirms the drop will land. */
 .photo-empty[data-dropping] {
-  border-color: var(--accent-lime-dim);
+  border-color: var(--accent-lime-ink);
   background: var(--accent-lime-surface);
   color: var(--text-primary);
   transform: scale(1.01);

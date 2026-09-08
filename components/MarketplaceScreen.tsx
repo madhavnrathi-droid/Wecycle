@@ -443,7 +443,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
       }}>
         <span style={{
           fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800,
-          color: item.condition === 'like_new' ? 'var(--accent-lime-dim)' : 'var(--text-muted)',
+          color: item.condition === 'like_new' ? 'var(--accent-lime-ink)' : 'var(--text-muted)',
         }}>
           {CONDITION_LABEL[item.condition]}
         </span>
@@ -530,7 +530,7 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         <span className="ticker-dot" style={{ color: 'var(--text-muted)' }} />
         <span style={{
           fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
-          color: item.condition === 'like_new' ? 'var(--accent-lime-dim)' : 'var(--text-muted)',
+          color: item.condition === 'like_new' ? 'var(--accent-lime-ink)' : 'var(--text-muted)',
         }}>
           {item.condition === 'like_new' ? '✦ New' : item.condition === 'good' ? 'Good' : 'Fair'}
         </span>

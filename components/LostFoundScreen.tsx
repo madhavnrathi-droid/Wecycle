@@ -216,7 +216,7 @@ export default function LostFoundScreen({
           style={{
             flex: 1, height: 44, borderRadius: 999,
             background: 'rgba(237,46,80,0.10)',
-            color: 'var(--accent-rose)',
+            color: 'var(--status-lost-ink)',
             border: '1px solid rgba(237,46,80,0.22)',
             cursor: 'pointer',
             fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
@@ -232,7 +232,7 @@ export default function LostFoundScreen({
           style={{
             flex: 1, height: 44, borderRadius: 999,
             background: 'rgba(34,197,94,0.10)',
-            color: '#16A34A',
+            color: 'var(--status-free-ink)',
             border: '1px solid rgba(34,197,94,0.22)',
             cursor: 'pointer',
             fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
@@ -324,7 +324,7 @@ function LostFoundCard({
   item, variant, onClick,
 }: { item: LostItem; variant: Variant; onClick: () => void }) {
   const isLost = item.status === 'lost';
-  const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
+  const accent = isLost ? 'var(--status-lost-ink)' : 'var(--status-free-ink)';
   const bg = isLost ? 'rgba(237,46,80,0.10)' : 'rgba(34,197,94,0.10)';
   const photo = resolveLostFoundPhoto(item.id, item.photoUrls);
   return (
@@ -369,7 +369,7 @@ function LostFoundCard({
         <span style={{
           position: 'absolute', top: 8, right: 8,
           background: 'rgba(255,255,255,0.92)',
-          color: '#16A34A',
+          color: 'var(--status-free-ink)',
           padding: 4, borderRadius: '50%',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         }} aria-label="Verified">
@@ -426,7 +426,7 @@ export function LostFoundDetailSheet({
   const isLost = item.status === 'lost';
   /* Owner (reporter) contact resolved on demand — raw columns are locked down. */
   const ownerContact = useOwnerContact(item.user.id, { email: item.user.email, phone: item.user.phone });
-  const accent = isLost ? 'var(--accent-rose)' : '#16A34A';
+  const accent = isLost ? 'var(--status-lost-ink)' : 'var(--status-free-ink)';
 
   /* Photo editing — only relevant when isOwner. */
   const [photoEditOpen, setPhotoEditOpen] = useState(false);
@@ -916,7 +916,7 @@ export function LostFoundDetailSheet({
             background: 'rgba(237,46,80,0.10)',
             border: '1px solid rgba(237,46,80,0.25)',
             borderRadius: 10,
-            color: 'var(--accent-rose)',
+            color: 'var(--status-lost-ink)',
             fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, textAlign: 'center',
           }}>{saveError}</div>
         )}
@@ -984,8 +984,8 @@ export function LostFoundDetailSheet({
                 }}
                 style={{
                   flex: 1, height: 48, padding: '0 18px', borderRadius: 14,
-                  background: 'transparent', color: 'var(--accent-rose)',
-                  border: '1px solid var(--accent-rose)', cursor: 'pointer',
+                  background: 'transparent', color: 'var(--status-lost-ink)',
+                  border: '1px solid var(--status-lost-ink)', cursor: 'pointer',
                   fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}

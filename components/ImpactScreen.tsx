@@ -169,7 +169,7 @@ function PersonalImpactTab() {
       }}>
         <p style={{
           margin: '0 0 6px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
-          color: 'var(--accent-lime-dim)',
+          color: 'var(--accent-lime-ink)',
         }}>
           Your rank
         </p>
@@ -403,7 +403,7 @@ function CommunityImpactTab() {
                   <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     {user.name.split(' ')[0]}
                     {isMe && <span style={{
-                      fontSize: 'calc(11px * var(--text-scale))', color: 'var(--accent-lime-dim)', fontWeight: 500,
+                      fontSize: 'calc(11px * var(--text-scale))', color: 'var(--accent-lime-ink)', fontWeight: 500,
                     }}>· you</span>}
                   </p>
                   <p style={{ margin: 0, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>{user.role}</p>

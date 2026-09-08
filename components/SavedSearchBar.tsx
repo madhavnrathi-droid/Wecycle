@@ -87,7 +87,7 @@ export default function SavedSearchBar({ requests, currentQuery = '', onRunSearc
             <Dialog.Overlay className="ss-overlay" />
             <Dialog.Content className="ss-content" aria-describedby="ss-desc">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Bell size={16} strokeWidth={2} style={{ color: 'var(--accent-lime-dim)' }} />
+                <Bell size={16} strokeWidth={2} style={{ color: 'var(--accent-lime-ink)' }} />
                 <Dialog.Title style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
                   Notify me about…
                 </Dialog.Title>
