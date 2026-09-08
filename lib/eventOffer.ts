@@ -161,3 +161,34 @@ export function offerStrapline(isSignedIn: boolean): string {
     ? `Your ${MEMBER_TIER.percent}% code is ready`
     : `Members get ${MEMBER_TIER.percent}% off tickets`;
 }
+
+/* ── The message that travels with the share card ──────────────────────────
+ *
+ * The image is a picture; this is the part that actually gets read, and in a
+ * WhatsApp group it is read in about two seconds while scrolling. So it is
+ * ordered by what a recipient needs to decide, not by what we want to say:
+ *
+ *   1. WHAT and WHEN, on the first line. If they cannot make the dates,
+ *      nothing else matters and they should be able to stop there.
+ *   2. WHERE, with the collaboration — "with Srishti" is what makes it feel
+ *      like it is happening to them rather than to the industry.
+ *   3. The discount, with the number.
+ *   4. The ORDER OF OPERATIONS. "Code first, then book" is the one thing
+ *      people get wrong, and getting it wrong means paying full price and
+ *      being annoyed at us rather than pleased.
+ *
+ * No emoji, no "🔥 don't miss out". The offer is genuinely good and stating it
+ * plainly is more persuasive than decorating it — and a card that arrives
+ * shouting is a card people learn to scroll past.
+ */
+export function uxIndiaShareMessage(url?: string): string {
+  const lines = [
+    `${UX_INDIA_EVENT.track} · ${UX_INDIA_EVENT.presenter}`,
+    `${UX_INDIA_EVENT.dates} · ${UX_INDIA_EVENT.venue}, ${UX_INDIA_EVENT.partner}`,
+    '',
+    `Wecycle members get ${MEMBER_TIER.percent}% off tickets.`,
+    'Get your code on Wecycle first, then book.',
+  ];
+  if (url) lines.push('', url);
+  return lines.join('\n');
+}

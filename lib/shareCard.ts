@@ -103,6 +103,22 @@ export interface ShareCardSpec {
   title: string;
   /** Present only for co-branded posts. See PartnerBrand. */
   partner?: PartnerBrand;
+  /** Overrides the caption pasted alongside the image. */
+  partnerMessage?: string;
+  /**
+   * The offer, in the money slot.
+   *
+   * An event has no price, so on a normal event card that row is empty and the
+   * panel ends in a band of dead white. On a partner card there IS a number,
+   * and it is the whole reason the card is being shared — so it goes exactly
+   * where a price would go, in a price's typography. "25% off" is the answer
+   * to the same question a price answers, which is why it belongs in the same
+   * slot rather than in a badge bolted somewhere else.
+   *
+   * `ink` because the accent that survives on a dark wash is usually too pale
+   * to read on the white panel; the caller passes the darker sibling.
+   */
+  offer?: { headline: string; qualifier: string; ink: string };
   imageUrls?: string[];
   price?: number;
   /** The money exactly as it should read — "₹200 / day", "Swap for a
@@ -1020,6 +1036,21 @@ async function renderClassicCard(spec: ShareCardSpec): Promise<RenderedCard> {
     ctx.fillText(badgeText, FX + 46, by + bh / 2 + 1);
     ctx.textBaseline = 'alphabetic';
 
+    /* The partner's own mark, top-left of the photo — but ONLY when the
+       artwork does not already carry it.
+     *
+       For UXINDIA the hero IS their poster, and their logo is printed on it.
+       Stamping it again would put the same mark on the same image twice, which
+       reads as a mistake rather than as co-branding. So this draws only when
+       there is no hero: a card built from an event with no cover art still
+       says whose event it is. */
+    if (partnerLogo && !hero) {
+      const plH = 44;
+      const plW = plH * (partnerLogo.width / partnerLogo.height);
+      const white = tintImage(partnerLogo, Math.round(plW), plH, '#FFFFFF');
+      ctx.drawImage(white, FX, 44, plW, plH);
+    }
+
     /* The wordmark, on the photo's bottom-right and twice the size it was.
        "Wecycle should read better" — it was 28px in a corner of the gradient,
        competing with body text; here it sits on the scrim at the card's optical
@@ -1144,6 +1175,35 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
   return CARD_LAYOUT === 'classic' ? renderClassicCard(spec) : renderSpotlightCard(spec);
 }
 
+/**
+ * Description text for a card, with links taken out.
+ *
+ * People routinely paste the event's own URL into the description, and on a
+ * share card that renders as "https://www.ux-india.org/rising-leaders-forum
+ * Design Leadership Forum A flagship…" — a wrapped, truncated link where a
+ * sentence should be. A URL is unclickable on a flat PNG anyway, so it is
+ * costing two lines of the only description the card has room for and giving
+ * nothing back. The link still travels: it is in the caption beside the image.
+ */
+function descriptionFor(spec: ShareCardSpec): string {
+  /* Paragraphs joined with an em dash, not flattened with a space.
+   *
+   * People paste descriptions in from a website, and those almost always open
+   * with a bare heading line — "Design Leadership Forum", then a blank line,
+   * then the actual sentence. Collapsing every run of whitespace to a single
+   * space welded those together into "Design Leadership Forum A flagship
+   * UXINDIA programme focused on…", which reads as a typo on a card that has
+   * room for one line. Soft wraps inside a paragraph still become spaces; only
+   * a genuine blank-line break becomes a dash, so a single-paragraph
+   * description is untouched. */
+  return (spec.description ?? '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .split(/\n\s*\n/)
+    .map(para => para.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join(' — ');
+}
+
 /* KEPT, NOT DEFAULT.
  *
  * The photo-first layout: hero photo on top, words on a white panel below.
@@ -1152,7 +1212,15 @@ export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard
  * differ in structure rather than in polish, so a future call between them is
  * a one-line change to CARD_LAYOUT and not a rebuild. */
 async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  const t = THEME[spec.kind];
+  /* Partner override — see PartnerBrand. Applied in BOTH renderers on purpose:
+     CARD_LAYOUT decides which one runs, and a partner card that silently lost
+     its branding because someone flipped that constant is exactly the kind of
+     bug that ships. It already did: the override went into renderClassicCard
+     while CARD_LAYOUT was 'spotlight', and the card stayed events-purple. */
+  const base = THEME[spec.kind];
+  const t: Theme = spec.partner
+    ? { ...base, label: spec.partner.label, colors: spec.partner.colors, accent: spec.partner.accent }
+    : base;
 
   const canvas = document.createElement('canvas');
   canvas.width = CARD_W;
@@ -1160,11 +1228,12 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
   const ctx = canvas.getContext('2d')!;
 
   const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
-  const [wordmark, logo, avatar, hero] = await Promise.all([
+  const [wordmark, logo, avatar, hero, partnerLogo] = await Promise.all([
     loadImage('/brand/wordmark.png', false),
     loadImage('/brand/logomark.png', false),
     spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
     urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
+    spec.partner?.logoUrl ? loadImage(spec.partner.logoUrl, false) : Promise.resolve(null),
   ]);
 
   /* Panel geometry. The white card floats on the wash with an even margin, and
@@ -1189,6 +1258,19 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
   const FX = PANEL_X + 46;              // text gutter inside the panel
   const TEXT_W = PANEL_W - 92;
 
+  /* ── Where the bottom-anchored rows begin ──
+     The price sits on the panel's floor and the meta line sits above it, both
+     measured up from the bottom. The title and description flow DOWN from the
+     photo. These constants are the only thing the two halves share, so they
+     live out here rather than inside paint() — the description has to know
+     where the meta line starts before it decides how many lines to wrap to. */
+  const PRICE_H = 84;
+  const ROW_Y = PANEL_Y + PANEL_H - 44 - PRICE_H;
+  const META_SIZE = 34;
+  /* Ink top of the meta line: it is drawn on the 'middle' baseline, so half
+     its size sits above the y it is drawn at. */
+  const META_INK_TOP = ROW_Y - META_SIZE - META_SIZE / 2;
+
   /* ── Measure the text before drawing any of it ── */
   const INK = '#12120E';
   const INK_MUTED = '#5C5C52';
@@ -1212,9 +1294,27 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
      the honest cap: it is enough for the sentence that makes someone tap, and
      more would push the price off the panel, which is the one number the card
      exists to communicate. */
-  const desc = (spec.description ?? '').replace(/\s+/g, ' ').trim();
+  const desc = descriptionFor(spec);
   ctx.font = `400 32px ${FONT}`;
-  const descLines = desc ? wrapText(ctx, desc, TEXT_W, 2) : [];
+  const DESC_LH = 42;
+
+  /* How many description lines there is ROOM for.
+   *
+   * Two is the cap, not the promise. The meta line and the price are anchored
+   * to the panel's bottom while the title and description flow down from the
+   * photo, so the two halves meet in the middle and the winner depends on how
+   * long the title wrapped. On the UXINDIA card the title takes two lines and
+   * the second description line landed 9px into the location text, descenders
+   * through the pin.
+   *
+   * The budget is decided HERE, before wrapping, rather than by dropping an
+   * overflowing line at paint time. Dropping it afterwards leaves the sentence
+   * cut off mid-word with no ellipsis, which reads as a rendering bug rather
+   * than as a summary — wrapText only knows to add the '…' if it is told the
+   * real line count up front. */
+  const descTop = PHOTO_Y + PHOTO_H + 44 + titleLines.length * TITLE_LH + 14;
+  const descBudget = Math.min(2, Math.floor((META_INK_TOP - 22 - descTop) / DESC_LH));
+  const descLines = desc && descBudget > 0 ? wrapText(ctx, desc, TEXT_W, descBudget) : [];
 
   const paint = (withPhoto: boolean) => {
     ctx.clearRect(0, 0, CARD_W, CARD_H);
@@ -1294,14 +1394,26 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
       ctx.translate(PHOTO_X, PHOTO_Y);
       paintGrain(ctx, PHOTO_W, PHOTO_H, 0.10, 1);
       ctx.restore();
-      ctx.font = `400 160px ${FONT}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.globalAlpha = 0.9;
-      ctx.fillText(t.glyph, PHOTO_X + PHOTO_W / 2, PHOTO_Y + PHOTO_H / 2);
-      ctx.globalAlpha = 1;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
+      if (partnerLogo) {
+        /* The partner's mark instead of a generic glyph — but only here, in
+           the no-photo case. When the event HAS artwork that artwork is the
+           partner's own poster and already carries their logo; stamping it
+           again would put the same mark on the same image twice, which reads
+           as a mistake rather than as co-branding. */
+        const plW = Math.min(PHOTO_W * 0.72, 620);
+        const plH = plW / (spec.partner?.logoAspect ?? (partnerLogo.width / partnerLogo.height));
+        const white = tintImage(partnerLogo, Math.round(plW), Math.round(plH), '#FFFFFF');
+        ctx.drawImage(white, PHOTO_X + (PHOTO_W - plW) / 2, PHOTO_Y + (PHOTO_H - plH) / 2, plW, plH);
+      } else {
+        ctx.font = `400 160px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = 0.9;
+        ctx.fillText(t.glyph, PHOTO_X + PHOTO_W / 2, PHOTO_Y + PHOTO_H / 2);
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+      }
     }
     ctx.restore();
 
@@ -1327,7 +1439,7 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
       ctx.font = `400 32px ${FONT}`;
       for (const line of descLines) {
         ctx.fillText(line, FX, y);
-        y += 42;
+        y += DESC_LH;
       }
     }
     ctx.textBaseline = 'alphabetic';
@@ -1350,10 +1462,50 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
        look fake. The action travels as the message pasted alongside, which is
        where it actually works — so the money gets the full width instead of
        sharing the row with a decoration. */
-    const PRICE_H = 84;
-    const rowY = PANEL_Y + PANEL_H - 44 - PRICE_H;
+    if (spec.offer) {
+      /* "25% off" carried in the price's own typography, with the qualifier
+         set beside it rather than under it — one line, so the row keeps the
+         same height it has on a listing card and the panel does not change
+         shape between a sofa and a conference. */
+      const { headline, qualifier, ink } = spec.offer;
+      const midY = ROW_Y + PRICE_H / 2 + 1;
+      ctx.textBaseline = 'middle';
 
-    if (money) {
+      let headSize = 76;
+      for (const size of [76, 64, 54, 46]) {
+        ctx.font = `800 ${size}px ${FONT}`;
+        headSize = size;
+        if (ctx.measureText(headline).width <= PANEL_W - 92) break;
+      }
+      ctx.font = `800 ${headSize}px ${FONT}`;
+      const headW = ctx.measureText(headline).width;
+
+      /* The qualifier only earns its place if it fits WHOLE on the same line.
+         Truncated to "for Wecycle mem…" it would say nothing and cost the
+         cleanliness of the row, so it is dropped instead — the caption beside
+         the image carries the same sentence in full. */
+      let qualSize = 34;
+      ctx.font = `600 ${qualSize}px ${FONT}`;
+      let qualW = ctx.measureText(qualifier).width;
+      if (headW + 18 + qualW > PANEL_W - 92) {
+        qualSize = 28;
+        ctx.font = `600 ${qualSize}px ${FONT}`;
+        qualW = ctx.measureText(qualifier).width;
+      }
+
+      ctx.fillStyle = ink;
+      ctx.font = `800 ${headSize}px ${FONT}`;
+      ctx.fillText(headline, FX, midY);
+
+      if (headW + 18 + qualW <= PANEL_W - 92) {
+        ctx.fillStyle = INK_MUTED;
+        ctx.font = `600 ${qualSize}px ${FONT}`;
+        /* +4: the small text sits on the big text's optical centre, not its
+           geometric one — matched by eye against the cap height of "25%". */
+        ctx.fillText(qualifier, FX + headW + 18, midY + 4);
+      }
+      ctx.textBaseline = 'alphabetic';
+    } else if (money) {
       /* Auto-fit: "Swap for any scientific calculator" and "₹450" are the same
          field and cannot share one size. Bigger than before now that nothing
          competes for the row. */
@@ -1367,18 +1519,18 @@ async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
       ctx.font = `800 ${moneySize}px ${FONT}`;
       ctx.fillStyle = INK;
       ctx.textBaseline = 'middle';
-      ctx.fillText(money, FX, rowY + PRICE_H / 2 + 1);
+      ctx.fillText(money, FX, ROW_Y + PRICE_H / 2 + 1);
       ctx.textBaseline = 'alphabetic';
     }
 
     /* ── Meta line: location and date, above the price row ── */
     const metaBits = [spec.location, spec.dateLine].filter(Boolean) as string[];
     if (metaBits.length) {
-      const metaY = rowY - 34;
+      const metaY = ROW_Y - META_SIZE;
       /* 34px, not 27. Location was the smallest text on a card that exists in
          part to say where the thing is — and it is half of the question the
          price asks. */
-      ctx.font = `600 34px ${FONT}`;
+      ctx.font = `600 ${META_SIZE}px ${FONT}`;
       ctx.fillStyle = INK_MUTED;
       ctx.textBaseline = 'middle';
       let mx = FX;
@@ -1790,7 +1942,7 @@ function shareMessage(spec: ShareCardSpec, url: string): string {
      makes the message read as a copy-paste error rather than as a caption. The
      classic layout leaves it off the card, so there the message carries it. */
   const onCard = spec.kind === 'storefront' || CARD_LAYOUT === 'spotlight';
-  const desc = onCard ? '' : (spec.description ?? '').replace(/\s+/g, ' ').trim();
+  const desc = onCard ? '' : descriptionFor(spec);
   const blurb = desc.length > 220 ? `${desc.slice(0, 219).trimEnd()}…` : desc;
   return [hook, blurb, url].filter(Boolean).join('\n\n');
 }

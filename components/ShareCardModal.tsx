@@ -349,6 +349,10 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
 }
 
 function shareText(spec: ShareCardSpec): string {
+  /* A partner post carries its own message. The generic event line —
+     "<title> · <date> — on Wecycle" — says nothing about the discount, which
+     is the entire reason anyone would forward this. */
+  if (spec.partnerMessage) return spec.partnerMessage;
   switch (spec.kind) {
     case 'request': return `Looking for "${spec.title}" on Wecycle`;
     case 'event':   return `${spec.title}${spec.dateLine ? ` · ${spec.dateLine}` : ''} — on Wecycle`;

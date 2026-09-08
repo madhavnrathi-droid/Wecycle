@@ -14,7 +14,7 @@ import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import PartnerOfferPanel from './PartnerOfferPanel';
 import EventDiscoverShelf from './EventDiscoverShelf';
-import { hasPartnerOffer } from '../lib/eventOffer';
+import { hasPartnerOffer, MEMBER_TIER, UX_INDIA_EVENT, uxIndiaShareMessage } from '../lib/eventOffer';
 import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
 import { useBreakpoint } from '../lib/useBreakpoint';
@@ -370,6 +370,32 @@ export default function EventDetailScreen({
     byEmail: ownerContact.email,
     byPhone: ownerContact.phone,
     url: shareUrl(event.id),
+    /* Black and orange instead of the events purple, the pill naming the
+       partner rather than saying "EVENT", and a caption that leads with the
+       discount. Only for the one event that carries the offer — every other
+       event card is untouched. */
+    ...(hasPartnerOffer(event.id) ? {
+      partner: {
+        label: UX_INDIA_EVENT.presenter,
+        /* The Ember wash, same four stops as the offer panel and the spotlight,
+           so all three read as one object seen from different angles. */
+        colors: ['#2A1608', '#7C2D12', '#C2410C', '#EA580C'] as [string, string, string, string],
+        accent: '#FB923C',
+        logoUrl: '/brand/uxindia-white.png',
+        logoAspect: 5.85,
+      },
+      partnerMessage: uxIndiaShareMessage(shareUrl(event.id)),
+      /* The discount, in the slot where a listing shows its price. Without it
+         the card is a poster for somebody else's conference — the one thing it
+         has to say that ux-india.org does not already say is that Wecycle
+         members pay less. #C2410C rather than the wash accent: the pale orange
+         that reads on near-black is 2.1:1 on the white panel. */
+      offer: {
+        headline: `${MEMBER_TIER.percent}% off`,
+        qualifier: 'for Wecycle members',
+        ink: '#C2410C',
+      },
+    } : {}),
   };
   const handleShareEvent = () => {
     track(EVT.share_clicked, { post_id: event.id, post_kind: 'event' });
