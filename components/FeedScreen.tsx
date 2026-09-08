@@ -11,6 +11,8 @@ import {
 } from '../lib/mockData';
 import { resolveItemMedia, getAvatar, resolveEventPhoto, resolveLostFoundPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
+import UxIndiaSpotlight from './UxIndiaSpotlight';
+import { UX_INDIA_EVENT_ID } from '../lib/eventOffer';
 import { opportunityCompLabel, oppRoleBadge } from '../lib/opportunity';
 import SavedSearchBar from './SavedSearchBar';
 import { useAuth } from '../lib/AuthContext';
@@ -172,6 +174,15 @@ export default function FeedScreen({
   const [opportunities, setOpportunities] = useState<MarketplaceItem[]>([]);
   const [requests, setRequests] = useState<MarketplaceItem[]>([]);
   const [events, setEvents] = useState<CommunityEvent[]>([]);
+
+  /* The one event that carries the partner offer. Looked up rather than
+     hard-rendered so the spotlight cannot outlive the event: when it is not in
+     the feed's data — unpublished, cancelled, or simply past — the row is not
+     rendered at all and nothing has to be remembered to take it down. */
+  const uxIndiaEvent = useMemo(
+    () => events.find(ev => ev.id === UX_INDIA_EVENT_ID) ?? null,
+    [events],
+  );
   const [lostFound, setLostFound] = useState<LostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
@@ -1189,6 +1200,22 @@ export default function FeedScreen({
           {engine.modules.map((m, idx) => (
             <Fragment key={`mod-${m.spec.id}`}>
               {renderModule(m)}
+              {/* The partner spotlight, after the second row. High enough to
+                  find without hunting, late enough that the marketplace has
+                  already shown what it is for — putting a partner card above
+                  "Just dropped" teaches people the top of the feed is
+                  advertising, which is how you lose the top of the feed.
+                  Rendered only while the event actually exists and is still
+                  ahead of us; it disappears on its own the day after. */}
+              {idx === 1 && uxIndiaEvent && (
+                <UxIndiaSpotlight
+                  posterUrl={resolveEventPhoto(uxIndiaEvent)}
+                  onOpen={() => {
+                    trackPostOpened('event', uxIndiaEvent.id, { source: 'feed_spotlight' });
+                    onOpenEvent?.(uxIndiaEvent);
+                  }}
+                />
+              )}
               {idx === 2 && (
                 <StorefrontCTA onPostJob={() => {
                   track(EVT.marketing_banner_tapped, { slide: 'post_job_cta' });

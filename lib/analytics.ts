@@ -143,6 +143,7 @@ export const EVT = {
   offer_code_copied:        'offer_code_copied',
   offer_tickets_opened:     'offer_tickets_opened',
   offer_sigchi_applied:     'offer_sigchi_applied',
+  offer_spotlight_tapped:   'offer_spotlight_tapped',
 } as const;
 
 export type EventName = typeof EVT[keyof typeof EVT];

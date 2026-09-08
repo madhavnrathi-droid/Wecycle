@@ -46,19 +46,42 @@ export function Wordmark({ height = 26, className, style, alt = 'Wecycle' }: Wor
   );
 }
 
+/* The four fills of the same mark. Solid variants are generated from the
+ * gradient's own alpha channel, so all four are one geometry rather than four
+ * tracings that drift apart.
+ *
+ *   gradient  the primary mark. Default everywhere on cream or white.
+ *   green     one colour, where a gradient would be noise — small sizes,
+ *             single-colour print, anywhere the mark sits on busy imagery.
+ *   black     high-contrast light surfaces, stamps, watermarks.
+ *   white     dark surfaces. The partner panels are near-black, and a green
+ *             mark on #141210 sits at about 3:1 — fine for a large shape,
+ *             muddy at 20px. White is legible at every size it is used. */
+export type LogomarkVariant = 'gradient' | 'green' | 'black' | 'white';
+
+const LOGOMARK_SRC: Record<LogomarkVariant, string> = {
+  gradient: '/brand/logomark.png',
+  green: '/brand/logomark-green.png',
+  black: '/brand/logomark-black.png',
+  white: '/brand/logomark-white.png',
+};
+
 interface LogomarkProps {
   /** Rendered size in px (square). */
   size?: number;
+  variant?: LogomarkVariant;
   className?: string;
   style?: React.CSSProperties;
   alt?: string;
 }
 
-export function Logomark({ size = 48, className, style, alt = 'Wecycle' }: LogomarkProps) {
+export function Logomark({
+  size = 48, variant = 'gradient', className, style, alt = 'Wecycle',
+}: LogomarkProps) {
   return (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
-      src="/brand/logomark.png"
+      src={LOGOMARK_SRC[variant]}
       alt={alt}
       width={Math.round(size * LOGOMARK_AR)}
       height={size}

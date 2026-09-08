@@ -6405,3 +6405,126 @@ summary::-webkit-details-marker { display: none; }
 @media (hover: hover) {
   .scratch-btn--ghost:hover { background: rgba(255, 255, 255, 0.07); filter: none; }
 }
+
+/* ── UXINDIA spotlight row ── */
+.uxi-spot-wrap { padding: 4px 16px 20px; }
+.uxi-spot {
+  position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 132px;
+  padding: 16px 18px;
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(130% 120% at 6% 0%, rgba(245, 158, 11, 0.30) 0%, transparent 55%),
+    linear-gradient(140deg, #2A1608 0%, var(--uxi-panel) 52%, #0C0A08 100%);
+  color: var(--uxi-ink);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.22s var(--ease-emphasized);
+}
+.uxi-spot:active { transform: scale(0.988); }
+
+/* The poster fills the whole card and a scrim sits over it, rather than the
+   art being confined to a masked strip on the right.
+ *
+ * The strip version was tried and abandoned twice. Confined to 52% it left the
+ * headline about 190px to live in, so "25% off UXINDIA 2026" broke across two
+ * lines; and the poster's own "RISING LEADERS FORUM" lettering landed directly
+ * beside the offer, giving the card two headlines competing an inch apart.
+ *
+ * Full bleed under a heavy scrim fixes both at once: the type gets the width
+ * it needs, and the artwork drops to a warm texture that reads as atmosphere
+ * rather than as a second message. */
+.uxi-spot-art {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* The scrim. Near-opaque where the words are, thinning to the right so the
+   illustration survives at the edge and the card still looks like a poster. */
+.uxi-spot-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(96deg,
+    rgba(14, 11, 9, 0.97) 0%,
+    rgba(16, 13, 10, 0.93) 38%,
+    rgba(18, 15, 12, 0.72) 72%,
+    rgba(20, 17, 13, 0.52) 100%);
+}
+.uxi-spot-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Crop to the illustration, not the poster's masthead: centred higher, the
+     poster's own "RISING LEADERS FORUM" lettering sat beside "25% off" and the
+     card carried two headlines an inch apart. */
+  object-position: 76% 44%;
+  display: block;
+  opacity: 1;
+}
+/* One fade, tuned — not two stacked. Layering a second gradient over the mask
+   drove the poster to nothing and left a flat dark rectangle; the art has to
+   survive to be worth including at all. */
+
+.uxi-spot-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  /* Room for the headline on one line. The scrim is near-opaque under this
+     column, so the text is measured against a dark ground throughout. */
+  max-width: 74%;
+}
+.uxi-spot-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(10px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--uxi-ink-dim);
+}
+.uxi-spot-title {
+  font-size: calc(17px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  color: var(--uxi-ink);
+}
+/* The percentage is the thing that stops a thumb, so it carries the weight and
+   the colour; the brand name stays regular so the two do not compete. */
+.uxi-spot-title b {
+  font-weight: 800;
+  color: var(--uxi-accent);
+}
+.uxi-spot-meta {
+  font-size: calc(11.5px * var(--text-scale));
+  line-height: 1.4;
+  color: var(--uxi-ink-dim);
+}
+.uxi-spot-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: var(--uxi-accent);
+  color: var(--uxi-char);
+  font-size: calc(12px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+@media (min-width: 560px) {
+  .uxi-spot-body { max-width: 68%; }
+  .uxi-spot-title { font-size: calc(19px * var(--text-scale)); }
+}
