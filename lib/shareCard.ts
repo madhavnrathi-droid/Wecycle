@@ -73,9 +73,36 @@ export const STOREFRONT_STYLES: StoreTheme[] = [
   },
 ];
 
+/* ── A partner-branded card ────────────────────────────────────────────────
+ *
+ * Overrides the palette and adds a second logo, for a post that belongs to
+ * someone else's brand as well as to Wecycle. Deliberately not a new
+ * ShareCardKind: the LAYOUT is identical to an event card and a new kind would
+ * mean a new entry in THEME, in the meta switch and in every exhaustive branch
+ * — five places to keep in step for a change that is purely cosmetic.
+ *
+ * The partner's own mark is drawn beside the Wecycle wordmark rather than
+ * instead of it. A card that carries only the partner's brand is an advert
+ * Wecycle paid to distribute; a card carrying both is a collaboration, which
+ * is what this actually is. */
+export interface PartnerBrand {
+  /** Pill label, e.g. "UXINDIA 2026". */
+  label: string;
+  /** Four-stop wash, darkest first. */
+  colors: Stops;
+  /** Must clear 2.58:1 on the lightest stop — same bar as every THEME accent. */
+  accent: string;
+  /** Transparent PNG, drawn white-on-dark beside the Wecycle wordmark. */
+  logoUrl?: string;
+  /** Aspect ratio (w/h) of that logo, so it can be sized without a load race. */
+  logoAspect?: number;
+}
+
 export interface ShareCardSpec {
   kind: ShareCardKind;
   title: string;
+  /** Present only for co-branded posts. See PartnerBrand. */
+  partner?: PartnerBrand;
   imageUrls?: string[];
   price?: number;
   /** The money exactly as it should read — "₹200 / day", "Swap for a
@@ -881,7 +908,13 @@ async function renderStorefrontCard(spec: ShareCardSpec): Promise<RenderedCard> 
  * every line it takes is a line off the price. It rides in the caption instead.
  */
 async function renderClassicCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  const t = THEME[spec.kind];
+  /* A partner card borrows the layout and replaces only the colour and the
+     label. Everything below is written against `t` and does not need to know
+     which of the two it got. */
+  const base = THEME[spec.kind];
+  const t: Theme = spec.partner
+    ? { ...base, label: spec.partner.label, colors: spec.partner.colors, accent: spec.partner.accent }
+    : base;
 
   const canvas = document.createElement('canvas');
   canvas.width = CARD_W;
@@ -889,10 +922,11 @@ async function renderClassicCard(spec: ShareCardSpec): Promise<RenderedCard> {
   const ctx = canvas.getContext('2d')!;
 
   const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
-  const [wordmark, avatar, hero] = await Promise.all([
+  const [wordmark, avatar, hero, partnerLogo] = await Promise.all([
     loadImage('/brand/wordmark.png', false),
     spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
     urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
+    spec.partner?.logoUrl ? loadImage(spec.partner.logoUrl, false) : Promise.resolve(null),
   ]);
 
   const PHOTO_H = 660;
