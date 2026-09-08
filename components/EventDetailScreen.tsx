@@ -6,13 +6,14 @@ import {
   Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus,
   BarChart3, ClipboardList,
 } from 'lucide-react';
-import type { CommunityEvent, User } from '../lib/mockData';
+import type { CommunityEvent, MarketplaceItem, User } from '../lib/mockData';
 import { resolveEventPhotos, getAvatar } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import PartnerOfferPanel from './PartnerOfferPanel';
+import EventDiscoverShelf from './EventDiscoverShelf';
 import { hasPartnerOffer } from '../lib/eventOffer';
 import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
 import { useOwnerContact } from '../lib/useOwnerContact';
@@ -56,6 +57,10 @@ interface EventDetailScreenProps {
   onOpenInsights?: () => void;
   /** Going + has a form: reopen the registration to view/edit answers. */
   onEditRegistration?: () => void;
+  /** Open a listing from the discovery shelf under a partner event. */
+  onOpenItem?: (item: MarketplaceItem) => void;
+  /** Leave the event for the feed proper. */
+  onBrowseAll?: () => void;
 }
 
 /* The vocabulary lives in lib/eventTypes.ts. It used to be duplicated here AND
@@ -75,6 +80,7 @@ function WhatsAppGlyph({ size = 14 }: { size?: number }) {
 
 export default function EventDetailScreen({
   event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onDelete,
+  onOpenItem, onBrowseAll,
   onOpenInsights, onEditRegistration,
 }: EventDetailScreenProps) {
   /* Prefer the organizer's uploaded photos; mock events fall back to the
@@ -1144,6 +1150,18 @@ export default function EventDetailScreen({
           onOpenStorefront={onOpenStorefront}
         />
       </section>
+
+      {/* ── WHAT ELSE IS HERE ──
+          Only under the partner event, and only when there is somewhere to send
+          the tap. The offer brings people who came for a discount code and have
+          never seen the marketplace; without this the visit ends when the code
+          is copied and the partnership bought a clipboard. Real listings answer
+          "what is this app" better than any paragraph could. */}
+      {hasPartnerOffer(event.id) && onOpenItem && (
+        <div style={{ marginTop: 8 }}>
+          <EventDiscoverShelf onOpenItem={onOpenItem} onBrowseAll={onBrowseAll} />
+        </div>
+      )}
 
         </div>{/* /right column */}
       </div>{/* /desktop grid wrapper */}

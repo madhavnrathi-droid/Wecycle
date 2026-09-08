@@ -144,6 +144,9 @@ export const EVT = {
   offer_tickets_opened:     'offer_tickets_opened',
   offer_sigchi_applied:     'offer_sigchi_applied',
   offer_spotlight_tapped:   'offer_spotlight_tapped',
+  /** A listing opened from the shelf under a partner event — the measure of
+   *  whether the partnership brought browsers or only code-copiers. */
+  offer_discover_tapped:    'offer_discover_tapped',
 } as const;
 
 export type EventName = typeof EVT[keyof typeof EVT];

@@ -729,6 +729,8 @@ export default function WecycleApp() {
               } : undefined}
               onOpenInsights={(isOwner || isAdmin) ? () => setInsightsEvent(openEvent) : undefined}
               onEditRegistration={() => { setRegisterEditMode(true); setRegisterEvent(openEvent); }}
+              onOpenItem={(it) => { setOpenEvent(null); setOpenItem(it); }}
+              onBrowseAll={() => { setOpenEvent(null); setActiveScreen('feed'); }}
             />
           </main>
         </div>
