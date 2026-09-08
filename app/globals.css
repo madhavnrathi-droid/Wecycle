@@ -205,22 +205,37 @@
  * magnify the page still can, which WCAG 1.4.4 requires. Scoped to things you
  * press rather than the whole document, so double-tapping ordinary content
  * still behaves as the platform intends. */
-button,
-a,
-select,
-label,
-summary,
-[role="button"],
-[role="tab"],
-[role="switch"],
-.feed-card,
-.pcard,
-.crow,
-.inventory-card,
-.bottom-nav-btn,
-.bottom-nav-post {
+/* Applied to the whole app surface, not just to things that look tappable.
+ *
+ * The element-by-element version shipped first and was not enough: a double tap
+ * that lands on the gap between two cards, on a card's padding, on a rail's
+ * background or on any wrapper still hits an element with the default
+ * touch-action, and the browser zooms. In a dense grid most of the pixels are
+ * not the button — they are the spaces around it — so the narrow fix missed
+ * most of the surface people actually tap.
+ *
+ * Nothing in Wecycle uses double-tap-to-zoom as a designed gesture: photos open
+ * in a viewer on a single tap, and there is no map or document to magnify. So
+ * there is nothing to preserve by leaving it enabled, and a whole class of
+ * accidental zooms to remove by turning it off.
+ *
+ * PINCH-TO-ZOOM IS UNAFFECTED. `manipulation` disables double-tap zoom and the
+ * 300ms click delay; it does not touch pinch. The viewport meta still omits
+ * user-scalable=no, so anyone who needs to magnify the page can, and WCAG 1.4.4
+ * is intact. That distinction is the whole reason this is done in CSS rather
+ * than by locking the viewport. */
+.app-container,
+.app-container * {
   touch-action: manipulation;
 }
+/* The two places that must keep their own gesture. The scratch foil needs raw
+   pointer streams to be scratched at all, and anything that scrolls sideways
+   needs pan-x back — `manipulation` allows panning, but stating these keeps the
+   intent visible if the rule above is ever narrowed. */
+.scratch-foil { touch-action: none; }
+.rail-track,
+.carousel-track,
+[data-hscroll] { touch-action: pan-x pan-y; }
 
 html {
   font-size: 16px; /* rem base — NOT scaled; --text-scale drives type */
