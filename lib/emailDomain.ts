@@ -13,6 +13,13 @@
  * Mirrored server-side by the enforce_manipal_signup_email trigger on
  * auth.users, so this can't be bypassed by calling the API directly. Keep the
  * two in step if you change the rule.
+ *
+ * Three lists sit beside the rule, and they are deliberately not one list:
+ *   DOMAIN_EXEMPT_EMAILS   admins + the Play reviewer. Exempt for everything.
+ *   LEGACY_MEMBER_EMAILS   members who predate the rule. Sign in only.
+ *   PARTNER_EMAILS         collectives the team onboards. Sign in only.
+ * Each grants a different amount, so collapsing them would grant the widest
+ * to all three.
  */
 
 import { ADMIN_EMAILS } from './AuthContext';
@@ -44,6 +51,39 @@ export const DOMAIN_EXEMPT_EMAILS: ReadonlyArray<string> = [
 export const LEGACY_MEMBER_EMAILS: ReadonlyArray<string> = [
   'divanshigo@gmail.com',
 ] as const;
+
+/* ── Onboarded partners ──
+ *
+ * Collectives and businesses the team brings onto Wecycle deliberately so they
+ * can hold a storefront. They have ordinary business addresses, which the
+ * Manipal rule exists to reject — and correctly, because that rule is about who
+ * may JOIN a student community, not about who the team may onboard.
+ *
+ * Its own list rather than reusing either of the two above, because both would
+ * have had to start lying about what they are: DOMAIN_EXEMPT_EMAILS is the
+ * admin roster and being on it grants moderation over every post in the app,
+ * and LEGACY_MEMBER_EMAILS is documented as people who predate the rule and as
+ * a list that can only ever shrink.
+ *
+ * Being on this list grants exactly ONE thing: an account may exist at this
+ * address. No admin powers, no second code path anywhere.
+ *
+ * Checked for 'signin' and 'reset' only — never 'signup'. A partner account is
+ * provisioned by the team, so the sign-up screen never needs to accept the
+ * address, and not accepting it means knowing the address is not enough to
+ * create anything with it.
+ *
+ * Mirrored server-side by public.wecycle_partner_emails(), which the
+ * enforce_manipal_signup_email trigger consults. Keep the two in step — a name
+ * added here alone gets past the app and is refused by the database. */
+export const PARTNER_EMAILS: ReadonlyArray<string> = [
+  'noolucollective.team@gmail.com',   /* Noolu Collective */
+] as const;
+
+/** True when the address is an onboarded partner rather than a member. */
+export function isPartnerEmail(email: string): boolean {
+  return PARTNER_EMAILS.includes(email.trim().toLowerCase());
+}
 
 /** Domains people typo when they mean a Manipal one → what they probably meant.
  *  Only ever consulted AFTER isManipalEmail() has said no, so a pattern that
@@ -135,10 +175,12 @@ export function emailGateProblem(
      perfectly good address. */
   if (isManipalEmail(trimmed)) return null;
 
-  /* Getting back into an account you already have is not signing up. Only
-     'signin' and 'reset' consult this, so a grandfathered address still can't
-     create anything. */
-  if (purpose !== 'signup' && LEGACY_MEMBER_EMAILS.includes(trimmed.toLowerCase())) {
+  /* Getting back into an account you already have is not signing up, and
+     neither is signing into one the team provisioned for you. Only 'signin'
+     and 'reset' consult these two, so neither a grandfathered nor a partner
+     address can create anything. */
+  if (purpose !== 'signup'
+      && (LEGACY_MEMBER_EMAILS.includes(trimmed.toLowerCase()) || isPartnerEmail(trimmed))) {
     return null;
   }
 
