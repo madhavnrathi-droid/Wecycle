@@ -59,6 +59,10 @@ precision mediump float;
 varying vec2 vUv;
 uniform float uTime;
 uniform vec2  uAspect;
+/* Which way the ember is weighted, as axis weights on vUv: (0,1) pools it at
+   the top, (1,0) at the right. A uniform rather than two shaders because the
+   ONLY difference between the two is which coordinate feeds the lift. */
+uniform vec2  uAxis;
 
 const float uSpeed     = 0.4;
 const float uDensity   = 1.3;
@@ -109,12 +113,18 @@ void main() {
      movement and not just boiling. */
   v += 0.16 * sin(uv.x * uFrequency * 0.28 + uv.y * 0.9 + t * 0.7);
 
-  /* WEIGHTED TO ONE END ON PURPOSE, and note which end: vUv.y comes from clip
-     space, where 0 is the BOTTOM, so this ramp puts the ember at the top of
-     the element as CSS sees it and leaves the foot near black. The card's veil
-     is deliberately strongest at that same top edge (0.72 against 0.34 in the
-     middle) — the two are a matched pair, which is why the measured figures
-     below hold for the heading that sits up there.
+  /* WEIGHTED TO ONE END ON PURPOSE, and note which end. vUv comes from clip
+     space, where y=0 is the BOTTOM — so the default axis (0,1) puts the ember
+     at the top of the element as CSS sees it and leaves the foot near black.
+     The card's veil is deliberately strongest at that same top edge (0.72
+     against 0.34 in the middle); the two are a matched pair, which is why the
+     measured figures below hold for the heading that sits up there.
+
+     bias="right" swaps the axis to (1,0) and pools the ember in the right
+     third instead. That is for a landscape strip, where the type occupies the
+     left and a top-weighted band would run straight through it. The surface
+     using it owes the same duty: a scrim matched to where the ember now is,
+     and a measurement rather than a guess.
   
      THESE NUMBERS WERE MEASURED, NOT PICKED. The first version of this shader
      rendered a field whose brightest pixel had a relative luminance of 0.149
@@ -129,7 +139,7 @@ void main() {
   
      The middle row is this. Nearly a fifth of the card reads as ember, and
      white type still has seventy percent more contrast than AA asks for. */
-  float lift = smoothstep(-0.05, 0.95, vUv.y * 0.9 + 0.22);
+  float lift = smoothstep(-0.05, 0.95, dot(vUv, uAxis) * 0.9 + 0.22);
   float e = clamp(v * 1.40 * lift, 0.0, 1.0);
 
   vec3 ink    = vec3(0.043, 0.027, 0.016);   /* #0B0704 */
@@ -157,9 +167,20 @@ function prefersReducedMotion(): boolean {
 export interface EmberShaderProps {
   /** Extra classes for the positioned wrapper. */
   className?: string;
+  /**
+   * Where the ember pools. 'top' (default) is the card: a horizontal band of
+   * ember along the upper edge. 'right' is the landscape strip: the ember sits
+   * in the right third and the left stays near-black for type.
+   *
+   * This drives the CSS fallback as well as the shader — `.ember--right`
+   * repositions the radial stops to match. The two must agree, or a device
+   * with no WebGL gets the glow in the one place the layout reserved for
+   * words.
+   */
+  bias?: 'top' | 'right';
 }
 
-export default function EmberShader({ className }: EmberShaderProps) {
+export default function EmberShader({ className, bias = 'top' }: EmberShaderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -208,6 +229,10 @@ export default function EmberShader({ className }: EmberShaderProps) {
 
     const uTime = gl.getUniformLocation(prog, 'uTime');
     const uAspect = gl.getUniformLocation(prog, 'uAspect');
+    /* Set once — it never changes for the life of the component, and the
+       effect re-runs if `bias` ever does. */
+    gl.uniform2f(gl.getUniformLocation(prog, 'uAxis'),
+      bias === 'right' ? 1 : 0, bias === 'right' ? 0 : 1);
 
     /* 1.5, not devicePixelRatio. A drifting gradient carries no detail worth
        three times the fragments, and this runs on mid-range Androids. */
@@ -404,10 +429,13 @@ export default function EmberShader({ className }: EmberShaderProps) {
          * actually matters; the context goes when the canvas is collected. */
       } catch { /* teardown is best effort */ }
     };
-  }, []);
+  }, [bias]);
 
   return (
-    <div className={`ember${className ? ` ${className}` : ''}`} aria-hidden="true">
+    <div
+      className={`ember${bias === 'right' ? ' ember--right' : ''}${className ? ` ${className}` : ''}`}
+      aria-hidden="true"
+    >
       {/* Painted first and never removed: the shader draws on top of it, and
           where the shader cannot run this is what the card looks like. */}
       <div className="ember-fallback" />

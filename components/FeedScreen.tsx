@@ -30,7 +30,7 @@ import { getBlockedUserIds, onBlocksChange } from '../lib/moderation';
 import { track, trackPostOpened, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import EmptyState from './EmptyState';
-import MarketingBanner, { type BannerSlide } from './MarketingBanner';
+import UxIndiaBanner from './UxIndiaBanner';
 import UserSearchResults from './UserSearchResults';
 import FitImage from './FitImage';
 import { priceChip, fromListingType, DEAL_BY_ID } from '../lib/dealTypes';
@@ -901,96 +901,107 @@ export default function FeedScreen({
     );
   };
 
-  /* Marketing banner slides — promote each Wecycle use case to first-time
-     visitors. Hand-drawn / abstract aesthetic: each card uses a Wecycle
-     accent gradient + a Twemoji illustration (loaded via Iconify CDN) that
-     reads as loose, flat, hand-crafted artwork rather than a literal photo.
-     The same `slides` array feeds both the compact (mobile) banner next to
-     the greeting and the wide (desktop) banner below the search bar. */
-  const bannerSlides: BannerSlide[] = [
-    {
-      id: 'share',
-      image: '/banners/share.webp',
-      illustration: 'twemoji:wrapped-gift',
-      title: 'Share what you don’t use',
-      subtitle: 'Give it a second life nearby',
-      detail: 'Drop a photo, name your price (or free) — the right neighbour finds it in minutes.',
-      gradient:
-        'linear-gradient(135deg, rgba(34,197,94,0.92) 0%, rgba(13,148,136,0.85) 100%)',
-      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'share' }); onBannerAction?.('share'); },
-    },
-    {
-      id: 'request',
-      image: '/banners/request.webp',
-      illustration: 'twemoji:raising-hand',
-      title: 'Ask for what you need',
-      subtitle: 'Borrow before you buy',
-      detail: 'Post a request and let the community come to you — books, tools, a kettle, anything.',
-      gradient:
-        'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
-      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'request' }); onBannerAction?.('request'); },
-    },
-    {
-      id: 'events',
-      image: '/banners/events.webp',
-      illustration: 'twemoji:tear-off-calendar',
-      title: 'Join local events',
-      subtitle: 'Repair cafés, swaps, cleanups',
-      detail: 'See what your community is hosting this week. RSVP in one tap.',
-      gradient:
-        'linear-gradient(135deg, rgba(99,102,241,0.92) 0%, rgba(168,85,247,0.88) 100%)',
-      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'events' }); onBannerAction?.('events'); },
-    },
-    {
-      id: 'lost-found',
-      image: '/banners/lost-found.webp',
-      illustration: 'twemoji:magnifying-glass-tilted-left',
-      title: 'Lost something?',
-      subtitle: 'Or help return what you found',
-      detail: 'A second board, side-by-side with the marketplace. Verified by the community.',
-      gradient:
-        'linear-gradient(135deg, rgba(234,179,8,0.92) 0%, rgba(217,119,6,0.88) 100%)',
-      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'lost-found' }); onBannerAction?.('lost-found'); },
-    },
-    {
-      /* New slide: the Jobs & gigs tab had no promotion anywhere on the home
-         screen, and its rail carries one post — the surface nobody knows exists
-         is the one that stays empty. This points at the tab rather than the post
-         form, because browsing what is already there is the lower-commitment
-         first step. */
-      id: 'jobs',
-      image: '/banners/jobs.webp',
-      illustration: 'twemoji:briefcase',
-      title: 'Get paid for what you’re good at',
-      subtitle: 'Design, tutoring, photography',
-      detail: 'Small paid work on campus — post a gig, or take one on this week.',
-      gradient:
-        'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
-      ariaLabel: 'Get paid for what you’re good at — browse jobs and gigs',
-      onClick: () => {
-        track(EVT.marketing_banner_tapped, { slide: 'jobs' });
-        setActiveType('services');
-      },
-    },
-    {
-      id: 'whatsapp',
-      image: '/banners/whatsapp.webp',
-      illustration: 'twemoji:graduation-cap',
-      /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
-           plainly that it is not affiliated with, endorsed by, or sponsored by
-           any university. A banner written in the institution's own voice
-           contradicts that, and App Review asks submitters to prove they are
-           authorised to use protected third-party material. Students
-           describing themselves claims nothing on anyone else's behalf. */
-        title: 'Better than the group chat',
-      subtitle: 'Searchable, and still here tomorrow',
-      detail: 'No scrolling four hundred messages to find who was selling a kettle.',
-      gradient:
-        'linear-gradient(135deg, rgba(37,99,235,0.92) 0%, rgba(168,85,247,0.9) 55%, rgba(34,197,94,0.9) 100%)',
-      ariaLabel: 'Better than the group chat — invite a friend to Wecycle',
-      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'whatsapp' }); onBannerAction?.('invite'); },
-    },
-  ];
+  /* ── BANNER_SLIDES_PARKED ─────────────────────────────────────────────
+   *
+   * The six-slide feature carousel, kept verbatim and switched off. Every
+   * slide is still true and the artwork is still in /public/banners — the
+   * reason it is not on screen is that the home feed now leads with one
+   * time-limited thing (see the banner mount below), and a carousel that gave
+   * that thing one slot in six would have spent most of its life advertising
+   * everything else.
+   *
+   * TO BRING THEM BACK: uncomment this block, re-import MarketingBanner, and
+   * put `<MarketingBanner slides={bannerSlides} variant="wide" />` back in the
+   * two mounts. Nothing else was removed — MarketingBanner itself, its CSS and
+   * its artwork are all untouched.
+   *
+   * Do NOT delete this to tidy up. The copy in here was written line by line
+   * and the alternative to a comment is rewriting it from memory.
+   */
+  // const bannerSlides: BannerSlide[] = [
+  //   {
+  //     id: 'share',
+  //     image: '/banners/share.webp',
+  //     illustration: 'twemoji:wrapped-gift',
+  //     title: 'Share what you don’t use',
+  //     subtitle: 'Give it a second life nearby',
+  //     detail: 'Drop a photo, name your price (or free) — the right neighbour finds it in minutes.',
+  //     gradient:
+  //       'linear-gradient(135deg, rgba(34,197,94,0.92) 0%, rgba(13,148,136,0.85) 100%)',
+  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'share' }); onBannerAction?.('share'); },
+  //   },
+  //   {
+  //     id: 'request',
+  //     image: '/banners/request.webp',
+  //     illustration: 'twemoji:raising-hand',
+  //     title: 'Ask for what you need',
+  //     subtitle: 'Borrow before you buy',
+  //     detail: 'Post a request and let the community come to you — books, tools, a kettle, anything.',
+  //     gradient:
+  //       'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
+  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'request' }); onBannerAction?.('request'); },
+  //   },
+  //   {
+  //     id: 'events',
+  //     image: '/banners/events.webp',
+  //     illustration: 'twemoji:tear-off-calendar',
+  //     title: 'Join local events',
+  //     subtitle: 'Repair cafés, swaps, cleanups',
+  //     detail: 'See what your community is hosting this week. RSVP in one tap.',
+  //     gradient:
+  //       'linear-gradient(135deg, rgba(99,102,241,0.92) 0%, rgba(168,85,247,0.88) 100%)',
+  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'events' }); onBannerAction?.('events'); },
+  //   },
+  //   {
+  //     id: 'lost-found',
+  //     image: '/banners/lost-found.webp',
+  //     illustration: 'twemoji:magnifying-glass-tilted-left',
+  //     title: 'Lost something?',
+  //     subtitle: 'Or help return what you found',
+  //     detail: 'A second board, side-by-side with the marketplace. Verified by the community.',
+  //     gradient:
+  //       'linear-gradient(135deg, rgba(234,179,8,0.92) 0%, rgba(217,119,6,0.88) 100%)',
+  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'lost-found' }); onBannerAction?.('lost-found'); },
+  //   },
+  //   {
+  //     /* New slide: the Jobs & gigs tab had no promotion anywhere on the home
+  //        screen, and its rail carries one post — the surface nobody knows exists
+  //        is the one that stays empty. This points at the tab rather than the post
+  //        form, because browsing what is already there is the lower-commitment
+  //        first step. */
+  //     id: 'jobs',
+  //     image: '/banners/jobs.webp',
+  //     illustration: 'twemoji:briefcase',
+  //     title: 'Get paid for what you’re good at',
+  //     subtitle: 'Design, tutoring, photography',
+  //     detail: 'Small paid work on campus — post a gig, or take one on this week.',
+  //     gradient:
+  //       'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
+  //     ariaLabel: 'Get paid for what you’re good at — browse jobs and gigs',
+  //     onClick: () => {
+  //       track(EVT.marketing_banner_tapped, { slide: 'jobs' });
+  //       setActiveType('services');
+  //     },
+  //   },
+  //   {
+  //     id: 'whatsapp',
+  //     image: '/banners/whatsapp.webp',
+  //     illustration: 'twemoji:graduation-cap',
+  //     /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
+  //          plainly that it is not affiliated with, endorsed by, or sponsored by
+  //          any university. A banner written in the institution's own voice
+  //          contradicts that, and App Review asks submitters to prove they are
+  //          authorised to use protected third-party material. Students
+  //          describing themselves claims nothing on anyone else's behalf. */
+  //       title: 'Better than the group chat',
+  //     subtitle: 'Searchable, and still here tomorrow',
+  //     detail: 'No scrolling four hundred messages to find who was selling a kettle.',
+  //     gradient:
+  //       'linear-gradient(135deg, rgba(37,99,235,0.92) 0%, rgba(168,85,247,0.9) 55%, rgba(34,197,94,0.9) 100%)',
+  //     ariaLabel: 'Better than the group chat — invite a friend to Wecycle',
+  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'whatsapp' }); onBannerAction?.('invite'); },
+  //   },
+  // ];
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -1109,14 +1120,32 @@ export default function FeedScreen({
         </div>
       </section>
 
-      {/* ── MOBILE MARKETING BANNER ── */}
-      <section className="marketing-banner-mount-mobile" style={{ padding: '0 16px 16px' }}>
-        <MarketingBanner slides={bannerSlides} variant="wide" />
-      </section>
+      {/* ── THE BANNER ──
+         One, not six. The carousel that was here rotated through Wecycle's own
+         features every four seconds; the slides are parked rather than deleted
+         (see BANNER_SLIDES_PARKED above) because the argument for showing them
+         is unchanged — it is just that right now there is something on the
+         home screen with a date on it, and a banner that spends five sixths of
+         its time on evergreen copy is a banner that mostly is not about the
+         thing that expires.
 
-      {/* ── DESKTOP MARKETING BANNER ── */}
-      <section className="marketing-banner-mount-desktop" style={{ padding: '0 16px 20px' }}>
-        <MarketingBanner slides={bannerSlides} variant="wide" />
+         One mount, not the mobile/desktop pair the carousel needed: this card
+         is one element that changes proportion at its breakpoints rather than
+         two elements taking turns being display:none. */}
+      <section style={{ padding: '0 16px 16px' }}>
+        <UxIndiaBanner
+          onOpen={() => {
+            track(EVT.marketing_banner_tapped, { slide: 'uxindia' });
+            if (uxIndiaEvent) {
+              trackPostOpened('event', uxIndiaEvent.id, { source: 'feed_banner' });
+              onOpenEvent?.(uxIndiaEvent);
+            } else {
+              /* The event has not loaded yet, or is gone. The events screen is
+                 the honest destination — never a dead tap. */
+              onBannerAction?.('events');
+            }
+          }}
+        />
       </section>
 
       {/* ── MOBILE SEARCH (under banner) ── */}

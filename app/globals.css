@@ -5829,6 +5829,260 @@ textarea:focus-visible {
    Services board a doorway (services are the thinnest board, so it needs the
    invitation most). Deliberately NOT a card and NOT a bordered box: one soft
    tinted fill, a floating pill button, no stroke. */
+/* ── The UXINDIA banner ───────────────────────────────────────────────────
+ *
+ * Home feed, top, and the only banner there. Black field, ember shader biased
+ * right, type on the left. 2:1 on a phone — the same shape the carousel it
+ * replaced used, so the product row below it did not move down the page.
+ *
+ * Everything here is in service of one rule: the shader drifts, and the type
+ * has to stay readable at the worst frame, not on average.
+ */
+.uxib {
+  position: relative;
+  /* A flex COLUMN, not a block. `height: 100%` on the inner span resolved to
+     auto against an auto-height parent — a min-height is not a height a
+     percentage can resolve against — so the inner box came out 165px inside a
+     190px card, and a <button> vertically centres its content, which parked
+     the extra 25px as 12px of dead space above and below. The card's own air
+     ended up outside the layer that was supposed to distribute it.
+
+     As a column with the inner set to flex: 1, the inner always fills the card
+     and space-between has the real figure to divide. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  /* ── A FLOOR, NOT A RATIO ──
+     The carousel this replaced was aspect-ratio: 2/1, and copying that was the
+     first mistake here: at 358px wide it gave 178px, and the measured stack —
+     lock 22, eyebrow 14, headline 52, meta 15, their internal gaps, 44px of
+     padding — filled 166 of it. Twelve pixels between the lock and the copy is
+     not air, it is a gap, and the card read as packed rather than spacious.
+
+     A ratio is also the wrong tool. It fixes the height from the WIDTH, so the
+     card cannot grow when the reader's text-scale grows the words inside it,
+     and it inflates the banner on a big phone for no reason — the same
+     "consistent density, not proportional enlargement" the rails settled on.
+
+     So: a minimum height, and space-between hands whatever is spare to the one
+     gap in the middle. Content taller than the floor simply makes the card
+     taller. */
+  min-height: 190px;
+  padding: 0;
+  border: none;
+  border-radius: 18px;
+  overflow: hidden;
+  /* Its own stacking context. The shader repaints every frame and must not be
+     able to invalidate anything outside this box. */
+  isolation: isolate;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  /* The floor under the shader, so the first paint is never a white flash and
+     a lost context is never a hole. */
+  background: #0B0704;
+  transition: transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.uxib:active { transform: scale(0.99); }
+.uxib:focus-visible {
+  /* On near-black, the page's dark focus ring is invisible. */
+  outline: 2px solid #F7F3EE;
+  outline-offset: -4px;
+}
+
+.uxib-bg { z-index: 0; }
+
+/* ── The scrim ──
+ *
+ * MEASURED, and the first two attempts were both wrong.
+ *
+ * Method: read the shader canvas back with readPixels, composite this gradient
+ * over it in JS, and take the WORST case rather than the average — the
+ * shader's palette ceiling (#FA5F19, which the canvas was measured actually
+ * reaching: brightest raw pixel [254,97,26]) seen through the THINNEST veil
+ * anywhere inside each text box. Contrast is then computed against that. The
+ * animation itself cannot be sampled frame by frame in a hidden tab, because
+ * rAF is paused there and every read returns the same frame; bounding it by
+ * the ceiling is stronger than sampling anyway, since no frame can beat it.
+ *
+ *   no scrim                          headline 2.83:1  warm 52.9%   fails
+ *   flat rgba(8,5,3,0.55)             headline 8.87:1  warm 35.4%
+ *   ramp 0.90 -> 0.20 across          headline 7.46:1  warm 34.1%
+ *   this: 0.80 -> 0.74 -> 0.30 -> .12 headline 9.61:1  warm 31.9%
+ *
+ * The third row was the first thing written here and it is WORSE than a flat
+ * scrim on both counts, which is the whole reason these numbers exist. The
+ * headline column runs to 68% of the width, and a scrim that starts thinning
+ * at 34% is thinnest exactly where the end of the headline is — it spent its
+ * darkness on the left margin, where there are no words, and left the last
+ * word of "UXINDIA 2026" the most exposed thing on the card.
+ *
+ * So it plateaus instead: 0.74 held flat across the whole type column, then
+ * falling away over the last third where the ember is and the words are not.
+ * Nine and a half to one on the headline, six and a quarter on the smallest
+ * line, and a third of the card still reads as ember — against 17.4% on the
+ * offer card this shader was built for.
+ */
+.uxib-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(100deg,
+    rgba(8, 5, 3, 0.80) 0%,
+    rgba(8, 5, 3, 0.74) 62%,
+    rgba(8, 5, 3, 0.30) 88%,
+    rgba(8, 5, 3, 0.12) 100%);
+}
+
+.uxib-inner {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  /* The lock at the top, the copy at the foot, and the air between them is
+     whatever is left — which is what makes the card feel spacious at every
+     width instead of at one. */
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.uxib-lock {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  /* The lock is the one element that must not stretch with the box. */
+  flex: 0 0 auto;
+}
+.uxib-x {
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(247, 243, 238, 0.45);
+  transform: translateY(0.5px);
+}
+/* The clipping box for the partner lockup — see UXI_LOCKUP in the component
+   for why this is a box-and-overflow crop rather than object-fit. Its width
+   and height come from the component so the arithmetic lives in one place. */
+.uxib-uxi {
+  display: block;
+  overflow: hidden;
+  flex: 0 0 auto;
+  user-select: none;
+}
+/* max-width: none is the load-bearing line. A global `max-width: 100%` on
+   images clamped the oversized source back down to the clip box's own width —
+   measured 124px against the 175px it needs — so the crop showed the whole
+   lockup shrunk instead of the top-left of it enlarged. The image is
+   DELIBERATELY wider and taller than its parent here; that overflow IS the
+   crop. */
+.uxib-uxi img {
+  display: block;
+  max-width: none;
+  max-height: none;
+}
+
+.uxib-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* 62% at the narrowest. The remaining third is where the ember lives and
+     where the arrow sits; letting the text run into it would put the headline
+     on the brightest part of the field. */
+  max-width: 68%;
+}
+.uxib-eyebrow {
+  font-size: calc(9.5px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  /* A warm tint rather than the shader's own #FF5005 — and a LIGHT one.
+     Candidates, against the worst-case ground under this box:
+       #F5A97A  4.17:1  fails AA for 9.5px text
+       #F8BE95  4.93:1  passes, but on a bound with no margin
+       #FBCBA8  6.93:1  this
+     The first was here first and it failed, which is what the measurement was
+     for. Keeping it warm at all is worth the trouble: the alternative is one
+     ink for all three lines, and then nothing in the type relates to the
+     ember behind it. */
+  color: #FBCBA8;
+  margin-bottom: 7px;
+}
+.uxib-head {
+  font-size: calc(25px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  color: #F7F3EE;
+  /* The number and the event name are one sentence, and it is allowed to take
+     two lines on a narrow phone rather than shrink. */
+  text-wrap: balance;
+}
+/* The event name, one step back from the number — same family, same weight,
+   80% opacity. Not a second colour: two colours in a two-word headline is a
+   decision the reader has to interpret. */
+.uxib-head-dim { color: rgba(247, 243, 238, 0.82); }
+
+.uxib-meta {
+  margin-top: 7px;
+  font-size: calc(11px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1.35;
+  /* Cream at 72%, which measures 6.25:1 against the worst-case ground under
+     this box — the smallest number on the card and still 39% clear of AA. */
+  color: rgba(247, 243, 238, 0.72);
+}
+
+.uxib-go {
+  position: absolute;
+  z-index: 3;
+  right: 16px;
+  bottom: 16px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #120A05;
+  background: #F7F3EE;
+  /* No shadow. The card is already the darkest thing on the page and a shadow
+     under a light disc on near-black draws a grey smudge, not depth. */
+  transition: transform 200ms var(--ease-spring), background 200ms;
+  flex: 0 0 auto;
+}
+.uxib:hover .uxib-go { transform: translate(1px, -1px); }
+.uxib:active .uxib-go { transform: scale(0.94); }
+
+/* ── Wider than a phone ──
+ * The strip gets longer rather than taller. A single 2:1 card across a
+ * desktop feed column is 450px of banner above the fold, which is a landing
+ * page, not a banner. */
+@media (min-width: 700px) {
+  .uxib { min-height: 178px; border-radius: 20px; }
+  .uxib-inner { padding: 22px 26px; }
+  .uxib-copy { max-width: 60%; }
+  .uxib-head { font-size: calc(31px * var(--text-scale)); }
+  .uxib-go { right: 22px; bottom: 22px; width: 42px; height: 42px; }
+}
+@media (min-width: 1024px) {
+  .uxib { min-height: 196px; border-radius: 22px; }
+  .uxib-inner { padding: 26px 30px; }
+  .uxib-copy { max-width: 56%; }
+  .uxib-head { font-size: calc(34px * var(--text-scale)); }
+}
+
+/* Narrow phones: the copy column gets more of the width, because at 320px a
+   68% column puts "UXINDIA 2026" onto a third line. The card's height needs no
+   special case — the floor above lets it grow on its own. */
+@media (max-width: 420px) {
+  .uxib-copy { max-width: 76%; }
+}
+
 /* ── Sell nudge ───────────────────────────────────────────────────────────
  *
  * Deliberately the SMALLER sibling of .sf-cta below, and every difference is a
@@ -6763,6 +7017,19 @@ summary::-webkit-details-marker { display: none; }
     radial-gradient(90% 70% at 88% 96%, #9A3412 0%, rgba(154,52,18,0) 62%),
     linear-gradient(158deg, #0B0704 0%, #2A1206 52%, #0B0704 100%);
 }
+/* ── bias="right": the landscape strip ──
+   The shader's lift axis moves to vUv.x, and this has to move with it. A
+   fallback glowing bottom-left while the shader glows right would put the
+   ember behind the headline on exactly the devices that cannot run the shader
+   — the one group that gets no second chance at it. */
+.ember--right .ember-fallback {
+  background:
+    radial-gradient(78% 128% at 96% 22%, #FF5005 0%, rgba(255,80,5,0) 62%),
+    radial-gradient(62% 96% at 78% 96%, #9A3412 0%, rgba(154,52,18,0) 66%),
+    linear-gradient(100deg, #0B0704 0%, #170A04 46%, #2A1206 100%);
+}
+
+
 .ember-canvas {
   position: absolute;
   inset: 0;
