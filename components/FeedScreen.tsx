@@ -64,6 +64,10 @@ interface FeedScreenProps {
   /** Straight into the "offer a service" composer, skipping the post-type
    *  picker — the mid-storefront job CTA already answered which type. */
   onPostService?: () => void;
+  /** Straight into the item composer, skipping the post-type picker. Used by
+   *  the sell nudge under the shop window, which has already answered "what
+   *  kind of post is this?" by asking about a thing you own. */
+  onSellItem?: () => void;
 }
 
 /* ── Rail filters ──────────────────────────────────────────────────────────
@@ -79,6 +83,12 @@ interface FeedScreenProps {
  * sorted differently.
  */
 type RailFilterId = 'fresh' | 'popular' | 'budget' | 'college' | 'free';
+
+/* How many cards the shop window holds. Ten is two and a half screens of
+   sideways scroll on a phone — enough that the row plainly continues past the
+   edge, short enough that it stays a sample rather than becoming the catalogue
+   the rails below are for. */
+const SHOP_WINDOW_SIZE = 10;
 
 interface RailFilterCtx { myCollege: string | null }
 
@@ -105,7 +115,7 @@ const RAIL_FILTERS: Record<RailFilterId, {
 
 export default function FeedScreen({
   onPost, onOpenMenu, onOpenAccount, onOpenItem, onOpenEvent, onOpenLF,
-  onBannerAction, onOpenUser, onRequireAuth, onPostService,
+  onBannerAction, onOpenUser, onRequireAuth, onPostService, onSellItem,
 }: FeedScreenProps) {
   const { profile, user } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -491,6 +501,98 @@ export default function FeedScreen({
   const categoryRails = CATEGORY_LIST
     .map(c => ({ id: c.id, title: c.rail.title, sub: c.rail.sub, list: itemsByCat(c.id) }))
     .filter(r => r.list.length >= 2);
+
+  /* ── The shop window ────────────────────────────────────────────────────
+   *
+   * Measured on a 390×844 phone: the first product card used to begin at
+   * roughly y=700, which is below the fold. Everything above it — the value
+   * proposition, the banner, the search field, the type tabs, the category
+   * tiles — describes the app without ever showing its stock, so the first
+   * screen answered "what is this?" and never answered "is there anything in
+   * here for me?". Categories are navigation, not evidence; a photograph with
+   * a price on it is evidence.
+   *
+   * ── WHY ONE PER CATEGORY RATHER THAN THE NEWEST ──
+   *
+   * The freshest listings already have a rail — "Just dropped" — a few hundred
+   * pixels below this one. A newest-first row here would show the same five
+   * objects twice on one screen, which makes the catalogue look SMALLER than it
+   * is: exactly backwards for the row whose job is to prove there is stock.
+   *
+   * So this row is a sampler. One item from each category, biggest shelves
+   * first, so a glance says "furniture, a cycle, a textbook, a kettle" rather
+   * than "four textbooks". Breadth is the thing a new visitor cannot infer from
+   * a taxonomy strip, and it is what tells them which of their own problems
+   * this app happens to solve.
+   *
+   * Round-robin across the shelves, so a thin catalogue still produces a full
+   * row rather than three cards and a gap, and a deep one does not get to
+   * spend the tail of the row on itself.
+   */
+  const shopWindow = useMemo(() => {
+    /* Real objects only. Requests are people ASKING for things and services
+       are labour; both belong in this app and neither is something you can
+       come and collect, which is what this row is promising. */
+    const pool = liveItems.filter(it => !it.isRequest && it.kind !== 'opportunity');
+
+    const byCat = new Map<string, MarketplaceItem[]>();
+    for (const it of pool) {
+      const cat = it.categoryId ?? normalizeCategory(it.category) ?? 'other';
+      const bucket = byCat.get(cat);
+      if (bucket) bucket.push(it);
+      else byCat.set(cat, [it]);
+    }
+    /* Inside a shelf: a photograph beats no photograph, then freshest.
+       A card with no cover renders as a blank tile, and this is the row whose
+       entire argument is "look at the things" — the first build put "Reusable
+       Scraps. Misc." second from the left as an empty white rectangle, which
+       argues the opposite. Photo-first also nudges the picks off pure recency,
+       which is the axis the "Just dropped" rail below already owns.
+
+       Across shelves: biggest first. Depth rather than recency at the top
+       level so the row does not reshuffle between two visits an hour apart —
+       a shop window people recognise is worth more here than a maximally
+       novel one. */
+    const shelves = [...byCat.values()]
+      .map(list => [...list].sort((a, b) => {
+        const pa = coverImage(a).url ? 0 : 1;
+        const pb = coverImage(b).url ? 0 : 1;
+        return pa !== pb ? pa - pb : a.postedDaysAgo - b.postedDaysAgo;
+      }))
+      .sort((a, b) => b.length - a.length);
+
+    /* Round-robin, not one-per-shelf-then-fill-from-the-rest. The first
+       version did the latter and the tail of the row came out "Oversized
+       T-shirt #7", "#6", "#5" — three cards from one seller's fashion shelf,
+       side by side, which reads as a rendering bug rather than a catalogue.
+       Taking the nth of every shelf before the (n+1)th of any keeps a deep
+       shelf's surplus spread across the row instead of stacked at its end. */
+    const picked: MarketplaceItem[] = [];
+    /* At most two from one seller. The window is the front page, and one
+       prolific seller owning it makes a busy marketplace look like a single
+       person's shop — the same concern sellerFairnessScore covers in the
+       ranker, which this row does not go through. */
+    const perSeller = new Map<string, number>();
+    const SELLER_CAP = 2;
+    for (let depth = 0; picked.length < SHOP_WINDOW_SIZE; depth++) {
+      let reachedAnything = false;
+      for (const shelf of shelves) {
+        const it = shelf[depth];
+        if (!it) continue;
+        reachedAnything = true;
+        const seller = it.user?.id ?? '';
+        const used = perSeller.get(seller) ?? 0;
+        if (seller && used >= SELLER_CAP) continue;
+        perSeller.set(seller, used + 1);
+        picked.push(it);
+        if (picked.length >= SHOP_WINDOW_SIZE) break;
+      }
+      /* Every shelf is shorter than `depth` — there is nothing left to take,
+         and without this the loop spins until the size cap. */
+      if (!reachedAnything) break;
+    }
+    return picked.slice(0, SHOP_WINDOW_SIZE);
+  }, [liveItems]);
 
   /* Storefront when nothing is narrowing the view; a product grid the
      moment a category, a type tab, or a search takes over. */
@@ -1048,6 +1150,49 @@ export default function FeedScreen({
         </div>
       </section>
 
+      {/* ── SHOP WINDOW ──
+         Stock, above the tabs, because the tabs and the category tiles are
+         both navigation and neither of them shows you a single thing you could
+         own. Only on the undisturbed storefront: once somebody has typed a
+         search or picked a category they have told us what they want, and a
+         sampler of everything else pushing their answer down the page is
+         noise. See the note on `shopWindow`. */}
+      {showStorefront && shopWindow.length >= 2 && (
+        <Rail
+          title="Have a look at what&rsquo;s here"
+          sub="A bit of everything students are passing on."
+          variant="micro"
+          /* The whole catalogue, unfiltered — not openRail('fresh'). A rail's
+             heading is a promise and the tap has to keep it: this one says "a
+             bit of everything", so handing it to the newest-first filter would
+             answer a different question than the one the row asked. */
+          onSeeAll={() => { setActiveType('shared'); setRailFilter(null); setActiveCategory('all'); }}
+        >
+          {shopWindow.map(it => railCell(
+            it,
+            renderProduct(it, 'feed_shop_window', it.listingType === 'free' ? 'free' : undefined, `win-${it.id}`),
+            `win-${it.id}`,
+          ))}
+        </Rail>
+      )}
+
+      {/* ── SELL NUDGE ──
+         Directly under the window, and that order is the argument: a person
+         who has just scrolled past somebody else's kettle is the person most
+         likely to remember their own. Asked before the tabs because supply is
+         the constraint in a campus marketplace — a thin catalogue is what kills
+         demand — and nothing above this point ever asks anyone to post.
+         Deliberately a strip and not a second card: the storefront already
+         carries one full-height CTA further down, and two of them would make
+         the homepage read as a page of adverts. */}
+      {showStorefront && (
+        <SellNudge onSell={() => {
+          haptics.selection();
+          track(EVT.marketing_banner_tapped, { slide: 'sell_nudge' });
+          (onSellItem ?? onPost)();
+        }} />
+      )}
+
       {/* ── USER SEARCH RESULTS ── */}
       <UserSearchResults
         results={userHits}
@@ -1376,6 +1521,50 @@ function Rail({
       </div>
       <div className="rail-track">{children}</div>
     </section>
+  );
+}
+
+/* ── Sell nudge ────────────────────────────────────────
+   The supply half of a marketplace, asked for in one line.
+
+   Nobody opens a marketplace to sell. They open it to look, and the thought
+   "I've got one of those sitting in a cupboard" only ever arrives while
+   looking at somebody else's — which is why this sits immediately under the
+   shop window rather than on a screen of its own.
+
+   Small on purpose. The storefront already carries one full-height promo
+   further down (StorefrontCTA, for the jobs board), and stacking a second slab
+   of the same weight at the top would teach people that the first screen is
+   advertising. A strip the height of a list row asks the question without
+   spending the fold on it.
+
+   The copy names an object rather than a category. "List an item" is a
+   database instruction; "the kettle you haven't touched since first year" is a
+   thing somebody can picture on their own shelf, which is the entire distance
+   between reading the sentence and acting on it. */
+function SellNudge({ onSell }: { onSell: () => void }) {
+  return (
+    /* The whole strip is the control, not a row containing one.
+       At 390px a title, a subtitle and a separate 44px pill cannot share a
+       358px row — measured: the pill wrapped to its own line and the strip grew
+       to 182px, taller than the shop window's card titles and no longer small
+       in any sense. Making the strip itself the button gets the height back
+       (62px) and gives the ask a target the width of the screen, which is the
+       cheaper trade under Fitts either way. */
+    <button type="button" className="sell-nudge" onClick={onSell}>
+      <span className="sell-nudge-ico" aria-hidden="true">📦</span>
+      <span className="sell-nudge-copy">
+        {/* Names an object, not a category. "List an item" is a database
+            instruction; a thing gathering dust is something the reader can
+            picture on their own shelf, which is the whole distance between
+            reading the sentence and acting on it. */}
+        <span className="sell-nudge-title">Something gathering dust?</span>
+        <span className="sell-nudge-sub">Someone on campus needs it.</span>
+      </span>
+      {/* Text, not a chevron. The strip has to name its own action somewhere —
+          a bare arrow leaves a screen reader with two statements and no verb. */}
+      <span className="sell-nudge-go">Sell it</span>
+    </button>
   );
 }
 

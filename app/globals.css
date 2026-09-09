@@ -5829,6 +5829,97 @@ textarea:focus-visible {
    Services board a doorway (services are the thinnest board, so it needs the
    invitation most). Deliberately NOT a card and NOT a bordered box: one soft
    tinted fill, a floating pill button, no stroke. */
+/* ── Sell nudge ───────────────────────────────────────────────────────────
+ *
+ * Deliberately the SMALLER sibling of .sf-cta below, and every difference is a
+ * step down: 62px tall against 116px, a flat tint against a two-stop gradient,
+ * an outlined pill against a filled one. Both are asks; only one of them is
+ * allowed to spend the fold.
+ *
+ * One flat lime tint rather than .sf-cta's gradient. This strip sits between
+ * the shop window and the tabs, and a gradient there would put a third distinct
+ * surface treatment inside one screen — product cards, this, category tiles.
+ * The tint is the brand's own lime and reads as a highlight on the cream base,
+ * which is all it has to do.
+ */
+.sell-nudge {
+  display: flex;
+  width: calc(100% - 32px);
+  align-items: center;
+  gap: 11px;
+  margin: 2px 16px 18px;
+  padding: 12px 13px;
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  background:
+    linear-gradient(180deg, rgba(168, 221, 0, 0.14) 0%, rgba(168, 221, 0, 0.06) 100%),
+    var(--bg-card);
+  transition: transform 0.14s var(--ease-spring);
+}
+.sell-nudge:active { transform: scale(0.985); }
+.sell-nudge-ico {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(19px * var(--text-scale));
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-sm);
+}
+/* flex-basis 0, not auto. A wrapping flex line is broken up using each item's
+   HYPOTHETICAL size — its basis before any shrinking — so an auto-basis copy
+   block measured at its content width, decided it could not sit beside the
+   glyph, and took a row of its own. Basis 0 lets it claim what is left. */
+.sell-nudge-copy {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sell-nudge-title {
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.sell-nudge-sub {
+  font-size: calc(11.5px * var(--text-scale));
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+/* A span, not a nested button — the strip around it already is one. Sized to
+   read as the affordance without claiming to be a second target. */
+.sell-nudge-go {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--text-primary);
+  font-size: calc(12.5px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  transition: background 0.14s, color 0.14s;
+}
+.sell-nudge:hover .sell-nudge-go {
+  background: var(--text-primary);
+  color: var(--bg-base);
+}
+
+/* Theme is a `.dark` class on the root, not a media query — same as .sf-cta.
+   A white glyph plate on the dark base is a hole punched in the strip. */
+.dark .sell-nudge-ico { background: rgba(255, 255, 255, 0.10); }
+
 .sf-cta {
   position: relative;
   overflow: hidden;

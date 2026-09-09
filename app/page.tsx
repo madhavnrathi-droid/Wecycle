@@ -761,6 +761,10 @@ export default function WecycleApp() {
               /* The storefront's "Post a job" CTA already knows the post type,
                  so it skips the picker and opens the service composer. */
               onPostService={openOfferService}
+              /* Same shortcut for the sell nudge under the shop window: it
+                 asked about a thing you own, so the picker has nothing left
+                 to ask. */
+              onSellItem={openShareItem}
               onOpenMenu={() => setDrawerOpen(true)}
               onOpenAccount={goToAccount}
               onOpenItem={setOpenItem}
