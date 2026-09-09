@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
   Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus,
-  BarChart3, ClipboardList,
+  BarChart3, ClipboardList, Pencil,
 } from 'lucide-react';
 import type { CommunityEvent, MarketplaceItem, User } from '../lib/mockData';
 import { resolveEventPhotos, getAvatar } from '../lib/photos';
@@ -13,6 +13,7 @@ import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import PartnerOfferPanel from './PartnerOfferPanel';
+import { LinkedText } from './PostLink';
 import EventDiscoverShelf from './EventDiscoverShelf';
 import { hasPartnerOffer, MEMBER_TIER, UX_INDIA_EVENT, uxIndiaShareMessage } from '../lib/eventOffer';
 import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
@@ -48,6 +49,9 @@ interface EventDetailScreenProps {
   event: CommunityEvent;
   isRsvpd: boolean;
   isOwner: boolean;
+  /** Cross-account moderation. Adds an affordance; never changes the layout.
+   *  See the note on canEdit. */
+  isAdmin?: boolean;
   onBack: () => void;
   onRsvp: () => void;
   onRequireAuth: () => void;
@@ -79,10 +83,27 @@ function WhatsAppGlyph({ size = 14 }: { size?: number }) {
 
 
 export default function EventDetailScreen({
-  event, isRsvpd, isOwner, onBack, onRsvp, onRequireAuth, onOpenStorefront, onDelete,
+  event, isRsvpd, isOwner, isAdmin, onBack, onRsvp, onRequireAuth, onOpenStorefront, onDelete,
   onOpenItem, onBrowseAll,
   onOpenInsights, onEditRegistration,
 }: EventDetailScreenProps) {
+  /* ── Who sees the ORGANISER view, and who sees the event ──
+   *
+   * The organiser's event page IS the editor: the description becomes a
+   * textarea, the date and venue become inputs. That is deliberate for the
+   * person who created it.
+   *
+   * It was also what every admin saw, because page.tsx passed
+   * `isOwner={isOwner || isAdmin}`. The admin allow-list is the people who run
+   * Wecycle, so the account most likely to be showing somebody the app was the
+   * one account that could not see this event as a student sees it — no
+   * rendered description, no links inside it, just a text box with the raw
+   * copy in it. Reported as "the links and cards aren't showing".
+   *
+   * Same rule as ItemDetailScreen: isOwner drives the editor, isAdmin adds a
+   * pencil. Nothing is taken away — one tap and the editor appears. */
+  const [adminEditOn, setAdminEditOn] = useState(false);
+  const canEdit = isOwner || (!!isAdmin && adminEditOn);
   /* Prefer the organizer's uploaded photos; mock events fall back to the
      curated Unsplash covers. Real events with no upload → empty array → we
      render the hero block without an image. */
@@ -450,13 +471,24 @@ export default function EventDetailScreen({
         {/* Header right-side is share only now — "add to calendar" moved down
            beside RSVP, where the other event actions live. */}
         <div style={{ display: 'flex', gap: 4 }}>
-          {isOwner && onOpenInsights && (
+          {canEdit && onOpenInsights && (
             <button
               aria-label="View insights"
               className="theme-toggle"
               onClick={() => { haptics.selection(); onOpenInsights(); }}
             >
               <BarChart3 size={17} strokeWidth={1.8} />
+            </button>
+          )}
+          {/* Moderator editing, opt-in. An admin reads the event exactly as a
+              student does until they ask for the editor. */}
+          {!!isAdmin && !isOwner && !adminEditOn && (
+            <button
+              aria-label="Edit this event as admin"
+              className="theme-toggle"
+              onClick={() => { haptics.selection(); setAdminEditOn(true); }}
+            >
+              <Pencil size={17} strokeWidth={1.8} />
             </button>
           )}
           <button
@@ -545,7 +577,7 @@ export default function EventDetailScreen({
                         <Check size={11} strokeWidth={2.5} /> Going
                       </div>
                     )}
-                    {isOwner && (
+                    {canEdit && (
                       <button
                         type="button"
                         onClick={() => setPhotoEditOpen(true)}
@@ -571,7 +603,7 @@ export default function EventDetailScreen({
               />
             </div>
           </section>
-        ) : isOwner ? (
+        ) : canEdit ? (
           <section style={{ padding: isDesktop ? 0 : '12px 16px 0' }}>
             <button
               type="button"
@@ -598,7 +630,7 @@ export default function EventDetailScreen({
       {/* ── BOTTOM CTA ── */}
       <section className="ev-cta">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
-          {isOwner && saveError && (
+          {canEdit && saveError && (
             <div role="alert" style={{
               padding: '6px 10px',
               background: 'rgba(237,46,80,0.1)',
@@ -612,7 +644,7 @@ export default function EventDetailScreen({
           {/* OWNER:
              Clean → Delete full-width
              Dirty → [Discard] [Save changes]  (no repost concept for events) */}
-          {isOwner ? (
+          {canEdit ? (
             isDirty ? (
               <>
                 <button
@@ -817,7 +849,7 @@ export default function EventDetailScreen({
           )}
         </div>
         {/* Going + form → quick access to their own submission. */}
-        {!isOwner && isRsvpd && !!event.hasForm && onEditRegistration && (
+        {!canEdit && isRsvpd && !!event.hasForm && onEditRegistration && (
           <button
             type="button"
             onClick={() => { haptics.selection(); onEditRegistration(); }}
@@ -842,7 +874,7 @@ export default function EventDetailScreen({
 
       {/* ── TITLE + KEY FACTS ── */}
       <section style={{ padding: '24px 20px 0' }}>
-        {isOwner ? (
+        {canEdit ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <EventEditField label="Event title">
               <input
@@ -1033,7 +1065,7 @@ export default function EventDetailScreen({
 
       {/* ── DESCRIPTION ── */}
       <section style={{ padding: '24px 20px 0' }}>
-        {isOwner ? (
+        {canEdit ? (
           /* The EventEditField provides its own label — no separate h3. */
           <EventEditField label="About this event">
             <textarea
@@ -1055,7 +1087,16 @@ export default function EventDetailScreen({
             }}>
               About this event
             </h3>
-            <p style={{
+            {/* LinkedText, not a plain <p>.
+                Listings have rendered their descriptions through this since it
+                was written — the comment there says "a URL someone typed into
+                the description should be tappable" — and events never did. So
+                the UXINDIA event, whose first line was its own registration
+                URL, showed that link as dead grey text: visible, unusable, and
+                impossible to copy out of a paragraph on a phone.
+                Segments, never dangerouslySetInnerHTML — the copy is
+                organiser-written and must not be parsed as markup. */}
+            <LinkedText text={desc} style={{
               margin: 0,
               fontSize: 'calc(14px * var(--text-scale))', color: 'var(--text-secondary)',
               lineHeight: 1.6,
@@ -1064,9 +1105,7 @@ export default function EventDetailScreen({
               WebkitLineClamp: shouldClamp && !expanded ? 5 : undefined,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-            }}>
-              {desc}
-            </p>
+            }} />
             {shouldClamp && (
               <button
                 onClick={() => setExpanded(e => !e)}
@@ -1200,7 +1239,7 @@ export default function EventDetailScreen({
         </div>{/* /right column */}
       </div>{/* /desktop grid wrapper */}
 
-      {isOwner && (
+      {canEdit && (
         <PhotoEditDialog
           open={photoEditOpen}
           onOpenChange={setPhotoEditOpen}
@@ -1212,7 +1251,7 @@ export default function EventDetailScreen({
       )}
       {/* ── Registration form manager (owner) — dedicated full-page builder.
            Back returns to this detail screen exactly as it was. */}
-      {isOwner && (
+      {canEdit && (
         <FormBuilderScreen
           open={manageFormOpen}
           subtitle={event.title}

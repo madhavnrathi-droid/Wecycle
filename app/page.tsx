@@ -718,7 +718,8 @@ export default function WecycleApp() {
             <EventDetailScreen
               event={openEvent}
               isRsvpd={rsvpdEvents.has(openEvent.id)}
-              isOwner={isOwner || isAdmin}
+              isOwner={isOwner}
+              isAdmin={isAdmin}
               onBack={() => setOpenEvent(null)}
               onRsvp={() => requestRsvp(openEvent)}
               onRequireAuth={() => setModal('auth')}
@@ -982,7 +983,8 @@ export default function WecycleApp() {
               <EventDetailScreen
                 event={openEvent}
                 isRsvpd={rsvpdEvents.has(openEvent.id)}
-                isOwner={isOwner || isAdmin}
+                isOwner={isOwner}
+                isAdmin={isAdmin}
                 onBack={() => setOpenEvent(null)}
                 onRsvp={() => requestRsvp(openEvent)}
                 onRequireAuth={() => setModal('auth')}
