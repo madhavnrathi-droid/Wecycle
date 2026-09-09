@@ -33,8 +33,37 @@ export const UX_INDIA_EVENT_ID = '3f22523a-4e96-4014-9405-9877d51f80ed';
 /** Where a member goes to actually buy the ticket. */
 export const UX_INDIA_TICKETS_URL = 'https://www.ux-india.org/tickets';
 
-/** Who verifies SIGCHI membership by hand. */
-export const SIGCHI_VERIFY_EMAIL = 'madhav.smiblr2024@learner.manipal.edu';
+/* ── Who fields a SIGCHI query ─────────────────────────────────────────────
+ *
+ * Three people, not one. The automatic check answers almost everybody, so what
+ * reaches this address is the residue: a member the roster has wrong, or has
+ * under a different address. That is a small number of mails and every one of
+ * them is a student who cannot get a discount they are entitled to — so it must
+ * not sit in one person's inbox waiting for them to be free.
+ *
+ * All three are on the admin allow-list in AuthContext, which is the roster of
+ * who actually runs Wecycle. Kept in that order deliberately: Kshama first, so
+ * the mail is not addressed to the owner by default and then forwarded.
+ *
+ * All three go in the TO field rather than one To and two Cc. Any of them can
+ * answer, and a student writing to a named group gets a reply from whoever
+ * reads it first instead of waiting on one name.
+ */
+export const SIGCHI_VERIFY_EMAILS: ReadonlyArray<string> = [
+  'kshama.smiblr2024@learner.manipal.edu',   /* Kshama M */
+  'madhav.smiblr2024@learner.manipal.edu',   /* Madhav Rathi */
+  'vidhi.smiblr2025@learner.manipal.edu',    /* Vidhi Shah */
+] as const;
+
+/**
+ * The recipient list as a mailto path expects it.
+ *
+ * A comma-separated list of addr-spec, per RFC 6068 — commas are the standard
+ * separator there and are NOT percent-encoded, because an encoded comma is
+ * read by mail clients as part of a single address rather than as a separator,
+ * which produces one invalid recipient instead of three valid ones.
+ */
+export const SIGCHI_VERIFY_TO = SIGCHI_VERIFY_EMAILS.join(',');
 
 /* ── The 30% code ──────────────────────────────────────────────────────────
  *
@@ -120,55 +149,23 @@ export function canRevealMemberCode(isSignedIn: boolean): boolean {
 
 /* ── The SIGCHI email, which is now a FALLBACK ─────────────────────────────
  *
- * This used to be the whole SIGCHI flow: compose a request, send it, wait for
- * a human to check a spreadsheet and reply. The roster now lives in the
- * database and `claim_sigchi_offer` answers in a second, so the primary path
- * is instant and this exists for the case the automatic check cannot solve —
- * the member is genuinely on UXINDIA's list and the address Wecycle holds for
- * them is wrong, or missing.
+ * This used to be the whole SIGCHI flow: compose a request, send it, wait for a
+ * human to check a spreadsheet and reply. The roster now lives in the database
+ * and `claim_sigchi_offer` answers in a second, so the primary path is instant
+ * and this exists for the case the automatic check cannot solve — the member is
+ * genuinely on UXINDIA's list and the address Wecycle holds for them is wrong,
+ * or missing.
  *
  * That is a real case and it must stay reachable. A verification flow with no
  * way to say "you have my details wrong" is a flow that silently turns
  * legitimate members away, and they have no idea why.
  *
- * Opens the member's own mail app with the message already written, because
- * the alternative is asking somebody to compose a formal-sounding request to a
- * stranger, which is where people give up. They still send it themselves, so
- * nothing is sent on their behalf and the reply lands in their own inbox.
- *
- * encodeURIComponent, not a template with raw text: a name with an ampersand
- * in it would otherwise truncate the body at that character and send a
- * half-written application.
+ * `sigchiApplicationMailto` used to live here as well — the "apply and wait"
+ * composer from the old flow. It was DEAD once the check moved into the
+ * product: defined, exported, and called from nowhere. Deleted rather than
+ * left, because a dead mailto still holding the old single recipient is
+ * exactly how the wrong address comes back.
  */
-export function sigchiApplicationMailto(opts: {
-  memberName?: string | null;
-  memberEmail?: string | null;
-}): string {
-  const name = (opts.memberName ?? '').trim();
-  const email = (opts.memberEmail ?? '').trim();
-
-  const subject = 'SIGCHI discount — UXINDIA 2026 Rising Leaders Forum';
-
-  const body = [
-    'Hello,',
-    '',
-    `I'd like to apply for the ${SIGCHI_TIER.percent}% SIGCHI member discount for the`,
-    'Rising Leaders Forum at UXINDIA 2026, via Wecycle.',
-    '',
-    name ? `Name: ${name}` : 'Name:',
-    email ? `Wecycle account: ${email}` : 'Wecycle account:',
-    'SIGCHI membership ID:',
-    '',
-    'I can share proof of my current SIGCHI membership if needed.',
-    '',
-    'Thank you,',
-    name || '',
-  ].join('\n');
-
-  return `mailto:${SIGCHI_VERIFY_EMAIL}`
-    + `?subject=${encodeURIComponent(subject)}`
-    + `&body=${encodeURIComponent(body)}`;
-}
 
 /**
  * The "your list is wrong" email, sent after the automatic check has failed.
@@ -206,7 +203,7 @@ export function sigchiMismatchMailto(opts: {
     name || '',
   ].join('\n');
 
-  return `mailto:${SIGCHI_VERIFY_EMAIL}`
+  return `mailto:${SIGCHI_VERIFY_TO}`
     + `?subject=${encodeURIComponent(subject)}`
     + `&body=${encodeURIComponent(body)}`;
 }
