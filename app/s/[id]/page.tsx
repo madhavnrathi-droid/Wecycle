@@ -90,7 +90,23 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   }
   const priceStr = m.price != null ? ` — ₹${m.price.toLocaleString('en-IN')}` : '';
   const ogTitle = `${m.title}${priceStr}`;
-  const desc = (m.description?.trim() || `${m.kindLabel} — circulate what you no longer need.`).slice(0, 180);
+  /* The preview blurb.
+   *
+   * Newlines collapse to spaces: a raw slice of a multi-paragraph description
+   * put "Design Leadership Forum\n\nA flagship UXINDIA programme…" into the
+   * card, and the crawlers that respect the break render a one-word first line.
+   *
+   * And it breaks on a WORD, not at exactly 180 characters — the hard slice
+   * ended this event's card on "It brings togethe", which reads as a truncated
+   * database field rather than a summary. The ellipsis says the sentence
+   * continues; a severed word just looks broken. */
+  const raw = (m.description?.trim() || `${m.kindLabel} — circulate what you no longer need.`)
+    .replace(/\s+/g, ' ')
+    .trim();
+  const LIMIT = 180;
+  const desc = raw.length <= LIMIT
+    ? raw
+    : `${raw.slice(0, raw.lastIndexOf(' ', LIMIT - 1) > 80 ? raw.lastIndexOf(' ', LIMIT - 1) : LIMIT - 1).trimEnd()}…`;
   const images = [{ url: m.photo ?? '/og-image.png', alt: m.title }];
   return {
     title: `${m.title} · Wecycle`,
