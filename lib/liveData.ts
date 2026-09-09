@@ -1482,6 +1482,38 @@ export interface EditListingPatch {
 
 type ListingUpdate = Database['public']['Tables']['listings']['Update'];
 
+/* ── Why every edit asks for its row back ─────────────────────────────────
+ *
+ * `update(...).eq('id', id)` returns `{ error: null }` when RLS filters the
+ * statement down to zero rows. Not an error — a success that changed nothing.
+ * PostgREST is behaving correctly: the UPDATE was valid and matched no visible
+ * row, which is not a failure at the SQL level.
+ *
+ * It is a failure at the product level, and it was reachable. Measured against
+ * production while signed out: the listing editor reported "All changes saved"
+ * for a title change that RLS had discarded, and the row's title in Postgres
+ * was untouched. Anyone whose session lapsed mid-edit — the ordinary way a
+ * phone left on a desk fails — would have been told their work was safe while
+ * every keystroke went nowhere. That mattered less when a person had to press
+ * Save and got no confirmation either way; it matters completely now that the
+ * screen states, on its own initiative, that the work is saved.
+ *
+ * So the writes ask for the affected ids back and treat an empty array as what
+ * it is. `admin_select_listings` / `admin_select_requests` exist so this check
+ * cannot produce a false negative for a moderator editing a hidden post — see
+ * the migration of the same name.
+ */
+function assertWrote(rows: { id: string }[] | null, what: string): void {
+  if (!rows || rows.length === 0) {
+    /* Phrased to complete a sentence, because both places that show this
+       already say what failed: the editor's status line prefixes "Couldn't
+       save — " and the photo dialog's toast follows an explicit Save. An
+       earlier wording repeated the verb and came out as "Couldn't save —
+       Could not save this listing — you may have been signed out". */
+    throw new Error(`you may have been signed out (the ${what} was not changed)`);
+  }
+}
+
 export async function updateListingFields(id: string, patch: EditListingPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   assertClean([patch.title, patch.description, patch.location]);
@@ -1515,8 +1547,10 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
   if (patch.priceMax !== undefined)    (update as { price_max?: number | null }).price_max = patch.priceMax;
   if (patch.isHidden !== undefined)    update.status = patch.isHidden ? 'hidden' : 'active';
 
-  const { error } = await supabase.from('listings').update(update).eq('id', id);
+  const { data, error } = await supabase
+    .from('listings').update(update).eq('id', id).select('id');
   if (error) throw error;
+  assertWrote(data, 'listing');
   notifyPostsChanged();
 }
 
@@ -1524,11 +1558,13 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
 export async function repostListing(id: string, patch?: EditListingPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   if (patch) await updateListingFields(id, patch);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('listings')
     .update({ posted_at: new Date().toISOString(), status: 'active' })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  assertWrote(data, 'listing');
   notifyPostsChanged();
 }
 
@@ -1540,15 +1576,19 @@ export async function updateListingMedia(
   videoUrls: string[],
 ) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('listings')
     .update({
       photo_urls: photoUrls,
       video_urls: videoUrls,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  /* Same silent-zero-rows trap as the field writes — and worse here, because
+     the photo dialog closes on success and the old photos stay on screen. */
+  assertWrote(data, 'listing');
   notifyPostsChanged();
 }
 
@@ -1571,19 +1611,23 @@ export async function updateRequestFields(id: string, patch: EditRequestPatch) {
   if (patch.description !== undefined) update.description = patch.description.trim() || null;
   if (patch.urgency !== undefined)     update.urgency = patch.urgency;
   if (patch.needByDate !== undefined)  update.need_by_date = patch.needByDate || null;
-  const { error } = await supabase.from('requests').update(update as never).eq('id', id);
+  const { data, error } = await supabase
+    .from('requests').update(update as never).eq('id', id).select('id');
   if (error) throw error;
+  assertWrote(data as { id: string }[] | null, 'request');
   notifyPostsChanged();
 }
 
 export async function repostRequest(id: string, patch?: EditRequestPatch) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   if (patch) await updateRequestFields(id, patch);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('requests')
     .update({ posted_at: new Date().toISOString(), status: 'open' } as never)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  assertWrote(data as { id: string }[] | null, 'request');
   notifyPostsChanged();
 }
 
@@ -1593,15 +1637,17 @@ export async function updateRequestMedia(
   videoUrls: string[],
 ) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('requests')
     .update({
       photo_urls: photoUrls,
       video_urls: videoUrls,
       updated_at: new Date().toISOString(),
     } as never)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  assertWrote(data as { id: string }[] | null, 'request');
   notifyPostsChanged();
 }
 
