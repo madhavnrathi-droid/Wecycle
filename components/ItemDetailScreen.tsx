@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Save, Loader2, Flag, Camera, ImagePlus, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp } from 'lucide-react';
 import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
@@ -67,6 +67,173 @@ function PhotoLogoStamp({ offset = 12 }: { offset?: number }) {
   );
 }
 
+/* ── The draft, and the baseline it is measured against ───────────────────
+ *
+ * Editing is auto-saved, and the thing that makes auto-save possible is having
+ * something honest to compare the fields to.
+ *
+ * `isDirty` used to compare them to the `item` PROP, and that prop is a
+ * snapshot: app/page.tsx puts the tapped listing in state and nothing refreshes
+ * it while the detail screen is open. So a successful save changed the database
+ * and changed nothing the comparison could see — the bar went on reading
+ * "Save changes" as though the tap had been ignored, which is exactly what a
+ * person would conclude. Under auto-save the same staleness is worse than
+ * confusing: permanently dirty means saving in a loop, once every debounce,
+ * for as long as the screen is open.
+ *
+ * So the component keeps its own baseline of what it has persisted, advances it
+ * on each successful write, and re-seeds it if a genuinely new item arrives.
+ */
+interface Draft {
+  title: string;
+  description: string;
+  location: string;
+  priceStr: string;
+  listingType: 'free' | 'sell' | 'borrow' | 'swap';
+  comp: Comp;
+  ratePeriod?: RatePeriod;
+  priceMaxStr: string;
+  category: string;
+  urgent: boolean;
+}
+
+/* Hoisted out of the component: no closure, and both `draftOf` and the
+   re-hydration effect need it. item.category carries the LABEL, so a raw read
+   here yields "hobbies & collectibles" — an id no <option> has, which is how
+   opening a post used to show the wrong category in the select while still
+   holding the bad value. normalizeCategory also maps retired ids forward. */
+const categoryIdOf = (it: { categoryId?: string; category?: string }) =>
+  normalizeCategory(it.categoryId) ?? normalizeCategory(it.category) ?? '';
+
+function draftOf(it: MarketplaceItem): Draft {
+  return {
+    title: it.title,
+    description: it.description ?? '',
+    location: it.location ?? '',
+    priceStr: typeof it.price === 'number' ? String(it.price) : '',
+    listingType: it.listingType ?? 'free',
+    comp: it.comp ?? 'free',
+    ratePeriod: it.ratePeriod,
+    priceMaxStr: it.priceMax != null ? String(it.priceMax) : '',
+    category: categoryIdOf(it),
+    urgent: !!it.urgent,
+  };
+}
+
+/* Which fields count, by post kind. A request has no price and no location; an
+   opportunity's money lives in comp/priceMax rather than in `price`. Comparing
+   fields the post does not have would report a listing as dirty the moment it
+   opened and auto-save it on a timer for no reason. */
+function draftsMatch(a: Draft, b: Draft, kind: { isRequest: boolean; isOpportunity: boolean }): boolean {
+  if (a.title !== b.title) return false;
+  if (a.description !== b.description) return false;
+  if (a.category !== b.category) return false;
+  if (kind.isRequest) return a.urgent === b.urgent;
+  if (a.location !== b.location) return false;
+  if (kind.isOpportunity) {
+    if (a.comp !== b.comp) return false;
+    if ((a.ratePeriod ?? null) !== (b.ratePeriod ?? null)) return false;
+    return a.priceMaxStr.trim() === b.priceMaxStr.trim();
+  }
+  if (a.priceStr !== b.priceStr) return false;
+  if (a.listingType !== b.listingType) return false;
+  /* Changing only "/ day" to "/ week" is a real edit. */
+  if (a.listingType === 'borrow'
+      && (a.ratePeriod ?? DEFAULT_RENT_PERIOD) !== (b.ratePeriod ?? DEFAULT_RENT_PERIOD)) return false;
+  return true;
+}
+
+/* ── What must be true before anything is written ─────────────────────────
+ *
+ * A hand-driven Save can afford to be permissive: the person chose the moment,
+ * and if the result is wrong they can see it and fix it. Auto-save writes
+ * whatever is on screen 900ms after typing stops, which means it will happily
+ * write the intermediate states — and one of those is the empty string left
+ * behind by select-all-then-type. A listing whose title is "" is not an edit in
+ * progress, it is a listing nobody can find.
+ *
+ * Returned as a reason rather than a boolean so the status line can say which
+ * field is holding the save, instead of going quiet and looking broken. */
+function draftBlocker(d: Draft, kind: { isRequest: boolean; isOpportunity: boolean }): string | null {
+  if (d.title.trim().length === 0) return 'Add a title to save';
+  if (!kind.isRequest && !kind.isOpportunity && d.priceStr.trim() !== '') {
+    const n = Number(d.priceStr);
+    /* NaN reaches Postgres as an invalid number and the whole patch fails —
+       including the title beside it. Under auto-save that is an error message
+       every debounce until the field is cleared. */
+    if (!Number.isFinite(n) || n < 0) return 'Price needs to be a number';
+  }
+  if (kind.isOpportunity && d.priceMaxStr.trim() !== '') {
+    const n = Number(d.priceMaxStr);
+    if (!Number.isFinite(n) || n < 0) return 'Rate needs to be a number';
+  }
+  return null;
+}
+
+/* ── Showing what was actually written ────────────────────────────────────
+ *
+ * The `item` prop is a snapshot and app/page.tsx never refreshes it, so a
+ * successful write changes the database and leaves this screen rendering the
+ * text from before it. That was invisible while the owner's post detail was
+ * ALWAYS the editor — the editor reads the field state, not the prop. It stops
+ * being invisible the moment a moderator can switch back to the reader view,
+ * because the whole reason to switch back is to see the post the way members
+ * see it, and it would show them the copy they just replaced. Verified: edit a
+ * description, wait for "All changes saved", tap done — the old text.
+ *
+ * So the screen renders the prop overlaid with what it last persisted. The
+ * baseline starts as an exact copy of the prop and only ever advances on a
+ * write that succeeded, so this is the prop until there is something truer to
+ * show, and then it is that.
+ *
+ * The real fix is one level up — a detail screen should not be handed a copy
+ * of a row and left to guess — but refreshing `openItem` on every
+ * notifyPostsChanged() means a refetch per keystroke burst and a new object
+ * identity for RelatedShelf and everything else beneath it. This is local,
+ * costs nothing, and cannot disagree with the write: it IS the write.
+ */
+function itemWithDraft(it: MarketplaceItem, d: Draft): MarketplaceItem {
+  const priceNum = d.priceStr.trim() === '' ? undefined : Number(d.priceStr);
+  const price = Number.isFinite(priceNum) ? priceNum : undefined;
+  const base: MarketplaceItem = {
+    ...it,
+    title: d.title,
+    description: d.description,
+    /* item.category is the LABEL and the draft holds the id — the same
+       direction the demo store's patch has to be mapped in. */
+    category: categoryLabel(d.category) || it.category,
+    categoryId: d.category || it.categoryId,
+  };
+  if (it.isRequest) return { ...base, urgent: d.urgent };
+  if (it.kind === 'opportunity') {
+    /* compToListing, the same helper the write goes through, so the page
+       cannot show a different reading of comp than the one it saved. */
+    const svc = compToListing(d.comp, price);
+    return {
+      ...base,
+      location: d.location,
+      comp: d.comp,
+      ratePeriod: d.comp === 'paid' ? d.ratePeriod : undefined,
+      priceMax: d.comp === 'paid' && d.priceMaxStr.trim() !== '' ? Number(d.priceMaxStr) : undefined,
+      listingType: svc.listingType,
+      price: svc.price,
+    };
+  }
+  return {
+    ...base,
+    location: d.location,
+    listingType: d.listingType,
+    price,
+    ratePeriod: d.listingType === 'borrow' ? (d.ratePeriod ?? DEFAULT_RENT_PERIOD) : undefined,
+  };
+}
+
+/* How long after the last keystroke a write goes out. 900ms is past the pause
+   between words for anyone typing continuously — measured against the Doherty
+   threshold from the other side: below ~400ms the request chases every letter,
+   above ~1.5s a person has already looked up and started wondering. */
+const AUTOSAVE_MS = 900;
+
 interface ItemDetailScreenProps {
   item: MarketplaceItem;
   onBack: () => void;
@@ -105,19 +272,18 @@ function WhatsAppGlyph({ size = 16 }: { size?: number }) {
  * These live on the SAME ROW as the product name now, NOT in the sticky bar —
  * the bottom bar is reserved for contacting the seller (email / WhatsApp). */
 function EngagementActions({
-  saved, onToggleSave, onShare, showReport, onReport, showAdminDelete, onAdminDelete,
-  showAdminEdit, onAdminEdit, size = 40,
+  saved, onToggleSave, onShare, showReport, onReport, adminEdit, size = 40,
 }: {
   saved: boolean;
   onToggleSave: () => void;
   onShare: () => void;
   showReport: boolean;
   onReport: () => void;
-  showAdminDelete: boolean;
-  onAdminDelete: () => void;
-  /** Moderator editing is OPT-IN — see the note on canManage. */
-  showAdminEdit?: boolean;
-  onAdminEdit?: () => void;
+  /** Moderator editing is OPT-IN and REVERSIBLE — see the note on canManage.
+   *  Absent for the owner and for everyone who is not a moderator.
+   *  There is no moderation-delete here any more: deleting somebody else's
+   *  post is reached through the editor, which is what the toggle turns on. */
+  adminEdit?: { on: boolean; onToggle: () => void };
   size?: number;
 }) {
   const base: React.CSSProperties = {
@@ -141,25 +307,152 @@ function EngagementActions({
           <Flag size={icon} strokeWidth={1.8} />
         </button>
       )}
-      {showAdminEdit && onAdminEdit && (
-        <button onClick={onAdminEdit} aria-label="Edit this post as admin"
-          style={{ ...base, color: 'var(--text-secondary)' }}>
-          <Pencil size={icon} strokeWidth={1.8} />
+      {adminEdit && (
+        /* The one control that separates a moderator's view of somebody
+           else's post from any other member's — and it goes BOTH ways. It
+           used to be one-way: switching editing on removed the button, so an
+           admin who wanted to see the post the way its readers see it had to
+           leave the screen and come back. Nothing is lost by leaving edit
+           mode now that saving is automatic. */
+        <button
+          onClick={adminEdit.onToggle}
+          aria-label={adminEdit.on ? 'Stop editing and read the post' : 'Edit this post as a moderator'}
+          aria-pressed={adminEdit.on}
+          style={{
+            ...base,
+            color: adminEdit.on ? 'var(--bg-base)' : 'var(--text-secondary)',
+            background: adminEdit.on ? 'var(--text-primary)' : 'var(--bg-surface)',
+            borderColor: adminEdit.on ? 'var(--text-primary)' : 'var(--border-subtle)',
+          }}
+        >
+          {adminEdit.on
+            ? <Check size={icon} strokeWidth={2.6} />
+            : <Pencil size={icon} strokeWidth={1.8} />}
         </button>
       )}
-      {showAdminDelete && (
-        <button onClick={onAdminDelete} aria-label="Admin delete"
-          style={{ ...base, color: '#ED2E50', borderColor: 'rgba(237,46,80,0.4)' }}>
-          <Trash2 size={icon} strokeWidth={1.8} />
+
+    </div>
+  );
+}
+
+/* ── Save status ───────────────────────────────────────────────────────────
+ *
+ * The one thing an auto-saving editor owes the person using it. Nobody pressed
+ * anything, so nothing confirms that the sentence they just typed is safe —
+ * and the previous design at least had a button that visibly said "Saving…".
+ * Removing the button without replacing what it told you would be a downgrade
+ * dressed as a simplification.
+ *
+ * Deliberately a line of text rather than a toast. A toast is for something
+ * that happened once; this is a standing fact about the screen, it changes
+ * several times per sentence, and it has to be readable at the moment the
+ * reader thinks to look — which is not the moment it changed.
+ *
+ * "Saving…" covers both the debounce and the request in flight. Splitting them
+ * would be more accurate and less useful: from where the reader sits, the
+ * pause before the write and the write are one wait, and two labels flickering
+ * between them reads as instability. It is honest within a second either way.
+ */
+function AutosaveStatus({
+  saving, isDirty, blocker, saveError, savedOnce, canRevert, onRevert, onRetry,
+}: {
+  saving: null | 'save' | 'repost';
+  isDirty: boolean;
+  blocker: string | null;
+  saveError: string | null;
+  savedOnce: boolean;
+  canRevert: boolean;
+  onRevert: () => void;
+  onRetry: () => void;
+}) {
+  const busy = !!saving || isDirty;
+  /* Order matters. An error outranks everything — it is the only state that
+     needs an action. A blocker outranks "saving" because while it stands
+     nothing IS saving, and showing a spinner over a draft that is going
+     nowhere is the one message worse than silence. */
+  const state: 'error' | 'blocked' | 'busy' | 'saved' | 'armed' =
+    saveError ? 'error'
+    : blocker && isDirty ? 'blocked'
+    : busy ? 'busy'
+    : savedOnce ? 'saved'
+    : 'armed';
+
+  /* --text-secondary, not --text-muted. Muted is 2.91:1 against --bg-base in
+     dark mode (#5C5C57 on #0C0C0B, measured) — under both 4.5:1 and 3:1, and
+     "Saving…" is the one line here somebody actually goes looking for.
+     Secondary is 6.74:1 light and 6.78:1 dark, and a status message is not
+     decorative metadata anyway. The three semantic inks all clear 5:1 light
+     and 7:1 dark. */
+  const ink =
+    state === 'error' ? 'var(--accent-rose-ink)'
+    : state === 'blocked' ? 'var(--accent-amber-ink)'
+    : state === 'saved' ? 'var(--accent-lime-ink)'
+    : 'var(--text-secondary)';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+      marginBottom: 8, minHeight: 18,
+      /* The bar's scrim is pointer-events:none; the retry and revert buttons
+         in here have to opt back in. */
+      pointerEvents: 'auto',
+    }}>
+      {/* polite, and the region exists before it has anything to say — an
+          aria-live node inserted at the same moment as its text is not
+          reliably announced. */}
+      <span
+        aria-live="polite"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 600,
+          letterSpacing: '-0.005em', color: ink,
+        }}
+      >
+        {state === 'busy' && <Loader2 size={12} strokeWidth={2.4} style={{ animation: 'spin 0.9s linear infinite' }} aria-hidden="true" />}
+        {state === 'saved' && <Check size={12} strokeWidth={3} aria-hidden="true" />}
+        {(state === 'error' || state === 'blocked') && <TriangleAlert size={12} strokeWidth={2.4} aria-hidden="true" />}
+        {state === 'error'   ? `Couldn’t save — ${saveError}`
+         : state === 'blocked' ? blocker
+         : state === 'busy'  ? (saving === 'repost' ? 'Reposting…' : 'Saving…')
+         : state === 'saved' ? 'All changes saved'
+         : 'Edits save as you type'}
+      </span>
+
+      {state === 'error' && (
+        <button type="button" onClick={onRetry} style={linkBtn('var(--accent-rose-ink)')}>
+          Try again
+        </button>
+      )}
+      {/* Only offered once something has actually changed — and it is the only
+          undo this editor has, since by the time a person notices a mistake
+          the mistake is already in the database. */}
+      {canRevert && state !== 'error' && (
+        <button type="button" onClick={onRevert} style={linkBtn('var(--text-secondary)')}>
+          <RotateCcw size={11} strokeWidth={2.4} aria-hidden="true" />
+          Undo my edits
         </button>
       )}
     </div>
   );
 }
 
-export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+/* A text button that keeps a 24px target without looking like a button —
+   2.5.8, met with padding rather than with a box. */
+function linkBtn(color: string): React.CSSProperties {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    minHeight: 24, padding: '3px 6px', margin: '-3px 0',
+    background: 'none', border: 'none', cursor: 'pointer',
+    font: 'inherit',
+    fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 700,
+    letterSpacing: '-0.005em', color,
+    textDecoration: 'underline', textUnderlineOffset: 2,
+  };
+}
+
+export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
-  const [saved, setSaved] = useState(item.saved);
+  const [saved, setSaved] = useState(itemProp.saved);
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -183,13 +476,19 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
    * the single worst thing to be unable to see, and it made every listing look
    * broken on the account most likely to be showing the app to somebody.
    *
-   * So moderator editing is opt-in: an admin gets the ordinary post, plus a
-   * pencil beside the moderation bin. One tap and the editor appears, with the
-   * same powers as before — nothing is taken away, it just is not the default
-   * way an admin reads the app. */
+   * So moderator editing is opt-in AND reversible. An admin viewing another
+   * member's post gets that member's post, unchanged, plus one pencil in the
+   * header — not in the post, which is what "the same page as a non-admin
+   * account" has to mean. A tap brings up the editor with every power it had
+   * before, and a second tap puts it away again, which the first version of
+   * this could not do: it removed its own button on the way in.
+   *
+   * The delete follows the editor rather than sitting in the reader view.
+   * Removing another student's listing is not part of using the app like a
+   * normal user, so it lives behind the same one tap as changing it. */
   const [adminEditOn, setAdminEditOn] = useState(false);
   const canManage = (!!isOwner || (!!isAdmin && adminEditOn)) && !!onDelete;
-  const photos = resolveItemMedia(item);
+  const photos = resolveItemMedia(itemProp);
 
   /* Photo editing — owner can open a picker dialog to add/remove/replace. */
   const [photoEditOpen, setPhotoEditOpen] = useState(false);
@@ -208,184 +507,326 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
 
   /* ── Inline edit state ──────────────────────────────────
      Hydrated from the item; tracks dirty by comparison to the snapshot. */
-  const [eTitle, setETitle]             = useState(item.title);
-  const [eDescription, setEDescription] = useState(item.description ?? '');
-  const [eLocation, setELocation]       = useState(item.location ?? '');
+  const [eTitle, setETitle]             = useState(itemProp.title);
+  const [eDescription, setEDescription] = useState(itemProp.description ?? '');
+  const [eLocation, setELocation]       = useState(itemProp.location ?? '');
   const [ePriceStr, setEPriceStr]       = useState(
-    typeof item.price === 'number' ? String(item.price) : '',
+    typeof itemProp.price === 'number' ? String(itemProp.price) : '',
   );
   const [eListingType, setEListingType] = useState<'free' | 'sell' | 'borrow' | 'swap'>(
-    item.listingType ?? 'free',
+    itemProp.listingType ?? 'free',
   );
   /* Opportunity compensation edit state (services only). */
-  const [eComp, setEComp]               = useState<Comp>(item.comp ?? 'free');
-  const [eRatePeriod, setERatePeriod]   = useState<RatePeriod | undefined>(item.ratePeriod);
-  const [ePriceMaxStr, setEPriceMaxStr] = useState<string>(item.priceMax != null ? String(item.priceMax) : '');
-  /* Seed from the category ID. item.category carries the LABEL, so this used to
-     hold "hobbies & collectibles" — which matches no <option value>, so the
-     select fell back to displaying the first entry (Electronics) while still
-     holding the bad value. Opening a post therefore showed the wrong category,
-     and saving sent an id no category has.
+  const [eComp, setEComp]               = useState<Comp>(itemProp.comp ?? 'free');
+  const [eRatePeriod, setERatePeriod]   = useState<RatePeriod | undefined>(itemProp.ratePeriod);
+  const [ePriceMaxStr, setEPriceMaxStr] = useState<string>(itemProp.priceMax != null ? String(itemProp.priceMax) : '');
+  const [eCategory, setECategory]       = useState(categoryIdOf(itemProp));
+  const [eUrgent, setEUrgent]           = useState(!!itemProp.urgent);
 
-     categoryId is normalised too, which it was not before. Trusting it raw is
-     the same bug wearing a different hat: a stored id this bundle has never
-     heard of — a retired one like `clothing`, or the `all` row that really does
-     exist in the categories table — sails through `??` and lands in the select
-     as a value with no matching option. normalizeCategory is exactly the
-     function that maps those forward, and skipping it for the id while
-     applying it to the label made no sense. */
-  const categoryIdOf = (it: { categoryId?: string; category?: string }) =>
-    normalizeCategory(it.categoryId) ?? normalizeCategory(it.category) ?? '';
-  const [eCategory, setECategory]       = useState(categoryIdOf(item));
-  const [eUrgent, setEUrgent]           = useState(!!item.urgent);
+  const isRequestPost = !!itemProp.isRequest;
+  const isOpportunityPost = itemProp.kind === 'opportunity';
+  const postKind = useMemo(
+    () => ({ isRequest: isRequestPost, isOpportunity: isOpportunityPost }),
+    [isRequestPost, isOpportunityPost],
+  );
 
-  /* Re-hydrate when the item prop changes (e.g. after server refetch). We
-     deliberately reset edits on incoming changes — local edits don't survive
-     a fresh fetch, which prevents stale conflicts. */
+  /* Everything on screen, as one value. */
+  const draft = useMemo<Draft>(() => ({
+    title: eTitle, description: eDescription, location: eLocation,
+    priceStr: ePriceStr, listingType: eListingType,
+    comp: eComp, ratePeriod: eRatePeriod, priceMaxStr: ePriceMaxStr,
+    category: eCategory, urgent: eUrgent,
+  }), [eTitle, eDescription, eLocation, ePriceStr, eListingType,
+       eComp, eRatePeriod, ePriceMaxStr, eCategory, eUrgent]);
+
+  /* What is known to be in the database — see the note on Draft. */
+  const [baseline, setBaseline] = useState<Draft>(() => draftOf(itemProp));
+  /* What was there when the editor opened, which is what Revert restores. A
+     rolling baseline cannot do that job: once auto-save has run, the baseline
+     IS the edit, so reverting to it would restore nothing. This is the only
+     undo an auto-saving editor has, and it matters most for the admin case —
+     a moderator who select-alls a description and types over it has destroyed
+     another student's copy the instant the debounce fires. */
+  const openedAt = useRef<Draft>(draftOf(itemProp));
+
+  /* From here down, `item` means the prop overlaid with what has actually been
+     written — see the note on itemWithDraft. Identical to the prop until a save
+     succeeds, so nothing below has to know this happened. */
+  const item = useMemo(() => itemWithDraft(itemProp, baseline), [itemProp, baseline]);
+
+  const applyDraft = useCallback((d: Draft) => {
+    setETitle(d.title);
+    setEDescription(d.description);
+    setELocation(d.location);
+    setEPriceStr(d.priceStr);
+    setEListingType(d.listingType);
+    setEComp(d.comp);
+    setERatePeriod(d.ratePeriod);
+    setEPriceMaxStr(d.priceMaxStr);
+    setECategory(d.category);
+    setEUrgent(d.urgent);
+  }, []);
+
+  /* Re-hydrate when a genuinely different post arrives — the related shelf
+     swaps the item in place without unmounting the screen. Keyed on item.id
+     ONLY, which is the correction that makes auto-save survivable: the old
+     effect also listened to item.title, description, price and the rest, so
+     the notifyPostsChanged() that follows every write would re-seed the fields
+     mid-sentence if anything upstream refreshed the prop. Under a debounce
+     that is a race between the person typing and their own last save. */
   useEffect(() => {
-    setETitle(item.title);
-    setEDescription(item.description ?? '');
-    setELocation(item.location ?? '');
-    setEPriceStr(typeof item.price === 'number' ? String(item.price) : '');
-    setEListingType(item.listingType ?? 'free');
-    setEComp(item.comp ?? 'free');
-    setERatePeriod(item.ratePeriod);
-    setEPriceMaxStr(item.priceMax != null ? String(item.priceMax) : '');
-    setECategory(categoryIdOf(item));
-    setEUrgent(!!item.urgent);
-  }, [item.id, item.title, item.description, item.location, item.price, item.listingType, item.comp, item.ratePeriod, item.category, item.urgent]);
+    /* From the PROP, never from the overlaid `item` — that is derived from the
+       baseline, so seeding a new post from it would hand the new row the
+       previous row's title. */
+    const fresh = draftOf(itemProp);
+    applyDraft(fresh);
+    setBaseline(fresh);
+    openedAt.current = fresh;
+    setSaveError(null);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [itemProp.id]);
 
-  const isRequestPost = !!item.isRequest;
-  const isDirty = useMemo(() => {
-    if (eTitle !== item.title) return true;
-    if (eDescription !== (item.description ?? '')) return true;
-    if (!isRequestPost && eLocation !== (item.location ?? '')) return true;
-    if (!isRequestPost) {
-      const origPriceStr = typeof item.price === 'number' ? String(item.price) : '';
-      if (ePriceStr !== origPriceStr) return true;
-      if (eListingType !== (item.listingType ?? 'free')) return true;
-      /* Changing only "/ day" to "/ week" is a real edit — without this the
-         Save button stays disabled and the change looks ignored. */
-      if (eListingType === 'borrow'
-          && (eRatePeriod ?? DEFAULT_RENT_PERIOD) !== (item.ratePeriod ?? DEFAULT_RENT_PERIOD)) return true;
-    }
-    if (item.kind === 'opportunity') {
-      if (eComp !== (item.comp ?? 'free')) return true;
-      if ((eRatePeriod ?? null) !== (item.ratePeriod ?? null)) return true;
-      if ((ePriceMaxStr.trim() === '' ? null : Number(ePriceMaxStr)) !== (item.priceMax ?? null)) return true;
-    }
-    if (eCategory !== categoryIdOf(item)) return true;
-    if (isRequestPost && eUrgent !== !!item.urgent) return true;
-    return false;
-  }, [eTitle, eDescription, eLocation, ePriceStr, eListingType, eComp, eRatePeriod, ePriceMaxStr, eCategory, eUrgent, item, isRequestPost]);
+  const isDirty = useMemo(
+    () => !draftsMatch(draft, baseline, postKind),
+    [draft, baseline, postKind],
+  );
+  const blocker = useMemo(() => draftBlocker(draft, postKind), [draft, postKind]);
 
   const [saving, setSaving] = useState<null | 'save' | 'repost'>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /* Set once a write has succeeded, so the status line can say "Saved" rather
+     than sitting silently at "no unsaved changes" — which is true from the
+     moment the screen opens and therefore tells the reader nothing about the
+     sentence they just typed. */
+  const [savedOnce, setSavedOnce] = useState(false);
 
-  /* Save handlers — separated into request vs listing branches so each
-     constructs the right shape without TS-union gymnastics. */
-  const handleSaveChanges = useCallback(async () => {
-    if (!isDirty || saving) return;
-    setSaving('save');
+  /* ── One write path ────────────────────────────────────────────────────
+   *
+   * Save and repost were two near-identical 45-line bodies that differed in
+   * which pair of liveData functions they called. They are one function now,
+   * because with a save happening on a timer there is no longer a version of
+   * this that a person is watching closely enough to catch a divergence: the
+   * demo branch, the request branch, the opportunity branch and the rent
+   * period all have to behave the same whether the write came from a keystroke
+   * or a button.
+   *
+   * The draft is captured at entry and the baseline is advanced to THAT
+   * capture, not to whatever is on screen when the promise resolves. Anything
+   * typed during the round trip stays dirty and gets its own write, which is
+   * the difference between "the last thing I typed is saved" and "the last
+   * thing I typed was silently marked as saved".
+   */
+  const persist = useCallback(async (mode: 'save' | 'repost', snapshot: Draft) => {
+    const priceNum = snapshot.priceStr ? Number(snapshot.priceStr) : undefined;
+    const isOpp = item.kind === 'opportunity';
+    const svc = isOpp ? compToListing(snapshot.comp, priceNum) : null;
+
+    if (isDemoMode()) {
+      const patch = {
+        /* The demo store's `category` is the LABEL — it is rendered directly by
+           the header and the tile chip — so the id has to be mapped back or the
+           post starts announcing itself as "electronics". */
+        title: snapshot.title, category: categoryLabel(snapshot.category),
+        description: snapshot.description,
+        ...(isRequestPost
+          ? { urgent: snapshot.urgent }
+          : isOpp
+            ? { location: snapshot.location, comp: snapshot.comp,
+                ratePeriod: snapshot.comp === 'paid' ? snapshot.ratePeriod : undefined,
+                priceMax: snapshot.comp === 'paid' && snapshot.priceMaxStr.trim() !== '' ? Number(snapshot.priceMaxStr) : undefined,
+                listingType: svc!.listingType, price: svc!.price }
+            : { location: snapshot.location, listingType: snapshot.listingType, price: priceNum,
+                ratePeriod: snapshot.listingType === 'borrow' ? (snapshot.ratePeriod ?? DEFAULT_RENT_PERIOD) : undefined }),
+      };
+      /* Both return false when the id is not in the demo store, which is
+         every catalogue post — the store only holds the demo user's own three
+         uploads and one request. Ignoring that made the status line report
+         "All changes saved" for a write that had gone nowhere, which is the
+         one thing a save indicator must never do. Live mode is unaffected:
+         there the write is a real UPDATE against Supabase. */
+      const ok = mode === 'repost'
+        ? repostDemoPost(item.id, patch)
+        : updateDemoPost(item.id, patch);
+      if (!ok) throw new Error('demo mode can’t edit catalogue posts');
+      return;
+    }
+
+    if (isRequestPost) {
+      const patch = {
+        title: snapshot.title, category: snapshot.category, description: snapshot.description,
+        urgency: (snapshot.urgent ? 'urgent' : 'normal') as 'urgent' | 'normal',
+      };
+      if (mode === 'repost') await repostRequest(item.id, patch);
+      else await updateRequestFields(item.id, patch);
+      return;
+    }
+
+    const patch = {
+      title: snapshot.title, category: snapshot.category, description: snapshot.description,
+      location: snapshot.location,
+      ...(isOpp
+        ? { listingType: svc!.listingType, price: svc!.price, comp: snapshot.comp,
+            ratePeriod: snapshot.comp === 'paid' ? (snapshot.ratePeriod ?? null) : null,
+            priceMax: snapshot.comp === 'paid' ? (snapshot.priceMaxStr.trim() === '' ? null : Number(snapshot.priceMaxStr)) : null }
+        /* Rent stores its period alongside the rate, or "₹200" comes back
+           without the "/ day" that gives it meaning. */
+        : { listingType: snapshot.listingType, price: priceNum,
+            ratePeriod: snapshot.listingType === 'borrow' ? (snapshot.ratePeriod ?? DEFAULT_RENT_PERIOD) : null }),
+    };
+    if (mode === 'repost') await repostListing(item.id, patch);
+    else await updateListingFields(item.id, patch);
+  }, [item.id, item.kind, isRequestPost]);
+
+  /* The guard around persist: one write at a time, and the baseline moves only
+     on success. Held in a ref as well as in state because the exit flush runs
+     from an effect cleanup, where the closed-over state value is whatever it
+     was at the last render. */
+  const savingRef = useRef(false);
+  /* ── Why a failed draft is remembered ─────────────────────────────────
+   *
+   * A write that fails leaves the baseline where it was, so the draft is still
+   * dirty — and the auto-save effect's job is to save dirty drafts. Nothing in
+   * it distinguishes "not saved yet" from "tried and refused", so a permanent
+   * failure became a permanent loop: another attempt every debounce, for as
+   * long as the screen stayed open. An RLS denial, a dropped connection or a
+   * column that no longer exists would each turn one editor into a request per
+   * second against the same failing endpoint.
+   *
+   * So the exact draft that failed is remembered, and automatic saving stops
+   * while the fields still hold it. Changing anything makes it a different
+   * draft and the retry is worth making; "Try again" calls the save directly
+   * and is not subject to this at all, because an explicit retry of the same
+   * text is exactly what a person does after reconnecting.
+   */
+  const failedDraft = useRef<Draft | null>(null);
+  const runSave = useCallback(async (mode: 'save' | 'repost', snapshot: Draft) => {
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    setSaving(mode);
     setSaveError(null);
     try {
-      const priceNum = ePriceStr ? Number(ePriceStr) : undefined;
-      const isOpp = item.kind === 'opportunity';
-      const svc = isOpp ? compToListing(eComp, priceNum) : null;
-      if (isDemoMode()) {
-        updateDemoPost(item.id, {
-          /* The demo store's `category` is the LABEL — it is rendered directly
-             by the header and the tile chip — so the id has to be mapped back
-             or the post starts announcing itself as "electronics". */
-          title: eTitle, category: categoryLabel(eCategory), description: eDescription,
-          ...(isRequestPost
-            ? { urgent: eUrgent }
-            : isOpp
-              ? { location: eLocation, comp: eComp, ratePeriod: eComp === 'paid' ? eRatePeriod : undefined, priceMax: eComp === 'paid' && ePriceMaxStr.trim() !== '' ? Number(ePriceMaxStr) : undefined, listingType: svc!.listingType, price: svc!.price }
-              : { location: eLocation, listingType: eListingType, price: priceNum,
-                  ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : undefined }),
-        });
-      } else if (isRequestPost) {
-        await updateRequestFields(item.id, {
-          title: eTitle, category: eCategory, description: eDescription,
-          urgency: eUrgent ? 'urgent' : 'normal',
-        });
-      } else {
-        await updateListingFields(item.id, {
-          title: eTitle, category: eCategory, description: eDescription,
-          location: eLocation,
-          ...(isOpp
-            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, ratePeriod: eComp === 'paid' ? (eRatePeriod ?? null) : null, priceMax: eComp === 'paid' ? (ePriceMaxStr.trim() === '' ? null : Number(ePriceMaxStr)) : null }
-            /* Rent stores its period alongside the rate, or "₹200" comes back
-               without the "/ day" that gives it meaning. */
-            : { listingType: eListingType, price: priceNum,
-                ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : null }),
-        });
-      }
+      await persist(mode, snapshot);
+      failedDraft.current = null;
+      setBaseline(snapshot);
+      setSavedOnce(true);
+      return true;
     } catch (e) {
-      setSaveError((e as Error).message ?? 'Could not save');
+      failedDraft.current = snapshot;
+      setSaveError((e as Error).message || 'Could not save');
+      return false;
     } finally {
+      savingRef.current = false;
       setSaving(null);
     }
-  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, eRatePeriod, ePriceStr, ePriceMaxStr]);
+  }, [persist]);
 
-  const handleSaveAndRepost = useCallback(async () => {
-    if (!isDirty || saving) return;
-    setSaving('repost');
-    setSaveError(null);
-    try {
-      const priceNum = ePriceStr ? Number(ePriceStr) : undefined;
-      const isOpp = item.kind === 'opportunity';
-      const svc = isOpp ? compToListing(eComp, priceNum) : null;
-      if (isDemoMode()) {
-        repostDemoPost(item.id, {
-          /* The demo store's `category` is the LABEL — it is rendered directly
-             by the header and the tile chip — so the id has to be mapped back
-             or the post starts announcing itself as "electronics". */
-          title: eTitle, category: categoryLabel(eCategory), description: eDescription,
-          ...(isRequestPost
-            ? { urgent: eUrgent }
-            : isOpp
-              ? { location: eLocation, comp: eComp, ratePeriod: eComp === 'paid' ? eRatePeriod : undefined, priceMax: eComp === 'paid' && ePriceMaxStr.trim() !== '' ? Number(ePriceMaxStr) : undefined, listingType: svc!.listingType, price: svc!.price }
-              : { location: eLocation, listingType: eListingType, price: priceNum,
-                  ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : undefined }),
-        });
-      } else if (isRequestPost) {
-        await repostRequest(item.id, {
-          title: eTitle, category: eCategory, description: eDescription,
-          urgency: eUrgent ? 'urgent' : 'normal',
-        });
-      } else {
-        await repostListing(item.id, {
-          title: eTitle, category: eCategory, description: eDescription,
-          location: eLocation,
-          ...(isOpp
-            ? { listingType: svc!.listingType, price: svc!.price, comp: eComp, ratePeriod: eComp === 'paid' ? (eRatePeriod ?? null) : null, priceMax: eComp === 'paid' ? (ePriceMaxStr.trim() === '' ? null : Number(ePriceMaxStr)) : null }
-            /* Rent stores its period alongside the rate, or "₹200" comes back
-               without the "/ day" that gives it meaning. */
-            : { listingType: eListingType, price: priceNum,
-                ratePeriod: eListingType === 'borrow' ? (eRatePeriod ?? DEFAULT_RENT_PERIOD) : null }),
-        });
-      }
-    } catch (e) {
-      setSaveError((e as Error).message ?? 'Could not save');
-    } finally {
-      setSaving(null);
-    }
-  }, [isDirty, saving, item.id, item.kind, isRequestPost, eTitle, eCategory, eDescription, eUrgent, eLocation, eListingType, eComp, eRatePeriod, ePriceStr, ePriceMaxStr]);
+  /* ── Auto-save ─────────────────────────────────────────────────────────
+   *
+   * Debounced from the DRAFT, not from `isDirty`. isDirty is a boolean: it
+   * flips true on the first keystroke and then stops changing, so an effect
+   * watching it would schedule one timer for a whole paragraph and fire it
+   * 900ms into the typing rather than 900ms after it.
+   *
+   * While a write is in flight this schedules nothing and simply returns. It
+   * does not need a queue: `saving` is in the deps, so the effect re-runs the
+   * moment the request settles, and if the draft has moved on since it is
+   * still dirty and gets a fresh debounce.
+   */
+  useEffect(() => {
+    if (!canManage) return;
+    if (!isDirty || blocker || saving) return;
+    /* This exact text has already been refused — see failedDraft. */
+    if (failedDraft.current && draftsMatch(draft, failedDraft.current, postKind)) return;
+    const t = window.setTimeout(() => { void runSave('save', draft); }, AUTOSAVE_MS);
+    return () => window.clearTimeout(t);
+  }, [canManage, isDirty, blocker, saving, draft, postKind, runSave]);
 
+  /* ── The last 900ms ───────────────────────────────────────────────────
+   *
+   * A debounce means the most recent edit is, by definition, not yet written.
+   * Leaving is the moment that matters most and it is the moment the timer has
+   * not reached, so the edit has to be flushed on the way out: Back, the
+   * desktop modal closing, tapping through to a related listing, the phone
+   * going to the home screen mid-sentence.
+   *
+   * Refs, not state, and no await. The cleanup runs during unmount, when a
+   * setState would be dropped and there is nothing left to await into — but
+   * fetch() is already in flight by then and the browser completes it
+   * regardless of who is listening.
+   */
+  const flushRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    flushRef.current = () => {
+      if (!canManage || !isDirty || blocker || savingRef.current) return;
+      if (failedDraft.current && draftsMatch(draft, failedDraft.current, postKind)) return;
+      void persist('save', draft).catch(() => { /* nothing left to tell */ });
+    };
+  }, [canManage, isDirty, blocker, draft, postKind, persist]);
+
+  useEffect(() => {
+    const flush = () => flushRef.current();
+    /* pagehide rather than beforeunload: beforeunload does not fire when iOS
+       Safari or a WebView freezes a backgrounded tab, which is the common way
+       an edit on a phone gets abandoned. */
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, []);
+
+  /* Is there anything to undo? Measured against the state the editor OPENED
+     in, not against the last write, because after an auto-save the last write
+     is the thing you would want to undo. */
+  const canRevert = !draftsMatch(openedAt.current, draft, postKind);
+
+  /* ── Why reposting has a floor ─────────────────────────────────────────
+   *
+   * Repost bumps posted_at, which is what the feed's recency ordering reads,
+   * and there is no server-side rate limit on it. It used to be reachable only
+   * from the dirty state, so an edit was the price of a bump — an accident,
+   * but a brake. Auto-save removes that state, and a button that is simply
+   * always available is a one-tap "stay at the top of the feed forever".
+   *
+   * A day is the floor, and the button says so rather than greying out
+   * mysteriously: reposting something posted this morning genuinely does
+   * nothing, so the honest label is that it is already there.
+   *
+   * `postedDaysAgo` comes off the item prop, which does not refresh while this
+   * screen is open, so a successful repost has to be remembered locally or the
+   * button stays live immediately after being used. */
+  const [repostedNow, setRepostedNow] = useState(false);
+  const repostBlocked = repostedNow || (item.postedDaysAgo ?? 99) < 1;
+
+  /* ── Leaving edit mode ────────────────────────────────────────────────
+   *
+   * Turning the editor off flips canManage to false, and BOTH the auto-save
+   * effect and the exit flush check canManage before doing anything — so a
+   * moderator who typed a correction and tapped done inside the 900ms window
+   * had the correction thrown away, silently, by the control whose whole job
+   * is to be safe to press. Same failure as leaving the screen mid-debounce,
+   * one gesture earlier.
+   *
+   * runSave rather than the flush, because the baseline has to advance too:
+   * the reader view they are switching TO renders from it. */
+  const toggleAdminEdit = useCallback(() => {
+    if (adminEditOn && isDirty && !blocker) void runSave('save', draft);
+    setAdminEditOn(v => !v);
+  }, [adminEditOn, isDirty, blocker, draft, runSave]);
+
+  const handleSaveAndRepost = useCallback(() => {
+    if (blocker || saving || repostBlocked) return;
+    void runSave('repost', draft).then(ok => { if (ok) setRepostedNow(true); });
+  }, [blocker, saving, repostBlocked, draft, runSave]);
+
+  /* Revert to the state the editor opened in — and WRITE it, because with
+     auto-save the edits being undone are already in the database. A local-only
+     reset would show the old text and leave the new text live. */
   const handleDiscard = useCallback(() => {
-    setETitle(item.title);
-    setEDescription(item.description ?? '');
-    setELocation(item.location ?? '');
-    setEPriceStr(typeof item.price === 'number' ? String(item.price) : '');
-    setEListingType(item.listingType ?? 'free');
-    setEComp(item.comp ?? 'free');
-    setERatePeriod(item.ratePeriod);
-    setEPriceMaxStr(item.priceMax != null ? String(item.priceMax) : '');
-    setECategory(categoryIdOf(item));
-    setEUrgent(!!item.urgent);
-  }, [item]);
+    const back = openedAt.current;
+    applyDraft(back);
+    if (!draftsMatch(back, baseline, postKind)) void runSave('save', back);
+  }, [applyDraft, baseline, postKind, runSave]);
 
   const handleSavePhotos = useCallback(async (photoUrls: string[]) => {
     if (isDemoMode()) {
@@ -405,13 +846,6 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
     setDeleting(true);
     try { await onDelete?.(); onBack(); }
     finally { setDeleting(false); }
-  };
-
-  /* Admin moderation delete (admin viewing someone else's post). Window confirm
-     since it's a destructive cross-user action; lives in the title-row actions. */
-  const handleAdminDelete = async () => {
-    if (typeof window !== 'undefined' && !window.confirm('Admin: delete this post permanently?')) return;
-    try { await onDelete?.(); } finally { onBack(); }
   };
 
   /* Count a view once per open for real listings. Fire-and-forget; the next
@@ -641,9 +1075,9 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         canManage={canManage}
         onDelete={onDelete}
         isAdmin={isAdmin}
-        showAdminEdit={!!isAdmin && !isOwner && !adminEditOn}
-        onAdminEdit={() => setAdminEditOn(true)}
-        onAdminDelete={handleAdminDelete}
+        adminEdit={(!!isAdmin && !isOwner)
+          ? { on: adminEditOn, onToggle: toggleAdminEdit }
+          : undefined}
         isOwner={isOwner}
         heroSentinelRef={heroSentinelRef}
         heroVisible={heroVisible}
@@ -665,9 +1099,13 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
           isDirty,
           saving,
           saveError,
-          handleSaveChanges,
+          blocker,
+          savedOnce,
+          canRevert,
+          repostBlocked,
           handleSaveAndRepost,
           handleDiscard,
+          onRetrySave: () => void runSave('save', draft),
           photoEditOpen,
           setPhotoEditOpen,
           currentPhotoUrlsForPicker,
@@ -705,9 +1143,45 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
         }}>
           {item.category}
         </span>
-        {/* Save lives in the title row now (with share/report), so the header
-            just needs a spacer to keep the category centred. */}
-        <span style={{ width: 36, flexShrink: 0 }} aria-hidden="true" />
+        {/* ── The moderator's one extra control ──
+            Save, share and report live in the title row, so this slot was a
+            36px spacer holding the category label in the centre. It is where
+            the moderator toggle goes, for two reasons.
+
+            It is the only place on the screen that is present in BOTH modes:
+            the title row and everything under it is replaced by the editor,
+            so a toggle down there can turn editing on and then disappear
+            along with the way back out of it.
+
+            And it leaves the post itself untouched. An admin's view of
+            another member's listing is now byte-for-byte the view any member
+            gets, plus one button in the chrome around it — which is the
+            actual request, rather than "mostly the same with a moderation
+            cluster grafted onto the title".
+
+            Still 36px wide either way, so the category stays centred. */}
+        {(!!isAdmin && !isOwner) ? (
+          <button
+            type="button"
+            onClick={toggleAdminEdit}
+            aria-pressed={adminEditOn}
+            aria-label={adminEditOn ? 'Stop editing and read the post' : 'Edit this post as a moderator'}
+            style={{
+              width: 36, height: 36, borderRadius: 999, flexShrink: 0,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+              background: adminEditOn ? 'var(--text-primary)' : 'var(--bg-surface)',
+              border: `1px solid ${adminEditOn ? 'var(--text-primary)' : 'var(--border-subtle)'}`,
+              color: adminEditOn ? 'var(--bg-base)' : 'var(--text-secondary)',
+            }}
+          >
+            {adminEditOn
+              ? <Check size={17} strokeWidth={2.6} />
+              : <Pencil size={16} strokeWidth={1.9} />}
+          </button>
+        ) : (
+          <span style={{ width: 36, flexShrink: 0 }} aria-hidden="true" />
+        )}
       </header>
 
       {/* ── STICKY TITLE BAR (mobile) ──
@@ -1003,10 +1477,12 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
               onShare={handleShare}
               showReport={!isOwner}
               onReport={() => setReportOpen(true)}
-              showAdminDelete={!!isAdmin && !isOwner}
-              showAdminEdit={!!isAdmin && !isOwner && !adminEditOn}
-              onAdminEdit={() => setAdminEditOn(true)}
-              onAdminDelete={handleAdminDelete}
+              /* No moderator controls in this row on the phone. The whole
+                 row is replaced by the title INPUT the moment editing turns
+                 on, so a toggle placed here could switch editing on and then
+                 vanish with no way back — which is what the first version did.
+                 It lives in the header instead, which both modes share.
+                 Delete is in the bottom bar for as long as editing is on. */
               size={40}
             />
           </div>
@@ -1220,130 +1696,97 @@ export default function ItemDetailScreen({ item, onBack, onRequireAuth, onOpenSt
          * pixels. "IKEA Linnmon table top (100x6" and then nothing.
          *
          * At 44px the text dissolves over roughly two line-heights and meets
-         * the button already gone. The gradient's solid stop moves with it: 40%
-         * of the old 76px height was 30px, which is now 44px of a ~110px box,
-         * i.e. exactly where the button starts. */
+         * the button already gone.
+         *
+         * The solid stop is 44px, in PIXELS, not 40%. A percentage ties the
+         * gradient to the box's height, and adding the save-status line above
+         * the buttons made the box taller — so the solid point slid down past
+         * the padding and the status text came out printed over a half-faded
+         * LOCATION field. Measured at 390px: "Saving… · Undo my edits" sitting
+         * on top of "Meera Bhawan". Anchoring the stop to the padding instead
+         * means everything the bar draws is on solid ground however many rows
+         * it grows to. 38px rather than 44 so the first row of the bar starts
+         * 6px INSIDE the solid area — measured at 44px it began on the exact
+         * pixel the ramp finished, which is correct and one rounding error from
+         * not being. */
         padding: '44px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
-        background: 'linear-gradient(to bottom, transparent 0%, var(--bg-base) 40%, var(--bg-base) 100%)',
+        background: 'linear-gradient(to bottom, transparent 0%, var(--bg-base) 38px, var(--bg-base) 100%)',
         /* The scrim is decoration; only the button inside it should take taps.
            At 12px the dead zone was invisible, at 44px it would swallow a tap
            aimed at the last line of the description. */
         pointerEvents: 'none',
       }}>
-        {canManage && saveError && (
-          <div role="alert" style={{
-            marginBottom: 8, padding: '6px 10px',
-            background: 'rgba(237,46,80,0.1)',
-            border: '1px solid rgba(237,46,80,0.25)',
-            borderRadius: 8,
-            color: 'var(--accent-rose-ink)',
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, textAlign: 'center',
-            /* The scrim above is pointer-events:none; anything real inside it
-               has to opt back in. */
-            pointerEvents: 'auto',
-          }}>
-            {saveError}
-          </div>
-        )}
+        {/* No separate error box. AutosaveStatus below carries the message
+            AND the retry — the standalone alert printed the same sentence a
+            second time, six pixels above itself. */}
         <div style={{
           display: 'flex', gap: 8, flexWrap: 'wrap',
           pointerEvents: 'auto',
         }}>
-          {/* OWNER VIEW —
-             Clean state → Delete only, full width
-             Dirty state → [Save changes] [Save & repost] (Delete hides until clean)
-             Save & repost also bumps posted_at so the post jumps to the top
-             of the feed; useful when the owner relists an item that's been
-             sitting around. */}
+          {/* OWNER / MODERATOR VIEW —
+             One layout, not two. The bar used to swap its whole contents on
+             `isDirty` — [Discard][Save][Repost] while editing, [Delete][Share]
+             when clean. Under auto-save "dirty" lasts under a second and
+             arrives on every keystroke, so that branch would have the bottom of
+             the screen changing shape while somebody types in it.
+
+             So the buttons are now the two things that are never automatic:
+             putting the post back at the top of the feed, and deleting it.
+             Saving is reported in the line above them, and Share is not
+             duplicated here — it is already on the title row for everyone. */}
           {canManage ? (
-            isDirty ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleDiscard}
-                  disabled={!!saving}
-                  aria-label="Discard changes"
-                  style={{
-                    width: 52, height: 52, borderRadius: 999,
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  <RotateCcw size={16} strokeWidth={1.8} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveChanges}
-                  disabled={!!saving}
-                  style={{
-                    flex: 1, height: 52, borderRadius: 999,
-                    background: 'var(--bg-surface)', color: 'var(--text-primary)',
-                    border: '1px solid var(--border-default)',
-                    cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
-                >
-                  {saving === 'save'
-                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite' }} />Saving…</>
-                    : <><Save size={15} strokeWidth={2} />Save changes</>}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAndRepost}
-                  disabled={!!saving}
-                  style={{
-                    flex: 1, height: 52, borderRadius: 999,
-                    background: 'var(--text-primary)', color: 'var(--bg-base)',
-                    border: 'none',
-                    cursor: saving ? 'wait' : 'pointer',
-                    fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
-                >
-                  {saving === 'repost'
-                    ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Reposting…</>
-                    : <>Save &amp; repost</>}
-                </button>
-              </>
-            ) : (
-              /* Owner, not editing: Delete + Share (owners can share their
-                 own listing too). */
-              <>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  style={{
-                    flex: 1, height: 52, padding: '0 16px', borderRadius: 999,
-                    background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
-                    color: confirmDelete ? '#fff' : 'var(--accent-rose)',
-                    border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
-                    cursor: 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
-                >
-                  <Trash2 size={16} strokeWidth={2} />
-                  {deleting ? 'Deleting…' : confirmDelete ? 'Tap again to confirm' : 'Delete'}
-                </button>
-                <button
-                  aria-label="Share"
-                  onClick={handleShare}
-                  style={{
-                    width: 52, height: 52, borderRadius: 999,
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0,
-                  }}
-                >
-                  <Share2 size={18} strokeWidth={1.8} />
-                </button>
-              </>
-            )
+            <>
+              <div style={{ flex: '1 1 100%' }}>
+                <AutosaveStatus
+                  saving={saving}
+                  isDirty={isDirty}
+                  blocker={blocker}
+                  saveError={saveError}
+                  savedOnce={savedOnce}
+                  canRevert={canRevert}
+                  onRevert={handleDiscard}
+                  onRetry={() => void runSave('save', draft)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveAndRepost}
+                disabled={!!saving || repostBlocked}
+                /* Disabled buttons have to say why, or they read as broken.
+                   The reason is short enough to be the label. */
+                title={repostBlocked ? 'Already at the top of the feed' : 'Move this post back to the top of the feed'}
+                style={{
+                  flex: 1, height: 52, borderRadius: 999,
+                  background: repostBlocked ? 'var(--bg-surface)' : 'var(--text-primary)',
+                  color: repostBlocked ? 'var(--text-muted)' : 'var(--bg-base)',
+                  border: repostBlocked ? '1px solid var(--border-subtle)' : 'none',
+                  cursor: saving ? 'wait' : repostBlocked ? 'default' : 'pointer',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                {saving === 'repost'
+                  ? <><Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Reposting…</>
+                  : repostBlocked
+                    ? <>At the top</>
+                    : <><ArrowUp size={15} strokeWidth={2.4} />Repost</>}
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  flex: 1, height: 52, padding: '0 12px', borderRadius: 999,
+                  background: confirmDelete ? '#ED2E50' : 'var(--bg-surface)',
+                  color: confirmDelete ? '#fff' : 'var(--accent-rose)',
+                  border: confirmDelete ? 'none' : '1px solid var(--accent-rose)',
+                  cursor: 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Trash2 size={16} strokeWidth={2} />
+                {deleting ? 'Deleting…' : confirmDelete ? 'Confirm?' : 'Delete'}
+              </button>
+            </>
           ) : (
           <>
           {/* ── Contact the seller — the ONLY thing in the sticky bar now.
@@ -1456,8 +1899,14 @@ interface EditState {
   isDirty: boolean;
   saving: null | 'save' | 'repost';
   saveError: string | null;
-  handleSaveChanges: () => Promise<void>;
-  handleSaveAndRepost: () => Promise<void>;
+  /* Non-null while something on the draft stops it being written — the status
+     line shows the reason rather than going quiet. */
+  blocker: string | null;
+  savedOnce: boolean;
+  canRevert: boolean;
+  repostBlocked: boolean;
+  onRetrySave: () => void;
+  handleSaveAndRepost: () => void;
   handleDiscard: () => void;
   /* Photo editing */
   photoEditOpen: boolean;
@@ -1497,9 +1946,7 @@ interface DesktopLayoutProps {
   isAdmin?: boolean;
   isOwner?: boolean;
   /** Moderator controls, mirroring the mobile layout's EngagementActions. */
-  showAdminEdit?: boolean;
-  onAdminEdit?: () => void;
-  onAdminDelete?: () => void;
+  adminEdit?: { on: boolean; onToggle: () => void };
   heroSentinelRef: React.RefObject<HTMLDivElement>;
   heroVisible: boolean;
   editState: EditState;
@@ -1512,7 +1959,7 @@ function DesktopLayout({
   onOpenItem, onOpenLF,
   contactLinks, gate, primaryActionLabel, handleContactClick, hasBoth,
   canManage, onDelete, isAdmin, isOwner, heroSentinelRef, heroVisible, editState,
-  showAdminEdit, onAdminEdit, onAdminDelete,
+  adminEdit,
 }: DesktopLayoutProps) {
   void primaryActionLabel;
   void hasBoth;
@@ -1566,8 +2013,9 @@ function DesktopLayout({
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType,
     eComp, setEComp, eRatePeriod, setERatePeriod, ePriceMaxStr, setEPriceMaxStr, eCategory, setECategory,
-    eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError,
-    handleSaveChanges, handleSaveAndRepost, handleDiscard,
+    eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError, blocker, savedOnce,
+    canRevert, repostBlocked, onRetrySave,
+    handleSaveAndRepost, handleDiscard,
     photoEditOpen, setPhotoEditOpen, currentPhotoUrlsForPicker, handleSavePhotos,
   } = editState;
   void setSaved; /* save state is driven through onToggleSave now */
@@ -2005,80 +2453,56 @@ function DesktopLayout({
           </button>
 
           {/* Action buttons — inline on desktop, no fixed bar.
-              Owners get inline-edit + Save/Delete; everyone else gets contact. */}
-          {canManage && saveError && (
-            <div role="alert" style={{
-              padding: '8px 12px',
-              background: 'rgba(237,46,80,0.1)',
-              border: '1px solid rgba(237,46,80,0.25)',
-              borderRadius: 10,
-              color: 'var(--accent-rose-ink)',
-              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
-            }}>{saveError}</div>
+              Same one-layout rule as the phone bar: saving is a status line,
+              and the buttons are only the things that never happen on their
+              own. The old red saveError box is gone from here because the
+              status line carries the error and its retry. */}
+          {canManage && (
+            <AutosaveStatus
+              saving={saving}
+              isDirty={isDirty}
+              blocker={blocker}
+              saveError={saveError}
+              savedOnce={savedOnce}
+              canRevert={canRevert}
+              onRevert={handleDiscard}
+              onRetry={onRetrySave}
+            />
           )}
           <div style={{
             display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap',
           }}>
             {canManage ? (
-              isDirty ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleDiscard}
-                    disabled={!!saving}
-                    aria-label="Discard changes"
-                    style={{
-                      flex: '0 0 auto', height: 52, padding: '0 14px', borderRadius: 14,
-                      background: 'var(--bg-surface)', color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-subtle)',
-                      cursor: saving ? 'not-allowed' : 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}
-                  >
-                    <RotateCcw size={15} strokeWidth={1.8} /> Discard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveChanges}
-                    disabled={!!saving}
-                    style={{
-                      flex: 1, minWidth: 140, height: 52, borderRadius: 14,
-                      background: 'var(--bg-surface)', color: 'var(--text-primary)',
-                      border: '1px solid var(--border-default)',
-                      cursor: saving ? 'wait' : 'pointer', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    }}
-                  >
-                    {saving === 'save'
-                      ? <><Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />Saving…</>
-                      : <><Save size={16} strokeWidth={2} /> Save changes</>}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveAndRepost}
-                    disabled={!!saving}
-                    style={{
-                      flex: 1, minWidth: 140, height: 52, borderRadius: 14,
-                      background: 'var(--text-primary)', color: 'var(--bg-base)',
-                      border: 'none',
-                      cursor: saving ? 'wait' : 'pointer', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    }}
-                  >
-                    {saving === 'repost'
-                      ? <><Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Reposting…</>
-                      : <>Save &amp; repost</>}
-                  </button>
-                </>
-              ) : (
-                onDelete && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSaveAndRepost}
+                  disabled={!!saving || repostBlocked}
+                  title={repostBlocked ? 'Already at the top of the feed' : 'Move this post back to the top of the feed'}
+                  style={{
+                    flex: 1, minWidth: 140, height: 52, borderRadius: 14,
+                    background: repostBlocked ? 'var(--bg-surface)' : 'var(--text-primary)',
+                    color: repostBlocked ? 'var(--text-muted)' : 'var(--bg-base)',
+                    border: repostBlocked ? '1px solid var(--border-subtle)' : 'none',
+                    cursor: saving ? 'wait' : repostBlocked ? 'default' : 'pointer',
+                    fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  {saving === 'repost'
+                    ? <><Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--bg-base)' }} />Reposting…</>
+                    : repostBlocked
+                      ? <>At the top of the feed</>
+                      : <><ArrowUp size={16} strokeWidth={2.4} /> Repost</>}
+                </button>
+                {onDelete && (
                   <button
                     onClick={async () => {
                       if (typeof window !== 'undefined' && !window.confirm('Delete this post permanently?')) return;
                       await onDelete();
                     }}
                     style={{
-                      flex: 1, height: 52, padding: '0 18px', borderRadius: 14,
+                      flex: 1, minWidth: 140, height: 52, padding: '0 18px', borderRadius: 14,
                       background: 'transparent', color: 'var(--accent-rose-ink)',
                       border: '1px solid var(--accent-rose)', cursor: 'pointer',
                       fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
@@ -2087,8 +2511,8 @@ function DesktopLayout({
                   >
                     <Trash2 size={16} strokeWidth={2} /> Delete
                   </button>
-                )
-              )
+                )}
+              </>
             ) : item.isClosed ? (
               <button
                 onClick={() => onOpenStorefront?.(item.user)}
@@ -2211,42 +2635,37 @@ function DesktopLayout({
             {/* Moderator controls. Previously the desktop layout took `void
                 isAdmin` and relied on canManage for both, which is why an
                 admin's only route to either was to have the whole page open as
-                a form. Now the pencil turns the editor on and the bin removes
-                the post, and neither changes how the page reads until used. */}
-            {showAdminEdit && onAdminEdit && (
+                a form.
+                The pencil is a toggle in both directions, and the bin only
+                joins it once editing is on — a member's view of somebody
+                else's post plus exactly one extra control, until that control
+                is used. */}
+            {adminEdit && (
               <button
-                aria-label="Edit this post as admin"
-                onClick={onAdminEdit}
+                aria-label={adminEdit.on ? 'Stop editing and read the post' : 'Edit this post as a moderator'}
+                aria-pressed={adminEdit.on}
+                onClick={adminEdit.onToggle}
                 style={{
                   width: 52, height: 52, borderRadius: 14,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
+                  background: adminEdit.on ? 'var(--text-primary)' : 'var(--bg-surface)',
+                  border: `1px solid ${adminEdit.on ? 'var(--text-primary)' : 'var(--border-subtle)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--text-secondary)',
+                  color: adminEdit.on ? 'var(--bg-base)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                   flexShrink: 0,
                 }}
               >
-                <Pencil size={18} strokeWidth={1.8} />
+                {adminEdit.on
+                  ? <Check size={18} strokeWidth={2.6} />
+                  : <Pencil size={18} strokeWidth={1.8} />}
               </button>
             )}
-            {!!isAdmin && !isOwner && onAdminDelete && (
-              <button
-                aria-label="Admin delete"
-                onClick={onAdminDelete}
-                style={{
-                  width: 52, height: 52, borderRadius: 14,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid rgba(237,46,80,0.4)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#ED2E50',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                <Trash2 size={18} strokeWidth={1.8} />
-              </button>
-            )}
+            {/* No separate moderation bin. Turning editing on already puts a
+                Delete in the manage row above, and the two sat 62px apart on
+                desktop — one red button labelled Delete and one red icon
+                labelled Admin delete, doing the same thing to the same post.
+                Before editing is on there is deliberately no delete at all:
+                that is the point of the toggle. */}
           </div>
 
           {/* Comments thread — full width below the right column on desktop */}
