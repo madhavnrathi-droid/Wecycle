@@ -6646,3 +6646,295 @@ summary::-webkit-details-marker { display: none; }
   .uxi-spot-body { max-width: 68%; }
   .uxi-spot-title { font-size: calc(19px * var(--text-scale)); }
 }
+
+/* ═══════════════════════════════════════════════
+   THE EMBER SHADER
+   A drifting orange-into-black field, behind the SIGCHI reveal card only.
+   See components/EmberShader.tsx for the shader and the reasons.
+   ═══════════════════════════════════════════════ */
+
+.ember {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Its own compositing layer, so a shader repainting every frame cannot
+     invalidate the card's text alongside it. */
+  isolation: isolate;
+  pointer-events: none;
+}
+/* Painted first, never removed. Where WebGL is unavailable, refused or lost,
+   THIS is the artwork — the same colours, standing still. */
+.ember-fallback {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 18% 108%, #FF5005 0%, rgba(255,80,5,0) 58%),
+    radial-gradient(90% 70% at 88% 96%, #9A3412 0%, rgba(154,52,18,0) 62%),
+    linear-gradient(158deg, #0B0704 0%, #2A1206 52%, #0B0704 100%);
+}
+.ember-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Transparent until a frame has actually been drawn into it. The GL context
+     is opaque, so an undrawn canvas is a black rectangle — revealing it early
+     would hide the fallback instead of replacing it. EmberShader flips this to
+     1 on its first successful paint and back to 0 if the context is lost. */
+  opacity: 0;
+  transition: opacity 260ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ember-canvas { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   SIGCHI REVEAL CARD
+   ═══════════════════════════════════════════════ */
+
+.sigchi-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 300; /* Z_LAYER.dialog */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    calc(20px + var(--safe-top)) calc(16px + var(--safe-right))
+    calc(20px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: rgba(6, 4, 2, 0.68);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  /* A tall card on a short phone with Larger text on must be reachable, so the
+     scrim scrolls rather than clipping the code off the bottom. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sigchi-card {
+  position: relative;
+  z-index: 301; /* Z_LAYER.dialog panel */
+  width: 100%;
+  max-width: 380px;
+  box-sizing: border-box;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* The final state, in CSS. The entrance only ever animates TOWARDS this, and
+     never leaves it as the thing a frame has to arrive to produce. */
+  opacity: 1;
+  transform: none;
+  /* Deep, warm, and low — the card should look lit from underneath by the
+     ember rather than dropped on the page. */
+  box-shadow:
+    0 32px 80px -24px rgba(120, 40, 8, 0.55),
+    0 12px 32px rgba(0, 0, 0, 0.45);
+  color: #FFFFFF;
+}
+.sigchi-card-bg { border-radius: inherit; }
+
+/* Between the shader and the words.
+   The shader moves; the contrast of the text must not move with it. Weighted
+   to the top, where the heading is, and eased off across the middle so the
+   ember still reads as a live surface rather than as a flat brown panel. */
+.sigchi-card-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* These four alphas are half of a measured pair — see the note in
+     EmberShader.tsx. With the shader's current gain they hold white text at
+     7.67:1 at the worst pixel across the animation, against the 4.5:1 the type
+     needs. Raise them and the ember disappears; drop them and the guarantee
+     goes with them. Re-measure if either side changes. */
+  background: linear-gradient(
+    180deg,
+    rgba(8, 5, 3, 0.72) 0%,
+    rgba(8, 5, 3, 0.44) 34%,
+    rgba(8, 5, 3, 0.34) 62%,
+    rgba(8, 5, 3, 0.58) 100%
+  );
+  pointer-events: none;
+}
+
+.sigchi-card-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.34);
+  color: #FFFFFF;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+@media (hover: hover) {
+  .sigchi-card-close:hover { background: rgba(0, 0, 0, 0.52); }
+}
+
+.sigchi-card-body {
+  position: relative;
+  z-index: 2;
+  padding: 26px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sigchi-card-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: calc(10.5px * var(--text-scale));
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+.sigchi-card-verified svg { color: #FFC98A; }
+
+.sigchi-card-title {
+  margin: 2px 0 0;
+  font-size: calc(26px * var(--text-scale));
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  color: #FFFFFF;
+}
+.sigchi-card-sub {
+  margin: 0 0 4px;
+  font-size: calc(14px * var(--text-scale));
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.86);
+}
+.sigchi-card-sub strong { color: #FFFFFF; font-weight: 800; }
+
+.sigchi-card-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: #FFFFFF;
+  color: #17110C;
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 700;
+  text-decoration: none;
+}
+@media (hover: hover) {
+  .sigchi-card-cta:hover { background: rgba(255, 255, 255, 0.9); }
+}
+.sigchi-card-note {
+  margin: 0;
+  font-size: calc(11.5px * var(--text-scale));
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* ═══════════════════════════════════════════════
+   SIGCHI VERIFICATION FORM (in the offer panel)
+   ═══════════════════════════════════════════════ */
+
+.uxi-spin { animation: spin 0.9s linear infinite; }
+
+.uxi-sigchi-form { display: block; }
+.uxi-sigchi-label {
+  display: block;
+  margin: 0 0 8px;
+  font-size: calc(12.5px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--uxi-ink);
+}
+.uxi-sigchi-field { display: flex; gap: 8px; align-items: stretch; }
+.uxi-sigchi-input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--uxi-ink);
+  font: inherit;
+  /* 16px, NOT smaller. Anything under 16 makes iOS Safari zoom the page on
+     focus, and this field sits inside a dark panel the zoom would then strand
+     half off-screen. */
+  font-size: calc(16px * var(--text-scale));
+  -webkit-appearance: none;
+  appearance: none;
+}
+.uxi-sigchi-input::placeholder { color: rgba(255, 255, 255, 0.42); }
+.uxi-sigchi-input:focus-visible {
+  outline: 2px solid var(--uxi-accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.uxi-sigchi-go {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--uxi-accent);
+  color: var(--uxi-char);
+  font: inherit;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 700;
+  cursor: pointer;
+}
+.uxi-sigchi-go:disabled { opacity: 0.5; cursor: default; }
+
+.uxi-sigchi-help {
+  display: inline-block;
+  margin: 10px 0 0;
+  font-size: calc(12px * var(--text-scale));
+  font-weight: 600;
+  color: var(--uxi-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.uxi-sigchi-warn {
+  margin: 10px 0 0;
+  font-size: calc(12px * var(--text-scale));
+  line-height: 1.45;
+  /* Warm rather than red. Neither of these is an error the member caused, and
+     a red alert on a discount card reads as something being broken. */
+  color: #FFC98A;
+}
+.uxi-sigchi-retry {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--uxi-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uxi-spin { animation: none; }
+}

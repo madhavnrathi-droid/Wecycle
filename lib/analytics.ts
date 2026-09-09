@@ -143,6 +143,13 @@ export const EVT = {
   offer_code_copied:        'offer_code_copied',
   offer_tickets_opened:     'offer_tickets_opened',
   offer_sigchi_applied:     'offer_sigchi_applied',
+  /* The SIGCHI funnel, now that verification happens in the product instead of
+   * by hand. `checked` minus `verified` is the number of members the roster is
+   * wrong about — the one figure that says whether the list needs fixing, and
+   * the reason the attempt log exists server-side. */
+  offer_sigchi_checked:     'offer_sigchi_checked',
+  offer_sigchi_verified:    'offer_sigchi_verified',
+  offer_sigchi_no_match:    'offer_sigchi_no_match',
   offer_spotlight_tapped:   'offer_spotlight_tapped',
   /** A listing opened from the shelf under a partner event — the measure of
    *  whether the partnership brought browsers or only code-copiers. */

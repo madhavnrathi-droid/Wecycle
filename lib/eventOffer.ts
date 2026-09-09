@@ -104,7 +104,18 @@ export function canRevealMemberCode(isSignedIn: boolean): boolean {
   return isSignedIn;
 }
 
-/* ── The SIGCHI application email ──────────────────────────────────────────
+/* ── The SIGCHI email, which is now a FALLBACK ─────────────────────────────
+ *
+ * This used to be the whole SIGCHI flow: compose a request, send it, wait for
+ * a human to check a spreadsheet and reply. The roster now lives in the
+ * database and `claim_sigchi_offer` answers in a second, so the primary path
+ * is instant and this exists for the case the automatic check cannot solve —
+ * the member is genuinely on UXINDIA's list and the address Wecycle holds for
+ * them is wrong, or missing.
+ *
+ * That is a real case and it must stay reachable. A verification flow with no
+ * way to say "you have my details wrong" is a flow that silently turns
+ * legitimate members away, and they have no idea why.
  *
  * Opens the member's own mail app with the message already written, because
  * the alternative is asking somebody to compose a formal-sounding request to a
@@ -135,6 +146,47 @@ export function sigchiApplicationMailto(opts: {
     'SIGCHI membership ID:',
     '',
     'I can share proof of my current SIGCHI membership if needed.',
+    '',
+    'Thank you,',
+    name || '',
+  ].join('\n');
+
+  return `mailto:${SIGCHI_VERIFY_EMAIL}`
+    + `?subject=${encodeURIComponent(subject)}`
+    + `&body=${encodeURIComponent(body)}`;
+}
+
+/**
+ * The "your list is wrong" email, sent after the automatic check has failed.
+ *
+ * Carries the address that was actually tried. Without it the reply thread
+ * starts with "which email did you use?", which is a second round trip for a
+ * fact the app already had — and the tried address is exactly what the owner
+ * needs in order to fix the roster row.
+ */
+export function sigchiMismatchMailto(opts: {
+  memberName?: string | null;
+  memberEmail?: string | null;
+  triedEmail?: string | null;
+}): string {
+  const name = (opts.memberName ?? '').trim();
+  const account = (opts.memberEmail ?? '').trim();
+  const tried = (opts.triedEmail ?? '').trim();
+
+  const subject = 'SIGCHI check did not find me — UXINDIA 2026 Rising Leaders Forum';
+
+  const body = [
+    'Hello,',
+    '',
+    `I'm a SIGCHI member and the ${SIGCHI_TIER.percent}% check on Wecycle did not`,
+    'find my membership. Could you check the list?',
+    '',
+    name ? `Name: ${name}` : 'Name:',
+    account ? `Wecycle account: ${account}` : 'Wecycle account:',
+    tried ? `Address I tried: ${tried}` : 'Address I tried:',
+    'SIGCHI membership ID:',
+    '',
+    'I can share proof of my current SIGCHI membership.',
     '',
     'Thank you,',
     name || '',

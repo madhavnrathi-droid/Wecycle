@@ -48,6 +48,50 @@ const CLEAR_AT = 0.38;
  *  but one radius for both keeps the erased path continuous either way. */
 const SCRATCH_RADIUS = 22;
 
+/* ── The brush is a verlet particle, not the pointer ──────────────────────
+ *
+ * Erasing straight between consecutive pointer events looks like what it is:
+ * a polyline. Move a finger quickly and the events arrive far apart, so the
+ * foil comes off in visible chords with corners at every sample.
+ *
+ * So the eraser is a point mass that CHASES the pointer, integrated by
+ * position-verlet — velocity is implied by the gap between where it is and
+ * where it was, rather than stored:
+ *
+ *     v  = (x - xPrev) * DAMPING          (implied velocity, bled off)
+ *     a  = (target - x) * STIFFNESS       (pulled toward the finger)
+ *     xPrev = x ;  x += v + a
+ *
+ * The carried velocity is what makes it smooth: the brush arrives at a corner
+ * still moving, overshoots by a hair and settles, so the erased path curves
+ * where a polyline would have a vertex. Several sub-steps run per input sample,
+ * which also fills in the gaps between sparse events.
+ *
+ * Tuned by scratching it. Stiffer than this and it snaps to the pointer and
+ * the curve is gone; looser and the foil lags visibly behind the finger, which
+ * reads as the app being slow rather than the brush being soft.
+ */
+const BRUSH_STIFFNESS = 0.34;
+const BRUSH_DAMPING = 0.62;
+/** Sub-steps per input sample. Four is where the chords stop being visible. */
+const BRUSH_SUBSTEPS = 4;
+/** Ceiling on sub-steps, for the case below. */
+const BRUSH_SUBSTEPS_MAX = 24;
+/* No single sub-step may move further than the brush is wide.
+ *
+ * Measured overshoot at realistic pointer spacing is 1.2px at 4px gaps and
+ * 11.8px at 40px gaps — all comfortably inside the 22px head, which is what
+ * makes the stroke curve while staying attached to the finger. But the spring
+ * is proportional to the GAP, and a stalled main thread can deliver one sample
+ * 300px from the last: that single jump sends the brush 88px PAST the finger,
+ * erasing foil well ahead of where anybody dragged.
+ *
+ * Clamping the step bounds that, and the sub-step count rises with the gap so
+ * a genuinely fast drag is still walked the whole way rather than left behind. */
+const BRUSH_MAX_STEP = SCRATCH_RADIUS;
+/** Below this the brush is considered to have arrived, in CSS px. */
+const BRUSH_SETTLED = 0.6;
+
 const revealKey = (code: string) => `wecycle.scratched.${code}`;
 
 function alreadyScratched(code: string): boolean {
@@ -102,7 +146,8 @@ export default function ScratchCode({ code, label, onReveal, onCopy }: ScratchCo
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeRef = useRef<HTMLDivElement>(null);
   const drawing = useRef(false);
-  const lastPt = useRef<{ x: number; y: number } | null>(null);
+  /** Position and previous position — verlet keeps velocity implicit. */
+  const brush = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   /* Guards the reveal so a scratch that crosses the threshold mid-stroke
      cannot fire the animation on every subsequent move event. */
   const settled = useRef(false);
@@ -236,7 +281,8 @@ export default function ScratchCode({ code, label, onReveal, onCopy }: ScratchCo
     return total ? clear / total : 0;
   }, []);
 
-  const scratchAt = useCallback((x: number, y: number) => {
+  /** Erase one segment. The only thing that actually touches the canvas. */
+  const eraseSegment = useCallback((ax: number, ay: number, bx: number, by: number) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -244,14 +290,79 @@ export default function ScratchCode({ code, label, onReveal, onCopy }: ScratchCo
     ctx.lineWidth = SCRATCH_RADIUS * 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    const from = lastPt.current;
     ctx.beginPath();
-    if (from) { ctx.moveTo(from.x, from.y); ctx.lineTo(x, y); ctx.stroke(); }
-    ctx.arc(x, y, SCRATCH_RADIUS, 0, Math.PI * 2);
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    /* A disc at the head as well: a zero-length segment draws nothing on some
+       engines, which is exactly the case for a tap that never moves. */
+    ctx.beginPath();
+    ctx.arc(bx, by, SCRATCH_RADIUS, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
-    lastPt.current = { x, y };
   }, []);
+
+  /** Plant the brush without erasing a trail to it — used on pointer down, so
+   *  a new stroke does not sweep the foil from wherever the last one ended. */
+  const placeBrush = useCallback((x: number, y: number) => {
+    brush.current = { x, y, px: x, py: y };
+    eraseSegment(x, y, x, y);
+  }, [eraseSegment]);
+
+  /**
+   * Advance the brush toward a target, erasing as it goes.
+   *
+   * Runs synchronously inside the pointer handler rather than on a frame
+   * ticker. That is deliberate: requestAnimationFrame is paused while the
+   * document is hidden, and a scratch whose erasing lived in a rAF loop would
+   * do nothing at all in that state — the member would drag across the foil
+   * and watch it stay put. Pointer events are the clock here, and sub-stepping
+   * between them is what makes it smooth without needing frames.
+   */
+  const strokeToward = useCallback((tx: number, ty: number) => {
+    const b = brush.current;
+    if (!b) { placeBrush(tx, ty); return; }
+
+    const gap = Math.hypot(tx - b.x, ty - b.y);
+    const steps = Math.min(
+      BRUSH_SUBSTEPS_MAX,
+      Math.max(BRUSH_SUBSTEPS, Math.ceil(gap / BRUSH_MAX_STEP) * 2),
+    );
+
+    for (let i = 0; i < steps; i++) {
+      const vx = (b.x - b.px) * BRUSH_DAMPING;
+      const vy = (b.y - b.py) * BRUSH_DAMPING;
+      const ax = (tx - b.x) * BRUSH_STIFFNESS;
+      const ay = (ty - b.y) * BRUSH_STIFFNESS;
+
+      let dx = vx + ax;
+      let dy = vy + ay;
+      /* Clamp the DISPLACEMENT, not the velocity — px/py are then set from the
+         clamped position, so the implied velocity stays consistent with where
+         the brush actually went and the spring cannot wind itself up. */
+      const len = Math.hypot(dx, dy);
+      if (len > BRUSH_MAX_STEP) {
+        const k = BRUSH_MAX_STEP / len;
+        dx *= k; dy *= k;
+      }
+
+      b.px = b.x; b.py = b.y;
+      b.x += dx;
+      b.y += dy;
+      eraseSegment(b.px, b.py, b.x, b.y);
+    }
+  }, [eraseSegment, placeBrush]);
+
+  /** Let the brush finish arriving after the finger lifts, so the tail of a
+   *  fast flick is erased instead of stopping short of where it ended. */
+  const settleBrush = useCallback((tx: number, ty: number) => {
+    const b = brush.current;
+    if (!b) return;
+    for (let i = 0; i < 24; i++) {
+      if (Math.hypot(tx - b.x, ty - b.y) < BRUSH_SETTLED) break;
+      strokeToward(tx, ty);
+    }
+  }, [strokeToward]);
 
   const pointTo = (e: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -261,26 +372,48 @@ export default function ScratchCode({ code, label, onReveal, onCopy }: ScratchCo
   const onPointerDown = (e: React.PointerEvent) => {
     if (revealed || settled.current) return;
     drawing.current = true;
-    lastPt.current = null;
     /* Capture here — unlike the feed's tap guard, this element WANTS every
        move even when the finger wanders outside it, and it is not inside a
        scroller competing for the gesture. */
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     const p = pointTo(e);
-    scratchAt(p.x, p.y);
+    placeBrush(p.x, p.y);
     haptics.selection();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drawing.current || revealed || settled.current) return;
-    const p = pointTo(e);
-    scratchAt(p.x, p.y);
+
+    /* COALESCED SAMPLES FIRST.
+     *
+     * The browser throttles pointermove to roughly one event per frame, but it
+     * keeps every sample the digitiser actually produced — on a 120Hz screen
+     * that is two or three points thrown away per event. Feeding the real
+     * samples into the solver in order is the difference between a smooth
+     * curve and a smooth-looking approximation of every second point. */
+    const native = e.nativeEvent as PointerEvent & {
+      getCoalescedEvents?: () => PointerEvent[];
+    };
+    let samples: { clientX: number; clientY: number }[] = [];
+    try {
+      const co = native.getCoalescedEvents?.();
+      if (co && co.length) samples = co;
+    } catch { /* not supported — the single event is fine */ }
+    if (!samples.length) samples = [{ clientX: e.clientX, clientY: e.clientY }];
+
+    const r = canvasRef.current?.getBoundingClientRect();
+    if (!r) return;
+    for (const sp of samples) {
+      strokeToward(sp.clientX - r.left, sp.clientY - r.top);
+    }
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent) => {
     if (!drawing.current) return;
     drawing.current = false;
-    lastPt.current = null;
+    const p = pointTo(e);
+    settleBrush(p.x, p.y);
+    brush.current = null;
     if (!settled.current && erasedFraction() >= CLEAR_AT) finish();
   };
 
