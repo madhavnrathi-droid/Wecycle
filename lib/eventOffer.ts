@@ -63,10 +63,24 @@ export const MEMBER_TIER: OfferTier = {
   appliesTo: 'Leadership Summit and Rising Leaders Forum',
 };
 
-/** Verified SIGCHI members, on the Rising Leaders Forum only. Issued by hand
- *  after verification — never rendered in the app, only sent by reply. */
-export const SIGCHI_TIER: OfferTier = {
-  code: 'UXI26WECYRLF35',
+/**
+ * Verified SIGCHI members, on the Rising Leaders Forum only.
+ *
+ * NO `code` FIELD, deliberately — this is `Omit<OfferTier, 'code'>`.
+ *
+ * The 35% code is issued by `claim_sigchi_offer` after the server has matched
+ * an address against the roster, and it is read from a config row rather than
+ * held anywhere in this bundle. It used to be a literal here, left over from
+ * when the code was mailed out by hand, and a grep of the built output found
+ * it sitting in the JavaScript — which quietly undid the point of moving the
+ * check server-side, since anyone could read the reward without ever being on
+ * the list.
+ *
+ * Nothing in the app referenced it: only `percent` and `appliesTo` are used.
+ * Removing the field rather than leaving it unread is what makes that
+ * permanent — an unused constant gets re-used.
+ */
+export const SIGCHI_TIER: Omit<OfferTier, 'code'> = {
   percent: 35,
   appliesTo: 'Rising Leaders Forum',
 };
