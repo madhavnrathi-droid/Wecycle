@@ -1,7 +1,7 @@
 'use client';
 
 import CategoryIcon from '../components/CategoryIcon';
-import { CATEGORIES as CATEGORY_LIST, normalizeCategory } from '../lib/categories';
+import { CATEGORIES as CATEGORY_LIST, normalizeCategory, categoryIdOf, matchesCategoryFilter } from '../lib/categories';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
 import { Wordmark } from './Brand';
@@ -396,7 +396,11 @@ export default function FeedScreen({
 
   const filtered = (() => {
     const base = source.filter(item => {
-      if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
+      /* matchesCategoryFilter, not category.toLowerCase(). The label is not the
+         id: "Vehicles & Mobility" never equalled "mobility", so tapping the
+         Mobility tile returned an empty page while the cars sat in the
+         database correctly filed. See the note on categoryIdOf. */
+      if (!matchesCategoryFilter(item, activeCategory)) return false;
       if (query && !item.title.toLowerCase().includes(query.toLowerCase())) return false;
       /* The rail's own promise, applied to the whole catalogue rather than to
          the twelve items the row had space for. */
@@ -445,16 +449,19 @@ export default function FeedScreen({
     /* Filter by category + query — events skip the category filter since
        they don't carry one, but they still honour the title query. */
     const matchesQuery = (t: string) => !query || t.toLowerCase().includes(query.toLowerCase());
-    const matchesCategory = (cat?: string) =>
-      activeCategory === 'all' || (cat ?? '').toLowerCase() === activeCategory;
+    /* Same label-is-not-the-id bug as the grid above, on the All tab. Takes the
+       whole post rather than one field, so it can read categoryId first. */
+    const matchesCategory = (post: { categoryId?: string | null; category?: string | null } | null) =>
+      matchesCategoryFilter(post, activeCategory);
 
     return merged
       .filter(e => {
-        if (e.kind === 'item')        return matchesCategory(e.item.category) && matchesQuery(e.item.title);
-        if (e.kind === 'opportunity') return matchesCategory(e.item.category) && matchesQuery(e.item.title);
-        if (e.kind === 'request')     return matchesCategory(e.item.category) && matchesQuery(e.item.title);
-        if (e.kind === 'event')       return matchesCategory(undefined)       && matchesQuery(e.event.title);
-        return                               matchesCategory(e.lf.category)   && matchesQuery(e.lf.title);
+        if (e.kind === 'item')        return matchesCategory(e.item)  && matchesQuery(e.item.title);
+        if (e.kind === 'opportunity') return matchesCategory(e.item)  && matchesQuery(e.item.title);
+        if (e.kind === 'request')     return matchesCategory(e.item)  && matchesQuery(e.item.title);
+        /* Events carry no category, so they belong to "All" and to nothing else. */
+        if (e.kind === 'event')       return matchesCategory(null)    && matchesQuery(e.event.title);
+        return                               matchesCategory(e.lf)    && matchesQuery(e.lf.title);
       })
       .sort((a, b) => a.sortKey - b.sortKey);
   }, [items, opportunities, requests, events, lostFound, activeCategory, query, blocked]);
@@ -491,7 +498,7 @@ export default function FeedScreen({
      Electronics and Fashion had one, those being the two whose label happens to
      equal its id. normalizeCategory covers rows that predate the id. */
   const itemsByCat = (cat: string) =>
-    liveItems.filter(it => (it.categoryId ?? normalizeCategory(it.category)) === cat).slice(0, 12);
+    liveItems.filter(it => categoryIdOf(it) === cat).slice(0, 12);
 
   /* Category rails, generated from the taxonomy rather than a hand-picked
      subset of it. A category that fills up earns a rail automatically, which is
@@ -612,6 +619,7 @@ export default function FeedScreen({
       isSaved={savedIds.has(it.id)}
       hidePrice={hidePrice}
       badgeKind={badgeKind}
+      isMine={!!user && it.user?.id === user.id}
       onToggleSave={() => handleToggleSave(it.id)}
       onLongPress={() => setMenuItem(it)}
       onClick={() => {
@@ -1694,7 +1702,7 @@ function LostMarquee({ items, onOpen }: { items: LostItem[]; onOpen: (lf: LostIt
    the e-commerce shape, not the Pinterest photo-with-overlay. Handles
    items, requests and service opportunities (the price line + badge adapt). */
 function ProductCard({
-  item, isSaved, onToggleSave, onClick, onLongPress, hidePrice, badgeKind,
+  item, isSaved, onToggleSave, onClick, onLongPress, hidePrice, badgeKind, isMine,
 }: {
   item: MarketplaceItem;
   isSaved: boolean;
@@ -1707,6 +1715,9 @@ function ProductCard({
   /** Small corner badge, shown when the card sits in a mixed context (the
    *  grid, or a rail whose theme isn't already the answer). */
   badgeKind?: 'request' | 'opportunity' | 'free';
+  /** The viewer posted this. Own posts are browsable now (see useFeedEngine)
+   *  and this is what stops one reading as something to buy. */
+  isMine?: boolean;
 }) {
   const cover = coverImage(item);
   const isPriced = item.listingType === 'sell' && typeof item.price === 'number';
@@ -1737,14 +1748,19 @@ function ProductCard({
      what happened when comp was the only signal) told the reader the opposite
      of the truth. Volunteer still wins as a label when nobody's being paid,
      since that's the more useful thing to know at a glance. */
-  const badgeLabel = badgeKind === 'request' ? 'Wanted'
+  /* "Yours" outranks the rest. Free or Wanted describes what the post IS;
+     yours describes what you can do with it, which is the more useful fact and
+     the one the reader is not expecting. */
+  const badgeLabel = isMine ? 'Yours'
+    : badgeKind === 'request' ? 'Wanted'
     : badgeKind === 'opportunity'
       ? (item.comp === 'volunteer' ? 'Volunteer' : oppRoleBadge(item.oppRole))
     : badgeKind === 'free' ? 'Free'
     : null;
   /* Hiring posts get their own badge colour so the two directions are
      separable at a glance inside one shared rail. */
-  const badgeTone = badgeKind === 'opportunity' && item.oppRole === 'hiring'
+  const badgeTone = isMine ? 'mine'
+    : badgeKind === 'opportunity' && item.oppRole === 'hiring'
     ? 'hiring' : badgeKind;
 
   const closedLabel = item.isClosed ? closedLabelFor(item) : null;

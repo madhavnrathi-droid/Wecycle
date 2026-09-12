@@ -5739,6 +5739,14 @@ textarea:focus-visible {
    share one rail. */
 .pcard-badge[data-kind="hiring"]       { background: var(--status-hiring); }
 .pcard-badge[data-kind="free"]        { background: var(--status-free); }
+/* YOURS — the viewer's own post. Deliberately the app's ink rather than one of
+   the status hues: the others classify the post (free, wanted, hiring) and this
+   one says who it belongs to, so it should not read as a sixth category. Near
+   black on white clears every contrast bar without a measurement. */
+.pcard-badge[data-kind="mine"] {
+  background: var(--text-primary);
+  color: var(--bg-base);
+}
 
 .pcard[data-closed] .pcard-media .fit-img-fg { filter: grayscale(0.7); opacity: 0.7; }
 .pcard[data-closed] .pcard-media .fit-img-bg { filter: blur(16px) grayscale(0.8); opacity: 0.35; }

@@ -17,6 +17,7 @@
  * empty state) since users will want to see "no requests right now". */
 
 import { useEffect, useMemo, useState } from 'react';
+import { matchesCategoryFilter } from '../lib/categories';
 import {
   ChevronLeft, MapPin, Calendar, Users, IndianRupee,
   Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal,
@@ -221,15 +222,18 @@ export default function StorefrontScreen({
      own type filter handled inline. */
   const [category, setCategory] = useState<string>('all');
 
-  const filteredUploads = useMemo(() => {
-    if (category === 'all') return uploads;
-    return uploads.filter(i => i.category.toLowerCase() === category);
-  }, [uploads, category]);
+  /* matchesCategoryFilter, not category.toLowerCase(): the label is not the id,
+     so a seller filtering their own shop by Mobility or Furniture saw nothing.
+     See the note on categoryIdOf. */
+  const filteredUploads = useMemo(
+    () => uploads.filter(i => matchesCategoryFilter(i, category)),
+    [uploads, category],
+  );
 
-  const filteredRequests = useMemo(() => {
-    if (category === 'all') return requests;
-    return requests.filter(r => (r.item?.category ?? '').toLowerCase() === category);
-  }, [requests, category]);
+  const filteredRequests = useMemo(
+    () => requests.filter(r => matchesCategoryFilter(r.item ?? null, category)),
+    [requests, category],
+  );
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 80, background: 'var(--bg-base)', minHeight: '100%' }}>

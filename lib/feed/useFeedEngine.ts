@@ -208,10 +208,32 @@ export function useFeedEngine(input: EngineInput): Engine {
     const seed = sessionSeed(memory.sessionAt, tick);
     const rand = rng(seed);
 
-    const opts = { blocked: input.blocked, selfId: input.viewer?.id ?? null, memory, now };
+    /* ── Your own posts are in the BROWSE pool ─────────────────────────────
+     *
+     * They used to be filtered out of everything, on the reasoning that you
+     * cannot buy your own things and you have an Inventory tab for them. The
+     * cost of that showed up the first time somebody posted a car: it went
+     * into the database correctly filed and then vanished from the app that
+     * had just accepted it. No row in "Just dropped", nothing under its own
+     * category, nothing in search. The seller's reasonable conclusion is that
+     * the upload failed, and the only thing that would have corrected them is
+     * the one screen they have no reason to visit yet.
+     *
+     * So a post you made is browsable like any other — chronological rails,
+     * category filters, search — and the card says "Your post" so it can never
+     * be mistaken for something to buy.
+     *
+     * It stays out of the RANKED pool below, which is what "Picked for you"
+     * draws from. Browsing past your own listing is normal; being recommended
+     * it is not. */
+    const opts = { blocked: input.blocked, selfId: null, memory, now };
     const items = eligible(input.items, opts);
     const requests = eligible(input.requests, opts);
     const opportunities = eligible(input.opportunities, opts);
+
+    const selfId = input.viewer?.id ?? null;
+    const notMine = <T extends { user?: { id?: string } }>(list: T[]) =>
+      selfId ? list.filter(i => i.user?.id !== selfId) : list;
 
     const phase = currentPhase(new Date(now));
     const intent = estimateIntent(memory, now);
@@ -225,7 +247,7 @@ export function useFeedEngine(input: EngineInput): Engine {
        would rotate the already-rotated list and the page would drift for no
        reason. The function and its tests stay in rank.ts for the infinite feed
        that will want them. */
-    const { items: ranked } = rankFeed(items, {
+    const { items: ranked } = rankFeed(notMine(items), {
       memory, viewer: input.viewer, now, categoryIdOf, phase, seed,
       pageSize: 24, page: tick,
     });
@@ -237,7 +259,8 @@ export function useFeedEngine(input: EngineInput): Engine {
       events: input.events.filter(e => !input.blocked.has(e.organizer?.id ?? '')),
       lostFound: input.lostFound.filter(l => !input.blocked.has(l.user?.id ?? '')),
       ranked,
-      sellers: summariseSellers(items, opportunities, now),
+      /* Sellers to discover — you are not one of them. */
+      sellers: summariseSellers(notMine(items), notMine(opportunities), now),
     };
 
     const modules = orchestrate(pools, {

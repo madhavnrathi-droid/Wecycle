@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import type { MarketplaceItem } from '../../lib/mockData';
 import { normalizeLink, linkHost } from '../../lib/postLink';
 import { findObjectionable, objectionableMessage } from '../../lib/contentFilter';
 import { MapPin, Bell, Link2, ChevronRight } from 'lucide-react';
@@ -44,6 +45,15 @@ interface ShareItemModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit?: (data: ShareItemForm) => void;
+  /** The post that was just created, handed back so the app can show it.
+   *
+   *  Posting used to end with the sheet closing onto the feed and nothing
+   *  else — and because a member's own posts were filtered out of that feed,
+   *  the thing they had just made was nowhere on the screen that had accepted
+   *  it. Both halves of that are fixed; this is the half that CONFIRMS, by
+   *  opening the finished post so the seller sees exactly what everyone else
+   *  will see. Absent in demo mode, where nothing is really created. */
+  onPosted?: (item: MarketplaceItem) => void;
   /* 'item' (default) = share a physical thing. 'service' = offer a service,
      which posts as an opportunity: no condition, pricing reads as a rate, and
      the category defaults to Services. Reuses this whole form + backend path. */
@@ -85,7 +95,7 @@ export interface ShareItemForm {
 
 const MAX_PHOTOS = 3;
 
-export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' }: ShareItemModalProps) {
+export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode = 'item' }: ShareItemModalProps) {
   const isService = mode === 'service';
   const [form, setForm] = useState<ShareItemForm>({
     title: '', category: isService ? 'Services' : '', condition: '', description: '',
@@ -153,6 +163,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
     if (!validate()) return;
     setSubmitting(true);
     setSubmitError(null);
+    let created: MarketplaceItem | null = null;
     try {
       if (hasSupabaseEnv && !isDemoMode()) {
         /* Real path: upload the picker's compressed blobs + insert the row.
@@ -160,7 +171,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
         /* Service posts derive listing_type/price from the compensation
            choice; item posts use the free/sell pricing toggle. */
         const svc = compToListing(form.comp, form.price);
-        await createListingWithMedia({
+        created = await createListingWithMedia({
           title: form.title,
           category: form.category,
           condition: (form.condition || 'good') as 'like_new' | 'good' | 'fair',
@@ -216,6 +227,9 @@ export default function ShareItemModal({ open, onClose, onSubmit, mode = 'item' 
       pickerRef.current?.clear();
       reset();
       onClose();
+      /* After the sheet is closed and the form is clear, so the detail screen
+         does not open behind a modal that is still unmounting. */
+      if (created) onPosted?.(created);
     } catch (err) {
       haptics.error();
       track(EVT.post_form_failed, {

@@ -903,8 +903,10 @@ export default function WecycleApp() {
         )}
 
         {/* ── FORM MODALS ── */}
-        <ShareItemModal open={modal === 'share-item'} onClose={closeModal} />
-        <ShareItemModal open={modal === 'offer-service'} onClose={closeModal} mode="service" />
+        {/* onPosted opens the finished listing. Posting used to end on the
+            feed with nothing to show for it — see the note on the prop. */}
+        <ShareItemModal open={modal === 'share-item'} onClose={closeModal} onPosted={setOpenItem} />
+        <ShareItemModal open={modal === 'offer-service'} onClose={closeModal} mode="service" onPosted={setOpenItem} />
         <PostRequestModal open={modal === 'post-request'} onClose={closeModal} />
         <ReportLostFoundModal open={modal === 'report-lf'} onClose={closeModal} defaultStatus={lfDefaultStatus} />
         <SubmitEventModal open={modal === 'submit-event'} onClose={closeModal} />

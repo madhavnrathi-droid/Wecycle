@@ -84,7 +84,12 @@ export function sessionSeed(sessionAt: number, page = 0): number {
 
 export interface EligibilityOptions {
   blocked: Set<string>;
-  /** Hide the viewer's own posts from discovery — they own an Inventory tab. */
+  /** Drop the viewer's own posts.
+   *
+   *  NOT used for the browse pool any more — a post that vanishes from the app
+   *  that just accepted it reads as a failed upload, see the note in
+   *  useFeedEngine. Still the right thing for anywhere that RECOMMENDS, which
+   *  is why it stays. */
   selfId?: string | null;
   includeClosed?: boolean;
   /** Memory + clock, so "not interested" is honoured here rather than as a

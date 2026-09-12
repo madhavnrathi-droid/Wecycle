@@ -1,6 +1,7 @@
 'use client';
 
 import CategoryIcon from './CategoryIcon';
+import { matchesCategoryFilter } from '../lib/categories';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search, SlidersHorizontal, Heart, MapPin, MessageCircle,
@@ -48,7 +49,8 @@ export default function MarketplaceScreen() {
     [mounted],
   );
   const filtered = items.filter(item => {
-    if (activeCategory !== 'all' && item.category.toLowerCase() !== activeCategory) return false;
+    /* The label is not the id — see categoryIdOf. */
+    if (!matchesCategoryFilter(item, activeCategory)) return false;
     if (activeType !== 'all' && item.listingType !== activeType) return false;
     if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;

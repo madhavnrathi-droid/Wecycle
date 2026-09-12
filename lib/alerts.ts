@@ -15,6 +15,7 @@
  */
 
 import { supabase } from './supabase';
+import { normalizeCategory } from './categories';
 import type { Database } from './database.types';
 
 /* ── public types ─────────────────────────────────────────── */
@@ -92,8 +93,12 @@ function rowToAlert(r: AlertRow): WecycleAlert {
 }
 
 function alertToInsert(a: CreateAlertInput, createdAt: Date, expiresAt: Date) {
-  /* category id is stored lowercase in `categories.id` */
-  const categoryId = a.category ? a.category.toLowerCase() : null;
+  /* categories.id is a real table and category_id is a foreign key at it, so a
+     lowercased LABEL is not a value it accepts: "Vehicles & Mobility" lowercases
+     to something no row has and the insert dies on the constraint. Whether the
+     caller hands over an id or a label depends on which form it came from, so
+     normalize rather than assume. */
+  const categoryId = normalizeCategory(a.category);
   return {
     user_id:        a.userId,
     title:          a.title.trim(),
@@ -154,7 +159,7 @@ async function supabaseUpdate(id: string, patch: Partial<CreateAlertInput>): Pro
   const updatePayload: Partial<AlertRow> = {};
   if (patch.title)        updatePayload.title = patch.title.trim();
   if (patch.description)  updatePayload.description = patch.description.trim();
-  if (patch.category)     updatePayload.category_id = patch.category.toLowerCase();
+  if (patch.category)     updatePayload.category_id = normalizeCategory(patch.category);
   if (patch.condition !== undefined) {
     updatePayload.condition = patch.condition === 'any' ? null : patch.condition;
   }

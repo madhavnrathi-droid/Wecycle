@@ -147,3 +147,43 @@ export function normalizeCategory(raw?: string | null): string | null {
   const byLegacyLabel = LEGACY[v.split(' ')[0]];
   return byLegacyLabel ?? null;
 }
+
+/* ── The category id of a post, from whichever field actually has one ──────
+ *
+ * THE ONE FUNCTION EVERY FILTER MUST USE. A post carries the category twice:
+ * `categoryId` holds the id and `category` holds the LABEL, and which of them
+ * is populated depends on where the object came from — the listings mapper
+ * sets both, a cached row from before the column existed sets only the label,
+ * and the demo fixtures set only the label.
+ *
+ * Comparing `category.toLowerCase()` to a category id looks like it works and
+ * does work, for exactly the two categories whose label happens to equal their
+ * id: Electronics and Fashion. Every other one silently matches nothing —
+ * "vehicles & mobility" is not "mobility" — so picking Mobility on the home
+ * screen returned an empty grid while the Honda City sat in the database with
+ * category_id 'mobility', correctly filed and unreachable.
+ *
+ * That bug was found and fixed once before, in the storefront's category
+ * rails, and the four other places doing the same comparison were left alone.
+ * Hence a shared function rather than a fifth copy of the same two lines:
+ * there is now one place to be right.
+ *
+ * normalizeCategory on BOTH fields, not just the label — a stored id can be a
+ * retired one (`clothing`, `tools`) that no live category has, and trusting it
+ * raw is the same bug wearing a different hat.
+ */
+export function categoryIdOf(
+  post: { categoryId?: string | null; category?: string | null } | null | undefined,
+): string | null {
+  if (!post) return null;
+  return normalizeCategory(post.categoryId) ?? normalizeCategory(post.category);
+}
+
+/** Does this post belong to the chosen filter? `'all'` matches everything. */
+export function matchesCategoryFilter(
+  post: { categoryId?: string | null; category?: string | null } | null | undefined,
+  filterId: string,
+): boolean {
+  if (filterId === 'all') return true;
+  return categoryIdOf(post) === filterId;
+}

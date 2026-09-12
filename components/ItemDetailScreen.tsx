@@ -33,7 +33,7 @@ import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES, closedLabelFor } from '../lib/mockData';
-import { normalizeCategory, categoryLabel } from '../lib/categories';
+import { normalizeCategory, categoryLabel, categoryIdOf } from '../lib/categories';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
@@ -97,14 +97,6 @@ interface Draft {
   urgent: boolean;
 }
 
-/* Hoisted out of the component: no closure, and both `draftOf` and the
-   re-hydration effect need it. item.category carries the LABEL, so a raw read
-   here yields "hobbies & collectibles" — an id no <option> has, which is how
-   opening a post used to show the wrong category in the select while still
-   holding the bad value. normalizeCategory also maps retired ids forward. */
-const categoryIdOf = (it: { categoryId?: string; category?: string }) =>
-  normalizeCategory(it.categoryId) ?? normalizeCategory(it.category) ?? '';
-
 function draftOf(it: MarketplaceItem): Draft {
   return {
     title: it.title,
@@ -115,7 +107,7 @@ function draftOf(it: MarketplaceItem): Draft {
     comp: it.comp ?? 'free',
     ratePeriod: it.ratePeriod,
     priceMaxStr: it.priceMax != null ? String(it.priceMax) : '',
-    category: categoryIdOf(it),
+    category: categoryIdOf(it) ?? '',
     urgent: !!it.urgent,
   };
 }
@@ -279,10 +271,9 @@ function EngagementActions({
   onShare: () => void;
   showReport: boolean;
   onReport: () => void;
-  /** Moderator editing is OPT-IN and REVERSIBLE — see the note on canManage.
-   *  Absent for the owner and for everyone who is not a moderator.
-   *  There is no moderation-delete here any more: deleting somebody else's
-   *  post is reached through the editor, which is what the toggle turns on. */
+  /** Editing is OPT-IN and REVERSIBLE for everyone who may do it — the post's
+   *  owner and a moderator alike. See the note on canManage. Absent for
+   *  everyone else. Deleting is reached through the editor, not from here. */
   adminEdit?: { on: boolean; onToggle: () => void };
   size?: number;
 }) {
@@ -316,7 +307,7 @@ function EngagementActions({
            mode now that saving is automatic. */
         <button
           onClick={adminEdit.onToggle}
-          aria-label={adminEdit.on ? 'Stop editing and read the post' : 'Edit this post as a moderator'}
+          aria-label={adminEdit.on ? 'Done editing' : 'Edit this post'}
           aria-pressed={adminEdit.on}
           style={{
             ...base,
@@ -465,8 +456,16 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
      this cannot grant more than the parent already decided. */
   /* ── Who sees the EDITOR, and who sees the post ──
    *
-   * The owner's post detail IS the editor: every field is an input, in place,
-   * with no Edit button. That is deliberate and stays.
+   * Nobody, until they ask. This used to differ by role: the owner's post
+   * detail WAS the editor, every field an input with no Edit button, while a
+   * moderator got the reader's view plus a pencil.
+   *
+   * The owner's half of that is now gone too, by request, and the reason is
+   * the same one that fixed it for moderators: a seller could not see their
+   * own listing the way a buyer sees it. Not the photo, not the price line,
+   * not the contact button — their post was a form, permanently, on the one
+   * screen whose whole job is to show what a listing looks like. So both roles
+   * get the post, and both get one button that turns it into the editor.
    *
    * An admin is not the owner, and this used to read `isOwner || isAdmin`.
    * Because the admin allow-list includes the people who run Wecycle, every
@@ -486,8 +485,10 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
    * The delete follows the editor rather than sitting in the reader view.
    * Removing another student's listing is not part of using the app like a
    * normal user, so it lives behind the same one tap as changing it. */
-  const [adminEditOn, setAdminEditOn] = useState(false);
-  const canManage = (!!isOwner || (!!isAdmin && adminEditOn)) && !!onDelete;
+  const [editOn, setEditOn] = useState(false);
+  /** Who is allowed to turn the editor on at all. */
+  const mayEdit = (!!isOwner || !!isAdmin) && !!onDelete;
+  const canManage = mayEdit && editOn;
   const photos = resolveItemMedia(itemProp);
 
   /* Photo editing — owner can open a picker dialog to add/remove/replace. */
@@ -520,7 +521,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   const [eComp, setEComp]               = useState<Comp>(itemProp.comp ?? 'free');
   const [eRatePeriod, setERatePeriod]   = useState<RatePeriod | undefined>(itemProp.ratePeriod);
   const [ePriceMaxStr, setEPriceMaxStr] = useState<string>(itemProp.priceMax != null ? String(itemProp.priceMax) : '');
-  const [eCategory, setECategory]       = useState(categoryIdOf(itemProp));
+  const [eCategory, setECategory]       = useState(categoryIdOf(itemProp) ?? '');
   const [eUrgent, setEUrgent]           = useState(!!itemProp.urgent);
 
   const isRequestPost = !!itemProp.isRequest;
@@ -809,10 +810,10 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
    *
    * runSave rather than the flush, because the baseline has to advance too:
    * the reader view they are switching TO renders from it. */
-  const toggleAdminEdit = useCallback(() => {
-    if (adminEditOn && isDirty && !blocker) void runSave('save', draft);
-    setAdminEditOn(v => !v);
-  }, [adminEditOn, isDirty, blocker, draft, runSave]);
+  const toggleEdit = useCallback(() => {
+    if (editOn && isDirty && !blocker) void runSave('save', draft);
+    setEditOn(v => !v);
+  }, [editOn, isDirty, blocker, draft, runSave]);
 
   const handleSaveAndRepost = useCallback(() => {
     if (blocker || saving || repostBlocked) return;
@@ -1075,8 +1076,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
         canManage={canManage}
         onDelete={onDelete}
         isAdmin={isAdmin}
-        adminEdit={(!!isAdmin && !isOwner)
-          ? { on: adminEditOn, onToggle: toggleAdminEdit }
+        adminEdit={mayEdit
+          ? { on: editOn, onToggle: toggleEdit }
           : undefined}
         isOwner={isOwner}
         heroSentinelRef={heroSentinelRef}
@@ -1160,22 +1161,22 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             cluster grafted onto the title".
 
             Still 36px wide either way, so the category stays centred. */}
-        {(!!isAdmin && !isOwner) ? (
+        {mayEdit ? (
           <button
             type="button"
-            onClick={toggleAdminEdit}
-            aria-pressed={adminEditOn}
-            aria-label={adminEditOn ? 'Stop editing and read the post' : 'Edit this post as a moderator'}
+            onClick={toggleEdit}
+            aria-pressed={editOn}
+            aria-label={editOn ? 'Done editing' : 'Edit this post'}
             style={{
               width: 36, height: 36, borderRadius: 999, flexShrink: 0,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
-              background: adminEditOn ? 'var(--text-primary)' : 'var(--bg-surface)',
-              border: `1px solid ${adminEditOn ? 'var(--text-primary)' : 'var(--border-subtle)'}`,
-              color: adminEditOn ? 'var(--bg-base)' : 'var(--text-secondary)',
+              background: editOn ? 'var(--text-primary)' : 'var(--bg-surface)',
+              border: `1px solid ${editOn ? 'var(--text-primary)' : 'var(--border-subtle)'}`,
+              color: editOn ? 'var(--bg-base)' : 'var(--text-secondary)',
             }}
           >
-            {adminEditOn
+            {editOn
               ? <Check size={17} strokeWidth={2.6} />
               : <Pencil size={16} strokeWidth={1.9} />}
           </button>
@@ -1258,8 +1259,12 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           </span>
         )}
         {/* Mini contact CTA. Also shown when signed out, where it prompts
-            sign-in — the channels simply aren't resolvable yet. */}
-        {!item.isClosed && (contactLinks.length > 0 || gate === 'sign-in') && (
+            sign-in — the channels simply aren't resolvable yet.
+            Never to the owner: contactGate knows about signed-in and signed-out
+            and nothing about self, so without !isOwner this put an "Email
+            Madhav Rathi" button on Madhav's own listing. Third site with that
+            same hole; the other two are the two action bars. */}
+        {!isOwner && !item.isClosed && (contactLinks.length > 0 || gate === 'sign-in') && (
           <button
             aria-label={gate === 'sign-in'
               ? `Sign in to contact ${item.user.name}`
@@ -1488,10 +1493,17 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--text-scale))', minWidth: 0, flex: 1 }}>
-              <MapPin size={14} strokeWidth={1.8} />
-              <span>{item.location}</span>
-            </div>
+            {/* A pin with nothing after it is not a location, it is a bug that
+                looks like one. Location is optional on a listing — the Honda
+                City had none — and the row rendered anyway as a lone 14px
+                marker floating beside the price. An empty span still takes the
+                flex slot, so the price did not move up to fill it either. */}
+            {item.location ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--text-scale))', minWidth: 0, flex: 1 }}>
+                <MapPin size={14} strokeWidth={1.8} />
+                <span>{item.location}</span>
+              </div>
+            ) : <span style={{ flex: 1 }} />}
             {item.isClosed ? (
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -1785,6 +1797,47 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
               >
                 <Trash2 size={16} strokeWidth={2} />
                 {deleting ? 'Deleting…' : confirmDelete ? 'Confirm?' : 'Delete'}
+              </button>
+            </>
+          ) : isOwner ? (
+            /* ── YOUR OWN POST, NOT BEING EDITED ──
+               It reads exactly like anyone else's post, which is the point —
+               the owner could not see their own listing the way their buyers
+               see it, because the detail screen WAS the editor and there was
+               no way to turn it off.
+               What it must not do is offer to contact the seller. contactGate
+               knows about signed-in and signed-out and nothing about self, so
+               without this branch the owner got an Email-the-seller button
+               addressed to their own inbox. Edit is the primary action here
+               instead, since it is the only thing they can do that a reader
+               cannot. */
+            <>
+              <button
+                type="button"
+                onClick={toggleEdit}
+                style={{
+                  flex: 1, height: 52, borderRadius: 999,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                }}
+              >
+                <Pencil size={16} strokeWidth={2} />
+                Edit this post
+              </button>
+              <button
+                aria-label="Share"
+                onClick={handleShare}
+                style={{
+                  width: 52, height: 52, borderRadius: 999,
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <Share2 size={18} strokeWidth={1.8} />
               </button>
             </>
           ) : (
@@ -2513,6 +2566,28 @@ function DesktopLayout({
                   </button>
                 )}
               </>
+            ) : isOwner ? (
+              /* Your own post, not being edited. Same reason as the phone bar:
+                 contactGate knows nothing about self, so the default branch
+                 would offer to email you your own listing. When editing is not
+                 available at all (no delete handler was passed) this renders
+                 nothing, which is still the right answer — no bar beats a bar
+                 that contacts you. */
+              adminEdit ? (
+              <button
+                type="button"
+                onClick={adminEdit.onToggle}
+                style={{
+                  flex: 1, minWidth: 160, height: 52, borderRadius: 14,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <Pencil size={16} strokeWidth={2} /> Edit this post
+              </button>
+              ) : null
             ) : item.isClosed ? (
               <button
                 onClick={() => onOpenStorefront?.(item.user)}
@@ -2642,7 +2717,7 @@ function DesktopLayout({
                 is used. */}
             {adminEdit && (
               <button
-                aria-label={adminEdit.on ? 'Stop editing and read the post' : 'Edit this post as a moderator'}
+                aria-label={adminEdit.on ? 'Done editing' : 'Edit this post'}
                 aria-pressed={adminEdit.on}
                 onClick={adminEdit.onToggle}
                 style={{
