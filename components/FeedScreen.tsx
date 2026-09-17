@@ -1,6 +1,7 @@
 'use client';
 
 import CategoryIcon from '../components/CategoryIcon';
+import { availableFirst, isRecentlyClosed } from '../lib/feed/rank';
 import { CATEGORIES as CATEGORY_LIST, normalizeCategory, categoryIdOf, matchesCategoryFilter } from '../lib/categories';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
@@ -405,10 +406,21 @@ export default function FeedScreen({
       /* The rail's own promise, applied to the whole catalogue rather than to
          the twelve items the row had space for. */
       if (railFilter && !RAIL_FILTERS[railFilter].match(item, { myCollege })) return false;
+      /* Closed posts: see SOLD_VISIBLE_MS. A listing stays stamped for the
+         window; a fulfilled request or a filled gig does not appear at all;
+         and the Free page drops them outright, because "up for grabs" is a
+         claim that a TAKEN stamp would contradict. */
+      if (item.isClosed) {
+        if (item.isRequest || item.kind === 'opportunity') return false;
+        if (railFilter === 'free') return false;
+        if (!isRecentlyClosed(item, Date.now())) return false;
+      }
       return true;
     });
     const cmp = railFilter ? RAIL_FILTERS[railFilter].compare : undefined;
-    return cmp ? [...base].sort(cmp) : base;
+    /* Sorted first, THEN stamped cards moved to the end — so "Most looked at"
+       still ranks by views, but a sold item never sits above a live one. */
+    return availableFirst(cmp ? [...base].sort(cmp) : base);
   })();
 
   /* ── "All" tab GRID entries (shown when a category/search narrows the
@@ -428,13 +440,21 @@ export default function FeedScreen({
        so smaller days-ago wins. For events we use the days-until-start so
        upcoming events feel "new". L&F uses position in the array since
        timeAgo is already a human string. */
-    const itemEntries: AllEntry[] = items.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
-      kind: 'item' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
-    }));
-    const opportunityEntries: AllEntry[] = opportunities.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
+    /* A stamped listing sorts after every live entry of any kind — the offset
+       is larger than any recency key can be. Closed requests and gigs are
+       dropped, same rule as the grid. */
+    const nowMs = Date.now();
+    const CLOSED_SINK = 1e9;
+    const itemEntries: AllEntry[] = items
+      .filter(it => !blocked.has(it.user.id) && (!it.isClosed || isRecentlyClosed(it, nowMs)))
+      .map((it, i) => ({
+        kind: 'item' as const, item: it,
+        sortKey: it.postedDaysAgo * 1000 + i + (it.isClosed ? CLOSED_SINK : 0),
+      }));
+    const opportunityEntries: AllEntry[] = opportunities.filter(it => !blocked.has(it.user.id) && !it.isClosed).map((it, i) => ({
       kind: 'opportunity' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
     }));
-    const requestEntries: AllEntry[] = requests.filter(it => !blocked.has(it.user.id)).map((it, i) => ({
+    const requestEntries: AllEntry[] = requests.filter(it => !blocked.has(it.user.id) && !it.isClosed).map((it, i) => ({
       kind: 'request' as const, item: it, sortKey: it.postedDaysAgo * 1000 + i,
     }));
     const eventEntries: AllEntry[] = events.filter(ev => !blocked.has(ev.organizer.id)).map((ev, i) => ({
@@ -498,7 +518,7 @@ export default function FeedScreen({
      Electronics and Fashion had one, those being the two whose label happens to
      equal its id. normalizeCategory covers rows that predate the id. */
   const itemsByCat = (cat: string) =>
-    liveItems.filter(it => categoryIdOf(it) === cat).slice(0, 12);
+    availableFirst(liveItems.filter(it => categoryIdOf(it) === cat)).slice(0, 12);
 
   /* Category rails, generated from the taxonomy rather than a hand-picked
      subset of it. A category that fills up earns a rail automatically, which is
@@ -507,7 +527,9 @@ export default function FeedScreen({
      Two is still the floor: a rail holding one card reads as broken. */
   const categoryRails = CATEGORY_LIST
     .map(c => ({ id: c.id, title: c.rail.title, sub: c.rail.sub, list: itemsByCat(c.id) }))
-    .filter(r => r.list.length >= 2);
+    /* Two LIVE items is the floor — a category rail may carry stamped cards but
+       cannot exist on the strength of them. */
+    .filter(r => r.list.filter(it => !it.isClosed).length >= 2);
 
   /* ── The shop window ────────────────────────────────────────────────────
    *
@@ -540,7 +562,10 @@ export default function FeedScreen({
     /* Real objects only. Requests are people ASKING for things and services
        are labour; both belong in this app and neither is something you can
        come and collect, which is what this row is promising. */
-    const pool = liveItems.filter(it => !it.isRequest && it.kind !== 'opportunity');
+    /* …and nothing closed. This row's whole argument is "there is stock"; a
+       SOLD stamp in the first row of the app argues the opposite. Sold cards
+       live further down, where they read as proof that things move. */
+    const pool = liveItems.filter(it => !it.isRequest && it.kind !== 'opportunity' && !it.isClosed);
 
     const byCat = new Map<string, MarketplaceItem[]>();
     for (const it of pool) {
@@ -1751,7 +1776,11 @@ function ProductCard({
   /* "Yours" outranks the rest. Free or Wanted describes what the post IS;
      yours describes what you can do with it, which is the more useful fact and
      the one the reader is not expecting. */
+  /* On a closed card the stamp IS the status, so every other status badge
+     goes — FREE next to TAKEN is a contradiction and WANTED next to FULFILLED
+     is noise. YOURS stays: whose it is does not change when it sells. */
   const badgeLabel = isMine ? 'Yours'
+    : item.isClosed ? null
     : badgeKind === 'request' ? 'Wanted'
     : badgeKind === 'opportunity'
       ? (item.comp === 'volunteer' ? 'Volunteer' : oppRoleBadge(item.oppRole))
@@ -1781,7 +1810,10 @@ function ProductCard({
       <button
         type="button"
         className="pcard-open"
-        aria-label={`Open ${item.title}`}
+        /* The stamp is aria-hidden decoration, so the state has to be in the
+           name — otherwise a screen reader offers "Open Honda City zx" on a car
+           that is no longer for sale. */
+        aria-label={closedLabel ? `Open ${item.title}, ${closedLabel.toLowerCase()}` : `Open ${item.title}`}
         onPointerDown={e => { tap.onPointerDown(e); press.handlers.onPointerDown?.(e); }}
         onPointerMove={e => { tap.onPointerMove(e); press.handlers.onPointerMove?.(e); }}
         onPointerUp={e => { tap.onPointerUp(e); press.handlers.onPointerUp?.(); }}
@@ -1808,18 +1840,30 @@ function ProductCard({
 
       {badgeLabel && <span className="pcard-badge" data-kind={badgeTone}>{badgeLabel}</span>}
 
-      <button
-        type="button"
-        className="pcard-save"
-        data-saved={isSaved || undefined}
-        aria-label={isSaved ? 'Unsave' : 'Save'}
-        aria-pressed={isSaved}
-        onClick={e => { e.stopPropagation(); onToggleSave(); }}
-      >
-        <Heart size={17} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
-      </button>
+      {/* No save on a closed card, unless it is already saved. Saving a thing
+          you can no longer get is a dead end; but a heart that vanishes from an
+          item you DID save reads as the app losing your data, so an existing
+          save keeps its control and can still be removed. */}
+      {(!item.isClosed || isSaved) && (
+        <button
+          type="button"
+          className="pcard-save"
+          data-saved={isSaved || undefined}
+          aria-label={isSaved ? 'Unsave' : 'Save'}
+          aria-pressed={isSaved}
+          onClick={e => { e.stopPropagation(); onToggleSave(); }}
+        >
+          <Heart size={17} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+        </button>
+      )}
 
-      {closedLabel && <span className="pcard-closed"><span>{closedLabel}</span></span>}
+      {/* The stamp. aria-hidden because the state is already in the button's
+          accessible name above. */}
+      {closedLabel && (
+        <span className="pcard-stamp-wrap" aria-hidden="true">
+          <span className="pcard-stamp">{closedLabel}</span>
+        </span>
+      )}
     </article>
   );
 }

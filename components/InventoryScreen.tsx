@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import PostStamp from './PostStamp';
+import { SOLD_VISIBLE_DAYS } from '../lib/feed/rank';
 import { Menu, Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
 import { Wordmark } from './Brand';
-import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem } from '../lib/mockData';
+import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem, closedLabelFor } from '../lib/mockData';
 import { opportunityCompLabel } from '../lib/opportunity';
 import { resolveItemMedia, getEventPhoto, getAvatar, resolveLostFoundPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
@@ -15,6 +17,7 @@ import {
   fetchMyUploads, fetchMyRequests, fetchEventsByUser, fetchLostFoundByUser,
   fetchMySaves, onPostsChanged,
   markListingSold, markRequestCompleted, markLostFoundResolved, deleteEvent,
+  reopenListing, reopenRequest,
 } from '../lib/liveData';
 import { track, EVT } from '../lib/analytics';
 import { getDemoUploads, getDemoRequests, deleteDemoPost, updateDemoPost } from '../lib/demoInventory';
@@ -337,14 +340,16 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
               void idx;
               if (entry.kind === 'item') {
                 const isMine = activeTab !== 'saved';
-                /* Pick the right action label for owner-only quick-close.
-                   Opportunities (services) aren't "sold"/"given" — a
-                   volunteering call gets "Filled", any other service
-                   "Completed". */
-                const completeLabel = entry.item.isRequest ? 'Completed'
-                  : entry.item.kind === 'opportunity'      ? (entry.item.comp === 'volunteer' ? 'Filled' : 'Completed')
-                  : entry.item.listingType === 'sell'      ? 'Sold'
-                  : 'Given';
+                /* The SAME word the card will be stamped with. This used to be
+                   its own table, calling a free or rental listing "Given" and
+                   promising a "Given" ribbon, while the card then said
+                   "Claimed" — the owner was told one word and shown another
+                   a second later. closedLabelFor is now the only table. */
+                const completeLabel = closedLabelFor(entry.item);
+                /* What the stamp means, for the confirm — so the owner agrees
+                   to the thing that will actually happen: public, stamped, and
+                   for how long. */
+                const isListing = !entry.item.isRequest && entry.item.kind !== 'opportunity';
                 return (
                   <InventoryCard
                     key={`item-${entry.item.id}`}
@@ -354,7 +359,11 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                     showHeart={activeTab === 'saved'}
                     completeLabel={isMine ? completeLabel : undefined}
                     onComplete={isMine ? async () => {
-                      if (typeof window !== 'undefined' && !window.confirm(`Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}? It stays on your storefront with a "${completeLabel}" ribbon — delete it from the post if you want it gone.`)) return;
+                      if (typeof window !== 'undefined' && !window.confirm(
+                        isListing
+                          ? `Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}?\n\nIt stays in the app for ${SOLD_VISIBLE_DAYS} days, greyed out with a ${completeLabel.toUpperCase()} stamp, so people can see it went. You can undo this from here.`
+                          : `Mark "${entry.item.title}" as ${completeLabel.toLowerCase()}?\n\nIt comes off the feed and stays in your Inventory. You can undo this from here.`,
+                      )) return;
                       track(EVT.post_marked_complete, {
                         post_id: entry.item.id,
                         post_kind: entry.item.isRequest ? 'request' : entry.item.kind === 'opportunity' ? 'opportunity' : 'item',
@@ -371,8 +380,30 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
                            * impression nothing happened, then the post would
                            * reappear and confuse the user. */
                           if (typeof window !== 'undefined') {
-                            window.alert((e as Error).message || 'Could not remove the post — please try again.');
+                            window.alert((e as Error).message || 'Could not update the post — please try again.');
                           }
+                        }
+                      }
+                    } : undefined}
+                    onReopen={isMine && entry.item.isClosed ? async () => {
+                      if (typeof window !== 'undefined' && !window.confirm(
+                        `Put "${entry.item.title}" back up?\n\nThe ${completeLabel.toUpperCase()} stamp comes off and it goes back where it was in the feed.`,
+                      )) return;
+                      track(EVT.post_marked_complete, {
+                        post_id: entry.item.id,
+                        post_kind: entry.item.isRequest ? 'request' : entry.item.kind === 'opportunity' ? 'opportunity' : 'item',
+                        action: 'reopened',
+                      });
+                      if (isDemoMode()) {
+                        updateDemoPost(entry.item.id, { isClosed: false });
+                        return;
+                      }
+                      try {
+                        if (entry.item.isRequest) await reopenRequest(entry.item.id);
+                        else                      await reopenListing(entry.item.id);
+                      } catch (e) {
+                        if (typeof window !== 'undefined') {
+                          window.alert((e as Error).message || 'Could not put the post back up — please try again.');
                         }
                       }
                     } : undefined}
@@ -458,13 +489,15 @@ function SummaryPill({ icon, label }: { icon: string; label: string }) {
 }
 
 function InventoryCard({
-  item, tall, onClick, showHeart, completeLabel, onComplete,
+  item, tall, onClick, showHeart, completeLabel, onComplete, onReopen,
 }: {
   item: MarketplaceItem; tall: boolean; onClick: () => void;
   showHeart: boolean;
-  /* Shown only when the viewer owns the post — closes it (sold/completed/given). */
+  /* Shown only when the viewer owns the post — closes it (sold/taken/etc). */
   completeLabel?: string;
   onComplete?: () => void | Promise<void>;
+  /** Puts a closed post back up. Owner-only, like onComplete. */
+  onReopen?: () => void | Promise<void>;
 }) {
   const photos = resolveItemMedia(item);
   const hasMedia = photos.length > 0;
@@ -483,8 +516,9 @@ function InventoryCard({
         <article
           className="feed-card inventory-card"
           data-stroke={strokeKind}
+          data-closed={item.isClosed || undefined}
           style={{ aspectRatio: ar, padding: 0, position: 'relative', overflow: 'hidden' }}
-          aria-label={`Open ${item.title}`}
+          aria-label={item.isClosed ? `Open ${item.title}, ${closedLabelFor(item).toLowerCase()}` : `Open ${item.title}`}
         >
           <button
             onClick={onClick}
@@ -546,12 +580,14 @@ function InventoryCard({
               </span>
             </div>
           </button>
+          {item.isClosed && <PostStamp label={closedLabelFor(item)} />}
         </article>
         {completeLabel && (
           <CompleteButton
             label={completeLabel}
             onClick={onComplete ?? (() => {})}
             isClosed={!!item.isClosed}
+            onReopen={onReopen}
           />
         )}
       </div>
@@ -563,8 +599,9 @@ function InventoryCard({
       <div
         className="feed-card inventory-card"
         data-stroke={strokeKind}
+        data-closed={item.isClosed || undefined}
         style={{ aspectRatio: ar, padding: 0, position: 'relative' }}
-        aria-label={`Open ${item.title}`}
+        aria-label={item.isClosed ? `Open ${item.title}, ${closedLabelFor(item).toLowerCase()}` : `Open ${item.title}`}
       >
         <PhotoCarousel
           photos={photos}
@@ -602,12 +639,18 @@ function InventoryCard({
             </>
           }
         />
+        {/* Your own Inventory shows the stamp too. Marking something sold here
+            used to change only the chip underneath — the card itself stayed in
+            full colour, so the one screen where you took the action was the
+            one screen that did not show its result. */}
+        {item.isClosed && <PostStamp label={closedLabelFor(item)} />}
       </div>
       {completeLabel && (
         <CompleteButton
           label={completeLabel}
           onClick={onComplete ?? (() => {})}
           isClosed={!!item.isClosed}
+          onReopen={onReopen}
         />
       )}
     </div>
@@ -619,18 +662,29 @@ function InventoryCard({
    Active/closed (already sold/completed): black bg, white text, no border.
    Hover: slight elevation on the available state. */
 function CompleteButton({
-  label, onClick, isClosed,
-}: { label: string; onClick: () => void | Promise<void>; isClosed: boolean }) {
+  label, onClick, isClosed, onReopen,
+}: {
+  label: string;
+  onClick: () => void | Promise<void>;
+  isClosed: boolean;
+  /** Undo. When present, the dark "Sold" chip on a closed post is a button
+   *  that puts it back on sale — see reopenListing for why this exists now. */
+  onReopen?: () => void | Promise<void>;
+}) {
   const [busy, setBusy] = useState(false);
+  const canUndo = isClosed && !!onReopen;
   return (
     <button
       onClick={async (e) => {
         e.stopPropagation();
-        if (busy || isClosed) return;
+        if (busy) return;
+        if (isClosed && !onReopen) return;
         setBusy(true);
-        try { await onClick(); } finally { setBusy(false); }
+        try { await (isClosed ? onReopen!() : onClick()); } finally { setBusy(false); }
       }}
-      aria-label={label}
+      /* The closed chip names its state AND what tapping it does. "Sold" alone
+         on a tappable control tells a screen reader nothing about the action. */
+      aria-label={canUndo ? `${label}. Mark as available again` : label}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
         width: '100%',
@@ -641,13 +695,13 @@ function CompleteButton({
         border: isClosed ? 'none' : '1px solid var(--border-default)',
         borderRadius: 999,
         fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-        cursor: isClosed ? 'default' : busy ? 'wait' : 'pointer',
+        cursor: busy ? 'wait' : (isClosed && !canUndo) ? 'default' : 'pointer',
         opacity: busy ? 0.65 : 1,
         transition: 'box-shadow 150ms ease',
         boxSizing: 'border-box',
       }}
       onMouseEnter={e => {
-        if (!isClosed) (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)';
+        if (!isClosed || canUndo) (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)';
       }}
       onMouseLeave={e => {
         (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
@@ -655,6 +709,11 @@ function CompleteButton({
     >
       <Check size={11} strokeWidth={2} />
       {busy ? '…' : label}
+      {canUndo && !busy && (
+        /* Quieter than the state it follows: the chip says what happened, and
+           the undo is there for the one time it should not have. */
+        <span style={{ opacity: 0.6, fontWeight: 500 }}>· Undo</span>
+      )}
     </button>
   );
 }

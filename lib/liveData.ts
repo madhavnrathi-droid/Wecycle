@@ -228,6 +228,13 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
     viewCount: row.view_count ?? 0,
     saveCount: row.save_count ?? 0,
     isClosed: (row as { status?: string }).status === 'completed',
+    /* updated_at is the closest thing the row has to a closed-at time: marking
+       sold writes it, and nothing else touches it while a post sits closed
+       apart from an owner editing a sold listing — which keeps it visible a
+       little longer and is harmless. Views do not write it. */
+    closedAt: (row as { status?: string }).status === 'completed'
+      ? ((row as { updated_at?: string }).updated_at ?? undefined)
+      : undefined,
   };
 }
 
@@ -918,6 +925,9 @@ export function mapRequestRow(row: RequestRowLite): MarketplaceItem {
     urgent: row.urgency === 'urgent',
     needBy: row.need_by_date ?? undefined,
     isClosed: (row as { status?: string }).status === 'fulfilled',
+    closedAt: (row as { status?: string }).status === 'fulfilled'
+      ? ((row as { updated_at?: string }).updated_at ?? undefined)
+      : undefined,
   };
 }
 
@@ -1716,20 +1726,61 @@ export async function deletePostById(id: string, kind: 'listing' | 'request' | '
    detail screen if they truly want it gone. */
 export async function markListingSold(id: string) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('listings')
     .update({ status: 'completed', updated_at: new Date().toISOString() } as never)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  /* Same trap as the edit helpers — see assertWrote. Here it is worse than a
+     lying save indicator: the owner is told their listing now carries a public
+     SOLD stamp, and it does not. */
+  assertWrote(data as { id: string }[] | null, 'listing');
   notifyPostsChanged();
 }
 export async function markRequestCompleted(id: string) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('requests')
     .update({ status: 'fulfilled', updated_at: new Date().toISOString() } as never)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  assertWrote(data as { id: string }[] | null, 'request');
+  notifyPostsChanged();
+}
+
+/* ── Undo a close ────────────────────────────────────────────────────────
+ *
+ * Closing a post used to be one-way from the app — the Inventory chip went
+ * dark and stopped responding. That was tolerable while a closed post simply
+ * left the feed. It is not tolerable now that closing puts a public SOLD stamp
+ * on the card: a mis-tap in Inventory would announce to the whole campus that
+ * something still for sale was gone, with no way back but deleting it.
+ *
+ * Deliberately NOT a repost. posted_at is left alone, so reopening puts the
+ * post back where it was in the feed rather than bumping it to the top — undo
+ * should undo, not advertise. */
+export async function reopenListing(id: string) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { data, error } = await supabase
+    .from('listings')
+    .update({ status: 'active', updated_at: new Date().toISOString() } as never)
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  assertWrote(data as { id: string }[] | null, 'listing');
+  notifyPostsChanged();
+}
+export async function reopenRequest(id: string) {
+  if (!hasSupabaseEnv) throw new Error('Backend not configured');
+  const { data, error } = await supabase
+    .from('requests')
+    .update({ status: 'open', updated_at: new Date().toISOString() } as never)
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  assertWrote(data as { id: string }[] | null, 'request');
   notifyPostsChanged();
 }
 /* L&F still resolves by removal — it has its own dedicated status UI on the

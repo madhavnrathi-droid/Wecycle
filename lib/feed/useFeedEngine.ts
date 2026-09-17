@@ -32,7 +32,7 @@ import {
 } from './memory';
 import { estimateIntent, dominantIntent, type IntentWeights } from './intent';
 import { currentPhase } from './semester';
-import { rankFeed, eligible, sessionSeed, rng } from './rank';
+import { rankFeed, eligible, sessionSeed, rng, SOLD_VISIBLE_MS } from './rank';
 import { orchestrate, summariseSellers, type PlacedModule, type ModulePools } from './modules';
 
 const categoryIdOf = (it: MarketplaceItem) => it.categoryId ?? normalizeCategory(it.category);
@@ -227,7 +227,11 @@ export function useFeedEngine(input: EngineInput): Engine {
      * draws from. Browsing past your own listing is normal; being recommended
      * it is not. */
     const opts = { blocked: input.blocked, selfId: null, memory, now };
-    const items = eligible(input.items, opts);
+    /* Listings carry recently-closed posts — stamped SOLD / TAKEN and sunk to
+       the end of every rail, see SOLD_VISIBLE_MS. Requests and services do
+       not: a fulfilled request is an ask nobody can answer and a filled gig is
+       a job nobody can take, so there is no version of them worth showing. */
+    const items = eligible(input.items, { ...opts, closedWindowMs: SOLD_VISIBLE_MS });
     const requests = eligible(input.requests, opts);
     const opportunities = eligible(input.opportunities, opts);
 
@@ -247,7 +251,9 @@ export function useFeedEngine(input: EngineInput): Engine {
        would rotate the already-rotated list and the page would drift for no
        reason. The function and its tests stay in rank.ts for the infinite feed
        that will want them. */
-    const { items: ranked } = rankFeed(notMine(items), {
+    /* Nothing closed is recommended — "Picked for you" is not a place to be
+       shown things you cannot have. */
+    const { items: ranked } = rankFeed(notMine(items).filter(i => !i.isClosed), {
       memory, viewer: input.viewer, now, categoryIdOf, phase, seed,
       pageSize: 24, page: tick,
     });

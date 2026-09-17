@@ -91,7 +91,12 @@ export interface EligibilityOptions {
    *  useFeedEngine. Still the right thing for anywhere that RECOMMENDS, which
    *  is why it stays. */
   selfId?: string | null;
+  /** Keep every closed post regardless of age. Storefronts and Inventory — a
+   *  seller's own history. */
   includeClosed?: boolean;
+  /** Keep closed posts that closed within this many ms, and drop older ones.
+   *  The browse pool uses SOLD_VISIBLE_MS. Ignored when includeClosed is set. */
+  closedWindowMs?: number;
   /** Memory + clock, so "not interested" is honoured here rather than as a
    *  score penalty. A rejection is an instruction, and an instruction that a
    *  high enough relevance score can overrule is a suggestion. */
@@ -99,12 +104,60 @@ export interface EligibilityOptions {
   now?: number;
 }
 
+/* ── Sold, taken, rented: how long a closed post stays in browse ─────────────
+ *
+ * A closed post used to be dropped from every feed surface the moment it
+ * closed. The owner's complaint was that it vanished, and they were right to
+ * mind: a marketplace where things visibly move is more convincing than one
+ * where they quietly disappear, and a seller who marks something sold should
+ * be able to see that it registered.
+ *
+ * But "stays" cannot mean "forever". A campus marketplace turns over every
+ * semester, and a feed that keeps every stamp it ever made becomes a museum of
+ * things you cannot have. Fourteen days: long enough to read as proof that the
+ * app works, short enough that a stamped card never outnumbers live ones.
+ *
+ * After the window a closed post leaves BROWSE only. It stays on the seller's
+ * storefront and in their Inventory, which are history, not shopping.
+ */
+export const SOLD_VISIBLE_DAYS = 14;
+export const SOLD_VISIBLE_MS = SOLD_VISIBLE_DAYS * 24 * 60 * 60 * 1000;
+
+/** Closed within the window? A post with no closedAt (demo fixtures, a row
+ *  cached before the field existed) counts as recent — failing open shows a
+ *  stamped card a little too long, failing shut would hide it with no trace. */
+export function isRecentlyClosed(
+  it: Pick<MarketplaceItem, 'isClosed' | 'closedAt'>,
+  now: number,
+  windowMs: number = SOLD_VISIBLE_MS,
+): boolean {
+  if (!it.isClosed) return false;
+  if (!it.closedAt) return true;
+  const at = Date.parse(it.closedAt);
+  return Number.isNaN(at) ? true : now - at <= windowMs;
+}
+
+/** Available posts first, closed ones after, each group keeping its own order.
+ *
+ *  Applied BEFORE a rail is cut to size, which is the property that matters: a
+ *  stamped card only ever occupies a slot that no available post wanted. A row
+ *  with twelve things you can buy shows twelve things you can buy. */
+export function availableFirst<T>(xs: T[]): T[] {
+  const open: T[] = [];
+  const closed: T[] = [];
+  for (const x of xs) ((x as { isClosed?: boolean }).isClosed ? closed : open).push(x);
+  return closed.length ? [...open, ...closed] : xs;
+}
+
 export function eligible(items: MarketplaceItem[], o: EligibilityOptions): MarketplaceItem[] {
   const now = o.now ?? Date.now();
   return items.filter(it => {
     if (!it || !it.id) return false;
     if (o.blocked.has(it.user?.id ?? '')) return false;
-    if (!o.includeClosed && it.isClosed) return false;
+    if (it.isClosed && !o.includeClosed) {
+      if (!o.closedWindowMs) return false;
+      if (!isRecentlyClosed(it, now, o.closedWindowMs)) return false;
+    }
     if (o.selfId && it.user?.id === o.selfId) return false;
     if (o.memory && isHidden(o.memory, it.id, it.user?.id ?? '', now)) return false;
     return true;

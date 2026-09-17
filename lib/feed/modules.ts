@@ -26,6 +26,7 @@
  */
 
 import type { MarketplaceItem, CommunityEvent, LostItem, User } from '../mockData';
+import { availableFirst } from './rank';
 import type { IntentWeights } from './intent';
 import type { PhaseInfo } from './semester';
 
@@ -133,7 +134,13 @@ export interface ModuleSpec {
   build: (p: ModulePools, c: OrchestratorContext) => unknown[];
 }
 
-const take = <T,>(xs: T[], n = 12) => xs.slice(0, n);
+/* Available posts before closed ones, THEN cut to size — so a stamped card only
+   ever fills a slot no live post wanted. See availableFirst in rank.ts. */
+const take = <T,>(xs: T[], n = 12) => availableFirst(xs).slice(0, n);
+
+/** How many of a rail's items can actually be had. */
+const liveCount = (xs: unknown[]) =>
+  xs.reduce<number>((n, x) => n + ((x as { isClosed?: boolean }).isClosed ? 0 : 1), 0);
 
 /* ── The library ────────────────────────────────────── */
 
@@ -184,7 +191,9 @@ export const MODULES: ModuleSpec[] = [
     id: 'free_stuff', kind: 'products', zone: 4, priority: 58, min: 2, mobility: 1, variant: 'standard',
     title: 'Free & up for grabs 🎁', sub: '₹0. Yes, really.',
     affinity: { browsing: 8 },
-    build: p => take(p.items.filter(i => i.listingType === 'free')),
+    /* "Up for grabs" is a promise about availability, and a TAKEN stamp inside
+       the row that makes it would contradict its own heading. */
+    build: p => take(p.items.filter(i => i.listingType === 'free' && !i.isClosed)),
   },
   {
     id: 'needs_a_home', kind: 'products', zone: 4, priority: 40, min: 2, mobility: 0, variant: 'standard',
@@ -192,8 +201,9 @@ export const MODULES: ModuleSpec[] = [
     affinity: { browsing: 6 },
     /* The inventory-health row: good listings the feed has under-served.
        Sorted by age, filtered to things nobody has opened much. */
+    /* "Still looking for someone" — a sold thing is not. */
     build: (p, c) => take([...p.items]
-      .filter(i => hoursOld(i, c.now) > 72 && (i.viewCount ?? 0) < 15)
+      .filter(i => !i.isClosed && hoursOld(i, c.now) > 72 && (i.viewCount ?? 0) < 15)
       .sort((a, b) => (a.viewCount ?? 0) - (b.viewCount ?? 0))),
   },
   {
@@ -270,7 +280,11 @@ export function orchestrate(pools: ModulePools, ctx: OrchestratorContext): Place
       score += ctx.rand() * 4;
       return { spec, content, score };
     })
-    .filter(m => m.content.length >= m.spec.min || m.spec.kind === 'categories');
+    /* The minimum is met by things you can actually get. Stamped cards may pad
+       a rail that already earned its place; they may not earn it. Without this
+       a "Listed today" whose three posts had all sold that afternoon would
+       appear as a whole row of SOLD, which is a row about nothing. */
+    .filter(m => liveCount(m.content) >= m.spec.min || m.spec.kind === 'categories');
 
   /* Effective zone: a module with mobility may climb one zone when intent is
      strongly behind it. Only upward — nothing gets demoted out of its band, so

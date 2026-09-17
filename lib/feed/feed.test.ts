@@ -22,7 +22,7 @@ import {
 } from './memory';
 import { estimateIntent, dominantIntent } from './intent';
 import { currentPhase, semesterBoost } from './semester';
-import { rankFeed, scoreItem, rotate, rng, sessionSeed, eligible, injectExploration } from './rank';
+import { rankFeed, scoreItem, rotate, rng, sessionSeed, eligible, injectExploration, availableFirst, isRecentlyClosed, SOLD_VISIBLE_MS } from './rank';
 import { orchestrate, summariseSellers, applyModuleBudget, MODULES, shuffle } from './modules';
 import type { MarketplaceItem, User } from '../mockData';
 
@@ -630,4 +630,81 @@ test('shuffle is a permutation, not a filter', () => {
   const out = shuffle(xs, rng(11));
   assert.equal(out.length, xs.length);
   assert.deepEqual([...out].sort((a, b) => a - b), xs);
+});
+
+/* ── Closed posts: stamped, sunk, and never the reason a row exists ─────── */
+
+test('a closed post stays in browse for the window and leaves after it', () => {
+  const now = T0;
+  const day = 24 * H;
+  const pool = [
+    item({ isClosed: true, closedAt: new Date(now - 3 * day).toISOString() }),    // recent
+    item({ isClosed: true, closedAt: new Date(now - 20 * day).toISOString() }),   // stale
+    item({ isClosed: true }),                                                     // no closedAt
+    item({}),                                                                     // live
+  ];
+  const out = eligible(pool, { blocked: new Set(), closedWindowMs: SOLD_VISIBLE_MS, now });
+  /* The stale one is the only casualty. A post with no closedAt fails OPEN —
+     a stamped card shown a little long beats one hidden with no trace. */
+  assert.equal(out.length, 3);
+  assert.ok(!out.some(i => i.closedAt === pool[1].closedAt));
+  assert.equal(isRecentlyClosed(pool[0], now), true);
+  assert.equal(isRecentlyClosed(pool[1], now), false);
+  assert.equal(isRecentlyClosed(pool[2], now), true);
+  assert.equal(isRecentlyClosed(pool[3], now), false, 'a live post is not "recently closed"');
+});
+
+test('without a window, closed posts are still dropped — the old default holds', () => {
+  const out = eligible([item({ isClosed: true }), item({})], { blocked: new Set() });
+  assert.equal(out.length, 1);
+});
+
+test('availableFirst moves stamped posts to the end and keeps each group in order', () => {
+  const a = item({ title: 'a' });
+  const b = item({ title: 'b', isClosed: true });
+  const c = item({ title: 'c' });
+  const d = item({ title: 'd', isClosed: true });
+  assert.deepEqual(availableFirst([b, a, d, c]).map(i => i.title), ['a', 'c', 'b', 'd']);
+  const live = [a, c];
+  assert.equal(availableFirst(live), live, 'nothing to move returns the same array');
+});
+
+test('a stamped card never takes a slot a live post wanted', () => {
+  /* Twelve live and two closed, closed listed FIRST. Just dropped takes twelve
+     — and all twelve must be live. */
+  const live = Array.from({ length: 12 }, (_, i) =>
+    item({ user: user(`l${i}`), postedAt: new Date(T0 - (i + 5) * H).toISOString() }));
+  const closed = [0, 1].map(i =>
+    item({ user: user(`c${i}`), isClosed: true, postedAt: new Date(T0 - i * H).toISOString() }));
+  const out = orchestrate(pools({ items: [...closed, ...live], ranked: live }), octx());
+  const fresh = out.find(m => m.spec.id === 'fresh');
+  assert.ok(fresh, 'fresh row should render');
+  const shown = fresh!.content as MarketplaceItem[];
+  assert.equal(shown.length, 12);
+  assert.ok(shown.every(i => !i.isClosed), 'a newer SOLD post displaced a live one');
+});
+
+test('a row cannot qualify on stamped cards alone', () => {
+  /* Two live and three closed: "Just dropped" needs three. It must not render
+     as two things to buy padded out to its minimum with SOLD stamps. */
+  const items = [
+    item({ user: user('x1') }), item({ user: user('x2') }),
+    item({ user: user('y1'), isClosed: true }),
+    item({ user: user('y2'), isClosed: true }),
+    item({ user: user('y3'), isClosed: true }),
+  ];
+  const out = orchestrate(pools({ items, ranked: [] }), octx());
+  assert.ok(!out.some(m => m.spec.id === 'fresh'), 'fresh qualified on stamped cards');
+});
+
+test('rows that promise availability never show a stamp', () => {
+  const items = [
+    ...Array.from({ length: 4 }, (_, i) => item({ user: user(`f${i}`), listingType: 'free' })),
+    item({ user: user('ft'), listingType: 'free', isClosed: true }),
+  ];
+  const out = orchestrate(pools({ items }), octx());
+  const free = out.find(m => m.spec.id === 'free_stuff');
+  assert.ok(free, 'free row should render');
+  assert.ok((free!.content as MarketplaceItem[]).every(i => !i.isClosed),
+    '"Free & up for grabs" showed a TAKEN post');
 });

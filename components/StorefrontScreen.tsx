@@ -17,6 +17,8 @@
  * empty state) since users will want to see "no requests right now". */
 
 import { useEffect, useMemo, useState } from 'react';
+import { availableFirst } from '../lib/feed/rank';
+import PostStamp from './PostStamp';
 import { matchesCategoryFilter } from '../lib/categories';
 import {
   ChevronLeft, MapPin, Calendar, Users, IndianRupee,
@@ -31,7 +33,7 @@ import type {
   User, MarketplaceItem, CommunityEvent, FeedItem, LostItem,
 } from '../lib/mockData';
 import {
-  MARKETPLACE_ITEMS, EVENTS, FEED_ITEMS, CATEGORIES, MY_EVENT_IDS,
+  MARKETPLACE_ITEMS, EVENTS, FEED_ITEMS, CATEGORIES, MY_EVENT_IDS, closedLabelFor,
 } from '../lib/mockData';
 import { getAvatar, resolveItemMedia, resolveEventPhoto, resolveLostFoundPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
@@ -225,8 +227,15 @@ export default function StorefrontScreen({
   /* matchesCategoryFilter, not category.toLowerCase(): the label is not the id,
      so a seller filtering their own shop by Mobility or Furniture saw nothing.
      See the note on categoryIdOf. */
+  const liveUploads = uploads.filter(i => !i.isClosed).length;
+
+  /* Everything the seller has ever closed stays on their storefront — it is
+     their history, and a shop that has sold things is more convincing than one
+     that has not. But it goes after what is still for sale, so the first row
+     of a shop is always a row you can buy from. No time window here: the
+     14-day limit is for the shared feed, not for a seller's own page. */
   const filteredUploads = useMemo(
-    () => uploads.filter(i => matchesCategoryFilter(i, category)),
+    () => availableFirst(uploads.filter(i => matchesCategoryFilter(i, category))),
     [uploads, category],
   );
 
@@ -492,7 +501,8 @@ export default function StorefrontScreen({
              up. Truer than an empty string and better than a placeholder. */
           description: [
             collegeName(normalizeCollege(publicProfile?.college)) ?? undefined,
-            uploads.length ? `${uploads.length} thing${uploads.length === 1 ? '' : 's'} up on Wecycle` : undefined,
+            /* "Up on Wecycle" means available. A sold car is not up. */
+            liveUploads ? `${liveUploads} thing${liveUploads === 1 ? '' : 's'} up on Wecycle` : undefined,
           ].filter(Boolean).join(' · ') || undefined,
           storeStats: [
             { value: String(sharedDisplay), label: 'shared' },
@@ -709,8 +719,9 @@ function ItemTile({
       type="button"
       onClick={onClick}
       className="feed-card"
+      data-closed={item.isClosed || undefined}
       style={{ aspectRatio: RATIOS[variant], padding: 0 }}
-      aria-label={`Open ${item.title}`}
+      aria-label={item.isClosed ? `Open ${item.title}, ${closedLabelFor(item).toLowerCase()}` : `Open ${item.title}`}
     >
       <img src={photo} alt="" className="feed-card-img" loading="lazy" />
       <div className="feed-card-overlay">
@@ -727,6 +738,7 @@ function ItemTile({
           </span>
         </div>
       </div>
+      {item.isClosed && <PostStamp label={closedLabelFor(item)} />}
     </button>
   );
 }

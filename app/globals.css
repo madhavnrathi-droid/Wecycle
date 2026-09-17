@@ -1789,38 +1789,34 @@ section.mobile-only { display: block; }
    The post stays in the feed, dimmed, with a clear "stamp" so a sold item
    reads as resolved-but-real rather than disappearing. data-stroke uses
    ::after, so the dim scrim rides on ::before to avoid clobbering it. */
+/* ── Closed posts on the tile cards (Inventory, seller storefront) ──
+   These rules existed before and nothing ever triggered them: no component set
+   data-closed on a .feed-card, and .feed-card-closed-ribbon was used nowhere.
+   So a sold post showed in FULL COLOUR on the seller's own storefront, looking
+   for sale, and in Inventory the only sign of it was the chip underneath.
+   Now both set data-closed and draw <PostStamp>, and this matches the feed:
+   no colour, still recognisable, one stamp. */
 .feed-card[data-closed] { position: relative; }
-.feed-card[data-closed]::before {
-  content: '';
+/* .carousel-slide, not .photo-carousel. PhotoCarousel renders .carousel-track
+   > .carousel-slide > img, and there is no .photo-carousel class anywhere in
+   it — so the selector these rules had was matching nothing, which is a
+   second reason they never did anything. Checked against the live DOM. */
+.feed-card[data-closed] .feed-card-img,
+.feed-card[data-closed] .carousel-slide img,
+.feed-card[data-closed] .carousel-slide video {
+  filter: grayscale(1) contrast(0.94);
+  opacity: 0.82;
+}
+/* The whole tile is the photo on these cards, so the stamp centres on all of
+   it — unlike .pcard-stamp-wrap, which sits on the photo half of a feed card. */
+.post-stamp-wrap {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  background: rgba(12, 12, 10, 0.46);
-  z-index: 4;            /* above media, below the stroke ring + ribbon */
-  pointer-events: none;
-}
-.feed-card[data-closed] .feed-card-img,
-.feed-card[data-closed] .photo-carousel img,
-.feed-card[data-closed] .photo-carousel video {
-  filter: grayscale(0.4);
-}
-.feed-card-closed-ribbon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(-4deg);
   z-index: 6;
-  background: rgba(12, 12, 10, 0.9);
-  color: #fff;
-  font-size: calc(14px * var(--text-scale));
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 8px 18px;
-  border-radius: 10px;
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 /* Type chip — top-left badge on feed cards in the All tab, mirroring the
@@ -5748,28 +5744,100 @@ textarea:focus-visible {
   color: var(--bg-base);
 }
 
-.pcard[data-closed] .pcard-media .fit-img-fg { filter: grayscale(0.7); opacity: 0.7; }
-.pcard[data-closed] .pcard-media .fit-img-bg { filter: blur(16px) grayscale(0.8); opacity: 0.35; }
-.pcard-closed {
+/* ── A closed post: desaturated and stamped ────────────────────────────────
+ *
+ * It used to be grayscale(0.7) at 70% with a small dark pill in the middle —
+ * which read as a loading state, or a photo that had failed, more than as
+ * SOLD. And it was rarely seen, because the feed dropped closed posts before a
+ * card could draw them.
+ *
+ * Now: the photo loses ALL of its colour, the words step back a tone, and a
+ * stamp goes across the picture at an angle. The stamp is the only colour left
+ * on the card, which is exactly why it cannot be missed — a rose stamp on a
+ * grey card needs no other help to be the first thing you read.
+ *
+ * Still recognisable on purpose. Dimmed to 82%, not 50%: the value of keeping a
+ * sold card in the feed is that you can see WHAT sold, and a photo too faint to
+ * make out throws that away.
+ */
+.pcard[data-closed] .pcard-media {
+  filter: grayscale(1) contrast(0.94);
+  opacity: 0.82;
+}
+/* --text-secondary, not --text-muted. Muted is 2.91:1 on the dark base
+   (measured), so "stepping back a tone" there would mean stepping below AA.
+   Secondary is 6.7:1 in both themes and still visibly lighter than the ink the
+   live cards use. The free-green price tone is overridden too — green is a
+   promise that the thing is free, and it no longer is anything. */
+.pcard[data-closed] .pcard-title,
+.pcard[data-closed] .pcard-price,
+.pcard[data-closed] .pcard-price[data-tone] {
+  color: var(--text-secondary);
+}
+
+/* Sized to the PHOTO, not the card: the stamp belongs on the picture of the
+   thing, and centring it on the whole card put it across the title. Same
+   aspect variable as .pcard-media, so it tracks every rail variant. */
+.pcard-stamp-wrap {
   position: absolute;
-  inset: 0 0 auto 0;
   top: 0;
-  height: 100%;
+  left: 0;
+  right: 0;
+  aspect-ratio: var(--pcard-ar, 1 / 1);
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
 }
-.pcard-closed span {
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(14, 14, 8, 0.82);
-  color: #fff;
-  font-size: calc(11px * var(--text-scale));
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.pcard-stamp {
+  display: inline-block;
+  max-width: 88%;
+  padding: 5px 12px 4px;
+  /* A rubber stamp, not a label: rotated, uppercase, heavy, widely tracked,
+     with the double rule a real stamp leaves. The outer border is the rule;
+     the inset shadows paint a cream gap and then a thinner inner rule inside
+     it. No image, no SVG — it scales with the text and survives any theme. */
+  transform: rotate(-9deg);
+  border: 2.5px solid currentColor;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px rgba(250, 250, 246, 0.92),
+    inset 0 0 0 3.5px currentColor;
+  /* A near-opaque fill behind the letters. The stamp sits over an arbitrary
+     photograph, and the only way a 14px word is guaranteed legible over any
+     photograph is to not be over it.
+     0.96, and MEASURED against the worst photo pixel, not the average: at 0.90
+     the rose ink fell to 4.19:1 wherever the stamp crossed a black area, the
+     10% of dark showing through the fill being enough to fail AA. 0.96 holds
+     4.81:1 over pure black and still reads as ink on paper rather than a
+     sticker. Dark theme below clears 4.96:1 over pure white. */
+  background: rgba(250, 250, 246, 0.96);
+  /* --accent-rose-ink. The one colour on a desaturated card. */
+  color: var(--accent-rose-ink);
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+/* Micro rails are ~130px wide; the tracking comes in so SWAPPED still fits. */
+.rail--micro .pcard-stamp {
+  font-size: calc(12px * var(--text-scale));
+  letter-spacing: 0.1em;
+  padding: 4px 9px 3px;
+}
+/* Dark theme: --accent-rose-ink is a light pink here (#FF6B80), which on a
+   cream fill would be nearly invisible. The fill turns dark instead — 7.1:1 —
+   and the inner gap follows it. */
+.dark .pcard-stamp {
+  background: rgba(12, 12, 11, 0.86);
+  box-shadow:
+    inset 0 0 0 2px rgba(12, 12, 11, 0.92),
+    inset 0 0 0 3.5px currentColor;
 }
 
 /* ── Product grid (category / search / focused tabs) ── */

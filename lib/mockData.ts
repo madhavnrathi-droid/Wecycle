@@ -182,24 +182,40 @@ export interface MarketplaceItem {
   urgent?: boolean;
   /* Optional "need by" date string for requests. */
   needBy?: string;
-  /* Terminal state: a sell/free/borrow/swap listing that's been completed
-     (sold / given away / returned / swapped) or a request that's been
-     fulfilled. We keep these in the feed — dimmed with a status ribbon — so
-     it reads as an active, trustworthy community rather than one where posts
-     silently vanish. */
+  /* Terminal state: a sell/free/rent/swap listing that has been completed, or
+     a request that has been fulfilled. Kept in the app, desaturated and
+     stamped — see closedLabelFor and the SOLD_VISIBLE window in feed/rank. */
   isClosed?: boolean;
+  /** When it closed (the row's updated_at at the time), ISO. Drives how long a
+   *  stamped card stays in browse before dropping out. Absent on demo fixtures
+   *  and on rows cached before the field existed, which are treated as recent —
+   *  failing open keeps the stamp visible rather than silently hiding a card. */
+  closedAt?: string;
 }
 
-/** Past-tense ribbon label for a closed listing/request, by type. */
+/** The stamp on a closed post, by type — and the label on the button that
+ *  closes it. ONE table for both.
+ *
+ *  There used to be two, and they disagreed. The Inventory button called a
+ *  free, rent or swap listing "Given", and its confirm promised a "Given"
+ *  ribbon; the card this function drew then said "Claimed". The owner was told
+ *  one word and shown another, about the same post, a second apart.
+ *
+ *  Two words also changed on the way:
+ *    free    Claimed  -> Taken     the owner's own word for it, and plainer
+ *    borrow  Returned -> Rented    a stamped RETURNED on a rental reads as "it
+ *                                  is back and available", which is exactly
+ *                                  the opposite of what closing it means
+ */
 export function closedLabelFor(item: Pick<MarketplaceItem, 'isRequest' | 'listingType' | 'kind' | 'comp'>): string {
   if (item.isRequest) return 'Fulfilled';
-  /* An opportunity (service) isn't "sold" or "claimed" — a volunteering call
+  /* An opportunity (service) isn't "sold" or "taken" — a volunteering call
      gets "Filled", any other service "Completed". */
   if (item.kind === 'opportunity') return item.comp === 'volunteer' ? 'Filled' : 'Completed';
   switch (item.listingType) {
     case 'sell':   return 'Sold';
-    case 'free':   return 'Claimed';
-    case 'borrow': return 'Returned';
+    case 'free':   return 'Taken';
+    case 'borrow': return 'Rented';
     case 'swap':   return 'Swapped';
     default:       return 'Closed';
   }
