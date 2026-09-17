@@ -5905,6 +5905,38 @@ textarea:focus-visible {
    Services board a doorway (services are the thinnest board, so it needs the
    invitation most). Deliberately NOT a card and NOT a bordered box: one soft
    tinted fill, a floating pill button, no stroke. */
+/* ── Outage notice ────────────────────────────────────────────────────────
+ * A calm amber strip, not a red error. Nothing the reader did caused this and
+ * nothing they can do fixes it; red would read as "you did something wrong".
+ * Amber-ink on the amber tint is the same pairing the status chips were
+ * measured with (4.66:1), and the title is primary ink.
+ */
+.outage { display: flex; flex-direction: column; gap: 12px; }
+.outage-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--accent-amber-surface);
+}
+.outage-icon { flex: 0 0 auto; margin-top: 2px; color: var(--accent-amber-ink); }
+.outage-copy { min-width: 0; }
+.outage-title {
+  margin: 0;
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+.outage-sub {
+  margin: 2px 0 0;
+  font-size: calc(12.5px * var(--text-scale));
+  line-height: 1.45;
+  color: var(--accent-amber-ink);
+}
+
 /* ── The UXINDIA banner ───────────────────────────────────────────────────
  *
  * Home feed, top, and the only banner there. Black field, ember shader biased

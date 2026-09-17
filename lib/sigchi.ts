@@ -40,6 +40,8 @@
  */
 
 import { rpcUntyped } from './supabase';
+import { OUTAGE_MODE } from './outage';
+import { apiBase } from './platform';
 
 /** The code and who it belongs to, or a plain no. */
 export type SigchiResult =
@@ -86,6 +88,12 @@ export async function claimSigchiOffer(email: string): Promise<SigchiResult> {
   const trimmed = email.trim();
   if (!looksLikeEmail(trimmed)) return { kind: 'no-match' };
 
+  /* During the backend outage there is no session to call the RPC with and no
+     database to answer it, so the check goes to the Next.js server instead —
+     see app/api/sigchi/route.ts. Same result shape either way, so nothing
+     above this function has to know which door answered. */
+  if (OUTAGE_MODE) return claimViaServer(trimmed);
+
   let data: ClaimRow[] | ClaimRow | null = null;
   let error: { message?: string; code?: string } | null = null;
   try {
@@ -112,4 +120,31 @@ export async function claimSigchiOffer(email: string): Promise<SigchiResult> {
   if (!row || !row.matched || !row.code) return { kind: 'no-match' };
 
   return { kind: 'matched', code: row.code, name: row.member_name ?? null };
+}
+
+/* ── The outage path ─────────────────────────────────────────────────────── */
+
+async function claimViaServer(email: string): Promise<SigchiResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}/api/sigchi`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      cache: 'no-store',
+    });
+  } catch {
+    return { kind: 'error', message: 'check your connection and try again' };
+  }
+
+  if (res.status === 429) return { kind: 'throttled' };
+  if (!res.ok) return { kind: 'error', message: 'the check is unavailable right now' };
+
+  let body: { matched?: boolean; code?: string; name?: string | null } = {};
+  try { body = await res.json(); } catch { /* treated as no answer below */ }
+
+  if (body.matched && typeof body.code === 'string' && body.code) {
+    return { kind: 'matched', code: body.code, name: body.name ?? null };
+  }
+  return { kind: 'no-match' };
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import CategoryIcon from '../components/CategoryIcon';
+import OutageNotice from './OutageNotice';
+import { OUTAGE_MODE } from '../lib/outage';
 import { availableFirst, isRecentlyClosed } from '../lib/feed/rank';
 import { CATEGORIES as CATEGORY_LIST, normalizeCategory, categoryIdOf, matchesCategoryFilter } from '../lib/categories';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -1165,7 +1167,21 @@ export default function FeedScreen({
          One mount, not the mobile/desktop pair the carousel needed: this card
          is one element that changes proportion at its breakpoints rather than
          two elements taking turns being display:none. */}
-      <section style={{ padding: '0 16px 16px' }}>
+{OUTAGE_MODE ? (
+        /* During the backend outage the banner gives way to a notice and the
+           codes themselves. The banner opens the event page, and the event
+           page needs the database — tapping it would lead nowhere. */
+        <section style={{ padding: '0 16px 16px' }}>
+          <OutageNotice
+            isSignedIn={!!user}
+            memberName={profile?.full_name ?? null}
+            memberEmail={user?.email ?? null}
+            /* Nowhere useful to send someone: sign-in is what is broken. */
+            onRequireAuth={() => {}}
+          />
+        </section>
+      ) : (
+            <section style={{ padding: '0 16px 16px' }}>
         <UxIndiaBanner
           onOpen={() => {
             track(EVT.marketing_banner_tapped, { slide: 'uxindia' });
@@ -1180,6 +1196,7 @@ export default function FeedScreen({
           }}
         />
       </section>
+      )}
 
       {/* ── MOBILE SEARCH (under banner) ── */}
       <section className="mobile-only" style={{ padding: '0 16px 14px' }}>

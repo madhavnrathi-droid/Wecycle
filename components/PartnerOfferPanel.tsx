@@ -45,6 +45,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { ArrowUpRight, BadgeCheck, Loader2, Lock, Ticket } from 'lucide-react';
 import ScratchCode from './ScratchCode';
+import PlainCode from './PlainCode';
+import { OUTAGE_MODE } from '../lib/outage';
 import SigchiRevealCard from './SigchiRevealCard';
 import {
   MEMBER_TIER, SIGCHI_TIER, UX_INDIA_TICKETS_URL, UX_INDIA_EVENT,
@@ -120,6 +122,13 @@ export default function PartnerOfferPanel({
 
   /** Step one: try the address we already hold. */
   const startCheck = useCallback(async () => {
+    /* During the outage there is no sign-in to require and no account address
+       to try, so it goes straight to asking. */
+    if (OUTAGE_MODE && !isSignedIn) {
+      setPhase({ s: 'ask', note: 'first' });
+      window.setTimeout(() => inputRef.current?.focus(), 60);
+      return;
+    }
     if (!isSignedIn) { onRequireAuth(); return; }
     track(EVT.offer_sigchi_checked, { origin: 'account' });
     const account = (memberEmail ?? '').trim();
@@ -166,7 +175,15 @@ export default function PartnerOfferPanel({
           </p>
         </header>
 
-        {canReveal ? (
+        {canReveal && OUTAGE_MODE ? (
+          /* Shown outright during the outage. The scratch is a reward for
+             signing in, and nobody can sign in. */
+          <PlainCode
+            code={MEMBER_TIER.code}
+            label={`${MEMBER_TIER.percent}% off · everyone`}
+            onCopy={() => track(EVT.offer_code_copied, { tier: 'member', percent: MEMBER_TIER.percent, outage: true })}
+          />
+        ) : canReveal ? (
           <ScratchCode
             code={MEMBER_TIER.code}
             label={`${MEMBER_TIER.percent}% off · Wecycle members`}
@@ -206,7 +223,7 @@ export default function PartnerOfferPanel({
             </span>
           </p>
 
-          {!isSignedIn ? (
+          {!isSignedIn && !OUTAGE_MODE ? (
             <button type="button" className="uxi-sigchi-btn" onClick={onRequireAuth}>
               Sign in to check
             </button>
@@ -220,7 +237,7 @@ export default function PartnerOfferPanel({
               >
                 {busy ? (
                   <><Loader2 size={14} strokeWidth={2.4} className="uxi-spin" aria-hidden="true" /> Checking…</>
-                ) : 'Check my membership'}
+                ) : OUTAGE_MODE && !isSignedIn ? 'Check with my SIGCHI email' : 'Check my membership'}
               </button>
               <p className="uxi-sigchi-note">
                 Verified against the SIGCHI registration list. Instant — no waiting

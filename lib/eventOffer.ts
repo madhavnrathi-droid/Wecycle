@@ -27,6 +27,8 @@
  * here, because there is nothing to enforce.
  */
 
+import { OUTAGE_MODE } from './outage';
+
 /** The event these offers belong to, in `events`. */
 export const UX_INDIA_EVENT_ID = '3f22523a-4e96-4014-9405-9877d51f80ed';
 
@@ -144,7 +146,9 @@ export function hasPartnerOffer(eventId: string | undefined): boolean {
  * hurdle in front of the thing the partnership exists to hand out.
  */
 export function canRevealMemberCode(isSignedIn: boolean): boolean {
-  return isSignedIn;
+  /* During the outage nobody CAN sign in, so a sign-in gate would hide the
+     code from every member. See lib/outage.ts. */
+  return isSignedIn || OUTAGE_MODE;
 }
 
 /* ── The SIGCHI email, which is now a FALLBACK ─────────────────────────────

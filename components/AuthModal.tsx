@@ -38,9 +38,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { OUTAGE_MODE } from '../lib/outage';
 import {
   Mail, User, ArrowLeft, KeyRound, Loader2, Phone, Lock, Eye, EyeOff,
   GraduationCap, LifeBuoy, MailWarning, WandSparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
@@ -789,6 +791,36 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                     {m === 'signin' ? 'Sign in' : 'Sign up'}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* During the backend outage, this is the screen where people find
+                out something is wrong — their password is right and it fails
+                anyway. Say so here, and say where the thing they probably
+                wanted is, with a way straight to it. */}
+            {OUTAGE_MODE && (
+              <div className="outage-notice" role="status">
+                <AlertTriangle size={16} strokeWidth={2.2} aria-hidden="true" className="outage-icon" />
+                <div className="outage-copy">
+                  <p className="outage-title">Sign-in is having trouble right now</p>
+                  <p className="outage-sub">
+                    We&rsquo;re facing some temporary technical difficulties.
+                    Your UXINDIA discount codes are on the home screen, no sign-in
+                    needed.{' '}
+                    <button
+                      type="button"
+                      onClick={handleClose}
+                      style={{
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        font: 'inherit', fontWeight: 700, color: 'inherit',
+                        textDecoration: 'underline', textUnderlineOffset: 2,
+                        minHeight: 24,
+                      }}
+                    >
+                      Show me the codes
+                    </button>
+                  </p>
+                </div>
               </div>
             )}
 
