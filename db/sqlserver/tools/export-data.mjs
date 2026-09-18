@@ -111,7 +111,7 @@ function lengthLimits() {
     if (t) { table = t[1]; continue; }
     if (!table) continue;
     if (/^\);/.test(line)) { table = null; continue; }
-    const c = line.match(/^\s{4}(\[?[a-z_]+\]?)\s+n?varchar\((\d+)\)/i);
+    const c = line.match(/^\s{4}(\[?[a-z_][a-z0-9_]*\]?)\s+n?varchar\((\d+)\)/i);
     if (c) limits.set(`${table}.${c[1].replace(/[[\]]/g, '')}`, Number(c[2]));
   }
   if (limits.size === 0) throw new Error(`No column widths found in ${SCHEMA_SQL}`);

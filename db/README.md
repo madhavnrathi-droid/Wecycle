@@ -10,7 +10,9 @@ db/
 └── sqlserver/
     ├── wecycle-sqlserver.sql          THE script — run this and the database exists
     └── tools/
-        ├── export-data.mjs            pulls the live rows out of Postgres
+        ├── convert-dump.mjs           pg_dump file  -> SQL Server data load
+        ├── export-data.mjs            live Postgres -> SQL Server data load
+        ├── fetch-storage.mjs          downloads the images a dump cannot hold
         └── run.mjs                    runs a .sql file if sqlcmd isn't installed
 ```
 
@@ -44,6 +46,16 @@ Requires SQL Server 2017 or newer. Azure SQL Database works; delete the
 
 ## Then the data
 
+Two ways in, depending on what you have. **From a `pg_dump` file** — no
+password, no reachable project, works when everything is down:
+
+```bash
+node db/sqlserver/tools/convert-dump.mjs ~/wecycle_backup.sql
+node db/sqlserver/tools/run.mjs db/data/wecycle-data.sql
+```
+
+**Or straight from the live database:**
+
 ```bash
 npm install pg                       # the exporter's only dependency
 node db/sqlserver/tools/export-data.mjs "postgresql://postgres:<password>@db.oxqnwqaumrqdiwrlvfel.supabase.co:5432/postgres"
@@ -52,7 +64,75 @@ node db/sqlserver/tools/run.mjs db/data/wecycle-data.sql
 
 The connection string is in the Supabase dashboard under **Settings → Database
 → Connection string → URI**. Use the direct connection on port 5432, not the
-pooler.
+pooler. Both tools produce the same file.
+
+Neither invents a column mapping. They read the Postgres column names from the
+source and the SQL Server ones from `wecycle-sqlserver.sql`, match them, and
+**report every column on either side with no partner** — so a column added to
+one and not the other appears as a line of output rather than as data that
+quietly did not arrive.
+
+### What the September 2026 dump contained
+
+`wecycle_backup.sql`, 31 MB, checked row by row against the live database —
+every table matched:
+
+| | |
+|---|---|
+| 99 | members (`auth.users` + `profiles`, with all 99 bcrypt hashes) |
+| 46 | listings |
+| 99 | community memberships |
+| 57 | SIGCHI roster |
+| 45 | SIGCHI claim attempts |
+| 28 | moderation terms |
+| 27 | notifications |
+| 13 / 5 | categories / communities |
+| 12 / 7 / 4 / 2 / 2 / 1 ×4 | RSVPs, saves, lost & found, events, comments, and the singletons |
+| **550** | **rows migrated** |
+
+Empty in the source and so empty here: requests, alerts, conversations,
+messages, reactions, impact_log, inventory_items, announcements, and the rest.
+Not a failure — nobody had used them yet.
+
+Deliberately **not** migrated: `auth.sessions`, `refresh_tokens`, `identities`
+and the `mfa_*` tables (GoTrue's own state — sessions do not survive a change
+of auth system, so everyone signs in once more against the same password);
+216,631 rows of `cron.job_run_details`, which is 99% of the dump's size and is
+pure log noise; and Supabase's own plumbing schemas.
+
+## The images are not in the dump, and this is the part to plan for
+
+A `pg_dump` contains the database. Supabase Storage is not the database — it is
+object storage, and the dump holds only `storage.objects`, a table of file
+*names*. **141 files, and not one byte of any of them:**
+
+| | |
+|---|---|
+| 119 | listing photos |
+| 16 | event covers |
+| 6 | lost & found photos |
+
+Restore the dump without them and the schema is perfect, the data is perfect,
+and every photo is a broken image — because `listings.photo_urls` still points
+at Supabase URLs that serve nothing.
+
+```bash
+node db/sqlserver/tools/fetch-storage.mjs ~/wecycle_backup.sql --out ~/wecycle-media
+```
+
+Resumable, so a failed run costs only what it missed.
+
+> **It cannot work while the project is restricted.** Checked 2026-09-18: all
+> 141 URLs answer `402`, the same `exceed_cached_egress_quota` that took
+> sign-in down — which is also the diagnosis. "Cached egress" is CDN bandwidth,
+> and 119 listing photos served to every visitor is where it went. **Lift the
+> quota first, then download.** There is no way around it; the files are behind
+> the same wall as everything else.
+
+Once the files are somewhere else, `photo_urls`, `cover_url` and `avatar_url`
+still contain absolute Supabase URLs and need rewriting to the new host — a
+find-and-replace over `db/data/wecycle-data.sql` before loading it is the
+simplest moment to do that.
 
 > **The file it writes never goes in git.** It is 99 real students' names,
 > email addresses, bcrypt password hashes and phone numbers, plus the 57-address
