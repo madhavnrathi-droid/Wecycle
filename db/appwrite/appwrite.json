@@ -140,7 +140,18 @@
           "required": true
         }
       ],
-      "indexes": []
+      "indexes": [
+        {
+          "key": "uq_communities_slug",
+          "type": "unique",
+          "columns": [
+            "slug"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
     },
     {
       "$id": "profiles",
@@ -403,6 +414,16 @@
       ],
       "indexes": [
         {
+          "key": "uq_profiles_username",
+          "type": "unique",
+          "columns": [
+            "username"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
           "key": "ix_profiles_community",
           "type": "key",
           "columns": [
@@ -437,16 +458,6 @@
           "type": "key",
           "columns": [
             "department"
-          ],
-          "orders": [
-            "ASC"
-          ]
-        },
-        {
-          "key": "ix_profiles_email",
-          "type": "key",
-          "columns": [
-            "email"
           ],
           "orders": [
             "ASC"
@@ -1569,6 +1580,18 @@
       ],
       "indexes": [
         {
+          "key": "uq_request_offers_request_id_user_id",
+          "type": "unique",
+          "columns": [
+            "request_id",
+            "user_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
           "key": "ix_request_offers_request",
           "type": "key",
           "columns": [
@@ -1717,7 +1740,18 @@
           "required": true
         }
       ],
-      "indexes": []
+      "indexes": [
+        {
+          "key": "uq_event_forms_event_id",
+          "type": "unique",
+          "columns": [
+            "event_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
     },
     {
       "$id": "event_form_responses",
@@ -1758,6 +1792,18 @@
         }
       ],
       "indexes": [
+        {
+          "key": "uq_event_form_responses_event_id_use",
+          "type": "unique",
+          "columns": [
+            "event_id",
+            "user_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
         {
           "key": "ix_efr_event",
           "type": "key",
@@ -1934,6 +1980,22 @@
         }
       ],
       "indexes": [
+        {
+          "key": "uq_reactions_user_id_entity_type_ent",
+          "type": "unique",
+          "columns": [
+            "user_id",
+            "entity_type",
+            "entity_id",
+            "kind"
+          ],
+          "orders": [
+            "ASC",
+            "ASC",
+            "ASC",
+            "ASC"
+          ]
+        },
         {
           "key": "ix_reactions_entity",
           "type": "key",
@@ -2391,6 +2453,20 @@
         }
       ],
       "indexes": [
+        {
+          "key": "uq_saved_searches_user_id_query_scop",
+          "type": "unique",
+          "columns": [
+            "user_id",
+            "query",
+            "scope"
+          ],
+          "orders": [
+            "ASC",
+            "ASC",
+            "ASC"
+          ]
+        },
         {
           "key": "ix_saved_searches_user",
           "type": "key",

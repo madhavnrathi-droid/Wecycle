@@ -87,6 +87,32 @@ const COMPOSITE_KEYS = {
   user_blocks:       ['blocker_id', 'target_id'],
 };
 
+/* Indexes that cannot exist here, and why each one is a deliberate drop rather
+   than an oversight.
+
+   MySQL underneath indexes at most 767 bytes, which is 191 utf8mb4 characters,
+   and a `text` column cannot be indexed without a prefix length that Appwrite
+   does not expose. Two columns run into that, and shrinking them to fit would
+   be the wrong trade in both cases:
+
+   profiles.email (320) — the index it replaced was a Postgres TRIGRAM index
+     serving "contains" search, which a plain B-tree could not accelerate
+     anyway; it was already documented as degraded. Shrinking the column to 191
+     to keep a near-useless index would start REJECTING valid addresses (RFC
+     allows 254). At 99 profiles the scan is free. Dropped.
+
+   push_subscriptions.endpoint (450) — this one was UNIQUE, and uniqueness
+     genuinely matters: it is what stops one browser registering twice and
+     getting every notification twice. So it is not dropped, it MOVES — the row
+     id is the hash of the endpoint (see COMPOSITE in import-data.mjs), which
+     makes the primary key enforce it, with no length limit at all. The longest
+     endpoint in the live data is 188 characters and a 191-char cap would have
+     had three characters of headroom, which is not a margin. */
+const INDEX_SKIP = new Set([
+  'profiles:email',
+  'push_subscriptions:endpoint',
+]);
+
 /* auth.users is not a table here — Appwrite Auth owns it. Only the profile
    half crosses over, keyed by the Appwrite user id. */
 const SKIP_TABLES = new Set(['auth.users', 'auth.sessions', 'auth.one_time_codes']);
@@ -110,7 +136,7 @@ function parseSchema() {
 
     const t = /^CREATE TABLE ([a-z]+)\.([a-z_]+)/.exec(line);
     if (t) {
-      table = { schema: t[1], name: t[2], columns: [], enums: new Map(), json: new Set() };
+      table = { schema: t[1], name: t[2], columns: [], enums: new Map(), json: new Set(), uniques: [] };
       tables.set(`${t[1]}.${t[2]}`, table);
       continue;
     }
@@ -132,6 +158,16 @@ function parseSchema() {
     }
     const j = /CHECK \(ISJSON\(([a-z_0-9]+)\)/.exec(line);
     if (j) { table.json.add(j[1]); continue; }
+
+    /* A UNIQUE declared inline in CREATE TABLE, which the CREATE INDEX sweep
+       below never sees. Missing these is not cosmetic: without the one on
+       profiles.username two members can take the same handle, and without the
+       one on reactions the same person can like a post twice. */
+    const u = /CONSTRAINT [a-z_0-9]+ UNIQUE \(([^)]*)\)/.exec(line);
+    if (u) {
+      table.uniques.push(u[1].split(',').map((c) => c.trim()));
+      continue;
+    }
 
     const c = /^\s{4}(\[?[a-z_][a-z0-9_]*\]?)\s+([a-z0-9]+)(\(([^)]*)\))?(.*)$/i.exec(line);
     if (!c) continue;
@@ -254,11 +290,26 @@ function main() {
       });
     }
 
+    const skipped = (cols) => cols.some((c) => INDEX_SKIP.has(`${table.name}:${c}`));
+
+    for (const cols of table.uniques) {
+      const keep = cols.filter((c) => c !== 'id');
+      if (skipped(keep)) continue;
+      if (!keep.length || !keep.every((c) => columns.some((x) => x.key === c))) continue;
+      indexes.push({
+        key: `uq_${table.name}_${keep.join('_')}`.slice(0, 36),
+        type: 'unique',
+        columns: keep,
+        orders: keep.map(() => 'ASC'),
+      });
+    }
+
     for (const m of sqlIndexes) {
       if (m[3] !== table.name) continue;
       const cols = m[4].split(',').map((c) => c.trim().split(/\s+/)[0]).filter((c) => c !== 'id');
       if (!cols.length) continue;
       if (!cols.every((c) => columns.some((x) => x.key === c))) continue;
+      if (skipped(cols)) continue;
       indexes.push({
         key: m[2].slice(0, 36),
         type: m[1] ? 'unique' : 'key',

@@ -85,6 +85,11 @@ const COMPOSITE = {
      only [a-zA-Z0-9._-] and at most 36 characters. So they are hashed the same
      way the composites are. Nothing looks a row up by id anyway — the app
      queries the email / term / key COLUMN, which is still there. */
+  /* Not a composite — the row id is the hash of the endpoint so the PRIMARY KEY
+     enforces "one subscription per browser". The unique index that used to do
+     that cannot exist: the column is 450 characters and MySQL indexes 191. */
+  push_subscriptions: ['endpoint'],
+
   moderation_terms: ['term'],
   sigchi_members: ['email'],
   sigchi_offer_config: ['key'],
