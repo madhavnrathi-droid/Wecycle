@@ -3,6 +3,7 @@
 import CategoryIcon from '../components/CategoryIcon';
 import OutageNotice from './OutageNotice';
 import { OUTAGE_MODE } from '../lib/outage';
+import SystemMessage from './SystemMessage';
 import { availableFirst, isRecentlyClosed } from '../lib/feed/rank';
 import { CATEGORIES as CATEGORY_LIST, normalizeCategory, categoryIdOf, matchesCategoryFilter } from '../lib/categories';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -1167,6 +1168,13 @@ export default function FeedScreen({
          One mount, not the mobile/desktop pair the carousel needed: this card
          is one element that changes proportion at its breakpoints rather than
          two elements taking turns being display:none. */}
+{/* Anything /api/status is currently saying. Almost always nothing, and
+          invisible when it is. This is the ONLY notice that can reach an
+          installed Android or iOS build without a store release — the outage
+          block below it is compiled in, so it only ever reached the website.
+          See lib/appStatus.ts. */}
+      <SystemMessage />
+
 {OUTAGE_MODE ? (
         /* During the backend outage the banner gives way to a notice and the
            codes themselves. The banner opens the event page, and the event

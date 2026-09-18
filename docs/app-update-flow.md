@@ -46,6 +46,40 @@ is on the web only. The apps need a build 17.
 
 ---
 
+## The status message — the one thing that must never live in the database
+
+`/api/status` is the channel the September 2026 outage did not have. The
+website could say sign-in was down, because that notice shipped with the web
+deploy. The apps could not be told anything: they bundle a frozen web build and
+get everything else from Supabase, which *was the thing that was down*.
+
+So the rule it is built around:
+
+> A "we're having problems" banner served from the thing that is having the
+> problems is not a status page. It is a second thing to explain.
+
+`app/api/status/route.ts` reads one environment variable and touches nothing
+else — no database, no other service. To put a message on **every install, web
+and native, without an app release**, set `APP_STATUS` in Vercel and redeploy
+(about a minute):
+
+```json
+{"id":"2026-09-egress","severity":"warn",
+ "title":"We're having some technical difficulties",
+ "body":"Signing in is unavailable right now. Your UXINDIA code is below.",
+ "platforms":["ios","android"],"dismissible":true}
+```
+
+Clear it by deleting the variable. `severity` is `info`, `warn` or `critical`.
+`platforms` and `minBuild`/`maxBuild` are optional and filtered server-side, so
+a targeting rule invented later still works on a build shipped today.
+
+**Give every incident a new `id`.** Dismissals are remembered against it, so
+reusing an id means everyone who dismissed the last one never sees the new one.
+
+This only helps builds that carry `lib/appStatus.ts` — **build 16 does not**.
+It is one of the reasons build 17 matters.
+
 ## Option A — make it data (already done, use this first)
 
 The best answer to "can I change the ad without shipping an app" is to stop

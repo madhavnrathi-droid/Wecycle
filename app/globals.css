@@ -5937,6 +5937,44 @@ textarea:focus-visible {
   color: var(--accent-amber-ink);
 }
 
+/* ── The remote status strip ──────────────────────────────────────────────
+ *
+ * <SystemMessage>, driven by /api/status. Borrows the outage notice's shape
+ * deliberately — one voice for "something is up" rather than two — and only
+ * changes colour by severity.
+ *
+ * `warn` needs no rule: .outage-notice is already amber, which is the case
+ * this is used for nine times out of ten.
+ */
+.sysmsg--info     { background: var(--accent-cyan-surface); }
+.sysmsg--info .outage-icon,
+.sysmsg--info .outage-sub { color: var(--text-secondary); }
+
+.sysmsg--critical { background: var(--accent-rose-surface); }
+.sysmsg--critical .outage-icon,
+.sysmsg--critical .outage-sub { color: var(--accent-rose-ink); }
+
+/* 32px box, but the tap target is pushed out to 44 with padding on the parent
+   side — a dismiss that needs aiming for gets mis-tapped into the banner
+   underneath it, which on this screen opens the event page. */
+.sysmsg-x {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -6px -6px 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sysmsg-x:hover  { background: rgba(0, 0, 0, 0.06); color: var(--text-primary); }
+.sysmsg-x:active { transform: scale(0.92); }
+
 /* ── The UXINDIA banner ───────────────────────────────────────────────────
  *
  * Home feed, top, and the only banner there. Black field, ember shader biased
