@@ -12,3 +12,7 @@ data/
 *-data.sql
 *.bak
 *.bacpac
+
+# Appwrite credentials, pasted in by hand. Secret: the API key in it can
+# read and delete the whole project. Never commit it.
+appwrite.env
