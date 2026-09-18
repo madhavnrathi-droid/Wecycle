@@ -88,6 +88,8 @@ play-assets/            Play Store listing assets
 | [docs/android.md](docs/android.md) | Building the native Android app, signing, Play readiness |
 | [docs/deploying.md](docs/deploying.md) | Web deploys, domain/DNS, auth email (SMTP) operations |
 | [docs/play-console-launch.md](docs/play-console-launch.md) | Play Console launch runbook (closed testing) |
+| [docs/app-update-flow.md](docs/app-update-flow.md) | Which changes reach the installed apps on their own, and which need a release |
+| [db/README.md](db/README.md) | The database on **SQL Server** — one script for the whole schema, plus the tool that carries the data across |
 
 ## Development
 

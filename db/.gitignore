@@ -1,0 +1,14 @@
+# ── NOT A CONVENIENCE. THE REASON THIS FILE EXISTS. ──────────────────────────
+#
+# The Wecycle repository is PUBLIC (github.com/madhavnrathi-droid/Wecycle).
+#
+# db/data/ is where tools/export-data.mjs writes the exported database: 99 real
+# students' names, email addresses, bcrypt password hashes and phone numbers,
+# and the 57-address SIGCHI roster. Committing it would publish all of that
+# permanently — a force-push does not un-publish a commit that has been fetched.
+#
+# Keep the data out of here. Move it to the server privately, load it, delete it.
+data/
+*-data.sql
+*.bak
+*.bacpac
