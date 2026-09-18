@@ -89,7 +89,8 @@ play-assets/            Play Store listing assets
 | [docs/deploying.md](docs/deploying.md) | Web deploys, domain/DNS, auth email (SMTP) operations |
 | [docs/play-console-launch.md](docs/play-console-launch.md) | Play Console launch runbook (closed testing) |
 | [docs/app-update-flow.md](docs/app-update-flow.md) | Which changes reach the installed apps on their own, and which need a release |
-| [db/README.md](db/README.md) | The database on **SQL Server** — one script for the whole schema, plus the tool that carries the data across |
+| [db/appwrite/README.md](db/appwrite/README.md) | **Where the backend is going** — Appwrite Education: the schema, the account/data import, and the media move |
+| [db/README.md](db/README.md) | The database routes side by side, and what changed in each translation |
 
 ## Development
 

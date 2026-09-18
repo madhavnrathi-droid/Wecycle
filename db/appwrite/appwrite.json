@@ -1,0 +1,3416 @@
+{
+  "projectId": "wecycle",
+  "projectName": "Wecycle",
+  "tablesDB": [
+    {
+      "$id": "wecycle",
+      "name": "Wecycle",
+      "enabled": true
+    }
+  ],
+  "tables": [
+    {
+      "$id": "categories",
+      "databaseId": "wecycle",
+      "name": "categories",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "label",
+          "type": "varchar",
+          "size": 100,
+          "required": true
+        },
+        {
+          "key": "icon",
+          "type": "varchar",
+          "size": 16,
+          "required": false
+        },
+        {
+          "key": "sort_order",
+          "type": "integer",
+          "required": false,
+          "default": 100
+        },
+        {
+          "key": "is_active",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "communities",
+      "databaseId": "wecycle",
+      "name": "communities",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "slug",
+          "type": "varchar",
+          "size": 100,
+          "required": true
+        },
+        {
+          "key": "name",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "type",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "campus",
+            "apartment",
+            "office",
+            "neighborhood"
+          ],
+          "required": false,
+          "default": "campus"
+        },
+        {
+          "key": "location",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "description",
+          "type": "longtext",
+          "size": 1000000,
+          "required": false
+        },
+        {
+          "key": "cover_url",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "member_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "items_circulated",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "co2_saved_kg",
+          "type": "double",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "is_public",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "active_since",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "profiles",
+      "databaseId": "wecycle",
+      "name": "profiles",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "username",
+          "type": "varchar",
+          "size": 100,
+          "required": true
+        },
+        {
+          "key": "full_name",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "avatar_url",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "avatar_color",
+          "type": "varchar",
+          "size": 20,
+          "required": false,
+          "default": "#6C63FF"
+        },
+        {
+          "key": "initials",
+          "type": "varchar",
+          "size": 8,
+          "required": false
+        },
+        {
+          "key": "bio",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "role",
+          "type": "varchar",
+          "size": 50,
+          "required": false
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "badges",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "impact_score",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "items_shared_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "items_received_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "repairs_helped_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "co2_saved_kg",
+          "type": "double",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "money_saved",
+          "type": "double",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "is_online",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "last_active_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "joined_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "email",
+          "type": "text",
+          "size": 320,
+          "required": false
+        },
+        {
+          "key": "phone",
+          "type": "varchar",
+          "size": 32,
+          "required": false
+        },
+        {
+          "key": "college_id",
+          "type": "varchar",
+          "size": 100,
+          "required": false
+        },
+        {
+          "key": "college",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "SMI",
+            "MIT",
+            "TAPMI",
+            "MLHS",
+            "MIRM",
+            "MLS",
+            "DOC"
+          ],
+          "required": false
+        },
+        {
+          "key": "graduating_year",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "key": "course",
+          "type": "varchar",
+          "size": 120,
+          "required": false
+        },
+        {
+          "key": "department",
+          "type": "varchar",
+          "size": 120,
+          "required": false
+        },
+        {
+          "key": "residence",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "day_scholar",
+            "hosteler"
+          ],
+          "required": false
+        },
+        {
+          "key": "contact_email_enabled",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "contact_whatsapp_enabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "show_online_status",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "allow_dms",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "show_phone_on_profile",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "hide_listings_from_search",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "hide_prices_on_feed",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "larger_text",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "theme",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "light",
+            "dark",
+            "system"
+          ],
+          "required": false,
+          "default": "system"
+        },
+        {
+          "key": "notification_prefs",
+          "type": "longtext",
+          "size": 1000000,
+          "required": true
+        },
+        {
+          "key": "suspended_until",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "suspended_reason",
+          "type": "text",
+          "size": 500,
+          "required": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_profiles_community",
+          "type": "key",
+          "columns": [
+            "community_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_profiles_impact",
+          "type": "key",
+          "columns": [
+            "impact_score"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_profiles_college_id",
+          "type": "key",
+          "columns": [
+            "college_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_profiles_department",
+          "type": "key",
+          "columns": [
+            "department"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_profiles_email",
+          "type": "key",
+          "columns": [
+            "email"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_profiles_full_name",
+          "type": "key",
+          "columns": [
+            "full_name"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "community_members",
+      "databaseId": "wecycle",
+      "name": "community_members",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "role",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "member",
+            "moderator",
+            "admin"
+          ],
+          "required": false,
+          "default": "member"
+        },
+        {
+          "key": "joined_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "uq_community_members",
+          "type": "unique",
+          "columns": [
+            "community_id",
+            "user_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_community_members_user",
+          "type": "key",
+          "columns": [
+            "user_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "listings",
+      "databaseId": "wecycle",
+      "name": "listings",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "category_id",
+          "type": "varchar",
+          "size": 64,
+          "required": false
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 2000,
+          "required": false
+        },
+        {
+          "key": "location",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "kind",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "item",
+            "opportunity"
+          ],
+          "required": false,
+          "default": "item"
+        },
+        {
+          "key": "listing_type",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "free",
+            "swap",
+            "borrow",
+            "sell"
+          ],
+          "required": true
+        },
+        {
+          "key": "condition",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "like_new",
+            "good",
+            "fair"
+          ],
+          "required": false,
+          "default": "good"
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "active",
+            "pending",
+            "completed",
+            "hidden",
+            "removed"
+          ],
+          "required": false,
+          "default": "active"
+        },
+        {
+          "key": "price",
+          "type": "double",
+          "required": false
+        },
+        {
+          "key": "price_max",
+          "type": "double",
+          "required": false
+        },
+        {
+          "key": "price_band",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "under_200",
+            "200_500",
+            "500_1000",
+            "over_1000"
+          ],
+          "required": false
+        },
+        {
+          "key": "deposit",
+          "type": "double",
+          "required": false
+        },
+        {
+          "key": "rate_period",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "hour",
+            "session",
+            "day",
+            "week",
+            "month",
+            "year",
+            "project"
+          ],
+          "required": false
+        },
+        {
+          "key": "comp",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "volunteer",
+            "free",
+            "paid"
+          ],
+          "required": false
+        },
+        {
+          "key": "opp_role",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "offering",
+            "hiring"
+          ],
+          "required": false
+        },
+        {
+          "key": "swap_for",
+          "type": "text",
+          "size": 280,
+          "required": false
+        },
+        {
+          "key": "link_url",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "link_on_photo",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "photo_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "video_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "tags",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "photo_color",
+          "type": "varchar",
+          "size": 20,
+          "required": false
+        },
+        {
+          "key": "photo_icon",
+          "type": "varchar",
+          "size": 50,
+          "required": false
+        },
+        {
+          "key": "is_featured",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "notify_on_engagement",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "response_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "save_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "view_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "posted_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "cx_listings_posted",
+          "type": "key",
+          "columns": [
+            "posted_at"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listings_active_posted",
+          "type": "key",
+          "columns": [
+            "status",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listings_category_active",
+          "type": "key",
+          "columns": [
+            "category_id",
+            "status",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listings_community_active",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "status",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listings_user_posted",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listings_live_posted",
+          "type": "key",
+          "columns": [
+            "posted_at"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listings_live_type",
+          "type": "key",
+          "columns": [
+            "listing_type",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listings_opportunity",
+          "type": "key",
+          "columns": [
+            "opp_role",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "requests",
+      "databaseId": "wecycle",
+      "name": "requests",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "category_id",
+          "type": "varchar",
+          "size": 64,
+          "required": false
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 2000,
+          "required": false
+        },
+        {
+          "key": "urgency",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "normal",
+            "urgent"
+          ],
+          "required": false,
+          "default": "normal"
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "open",
+            "fulfilled",
+            "expired",
+            "cancelled"
+          ],
+          "required": false,
+          "default": "open"
+        },
+        {
+          "key": "need_by_date",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "photo_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "video_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "offer_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "notify_on_engagement",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "posted_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "expires_at",
+          "type": "datetime",
+          "required": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "cx_requests_posted",
+          "type": "key",
+          "columns": [
+            "posted_at"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_requests_open_posted",
+          "type": "key",
+          "columns": [
+            "status",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_requests_community_open",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_requests_urgency",
+          "type": "key",
+          "columns": [
+            "urgency",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_requests_user_posted",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_requests_expires",
+          "type": "key",
+          "columns": [
+            "expires_at"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "events",
+      "databaseId": "wecycle",
+      "name": "events",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "organizer_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 3000,
+          "required": false
+        },
+        {
+          "key": "event_type",
+          "type": "varchar",
+          "size": 20,
+          "required": false,
+          "default": "community"
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "pending_review",
+            "published",
+            "completed",
+            "cancelled"
+          ],
+          "required": false,
+          "default": "pending_review"
+        },
+        {
+          "key": "color_accent",
+          "type": "varchar",
+          "size": 20,
+          "required": false
+        },
+        {
+          "key": "location",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "cover_url",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "starts_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "ends_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "time_unspecified",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "max_attendees",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "key": "photo_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "video_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "attendee_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "save_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "view_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "cx_events_starts",
+          "type": "key",
+          "columns": [
+            "starts_at"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_events_status_starts",
+          "type": "key",
+          "columns": [
+            "status",
+            "starts_at"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_events_organizer_starts",
+          "type": "key",
+          "columns": [
+            "organizer_id",
+            "starts_at"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_events_published",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "starts_at"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "lost_found_reports",
+      "databaseId": "wecycle",
+      "name": "lost_found_reports",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "category_id",
+          "type": "varchar",
+          "size": 64,
+          "required": false
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 2000,
+          "required": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "lost",
+            "found",
+            "claimed",
+            "returned"
+          ],
+          "required": true
+        },
+        {
+          "key": "last_seen",
+          "type": "text",
+          "size": 300,
+          "required": false
+        },
+        {
+          "key": "last_seen_date",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "reward",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "photo_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "video_urls",
+          "type": "varchar",
+          "size": 2000,
+          "array": true,
+          "required": false
+        },
+        {
+          "key": "photo_color",
+          "type": "varchar",
+          "size": 20,
+          "required": false
+        },
+        {
+          "key": "photo_icon",
+          "type": "varchar",
+          "size": 50,
+          "required": false
+        },
+        {
+          "key": "contact_phone",
+          "type": "varchar",
+          "size": 32,
+          "required": false
+        },
+        {
+          "key": "contact_email",
+          "type": "text",
+          "size": 320,
+          "required": false
+        },
+        {
+          "key": "verified",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "notify_on_engagement",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "claimed_by",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "claimed_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "posted_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "cx_lf_posted",
+          "type": "key",
+          "columns": [
+            "posted_at"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_lf_status_posted",
+          "type": "key",
+          "columns": [
+            "status",
+            "posted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_lf_community_status",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "status"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_lf_user",
+          "type": "key",
+          "columns": [
+            "user_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "saves",
+      "databaseId": "wecycle",
+      "name": "saves",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "listing_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "saved_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "uq_saves",
+          "type": "unique",
+          "columns": [
+            "user_id",
+            "listing_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_saves_user",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "saved_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "listing_responses",
+      "databaseId": "wecycle",
+      "name": "listing_responses",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "listing_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "message",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_listing_responses_listing",
+          "type": "key",
+          "columns": [
+            "listing_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_listing_responses_user",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "request_offers",
+      "databaseId": "wecycle",
+      "name": "request_offers",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "request_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "message",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_request_offers_request",
+          "type": "key",
+          "columns": [
+            "request_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "event_rsvps",
+      "databaseId": "wecycle",
+      "name": "event_rsvps",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "event_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "going",
+            "maybe",
+            "declined"
+          ],
+          "required": false,
+          "default": "going"
+        },
+        {
+          "key": "rsvped_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "uq_event_rsvps",
+          "type": "unique",
+          "columns": [
+            "event_id",
+            "user_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_rsvps_user",
+          "type": "key",
+          "columns": [
+            "user_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "event_saves",
+      "databaseId": "wecycle",
+      "name": "event_saves",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "event_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "saved_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "uq_event_saves",
+          "type": "unique",
+          "columns": [
+            "event_id",
+            "user_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "event_forms",
+      "databaseId": "wecycle",
+      "name": "event_forms",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "event_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "fields",
+          "type": "longtext",
+          "size": 1000000,
+          "required": true
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "event_form_responses",
+      "databaseId": "wecycle",
+      "name": "event_form_responses",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "form_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "event_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "answers",
+          "type": "longtext",
+          "size": 1000000,
+          "required": true
+        },
+        {
+          "key": "submitted_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_efr_event",
+          "type": "key",
+          "columns": [
+            "event_id",
+            "submitted_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "comments",
+      "databaseId": "wecycle",
+      "name": "comments",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "entity_type",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "listing",
+            "request",
+            "event",
+            "lost_found",
+            "milestone",
+            "announcement",
+            "alert"
+          ],
+          "required": true
+        },
+        {
+          "key": "entity_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "parent_comment_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "body",
+          "type": "text",
+          "size": 2000,
+          "required": true
+        },
+        {
+          "key": "is_edited",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "like_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "reply_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "cx_comments_entity",
+          "type": "key",
+          "columns": [
+            "entity_type",
+            "entity_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_comments_user",
+          "type": "key",
+          "columns": [
+            "user_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_comments_parent",
+          "type": "key",
+          "columns": [
+            "parent_comment_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "reactions",
+      "databaseId": "wecycle",
+      "name": "reactions",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "entity_type",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "listing",
+            "request",
+            "event",
+            "lost_found",
+            "milestone",
+            "announcement",
+            "alert"
+          ],
+          "required": true
+        },
+        {
+          "key": "entity_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "kind",
+          "type": "varchar",
+          "size": 20,
+          "required": false,
+          "default": "like"
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_reactions_entity",
+          "type": "key",
+          "columns": [
+            "entity_type",
+            "entity_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_reactions_user",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "notifications",
+      "databaseId": "wecycle",
+      "name": "notifications",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "actor_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "type",
+          "type": "varchar",
+          "size": 40,
+          "required": true
+        },
+        {
+          "key": "entity_type",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "listing",
+            "request",
+            "event",
+            "lost_found",
+            "milestone",
+            "announcement",
+            "alert"
+          ],
+          "required": false
+        },
+        {
+          "key": "entity_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "title",
+          "type": "text",
+          "size": 300,
+          "required": true
+        },
+        {
+          "key": "body",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "is_read",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "read_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "cx_notifications_user",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_notifications_unread",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "alerts",
+      "databaseId": "wecycle",
+      "name": "alerts",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "category_id",
+          "type": "varchar",
+          "size": 64,
+          "required": false
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 1000,
+          "required": true
+        },
+        {
+          "key": "condition",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "like_new",
+            "good",
+            "fair"
+          ],
+          "required": false
+        },
+        {
+          "key": "max_price",
+          "type": "double",
+          "required": false
+        },
+        {
+          "key": "location_pref",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "notify",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "email",
+            "phone",
+            "both"
+          ],
+          "required": false,
+          "default": "email"
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "active",
+            "matched",
+            "expired",
+            "cancelled"
+          ],
+          "required": false,
+          "default": "active"
+        },
+        {
+          "key": "duration_hours",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "key": "match_count",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "last_matched_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "expires_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_alerts_user_status",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "status"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_alerts_active_by_cat",
+          "type": "key",
+          "columns": [
+            "category_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_alerts_expiring",
+          "type": "key",
+          "columns": [
+            "expires_at"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "push_subscriptions",
+      "databaseId": "wecycle",
+      "name": "push_subscriptions",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "endpoint",
+          "type": "text",
+          "size": 450,
+          "required": true
+        },
+        {
+          "key": "p256dh",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "auth",
+          "type": "varchar",
+          "size": 100,
+          "required": true
+        },
+        {
+          "key": "user_agent",
+          "type": "text",
+          "size": 400,
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "last_seen_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_push_subscriptions_user",
+          "type": "key",
+          "columns": [
+            "user_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "push_queue",
+      "databaseId": "wecycle",
+      "name": "push_queue",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "channel",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "email",
+            "phone",
+            "both"
+          ],
+          "required": true
+        },
+        {
+          "key": "payload",
+          "type": "longtext",
+          "size": 1000000,
+          "required": true
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "pending",
+            "sent",
+            "failed",
+            "skipped"
+          ],
+          "required": false,
+          "default": "pending"
+        },
+        {
+          "key": "attempts",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "last_error",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "sent_at",
+          "type": "datetime",
+          "required": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_push_queue_pending",
+          "type": "key",
+          "columns": [
+            "created_at"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "saved_searches",
+      "databaseId": "wecycle",
+      "name": "saved_searches",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "query",
+          "type": "varchar",
+          "size": 80,
+          "required": true
+        },
+        {
+          "key": "scope",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "requests",
+            "listings",
+            "all"
+          ],
+          "required": false,
+          "default": "requests"
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_saved_searches_user",
+          "type": "key",
+          "columns": [
+            "user_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "conversations",
+      "databaseId": "wecycle",
+      "name": "conversations",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_a",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "user_b",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "listing_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "subject",
+          "type": "text",
+          "size": 300,
+          "required": false
+        },
+        {
+          "key": "last_message",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "last_message_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "last_sender_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_conversations_a",
+          "type": "key",
+          "columns": [
+            "user_a",
+            "last_message_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_conversations_b",
+          "type": "key",
+          "columns": [
+            "user_b",
+            "last_message_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "messages",
+      "databaseId": "wecycle",
+      "name": "messages",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "conversation_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "sender_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "body",
+          "type": "text",
+          "size": 4000,
+          "required": true
+        },
+        {
+          "key": "read_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "cx_messages_conversation",
+          "type": "key",
+          "columns": [
+            "conversation_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_messages_unread",
+          "type": "key",
+          "columns": [
+            "conversation_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "user_blocks",
+      "databaseId": "wecycle",
+      "name": "user_blocks",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "blocker_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "target_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "uq_user_blocks",
+          "type": "unique",
+          "columns": [
+            "blocker_id",
+            "target_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_user_blocks_target",
+          "type": "key",
+          "columns": [
+            "target_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "content_reports",
+      "databaseId": "wecycle",
+      "name": "content_reports",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "reporter_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "target_type",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "listing",
+            "request",
+            "lostfound",
+            "event",
+            "comment",
+            "message",
+            "user"
+          ],
+          "required": true
+        },
+        {
+          "key": "target_id",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "target_user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "reason",
+          "type": "varchar",
+          "size": 60,
+          "required": true
+        },
+        {
+          "key": "details",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "open",
+            "reviewing",
+            "actioned",
+            "dismissed"
+          ],
+          "required": false,
+          "default": "open"
+        },
+        {
+          "key": "reviewed_by",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "reviewed_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_content_reports_status",
+          "type": "key",
+          "columns": [
+            "status",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_content_reports_target",
+          "type": "key",
+          "columns": [
+            "target_type",
+            "target_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_content_reports_target_user",
+          "type": "key",
+          "columns": [
+            "target_user_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "moderation_terms",
+      "databaseId": "wecycle",
+      "name": "moderation_terms",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "term",
+          "type": "varchar",
+          "size": 100,
+          "required": true
+        },
+        {
+          "key": "category",
+          "type": "varchar",
+          "size": 50,
+          "required": false,
+          "default": "profanity"
+        },
+        {
+          "key": "added_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "inventory_items",
+      "databaseId": "wecycle",
+      "name": "inventory_items",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "owner_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "category_id",
+          "type": "varchar",
+          "size": 64,
+          "required": false
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "photo_url",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "photo_color",
+          "type": "varchar",
+          "size": 20,
+          "required": false
+        },
+        {
+          "key": "photo_icon",
+          "type": "varchar",
+          "size": 50,
+          "required": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "available",
+            "borrowed",
+            "maintenance",
+            "retired"
+          ],
+          "required": false,
+          "default": "available"
+        },
+        {
+          "key": "borrowed_by",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "borrow_started_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "due_date",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "total_borrows",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_inventory_community",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "status"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_inventory_owner",
+          "type": "key",
+          "columns": [
+            "owner_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "impact_log",
+      "databaseId": "wecycle",
+      "name": "impact_log",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "action_type",
+          "type": "varchar",
+          "size": 50,
+          "required": true
+        },
+        {
+          "key": "points",
+          "type": "integer",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "co2_kg",
+          "type": "double",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "money_saved",
+          "type": "double",
+          "required": false,
+          "default": 0
+        },
+        {
+          "key": "related_listing_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "related_request_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "related_event_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "notes",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_impact_user",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_impact_community",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_impact_action",
+          "type": "key",
+          "columns": [
+            "action_type"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "announcements",
+      "databaseId": "wecycle",
+      "name": "announcements",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "author_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "title",
+          "type": "text",
+          "size": 300,
+          "required": true
+        },
+        {
+          "key": "body",
+          "type": "longtext",
+          "size": 1000000,
+          "required": true
+        },
+        {
+          "key": "is_pinned",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_announcements_community",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "created_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "community_milestones",
+      "databaseId": "wecycle",
+      "name": "community_milestones",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "metric",
+          "type": "varchar",
+          "size": 50,
+          "required": true
+        },
+        {
+          "key": "title",
+          "type": "text",
+          "size": 300,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "value_display",
+          "type": "varchar",
+          "size": 100,
+          "required": true
+        },
+        {
+          "key": "value_numeric",
+          "type": "double",
+          "required": false
+        },
+        {
+          "key": "is_pinned",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "reached_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_milestones_community",
+          "type": "key",
+          "columns": [
+            "community_id",
+            "reached_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "sigchi_members",
+      "databaseId": "wecycle",
+      "name": "sigchi_members",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "email",
+          "type": "text",
+          "size": 320,
+          "required": true
+        },
+        {
+          "key": "full_name",
+          "type": "varchar",
+          "size": 200,
+          "required": false,
+          "default": ""
+        },
+        {
+          "key": "added_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "sigchi_offer_config",
+      "databaseId": "wecycle",
+      "name": "sigchi_offer_config",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "key",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "value",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "sigchi_claim_attempts",
+      "databaseId": "wecycle",
+      "name": "sigchi_claim_attempts",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "user_id",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "email_tried",
+          "type": "text",
+          "size": 320,
+          "required": true
+        },
+        {
+          "key": "matched",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "key": "at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_sigchi_attempts_user",
+          "type": "key",
+          "columns": [
+            "user_id",
+            "at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "app_config",
+      "databaseId": "wecycle",
+      "name": "app_config",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "key",
+          "type": "varchar",
+          "size": 100,
+          "required": true
+        },
+        {
+          "key": "value",
+          "type": "longtext",
+          "size": 1000000,
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "platform",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "web",
+            "ios",
+            "android"
+          ],
+          "required": false
+        },
+        {
+          "key": "min_build",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_by",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "$id": "banners",
+      "databaseId": "wecycle",
+      "name": "banners",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "slot",
+          "type": "varchar",
+          "size": 50,
+          "required": true
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "subtitle",
+          "type": "text",
+          "size": 300,
+          "required": false
+        },
+        {
+          "key": "eyebrow",
+          "type": "varchar",
+          "size": 100,
+          "required": false
+        },
+        {
+          "key": "cta_label",
+          "type": "varchar",
+          "size": 60,
+          "required": false
+        },
+        {
+          "key": "image_url",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "bg_color",
+          "type": "varchar",
+          "size": 20,
+          "required": false
+        },
+        {
+          "key": "text_color",
+          "type": "varchar",
+          "size": 20,
+          "required": false
+        },
+        {
+          "key": "action_kind",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "none",
+            "screen",
+            "url",
+            "event"
+          ],
+          "required": false,
+          "default": "none"
+        },
+        {
+          "key": "action_value",
+          "type": "text",
+          "size": 500,
+          "required": false
+        },
+        {
+          "key": "priority",
+          "type": "integer",
+          "required": false,
+          "default": 100
+        },
+        {
+          "key": "is_active",
+          "type": "boolean",
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "starts_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "ends_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "platform",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "web",
+            "ios",
+            "android"
+          ],
+          "required": false
+        },
+        {
+          "key": "min_build",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_banners_live",
+          "type": "key",
+          "columns": [
+            "slot",
+            "priority"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        }
+      ]
+    }
+  ]
+}

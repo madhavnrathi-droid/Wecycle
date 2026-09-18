@@ -1,4 +1,17 @@
-# The Wecycle database, on SQL Server
+# The Wecycle database
+
+Two destinations live here. **[`appwrite/`](appwrite/README.md) is the one being
+taken** — Appwrite Education, chosen because it keeps auth, storage and
+browser-direct access instead of making you rebuild them, and because its 2TB
+bandwidth is ~400× the cap that took Supabase down.
+
+`sqlserver/` below is the earlier route. It is kept, complete and verified: it
+is the single source of truth the Appwrite schema is generated from, and it is
+the fallback if Appwrite does not work out.
+
+---
+
+# The SQL Server route
 
 Everything needed to stand the whole database up on a Microsoft SQL Server:
 the schema, the logic, and the tool that carries the existing data across.
