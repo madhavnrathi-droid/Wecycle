@@ -71,6 +71,38 @@ a 409 is counted as success, so a run that dies halfway can just be repeated.
 
 `--dry-run` prints all of this and sends nothing.
 
+## What actually ran, 18 September 2026
+
+Against project `6aacfd62003de774675c` on `sgp.cloud.appwrite.io`, which was
+verified empty first (0 users, 0 databases, 0 buckets).
+
+| | |
+|---|---|
+| Schema | 36 tables, 339 columns (all `available`), 76 indexes |
+| Accounts | **99**, original UUIDs and bcrypt hashes |
+| Rows | **451** across 19 tables |
+| Verified | `verify.mjs` — 35 checks, **0 mismatches** |
+| Spot-checked | 3 listings field-by-field; 187 values across all 99 profiles |
+| Images | **0 of 141** — still only in Supabase |
+
+Two faults surfaced by running it that reading would not have caught, both
+fixed and both worth knowing about if this is ever repeated:
+
+**`ix_profiles_email` was rejected** — MySQL underneath indexes at most 767
+bytes, 191 utf8mb4 characters, against a 320-character column. See INDEX_SKIP
+in `generate-schema.mjs` for why each affected column got a different answer
+rather than a blanket shrink.
+
+**The importer guessed types from values.** Anything matching `/^\d+$/` became
+a Number, so a phone number and a college id went as numbers into string
+columns and 22 of 99 profiles were refused. Rejection was the lucky outcome —
+the dangerous one is `"0123"` silently becoming `123`. Coercion now reads the
+declared type out of `appwrite.json`.
+
+**Supabase has not been touched**, and must not be until the 141 images are
+out. They are not in the dump, and deleting the project destroys them
+permanently.
+
 ## Permissions — the one thing that is NOT generated
 
 `appwrite.json` ships every table with `"$permissions": []` and
