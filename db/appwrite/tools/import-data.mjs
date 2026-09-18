@@ -41,9 +41,41 @@
  * rewrites the URLs. Until then photo_urls still points at Supabase.
  */
 
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { createHash } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/* ── COERCE BY THE DECLARED COLUMN TYPE, NEVER BY THE VALUE'S SHAPE ─────────
+ *
+ * The first version of this guessed: anything matching /^\d+$/ became a
+ * Number. That is wrong the moment a STRING column holds digits — a phone
+ * number, a college id — and it failed 22 of 99 profiles with "Attribute
+ * phone has invalid type. Value must be a valid string".
+ *
+ * Rejection was the lucky outcome. The dangerous one is a value like "0123"
+ * silently becoming 123 in a column that happened to accept it: no error, and
+ * a college id quietly missing its leading zero forever.
+ *
+ * So the target type is read out of appwrite.json, which is generated from the
+ * schema, and every value is converted to what its column actually declares. */
+const SCHEMA = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'appwrite.json'), 'utf8'),
+);
+const COLUMN_TYPE = new Map();
+for (const t of SCHEMA.tables) {
+  for (const c of t.columns) {
+    const kind = c.format === 'enum' ? 'string'
+      : ['varchar', 'text', 'mediumtext', 'longtext', 'string'].includes(c.type) ? 'string'
+      : ['integer', 'bigint'].includes(c.type) ? 'integer'
+      : c.type === 'double' ? 'double'
+      : c.type === 'boolean' ? 'boolean'
+      : c.type === 'datetime' ? 'datetime'
+      : 'string';
+    COLUMN_TYPE.set(`${t.$id}.${c.key}`, { kind, array: !!c.array });
+  }
+}
 
 const ENDPOINT = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
 const PROJECT = process.env.APPWRITE_PROJECT;
@@ -134,20 +166,35 @@ function pgArray(v) {
 const TS = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d+)?([+-]\d{2}(:?\d{2})?)?$/;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-function coerce(key, raw) {
+function coerce(table, key, raw) {
   if (raw === null) return null;
-  if (ARRAY_COLUMNS.has(key)) return pgArray(raw);
-  if (raw === 't') return true;
-  if (raw === 'f') return false;
-  if (DATE_ONLY.test(raw)) return `${raw}T00:00:00.000Z`;
-  const m = TS.exec(raw);
-  if (m) {
-    const frac = m[3] ? (m[3] + '000').slice(0, 4) : '.000';
-    return `${m[1]}T${m[2]}${frac}Z`;          // the dump is UTC
+
+  const spec = COLUMN_TYPE.get(`${table}.${key}`);
+  if (!spec) return undefined;          // no such column here — drop it
+
+  if (spec.array) return pgArray(raw);
+
+  switch (spec.kind) {
+    case 'boolean':
+      return raw === 't' || raw === 'true' || raw === '1';
+    case 'integer': {
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) ? n : null;
+    }
+    case 'double': {
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    }
+    case 'datetime': {
+      if (DATE_ONLY.test(raw)) return `${raw}T00:00:00.000Z`;
+      const m = TS.exec(raw);
+      if (!m) return null;
+      const frac = m[3] ? (m[3] + '000').slice(0, 4) : '.000';
+      return `${m[1]}T${m[2]}${frac}Z`;        // the dump is UTC
+    }
+    default:
+      return String(raw);                      // digits stay digits, as text
   }
-  if (/^-?\d+$/.test(raw)) return Number(raw);
-  if (/^-?\d+\.\d+$/.test(raw)) return Number(raw);
-  return raw;
 }
 
 async function api(path, body, method = 'POST') {
@@ -268,8 +315,10 @@ async function main() {
       const data = {};
       got.columns.forEach((c, i) => {
         if (DROP.has(c)) return;
-        const v = coerce(c, r[i]);
-        if (v !== null) data[c] = v;      // Appwrite: omit rather than send null
+        const v = coerce(table, c, r[i]);
+        /* null -> omit (Appwrite has no explicit null); undefined -> the column
+           does not exist in the Appwrite schema, so there is nothing to send. */
+        if (v !== null && v !== undefined) data[c] = v;
       });
 
       const res = await api(`/tablesdb/${DB}/tables/${table}/rows`, { rowId, data });
