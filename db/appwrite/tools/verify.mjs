@@ -47,7 +47,7 @@ async function dumpCounts(path) {
       else n++;
       continue;
     }
-    const m = /^COPY (public\.[a-z_0-9]+|auth\.users) \(/.exec(line);
+    const m = /^COPY (public\.[a-z_0-9]+|auth\.users|storage\.objects) \(/.exec(line);
     if (m) { cur = m[1]; n = 0; }
   }
   return counts;
@@ -73,7 +73,7 @@ async function main() {
   console.log('');
 
   for (const [pgName, want] of [...source].sort()) {
-    if (pgName === 'auth.users') continue;
+    if (pgName === 'auth.users' || pgName.startsWith('storage.')) continue;
     const table = pgName.replace('public.', '');
     const res = await api(`/tablesdb/${DB}/tables/${table}/rows?queries[]=`
       + encodeURIComponent(JSON.stringify({ method: 'limit', values: [1] })));
@@ -101,10 +101,16 @@ async function main() {
     files += f.json?.total ?? 0;
   }
 
-  console.log(`\n  storage: ${nBuckets} bucket(s), ${files} file(s)`);
-  if (files < 141) {
-    console.log(`  ${141 - files} of 141 images still missing — they are only in Supabase,`);
-    console.log('  and only reachable once the egress quota is lifted.');
+  /* The dump records how many objects Storage held, so the expected number is
+     read from it rather than hardcoded — otherwise this check quietly stops
+     meaning anything the first time someone uploads a photo. */
+  const expectedFiles = source.get('storage.objects') ?? 0;
+  console.log(`\n  storage: ${nBuckets} bucket(s), ${files} file(s) of ${expectedFiles} recorded in the dump`);
+  const storageOk = expectedFiles > 0 && files >= expectedFiles;
+  if (!storageOk) {
+    mismatches++;
+    console.log(`  ${expectedFiles - files} file(s) missing — they exist only in Supabase.`);
+    console.log('  Checksums are the real test: node verify-media.mjs ~/wecycle-media');
   }
 
   console.log(`\n  ${checked} checks, ${mismatches} mismatch${mismatches === 1 ? '' : 'es'}`);
@@ -112,8 +118,8 @@ async function main() {
     console.log('\n  DO NOT delete the Supabase project.\n');
     process.exitCode = 1;
   } else {
-    console.log('\n  Database and accounts match the source.');
-    console.log('  Storage still does — see above.\n');
+    console.log('\n  Database, accounts and storage all match the source.');
+    console.log('  Byte-level proof is a separate step: verify-media.mjs\n');
   }
 }
 

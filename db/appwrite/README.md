@@ -83,7 +83,7 @@ verified empty first (0 users, 0 databases, 0 buckets).
 | Rows | **451** across 19 tables |
 | Verified | `verify.mjs` — 35 checks, **0 mismatches** |
 | Spot-checked | 3 listings field-by-field; 187 values across all 99 profiles |
-| Images | **0 of 141** — still only in Supabase |
+| Images | **141 of 141**, verified byte-identical (21 Sep, after the Pro upgrade) |
 
 Two faults surfaced by running it that reading would not have caught, both
 fixed and both worth knowing about if this is ever repeated:
@@ -99,9 +99,38 @@ columns and 22 of 99 profiles were refused. Rejection was the lucky outcome —
 the dangerous one is `"0123"` silently becoming `123`. Coercion now reads the
 declared type out of `appwrite.json`.
 
-**Supabase has not been touched**, and must not be until the 141 images are
-out. They are not in the dump, and deleting the project destroys them
-permanently.
+### The images, 21 September
+
+The Supabase Pro upgrade lifted the egress block and the remaining half ran:
+
+| | |
+|---|---|
+| Downloaded | 141 files, 70.7 MB — 109 JPEG, 16 PNG, 9 WebP, **7 MP4** |
+| Uploaded | 141 to Appwrite Storage across 3 buckets |
+| URLs rewritten | 51 rows; **0** still point at `supabase.co` |
+| Checksums | **141 of 141 byte-identical**, fetched with no credentials |
+
+Checked for drift first: every table's live Supabase count still equalled the
+18 September dump, so the snapshot was exact and nothing had to be re-exported.
+
+Three things worth knowing:
+
+**48 of the 141 files are orphans** (37.7 MB) — uploads whose post was deleted
+or whose photo was replaced. They were copied anyway. They are a faithful copy
+of what Supabase held, and deciding to delete them is a separate decision from
+migrating them.
+
+**One file is a 22-byte JPEG** — a valid header with no image in it, someone's
+`test.jpg`, and it is referenced by a live listing. It was 22 bytes in Supabase
+too. That listing's photo was already blank; this did not break it.
+
+**`verify-media.mjs` downloads with no API key on purpose**, as an anonymous
+visitor would. A file that verifies with a server key but 401s for a real user
+has not migrated in any sense that matters.
+
+**Supabase still has not been touched.** Every byte is now in two places, which
+is the only state in which deleting the source is a decision rather than a
+gamble — and even then, not until the app is actually running on Appwrite.
 
 ## Permissions — the one thing that is NOT generated
 

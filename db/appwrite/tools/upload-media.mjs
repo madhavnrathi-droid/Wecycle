@@ -95,7 +95,17 @@ async function ensureBucket(id) {
     /* read("any") because these are listing photos on a public feed — the same
        thing the Supabase buckets were. Nothing private goes in here; the
        form-uploads bucket was private and holds no images. */
-    body: JSON.stringify({ bucketId: id, name: id, permissions: ['read("any")'], fileSecurity: false }),
+    /* maximumFileSize is set explicitly because the default is smaller than
+       the largest file being moved (a 4.9MB listing photo), and the rejection
+       would arrive per-file as a 400 rather than as anything naming the cap. */
+    body: JSON.stringify({
+      bucketId: id,
+      name: id,
+      permissions: ['read("any")'],
+      fileSecurity: false,
+      maximumFileSize: 52428800,
+      compression: 'none',
+    }),
   });
 }
 
