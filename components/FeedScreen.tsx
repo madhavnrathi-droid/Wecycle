@@ -37,6 +37,7 @@ import EmptyState from './EmptyState';
 import UxIndiaBanner from './UxIndiaBanner';
 import UserSearchResults from './UserSearchResults';
 import FitImage from './FitImage';
+import CardMedia from './CardMedia';
 import { priceChip, fromListingType, DEAL_BY_ID } from '../lib/dealTypes';
 import { useFeedEngine } from '../lib/feed/useFeedEngine';
 import { useTap } from '../lib/useTap';
@@ -1769,7 +1770,10 @@ function ProductCard({
    *  and this is what stops one reading as something to buy. */
   isMine?: boolean;
 }) {
-  const cover = coverImage(item);
+  /* The whole gallery, not just frame one — the card shows all of it now.
+     coverImage() stays for the feed sort, which only asks "is there a
+     picture at all" and does not care which one. */
+  const media = resolveItemMedia(item);
   const isPriced = item.listingType === 'sell' && typeof item.price === 'number';
   const isOpportunity = item.kind === 'opportunity';
 
@@ -1818,7 +1822,6 @@ function ProductCard({
     ? 'hiring' : badgeKind;
 
   const closedLabel = item.isClosed ? closedLabelFor(item) : null;
-  const cut = cover.url ? isCutoutUrl(cover.url) : false;
 
   /* Not onClick. A click fires whenever a press and a release land on this
      button, including at the end of a drag and when a finger stops a coasting
@@ -1835,10 +1838,15 @@ function ProductCard({
       <button
         type="button"
         className="pcard-open"
-        /* The stamp is aria-hidden decoration, so the state has to be in the
-           name — otherwise a screen reader offers "Open Honda City zx" on a car
-           that is no longer for sale. */
-        aria-label={closedLabel ? `Open ${item.title}, ${closedLabel.toLowerCase()}` : `Open ${item.title}`}
+        /* The stamp and the photo dots are both aria-hidden decoration, so
+           anything they convey has to be in the name — otherwise a screen
+           reader offers "Open Honda City zx" on a car that is no longer for
+           sale, and never mentions that there are four photos of it. */
+        aria-label={[
+          `Open ${item.title}`,
+          closedLabel ? closedLabel.toLowerCase() : null,
+          media.length > 1 ? `${media.length} photos` : null,
+        ].filter(Boolean).join(', ')}
         onPointerDown={e => { tap.onPointerDown(e); press.handlers.onPointerDown?.(e); }}
         onPointerMove={e => { tap.onPointerMove(e); press.handlers.onPointerMove?.(e); }}
         onPointerUp={e => { tap.onPointerUp(e); press.handlers.onPointerUp?.(); }}
@@ -1847,9 +1855,7 @@ function ProductCard({
         onClick={tap.onClick}
       >
         <span className="pcard-media" style={transitionStyle(item.id)}>
-          {cover.url
-            ? <FitImage src={cover.url} cutout={cut} />
-            : <NoPhoto tint={tintFor(item.photoColor)} />}
+          <CardMedia media={media} tint={tintFor(item.photoColor)} />
         </span>
         <span className="pcard-body">
           <span className="pcard-title">{item.title}</span>

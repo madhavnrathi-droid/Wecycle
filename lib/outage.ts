@@ -12,8 +12,18 @@
  *     live in server-only Vercel environment variables.
  *   - The sign-in screen says why it is failing and where the codes are.
  *
- * TO TURN IT OFF when the backend is back: set this to false and deploy. The
- * normal sign-in-gated flow and the RPC come straight back; nothing was
- * removed to make room for this.
+ * TO TURN IT ON again: set this to true and deploy. The normal sign-in-gated
+ * flow and the RPC give way; nothing has to be rebuilt.
+ *
+ * OFF since 21 September 2026. The September outage was a Supabase egress
+ * quota — 119 listing photos served to every visitor exhausted the free
+ * tier's cached-egress allowance, and the project answered 402 on the API,
+ * on storage and on sign-in alike. A Pro upgrade lifted it.
+ *
+ * Note what this flag can and cannot reach. It is COMPILED IN, so turning it
+ * on only ever changed the website; the Android and iOS builds carry a web
+ * bundle frozen at submit time and never saw it. The channel that does reach
+ * an installed app is /api/status — see lib/appStatus.ts — which is why that
+ * exists and why it reads one environment variable and touches nothing else.
  */
-export const OUTAGE_MODE = true;
+export const OUTAGE_MODE = false;

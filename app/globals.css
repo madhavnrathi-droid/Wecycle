@@ -5600,6 +5600,152 @@ textarea:focus-visible {
 @media (hover: hover) {
   .pcard:hover .pcard-media .fit-img-fg { transform: scale(1.04); }
 }
+
+/* ── CardMedia — the multi-photo strip ─────────────────────────────────────
+ *
+ * A native scroll-snap container, not a transform. The browser gives us
+ * direction locking, momentum and snapping for free, and — the part that
+ * matters — lib/useTap.ts already refuses to count a tap when a scrollable
+ * ancestor moved, so swiping to photo two cannot open the listing. That guard
+ * predates this component; nothing here had to teach it anything. */
+.cmedia {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  /* Without this, a swipe past the last photo hands the gesture to the browser
+     and navigates BACK on iOS Safari and Chrome — losing the feed to look at a
+     jacket from the other side. */
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Deliberately NOT scroll-behavior: smooth. Setting it routes every
+     programmatic scroll through the engine's smooth path, and where that path
+     is unavailable the scroll does not degrade to a jump — it does not happen
+     at all, so the arrows silently stop working. An instant move to the next
+     photo is a perfectly good arrow; one that does nothing is a bug. The swipe
+     itself is untouched by this: that is native, and keeps its momentum. */
+}
+.cmedia::-webkit-scrollbar { display: none; }
+.cmedia-slide {
+  position: relative;
+  flex: 0 0 100%;
+  height: 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+/* The hover zoom is for a single still image. Inside a scroller it fights the
+   snap and shimmers mid-swipe, so a strip opts out. */
+@media (hover: hover) {
+  .pcard:hover .pcard-media .cmedia .fit-img-fg { transform: none; }
+}
+
+/* Dots sit on a soft scrim: white alone disappears on a pale photo, and a
+   photo of a white desk against a white wall is not a rare upload here. */
+.cmedia-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(16, 18, 20, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+  z-index: 2;
+}
+.cmedia-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  transition: width 140ms var(--ease-smooth), background-color 140ms var(--ease-smooth);
+}
+/* The active dot lengthens rather than only brightening — position survives a
+   glance, and it reads without relying on a brightness difference alone. */
+.cmedia-dot[data-on] {
+  width: 12px;
+  background: #fff;
+}
+.cmedia-count {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(16, 18, 20, 0.52);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: calc(10px * var(--text-scale));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  z-index: 2;
+}
+/* A video slide shows its poster, so without this it is a still photo that
+   mysteriously does nothing when you open it. */
+.cmedia-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding-left: 2px;
+  border-radius: 999px;
+  background: rgba(16, 18, 20, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Mouse users have no swipe. Touch devices never see these — they would sit
+   permanently on top of the photo for a gesture that already works. */
+.cmedia-arrow { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .cmedia-arrow {
+    position: absolute;
+    top: calc(var(--cmedia-arrow-top, 50%));
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: rgba(16, 18, 20, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 140ms var(--ease-smooth);
+    z-index: 3;
+  }
+  .cmedia-arrow--prev { left: 6px; }
+  .cmedia-arrow--next { right: 6px; }
+  .pcard:hover .cmedia-arrow { opacity: 1; }
+  /* At either end the arrow has nothing to do, and an arrow that does nothing
+     is worse than no arrow. */
+  .cmedia-arrow[data-hide] { opacity: 0 !important; pointer-events: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmedia-dot { transition: none; }
+  .cmedia-arrow { transition: none; }
+}
 /* The caption is deliberately the small half of the card. A fixed min-height
    keeps every card in a rail the same height (ragged card bottoms are the
    giveaway of a hand-rolled rail) without truncating two-line titles. */
