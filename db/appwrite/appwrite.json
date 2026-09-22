@@ -275,18 +275,6 @@
           "required": true
         },
         {
-          "key": "email",
-          "type": "text",
-          "size": 320,
-          "required": false
-        },
-        {
-          "key": "phone",
-          "type": "varchar",
-          "size": 32,
-          "required": false
-        },
-        {
           "key": "college_id",
           "type": "varchar",
           "size": 100,
@@ -3487,6 +3475,29 @@
           ]
         }
       ]
+    },
+    {
+      "$id": "profile_contacts",
+      "databaseId": "wecycle",
+      "name": "profile_contacts",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "email",
+          "type": "varchar",
+          "size": 320,
+          "required": false
+        },
+        {
+          "key": "phone",
+          "type": "varchar",
+          "size": 32,
+          "required": false
+        }
+      ],
+      "indexes": []
     }
   ]
 }

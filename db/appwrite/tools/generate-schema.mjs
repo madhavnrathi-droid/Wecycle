@@ -120,6 +120,21 @@ const SKIP_TABLES = new Set(['auth.users', 'auth.sessions', 'auth.one_time_codes
 /* Dropped because Appwrite provides the thing they existed for. */
 const SKIP_COLUMNS = new Set(['id']);   // becomes $id
 
+/* ── Columns that must not exist on a publicly readable row ────────────────
+ *
+ * Appwrite has no column-level permission: a row is readable or it is not.
+ * profiles MUST be readable, because every listing shows its seller's name and
+ * avatar — so anything left on that row is public. Postgres protected these
+ * two with RLS and only ever served them through get_contact, which honours
+ * each member's sharing preferences; the SQL Server port used DENY SELECT.
+ * Neither has an equivalent here.
+ *
+ * So they are not on the profile at all. They live in profile_contacts, which
+ * no client permission touches, and a server endpoint applies the preferences.
+ * This was found the hard way: an anonymous request carrying nothing but the
+ * project id returned all 99 students' email addresses and phone numbers. */
+const MOVED_TO_SERVER_ONLY = { profiles: ['email', 'phone'] };
+
 function varcharFor(size) {
   if (size <= 255) return { type: 'varchar', size };
   if (size <= 65535) return { type: 'text', size };
@@ -271,9 +286,11 @@ function main() {
   for (const [full, table] of tables) {
     if (SKIP_TABLES.has(full) || table.schema !== 'app') continue;
 
+    const moved = MOVED_TO_SERVER_ONLY[table.name] ?? [];
     const columns = [];
     for (const col of table.columns) {
       if (SKIP_COLUMNS.has(col.key)) continue;
+      if (moved.includes(col.key)) continue;
       const { column, notes } = toColumn(col, table);
       columns.push(column);
       allNotes.push(...notes);
@@ -333,6 +350,22 @@ function main() {
       indexes,
     });
   }
+
+  /* The server-only half of the split. Empty permissions is the whole point:
+     only a server key reads this. */
+  out.tables.push({
+    $id: 'profile_contacts',
+    databaseId: DB_ID,
+    name: 'profile_contacts',
+    enabled: true,
+    '$permissions': [],
+    documentSecurity: true,
+    columns: [
+      { key: 'email', type: 'varchar', size: 320, required: false },
+      { key: 'phone', type: 'varchar', size: 32, required: false },
+    ],
+    indexes: [],
+  });
 
   writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n', 'utf8');
 
