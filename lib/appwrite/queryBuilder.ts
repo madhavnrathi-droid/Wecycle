@@ -31,7 +31,7 @@
  */
 
 import { Query, ID } from 'appwrite';
-import { tables, toRow, toRows, toPayload, APPWRITE_DB, type AnyRow } from './client';
+import { tables, toRow, toRows, toPayload, fillServerDefaults, APPWRITE_DB, type AnyRow } from './client';
 
 export interface Result<T> { data: T | null; error: { message: string; code?: string } | null; }
 
@@ -213,6 +213,7 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
           const out: AnyRow[] = [];
           for (const row of this.payload) {
             const { rowId, data } = toPayload(row);
+            fillServerDefaults(this.table, data);
             const r = this.mode === 'upsert' && rowId
               ? await tables().upsertRow({ databaseId: APPWRITE_DB, tableId: this.table, rowId, data })
               : await tables().createRow({

@@ -29,6 +29,7 @@
  */
 
 import { Client, Account, TablesDB, Storage, Functions } from 'appwrite';
+import { SERVER_FILLED_TIMESTAMPS } from './generatedDefaults';
 
 export const APPWRITE_ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? '';
 export const APPWRITE_PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT ?? '';
@@ -101,4 +102,33 @@ export function toPayload(data: AnyRow): { rowId?: string; data: AnyRow } {
     out[k] = v;
   }
   return { rowId, data: out };
+}
+
+/**
+ * Supply the timestamps the database used to.
+ *
+ * Postgres had DEFAULT now() on posted_at, created_at, saved_at and forty
+ * others, so the app has never sent them and should not have to start.
+ * Appwrite has no server-side default and reports them as required.
+ *
+ * This lives here rather than in the query builder because it is not the query
+ * builder's rule — it is the schema's. The RPC layer creates rows directly
+ * (a save, an RSVP, a like) without going through the builder, and when this
+ * logic lived only there, every toggle failed with "Missing required attribute
+ * saved_at" while ordinary inserts worked. One rule, one place.
+ *
+ * Only columns the generator recorded as HAVING had a default are filled.
+ * events.starts_at is required with no default because an event's start time
+ * is genuinely the user's to give, so it stays absent and a missing one still
+ * fails loudly instead of silently becoming "now".
+ *
+ * The clock is the browser's where Postgres used the server's; a device with a
+ * wrong clock posts with a wrong timestamp, affecting only that row's ordering.
+ */
+export function fillServerDefaults(tableId: string, data: AnyRow): AnyRow {
+  const cols = SERVER_FILLED_TIMESTAMPS[tableId];
+  if (!cols) return data;
+  const now = new Date().toISOString();
+  for (const c of cols) if (data[c] === undefined || data[c] === null) data[c] = now;
+  return data;
 }

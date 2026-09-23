@@ -15,7 +15,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { md5, fileIdFor } from './storageAdapter.ts';
+import { md5, fileIdFor } from './storageAdapter';
 
 const node = (s: string) => createHash('md5').update(s).digest('hex');
 

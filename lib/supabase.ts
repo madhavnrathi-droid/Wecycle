@@ -11,6 +11,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import type { Database } from './database.types';
+import { createAppwriteBackedClient } from './appwrite';
+import { hasAppwriteEnv } from './appwrite/client';
 
 /* ── Session storage ────────────────────────────────────────────────────────
  * WEB: the default localStorage adapter. Sessions already survive restarts —
@@ -80,10 +82,35 @@ const SUPABASE_BROWSER_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/** True when the URL + at least one browser key is present. */
-export const hasSupabaseEnv = !!(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && SUPABASE_BROWSER_KEY
-);
+/* ── Which backend answers ─────────────────────────────────────────────────
+ *
+ * Wecycle is moving from Supabase to Appwrite. Rather than rewrite the 117
+ * call sites that use this client, lib/appwrite implements the slice of this
+ * API they actually use and is returned instead when NEXT_PUBLIC_BACKEND is
+ * "appwrite".
+ *
+ * A switch rather than a replacement, for one reason: this is a live app with
+ * 99 members, and a cutover that cannot be undone is a cutover that has to be
+ * right first time. Setting the variable back and redeploying restores
+ * Supabase exactly, with no code change and nothing to revert.
+ *
+ * The Supabase path stays until Appwrite has run a while. Deleting it earlier
+ * would save a few hundred lines and remove the only way back. */
+export const BACKEND: 'supabase' | 'appwrite' =
+  process.env.NEXT_PUBLIC_BACKEND === 'appwrite' ? 'appwrite' : 'supabase';
+
+const hasSupabaseCreds = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && SUPABASE_BROWSER_KEY);
+
+/**
+ * True when SOME backend is configured.
+ *
+ * The name is now wrong and is kept deliberately: roughly forty call sites
+ * guard on it (`if (!hasSupabaseEnv) return []`), and renaming it in the same
+ * change that swaps the backend would put a mechanical rename and a behavioural
+ * change in one diff, where a mistake in either looks like a mistake in the
+ * other. It is renamed once Appwrite is the only backend.
+ */
+export const hasSupabaseEnv = BACKEND === 'appwrite' ? hasAppwriteEnv : hasSupabaseCreds;
 
 /**
  * Build a no-op stub that satisfies the shape used across the codebase so
@@ -142,6 +169,19 @@ function makeStubClient(): ReturnType<typeof createClient<Database>> {
 
 export function getSupabase() {
   if (_client) return _client;
+
+  if (BACKEND === 'appwrite') {
+    if (!hasAppwriteEnv) {
+      if (typeof window !== 'undefined') {
+        // eslint-disable-next-line no-console
+        console.warn('[wecycle] NEXT_PUBLIC_BACKEND=appwrite but the Appwrite env vars are missing — using the stub client.');
+      }
+      _client = makeStubClient();
+      return _client;
+    }
+    _client = createAppwriteBackedClient() as unknown as ReturnType<typeof createClient<Database>>;
+    return _client;
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = SUPABASE_BROWSER_KEY;
@@ -203,6 +243,10 @@ export async function rpcUntyped<T = unknown>(
   fn: string,
   args: Record<string, unknown> = {},
 ): Promise<{ data: T | null; error: { message?: string } | null }> {
+  /* The `this`-binding hazard documented above is a supabase-js detail. The
+     Appwrite client's rpc is a plain function, so it is called directly and
+     the workaround is skipped rather than applied to something that does not
+     need it. */
   const client = getSupabase() as unknown as {
     rpc: (
       fn: string, args: Record<string, unknown>,
