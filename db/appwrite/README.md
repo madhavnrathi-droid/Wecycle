@@ -132,6 +132,42 @@ has not migrated in any sense that matters.
 is the only state in which deleting the source is a decision rather than a
 gamble — and even then, not until the app is actually running on Appwrite.
 
+## The API key is narrow now
+
+The project has ONE key, and it is the one in Vercel as `APPWRITE_API_KEY`.
+On 23 September it was cut from **111 scopes to 6**:
+
+```
+databases.read  tables.read  rows.read  rows.write  users.read  users.write
+```
+
+Exactly what `app/api/rpc/[fn]` performs, and nothing else. Verified after the
+change: it can no longer read the project's keys, re-grant itself scopes,
+register a platform, or delete a bucket or a table — all 401 — while every
+operation the route makes still returns 200.
+
+Dropping `keys.write` was the last step on purpose, and only after the narrow
+set had been proven sufficient: a key that can grant itself scopes is not a
+narrowed key, but removing that power before knowing the rest was enough would
+have meant no way back without the console.
+
+**So API-level admin now needs a new key.** Schema changes, storage work and
+platform registration are no longer possible with this one. Make a fresh key in
+the console (Overview → Integrations → API keys), use it, and delete it when
+done — rather than widening the key production runs on.
+
+## Platforms
+
+Appwrite only accepts browser requests from registered origins. Registered:
+`wecycle.page`, `www.wecycle.page`, `*.vercel.app`, `localhost`.
+
+This is worth knowing because of how it fails: the deploy succeeded, the site
+loaded, and every data call died with `Failed to fetch` and an empty feed.
+Nothing in local testing showed it, because localhost was fine.
+
+**The Android and iOS builds run from `capacitor://localhost`** and will need
+their own platform entries before build 17 can reach Appwrite at all.
+
 ## Permissions — the one thing that is NOT generated
 
 `appwrite.json` ships every table with `"$permissions": []` and
