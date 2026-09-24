@@ -51,8 +51,36 @@ const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT ?? '';
 const API_KEY = process.env.APPWRITE_API_KEY ?? '';
 const DB = process.env.NEXT_PUBLIC_APPWRITE_DB ?? 'wecycle';
 
+/* ── CORS ──────────────────────────────────────────────────────────────────
+ *
+ * The native builds are a static export served from the WebView's own origin —
+ * https://localhost on Android, capacitor://localhost on iOS — so every call
+ * to this route from a phone is cross-origin. Without these headers the
+ * browser blocks the response and every save, like, RSVP and view count fails
+ * on mobile while working perfectly on the website.
+ *
+ * Allow-Origin is * rather than a list because the native origins are
+ * localhost, which is also every developer's machine, so a list buys nothing.
+ * It is safe here because this route authorises on the Appwrite JWT in the
+ * header and never on a cookie: a hostile page can make a browser send the
+ * request, but cannot obtain a JWT for the user to put in it. Credentials are
+ * deliberately not allowed, which is what keeps that true.
+ *
+ * X-Appwrite-JWT is not a CORS-simple header, so the preflight below is
+ * required, not optional. */
+const cors: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Appwrite-JWT',
+  'Access-Control-Max-Age': '86400',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: cors });
+}
+
 const json = (body: unknown, status = 200) =>
-  NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+  NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store', ...cors } });
 
 type Args = Record<string, unknown>;
 type Row = Record<string, unknown>;

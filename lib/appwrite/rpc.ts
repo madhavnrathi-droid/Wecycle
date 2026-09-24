@@ -36,6 +36,7 @@
 
 import { ID, Query } from 'appwrite';
 import { tables, account, fillServerDefaults, APPWRITE_DB, toRows, type AnyRow } from './client';
+import { apiBase } from '../platform';
 
 interface RpcResult<T> { data: T | null; error: { message: string; code?: string } | null; }
 
@@ -158,7 +159,12 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
        name, mapped here. */
     case 'claim_sigchi_offer': {
       try {
-        const res = await fetch('/api/sigchi', {
+        /* apiBase(), not a bare path. The native builds are a STATIC EXPORT
+           served from the WebView's own origin — https://localhost on Android,
+           capacitor://localhost on iOS — where /api/sigchi does not exist. A
+           relative URL works perfectly on the website and fails on every
+           phone, which is the worst place for it to fail. */
+        const res = await fetch(`${apiBase()}/api/sigchi`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: a.p_email }),
@@ -195,7 +201,10 @@ async function serverRpc<T>(fn: string, args: Record<string, unknown>): Promise<
     let jwt = '';
     try { jwt = (await account().createJWT()).jwt; } catch { /* signed out */ }
 
-    const res = await fetch(`/api/rpc/${fn}`, {
+    /* Same reason as /api/sigchi above: the native app has no server of its
+       own, so this has to be absolute there. Every save, like, RSVP and view
+       count goes through here. */
+    const res = await fetch(`${apiBase()}/api/rpc/${fn}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(jwt ? { 'X-Appwrite-JWT': jwt } : {}) },
       body: JSON.stringify(args),
