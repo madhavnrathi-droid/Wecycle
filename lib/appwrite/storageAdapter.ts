@@ -18,7 +18,7 @@
  * predictable, so nothing needs to be asked of the server to build it.
  */
 
-import { storage, APPWRITE_ENDPOINT, APPWRITE_PROJECT } from './client';
+import { storage, account, APPWRITE_ENDPOINT, APPWRITE_PROJECT } from './client';
 
 /* ── md5, because the file ids already in the database are md5 ─────────────
  *
@@ -195,7 +195,22 @@ function bucketApi(bucket: string) {
         const fileId = fileIdFor(bucket, path);
         const name = path.split('/').pop() || 'upload';
         const asFile = file instanceof File ? file : new File([file], name, { type: file.type });
-        await storage().createFile({ bucketId: bucket, fileId, file: asFile });
+
+        /* The uploader must be named on the file or they cannot delete it
+           later — removing a photo from a listing, or replacing one. Buckets
+           grant create to signed-in members and never delete, because a
+           bucket-wide delete would let anyone remove anyone's photo. Same rule
+           as rows: ownership is per object, stamped at creation. */
+        let permissions: string[] | undefined;
+        try {
+          const uid = (await account().get()).$id;
+          permissions = [`read("any")`, `update("user:${uid}")`, `delete("user:${uid}")`];
+        } catch { /* signed out — the bucket's own permissions decide */ }
+
+        await storage().createFile({
+          bucketId: bucket, fileId, file: asFile,
+          ...(permissions ? { permissions } : {}),
+        });
         return { data: { path }, error: null };
       } catch (e) {
         return { data: null, error: err(e) };

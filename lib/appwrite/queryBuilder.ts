@@ -31,7 +31,7 @@
  */
 
 import { Query, ID } from 'appwrite';
-import { tables, toRow, toRows, toPayload, fillServerDefaults, APPWRITE_DB, type AnyRow } from './client';
+import { tables, toRow, toRows, toPayload, fillServerDefaults, ownerPermissions, APPWRITE_DB, type AnyRow } from './client';
 
 export interface Result<T> { data: T | null; error: { message: string; code?: string } | null; }
 
@@ -214,11 +214,19 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
           for (const row of this.payload) {
             const { rowId, data } = toPayload(row);
             fillServerDefaults(this.table, data);
+            const id = rowId ?? ID.unique();
+            /* Without this the author of a new post cannot edit or delete it:
+               tables grant create and never update, because granting update
+               table-wide would let anyone edit anyone's listing. */
+            const permissions = ownerPermissions(this.table, data, id);
             const r = this.mode === 'upsert' && rowId
-              ? await tables().upsertRow({ databaseId: APPWRITE_DB, tableId: this.table, rowId, data })
+              ? await tables().upsertRow({
+                  databaseId: APPWRITE_DB, tableId: this.table, rowId, data,
+                  ...(permissions ? { permissions } : {}),
+                })
               : await tables().createRow({
-                  databaseId: APPWRITE_DB, tableId: this.table,
-                  rowId: rowId ?? ID.unique(), data,
+                  databaseId: APPWRITE_DB, tableId: this.table, rowId: id, data,
+                  ...(permissions ? { permissions } : {}),
                 });
             out.push(r as AnyRow);
           }

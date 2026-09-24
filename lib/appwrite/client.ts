@@ -30,6 +30,7 @@
 
 import { Client, Account, TablesDB, Storage, Functions } from 'appwrite';
 import { SERVER_FILLED_TIMESTAMPS } from './generatedDefaults';
+import { OWNER_COLUMN, PRIVATE_TO_OWNER } from './generatedOwnership';
 
 export const APPWRITE_ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? '';
 export const APPWRITE_PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT ?? '';
@@ -131,4 +132,30 @@ export function fillServerDefaults(tableId: string, data: AnyRow): AnyRow {
   const now = new Date().toISOString();
   for (const c of cols) if (data[c] === undefined || data[c] === null) data[c] = now;
   return data;
+}
+
+/**
+ * The permissions a NEW row needs so its author can edit and delete it.
+ *
+ * Tables grant `create` to signed-in members and never `update` or `delete` —
+ * granting those table-wide would let any student edit any other student's
+ * listing. Ownership is therefore per row, and a row created without this
+ * stamp can be posted and then never changed or removed by the person who
+ * posted it. The migrated rows were given these by set-permissions.mjs; rows
+ * the app creates need the same thing, from the same map, or old posts stay
+ * editable while new ones quietly are not.
+ *
+ * Returns undefined when the table has no owner (categories, communities) so
+ * the caller can omit the field rather than send an empty array, which Appwrite
+ * reads as "no permissions at all".
+ */
+export function ownerPermissions(tableId: string, data: AnyRow, rowId?: string): string[] | undefined {
+  const col = OWNER_COLUMN[tableId];
+  if (!col) return undefined;
+  /* profiles is keyed BY the member, so its owner is the row's own id. */
+  const owner = col === '$id' ? rowId : data[col];
+  if (typeof owner !== 'string' || !owner) return undefined;
+  return PRIVATE_TO_OWNER.has(tableId)
+    ? [`read("user:${owner}")`, `update("user:${owner}")`, `delete("user:${owner}")`]
+    : [`read("any")`, `update("user:${owner}")`, `delete("user:${owner}")`];
 }

@@ -69,6 +69,12 @@ const MEMBERS_READ = [read(USERS), create(USERS)];
 const OWNER_ONLY = [create(USERS)];
 /* Server key only. No client permission of any kind. */
 const SERVER_ONLY = [];
+/* Members may FILE a report and may not read the table. Reporting is a write
+   into a box only moderators open: a reporter reading the table would see who
+   else reported what, and the person reported would learn who reported them.
+   The reporter still gets per-row read on their own report via
+   privateToOwner in ownership.json. */
+const REPORTABLE = [create(USERS)];
 
 const TABLES = {
   categories: PUBLIC_READONLY,
@@ -107,29 +113,19 @@ const TABLES = {
   sigchi_offer_config: SERVER_ONLY,
   sigchi_claim_attempts: SERVER_ONLY,
   moderation_terms: SERVER_ONLY,
-  content_reports: SERVER_ONLY,
+  content_reports: REPORTABLE,
   push_queue: SERVER_ONLY,
   app_config: PUBLIC_READONLY,
   banners: PUBLIC_READONLY,
 };
 
-/* Which column names the member who owns a row. Rows in these tables get
-   per-row permissions naming that member, which is what makes "only the person
-   who posted it can edit it" true without granting it table-wide. */
-const OWNER_COLUMN = {
-  listings: 'user_id', requests: 'user_id', events: 'created_by',
-  lost_found_reports: 'user_id', comments: 'user_id', reactions: 'user_id',
-  saves: 'user_id', alerts: 'user_id', notifications: 'user_id',
-  saved_searches: 'user_id', push_subscriptions: 'user_id',
-  event_rsvps: 'user_id', event_saves: 'user_id', user_blocks: 'blocker_id',
-  community_members: 'user_id', impact_log: 'user_id',
-  inventory_items: 'user_id', event_form_responses: 'user_id',
-  listing_responses: 'user_id', request_offers: 'user_id',
-  profiles: 'id',
-};
-/* A private row is readable only by its owner; a public one by anyone. */
-const PRIVATE = new Set(['saves', 'alerts', 'notifications', 'saved_searches',
-  'push_subscriptions', 'user_blocks', 'event_form_responses']);
+/* Ownership comes from db/appwrite/ownership.json — the SAME file the schema
+   generator copies into lib/appwrite/generatedOwnership.ts for the app. Two
+   copies of this map is how you get migrated posts that are editable and new
+   posts that are not. */
+const OWN = JSON.parse(readFileSync(join(HERE, '..', 'ownership.json'), 'utf8'));
+const OWNER_COLUMN = OWN.ownerColumn;
+const PRIVATE = new Set(OWN.privateToOwner);
 
 async function api(method, path, body) {
   if (DRY) return { ok: true, status: 200, json: { rows: [], total: 0 } };
@@ -181,7 +177,7 @@ async function main() {
            returned undefined and skipped all 99 profiles silently, which is
            exactly the shape of bug that only shows up as "why can nobody edit
            their own profile". */
-        const owner = ownerCol === 'id' ? row.$id : row[ownerCol];
+        const owner = ownerCol === '$id' ? row.$id : row[ownerCol];
         if (typeof owner !== 'string' || !owner) continue;
         const perms = PRIVATE.has(table)
           ? [`read("user:${owner}")`, `update("user:${owner}")`, `delete("user:${owner}")`]
