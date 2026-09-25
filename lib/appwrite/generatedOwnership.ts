@@ -5,7 +5,7 @@ export const OWNER_COLUMN: Record<string, string> = {
   "profiles": "$id",
   "listings": "user_id",
   "requests": "user_id",
-  "events": "created_by",
+  "events": "organizer_id",
   "lost_found_reports": "user_id",
   "comments": "user_id",
   "reactions": "user_id",
@@ -19,11 +19,10 @@ export const OWNER_COLUMN: Record<string, string> = {
   "user_blocks": "blocker_id",
   "community_members": "user_id",
   "impact_log": "user_id",
-  "inventory_items": "user_id",
+  "inventory_items": "owner_id",
   "event_form_responses": "user_id",
   "listing_responses": "user_id",
   "request_offers": "user_id",
-  "event_forms": "created_by",
   "content_reports": "reporter_id"
 };
 export const PRIVATE_TO_OWNER: ReadonlySet<string> = new Set(["saves","alerts","notifications","saved_searches","push_subscriptions","user_blocks","event_form_responses","content_reports"]);

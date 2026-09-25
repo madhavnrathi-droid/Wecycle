@@ -114,7 +114,16 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
 
     case 'rpc_community_feed': {
       try {
-        const q = [Query.equal('status', ['active']), Query.orderDesc('posted_at'), Query.limit(50)];
+        /* _limit and _before are how the feed pages. Ignoring them returned the
+           same newest 50 rows every time, so scrolling for more silently showed
+           what was already on screen. */
+        const limit = Number(a._limit ?? 20);
+        const q = [
+          Query.equal('status', ['active']),
+          Query.orderDesc('posted_at'),
+          Query.limit(Math.max(1, Math.min(limit, 100))),
+        ];
+        if (a._before) q.push(Query.lessThan('posted_at', a._before as string));
         if (a._community_id) q.unshift(Query.equal('community_id', [a._community_id as string]));
         const res = await list('listings', q);
         return ok(toRows(res.rows as AnyRow[])) as RpcResult<T>;
@@ -124,9 +133,23 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
     case 'upsert_push_subscription': {
       if (!uid) return { data: null, error: { message: 'Not signed in' } };
       try {
-        const endpoint = a.endpoint as string;
-        const data = { user_id: uid, endpoint, ...(args as AnyRow) };
-        delete (data as AnyRow).p256dh_key;
+        /* The app calls this with the Postgres function's parameter names —
+           _endpoint, _p256dh, _auth, _user_agent — because that is what the
+           RPC took. They are NOT column names, and spreading them into the row
+           sent four attributes the table does not have while leaving the four
+           it requires empty. Push registration failed outright with "Missing
+           required attribute p256dh". Map them explicitly; a spread cannot
+           know the difference. */
+        const endpoint = (a._endpoint ?? a.endpoint) as string;
+        if (!endpoint) return { data: null, error: { message: 'No push endpoint given' } };
+        const data: AnyRow = {
+          user_id: uid,
+          endpoint,
+          p256dh: (a._p256dh ?? '') as string,
+          auth: (a._auth ?? '') as string,
+          user_agent: (a._user_agent ?? null) as string | null,
+          last_seen_at: new Date().toISOString(),
+        };
         const found = await list('push_subscriptions', [Query.equal('endpoint', [endpoint]), Query.limit(1)]);
         const existing = (found.rows as AnyRow[])[0];
         const perms = [`read("user:${uid}")`, `update("user:${uid}")`, `delete("user:${uid}")`];

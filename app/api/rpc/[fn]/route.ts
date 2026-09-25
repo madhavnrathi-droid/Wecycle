@@ -271,16 +271,25 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
         if (role !== 'admin' && role !== 'owner') {
           return json({ message: 'Not permitted', code: '42501' }, 403);
         }
-        const target = String(args._user_id ?? '');
+        /* The app sends { target, days, reason } — the Postgres function's own
+           parameter names. Reading _user_id/_until here suspended nobody and
+           reported success, which is the worst possible outcome for a
+           moderation action. */
+        const target = String(args.target ?? '');
         if (!target) return json({ message: 'No user given' }, 400);
+        const days = Number(args.days ?? 0);
+        /* days of 0 or less lifts a suspension, which is how the app unbans. */
+        const until = days > 0
+          ? new Date(Date.now() + days * 86400000).toISOString()
+          : null;
         const r = await aw('PATCH', `/tablesdb/${DB}/tables/profiles/rows/${target}`, {
           data: {
-            suspended_until: args._until ?? null,
-            suspended_reason: args._reason ?? null,
+            suspended_until: until,
+            suspended_reason: until ? (args.reason ?? null) : null,
           },
         });
         if (!r.ok) return json({ message: r.json?.message ?? 'Could not update', code: String(r.status) }, 500);
-        return json({ data: true });
+        return json({ data: until });
       }
 
       default:

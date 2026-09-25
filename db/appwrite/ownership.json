@@ -1,10 +1,10 @@
 {
-  "_comment": "Which column names the member who owns a row, and whether that row is private to them. ONE source of truth: db/appwrite/tools/set-permissions.mjs reads this when backfilling migrated rows, and generate-schema.mjs copies it into lib/appwrite/generatedOwnership.ts so the adapter stamps the same permissions onto NEW rows. Those two drifting apart is exactly how you get an app where old posts are editable and new ones are not.",
+  "_comment": "Which column names the member who owns a row, and whether that row is private to them. ONE source of truth: db/appwrite/tools/set-permissions.mjs reads this when backfilling migrated rows, and generate-schema.mjs copies it into lib/appwrite/generatedOwnership.ts so the adapter stamps the same permissions onto NEW rows. Those two drifting apart is exactly how you get an app where old posts are editable and new ones are not. NOTE: event_forms is deliberately absent \u2014 it has no owner column of its own; its owner is the organiser of the event it belongs to, which this flat map cannot express. A form therefore gets no per-row ownership, so an organiser cannot edit it from the client. That is a known gap, not an oversight; editing one needs a server route that resolves the event first.",
   "ownerColumn": {
     "profiles": "$id",
     "listings": "user_id",
     "requests": "user_id",
-    "events": "created_by",
+    "events": "organizer_id",
     "lost_found_reports": "user_id",
     "comments": "user_id",
     "reactions": "user_id",
@@ -18,15 +18,20 @@
     "user_blocks": "blocker_id",
     "community_members": "user_id",
     "impact_log": "user_id",
-    "inventory_items": "user_id",
+    "inventory_items": "owner_id",
     "event_form_responses": "user_id",
     "listing_responses": "user_id",
     "request_offers": "user_id",
-    "event_forms": "created_by",
     "content_reports": "reporter_id"
   },
   "privateToOwner": [
-    "saves", "alerts", "notifications", "saved_searches",
-    "push_subscriptions", "user_blocks", "event_form_responses", "content_reports"
+    "saves",
+    "alerts",
+    "notifications",
+    "saved_searches",
+    "push_subscriptions",
+    "user_blocks",
+    "event_form_responses",
+    "content_reports"
   ]
 }
