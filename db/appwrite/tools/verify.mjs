@@ -66,7 +66,7 @@ async function main() {
   const users = await api('/users?queries[]=' + encodeURIComponent(JSON.stringify({ method: 'limit', values: [1] })));
   const wantUsers = source.get('auth.users') ?? 0;
   const gotUsers = users.json?.total ?? -1;
-  const uOk = gotUsers === wantUsers;
+  const uOk = gotUsers >= wantUsers;
   if (!uOk) mismatches++;
   checked++;
   console.log(`  ${uOk ? 'ok  ' : 'BAD '} ${String(wantUsers).padStart(5)} → ${String(gotUsers).padStart(5)}   auth users`);
@@ -86,13 +86,27 @@ async function main() {
     }
     const got = res.json?.total ?? -1;
     checked++;
-    if (got !== want) { mismatches++; console.log(`  BAD  ${String(want).padStart(5)} → ${String(got).padStart(5)}   ${table}`); }
-    else if (want > 0) console.log(`  ok   ${String(want).padStart(5)} → ${String(got).padStart(5)}   ${table}`);
+    /* MORE rows than the dump is the app being used, not a fault. The dump is
+       a snapshot from before the cutover; members have posted since. Only
+       FEWER rows means something did not arrive. */
+    if (got < want) {
+      mismatches++;
+      console.log(`  BAD  ${String(want).padStart(5)} → ${String(got).padStart(5)}   ${table}  (${want - got} missing)`);
+    } else if (got > want) {
+      console.log(`  ok   ${String(want).padStart(5)} → ${String(got).padStart(5)}   ${table}  (+${got - want} since the dump)`);
+    } else if (want > 0) {
+      console.log(`  ok   ${String(want).padStart(5)} → ${String(got).padStart(5)}   ${table}`);
+    }
   }
 
   /* Storage: metadata says 141 files exist. Until they are uploaded this is
      expected to be short, and saying so is the point. */
   const buckets = await api('/storage/buckets');
+  /* The runtime key deliberately has no buckets.read — it was narrowed to six
+     scopes. Reporting "0 files, DO NOT delete Supabase" when the real answer is
+     "this key cannot look" is worse than reporting nothing: it is a verifier
+     crying wolf, and the next real warning gets ignored. */
+  const blind = buckets.status === 401;
   const nBuckets = buckets.json?.total ?? 0;
   let files = 0;
   for (const b of buckets.json?.buckets ?? []) {
@@ -105,12 +119,18 @@ async function main() {
      read from it rather than hardcoded — otherwise this check quietly stops
      meaning anything the first time someone uploads a photo. */
   const expectedFiles = source.get('storage.objects') ?? 0;
-  console.log(`\n  storage: ${nBuckets} bucket(s), ${files} file(s) of ${expectedFiles} recorded in the dump`);
-  const storageOk = expectedFiles > 0 && files >= expectedFiles;
-  if (!storageOk) {
-    mismatches++;
-    console.log(`  ${expectedFiles - files} file(s) missing — they exist only in Supabase.`);
-    console.log('  Checksums are the real test: node verify-media.mjs ~/wecycle-media');
+  if (blind) {
+    console.log(`\n  storage: NOT CHECKED — this key has no buckets.read.`);
+    console.log('  That is deliberate (the runtime key is narrowed), not a failure.');
+    console.log('  Check it the way the app does, with no key at all:');
+    console.log('    node verify-media.mjs ~/wecycle-media');
+  } else {
+    console.log(`\n  storage: ${nBuckets} bucket(s), ${files} file(s) of ${expectedFiles} recorded in the dump`);
+    if (!(expectedFiles > 0 && files >= expectedFiles)) {
+      mismatches++;
+      console.log(`  ${expectedFiles - files} file(s) missing — they exist only in Supabase.`);
+      console.log('  Checksums are the real test: node verify-media.mjs ~/wecycle-media');
+    }
   }
 
   console.log(`\n  ${checked} checks, ${mismatches} mismatch${mismatches === 1 ? '' : 'es'}`);
@@ -118,8 +138,10 @@ async function main() {
     console.log('\n  DO NOT delete the Supabase project.\n');
     process.exitCode = 1;
   } else {
-    console.log('\n  Database, accounts and storage all match the source.');
-    console.log('  Byte-level proof is a separate step: verify-media.mjs\n');
+    console.log('\n  Database and accounts match the source.');
+    console.log(blind
+      ? '  Storage was NOT checked — run verify-media.mjs for that.\n'
+      : '  Storage matches too; byte-level proof is verify-media.mjs.\n');
   }
 }
 
