@@ -930,7 +930,7 @@ export default function FeedScreen({
 
   /* ── The feature carousel ──────────────────────────────────────────────
    *
-   * Six slides about what Wecycle is for. These were parked in September 2026
+   * Five slides about what Wecycle is for. These were parked in September 2026
    * while the home feed led with UXINDIA, which had a date on it; that event
    * ran on 26–27 September and is over, so the carousel is back and the
    * partner banner is gone.
