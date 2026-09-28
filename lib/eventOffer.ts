@@ -133,9 +133,27 @@ export function sigchiHeadline(): { headline: string; breakdown: string | null }
   };
 }
 
+/* ── Is the offer still on? ────────────────────────────────────────────────
+ *
+ * OFF since 28 September 2026. UXINDIA 2026 ran on the 26th and 27th; the
+ * codes stopped being worth anything the moment it ended, and a discount panel
+ * on a finished event is worse than no panel — it reads as a live offer and
+ * sends people to a checkout that will refuse them.
+ *
+ * A flag rather than a deletion, and rather than a date check. The whole
+ * partnership — the tiers, the SIGCHI roster check, the reveal card, the
+ * share copy — is intact behind this one boolean, so the next one is a flip
+ * and a new event id rather than a rebuild. A date check would have been
+ * tidier in theory and would have needed someone to have picked the right
+ * timezone and end-of-day in advance, months before anyone could check it.
+ *
+ * TO TURN IT ON for the next partnership: set this true and point
+ * UX_INDIA_EVENT_ID at the new event. */
+const PARTNER_OFFER_LIVE = false;
+
 /** True when this event carries the UXINDIA offer. */
 export function hasPartnerOffer(eventId: string | undefined): boolean {
-  return eventId === UX_INDIA_EVENT_ID;
+  return PARTNER_OFFER_LIVE && eventId === UX_INDIA_EVENT_ID;
 }
 
 /**

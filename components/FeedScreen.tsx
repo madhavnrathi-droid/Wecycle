@@ -15,8 +15,6 @@ import {
 } from '../lib/mockData';
 import { resolveItemMedia, getAvatar, resolveEventPhoto, resolveLostFoundPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
-import UxIndiaSpotlight from './UxIndiaSpotlight';
-import { UX_INDIA_EVENT_ID } from '../lib/eventOffer';
 import { opportunityCompLabel, oppRoleBadge } from '../lib/opportunity';
 import SavedSearchBar from './SavedSearchBar';
 import { useAuth } from '../lib/AuthContext';
@@ -34,7 +32,7 @@ import { getBlockedUserIds, onBlocksChange } from '../lib/moderation';
 import { track, trackPostOpened, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import EmptyState from './EmptyState';
-import UxIndiaBanner from './UxIndiaBanner';
+import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
 import FitImage from './FitImage';
 import CardMedia from './CardMedia';
@@ -190,14 +188,6 @@ export default function FeedScreen({
   const [requests, setRequests] = useState<MarketplaceItem[]>([]);
   const [events, setEvents] = useState<CommunityEvent[]>([]);
 
-  /* The one event that carries the partner offer. Looked up rather than
-     hard-rendered so the spotlight cannot outlive the event: when it is not in
-     the feed's data — unpublished, cancelled, or simply past — the row is not
-     rendered at all and nothing has to be remembered to take it down. */
-  const uxIndiaEvent = useMemo(
-    () => events.find(ev => ev.id === UX_INDIA_EVENT_ID) ?? null,
-    [events],
-  );
   const [lostFound, setLostFound] = useState<LostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
@@ -938,107 +928,101 @@ export default function FeedScreen({
     );
   };
 
-  /* ── BANNER_SLIDES_PARKED ─────────────────────────────────────────────
+  /* ── The feature carousel ──────────────────────────────────────────────
    *
-   * The six-slide feature carousel, kept verbatim and switched off. Every
-   * slide is still true and the artwork is still in /public/banners — the
-   * reason it is not on screen is that the home feed now leads with one
-   * time-limited thing (see the banner mount below), and a carousel that gave
-   * that thing one slot in six would have spent most of its life advertising
-   * everything else.
+   * Six slides about what Wecycle is for. These were parked in September 2026
+   * while the home feed led with UXINDIA, which had a date on it; that event
+   * ran on 26–27 September and is over, so the carousel is back and the
+   * partner banner is gone.
    *
-   * TO BRING THEM BACK: uncomment this block, re-import MarketingBanner, and
-   * put `<MarketingBanner slides={bannerSlides} variant="wide" />` back in the
-   * two mounts. Nothing else was removed — MarketingBanner itself, its CSS and
-   * its artwork are all untouched.
-   *
-   * Do NOT delete this to tidy up. The copy in here was written line by line
-   * and the alternative to a comment is rewriting it from memory.
+   * Parking rather than deleting them is why this is an uncomment and not a
+   * rewrite — the copy was written line by line. If the next partnership wants
+   * the top of the feed, park them the same way rather than removing them.
    */
-  // const bannerSlides: BannerSlide[] = [
-  //   {
-  //     id: 'share',
-  //     image: '/banners/share.webp',
-  //     illustration: 'twemoji:wrapped-gift',
-  //     title: 'Share what you don’t use',
-  //     subtitle: 'Give it a second life nearby',
-  //     detail: 'Drop a photo, name your price (or free) — the right neighbour finds it in minutes.',
-  //     gradient:
-  //       'linear-gradient(135deg, rgba(34,197,94,0.92) 0%, rgba(13,148,136,0.85) 100%)',
-  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'share' }); onBannerAction?.('share'); },
-  //   },
-  //   {
-  //     id: 'request',
-  //     image: '/banners/request.webp',
-  //     illustration: 'twemoji:raising-hand',
-  //     title: 'Ask for what you need',
-  //     subtitle: 'Borrow before you buy',
-  //     detail: 'Post a request and let the community come to you — books, tools, a kettle, anything.',
-  //     gradient:
-  //       'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
-  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'request' }); onBannerAction?.('request'); },
-  //   },
-  //   {
-  //     id: 'events',
-  //     image: '/banners/events.webp',
-  //     illustration: 'twemoji:tear-off-calendar',
-  //     title: 'Join local events',
-  //     subtitle: 'Repair cafés, swaps, cleanups',
-  //     detail: 'See what your community is hosting this week. RSVP in one tap.',
-  //     gradient:
-  //       'linear-gradient(135deg, rgba(99,102,241,0.92) 0%, rgba(168,85,247,0.88) 100%)',
-  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'events' }); onBannerAction?.('events'); },
-  //   },
-  //   {
-  //     id: 'lost-found',
-  //     image: '/banners/lost-found.webp',
-  //     illustration: 'twemoji:magnifying-glass-tilted-left',
-  //     title: 'Lost something?',
-  //     subtitle: 'Or help return what you found',
-  //     detail: 'A second board, side-by-side with the marketplace. Verified by the community.',
-  //     gradient:
-  //       'linear-gradient(135deg, rgba(234,179,8,0.92) 0%, rgba(217,119,6,0.88) 100%)',
-  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'lost-found' }); onBannerAction?.('lost-found'); },
-  //   },
-  //   {
-  //     /* New slide: the Jobs & gigs tab had no promotion anywhere on the home
-  //        screen, and its rail carries one post — the surface nobody knows exists
-  //        is the one that stays empty. This points at the tab rather than the post
-  //        form, because browsing what is already there is the lower-commitment
-  //        first step. */
-  //     id: 'jobs',
-  //     image: '/banners/jobs.webp',
-  //     illustration: 'twemoji:briefcase',
-  //     title: 'Get paid for what you’re good at',
-  //     subtitle: 'Design, tutoring, photography',
-  //     detail: 'Small paid work on campus — post a gig, or take one on this week.',
-  //     gradient:
-  //       'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
-  //     ariaLabel: 'Get paid for what you’re good at — browse jobs and gigs',
-  //     onClick: () => {
-  //       track(EVT.marketing_banner_tapped, { slide: 'jobs' });
-  //       setActiveType('services');
-  //     },
-  //   },
-  //   {
-  //     id: 'whatsapp',
-  //     image: '/banners/whatsapp.webp',
-  //     illustration: 'twemoji:graduation-cap',
-  //     /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
-  //          plainly that it is not affiliated with, endorsed by, or sponsored by
-  //          any university. A banner written in the institution's own voice
-  //          contradicts that, and App Review asks submitters to prove they are
-  //          authorised to use protected third-party material. Students
-  //          describing themselves claims nothing on anyone else's behalf. */
-  //       title: 'Better than the group chat',
-  //     subtitle: 'Searchable, and still here tomorrow',
-  //     detail: 'No scrolling four hundred messages to find who was selling a kettle.',
-  //     gradient:
-  //       'linear-gradient(135deg, rgba(37,99,235,0.92) 0%, rgba(168,85,247,0.9) 55%, rgba(34,197,94,0.9) 100%)',
-  //     ariaLabel: 'Better than the group chat — invite a friend to Wecycle',
-  //     onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'whatsapp' }); onBannerAction?.('invite'); },
-  //   },
-  // ];
+  const bannerSlides: BannerSlide[] = [
+    {
+      id: 'share',
+      image: '/banners/share.webp',
+      illustration: 'twemoji:wrapped-gift',
+      title: 'Share what you don’t use',
+      subtitle: 'Give it a second life nearby',
+      detail: 'Drop a photo, name your price (or free) — the right neighbour finds it in minutes.',
+      gradient:
+        'linear-gradient(135deg, rgba(34,197,94,0.92) 0%, rgba(13,148,136,0.85) 100%)',
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'share' }); onBannerAction?.('share'); },
+    },
+    {
+      id: 'request',
+      image: '/banners/request.webp',
+      illustration: 'twemoji:raising-hand',
+      title: 'Ask for what you need',
+      subtitle: 'Borrow before you buy',
+      detail: 'Post a request and let the community come to you — books, tools, a kettle, anything.',
+      gradient:
+        'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'request' }); onBannerAction?.('request'); },
+    },
+    {
+      id: 'events',
+      image: '/banners/events.webp',
+      illustration: 'twemoji:tear-off-calendar',
+      title: 'Join local events',
+      subtitle: 'Repair cafés, swaps, cleanups',
+      detail: 'See what your community is hosting this week. RSVP in one tap.',
+      gradient:
+        'linear-gradient(135deg, rgba(99,102,241,0.92) 0%, rgba(168,85,247,0.88) 100%)',
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'events' }); onBannerAction?.('events'); },
+    },
+    {
+      id: 'lost-found',
+      image: '/banners/lost-found.webp',
+      illustration: 'twemoji:magnifying-glass-tilted-left',
+      title: 'Lost something?',
+      subtitle: 'Or help return what you found',
+      detail: 'A second board, side-by-side with the marketplace. Verified by the community.',
+      gradient:
+        'linear-gradient(135deg, rgba(234,179,8,0.92) 0%, rgba(217,119,6,0.88) 100%)',
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'lost-found' }); onBannerAction?.('lost-found'); },
+    },
+    {
+      /* New slide: the Jobs & gigs tab had no promotion anywhere on the home
+         screen, and its rail carries one post — the surface nobody knows exists
+         is the one that stays empty. This points at the tab rather than the post
+         form, because browsing what is already there is the lower-commitment
+         first step. */
+      id: 'jobs',
+      image: '/banners/jobs.webp',
+      illustration: 'twemoji:briefcase',
+      title: 'Get paid for what you’re good at',
+      subtitle: 'Design, tutoring, photography',
+      detail: 'Small paid work on campus — post a gig, or take one on this week.',
+      gradient:
+        'linear-gradient(135deg, rgba(245,132,0,0.92) 0%, rgba(244,63,94,0.88) 100%)',
+      ariaLabel: 'Get paid for what you’re good at — browse jobs and gigs',
+      onClick: () => {
+        track(EVT.marketing_banner_tapped, { slide: 'jobs' });
+        setActiveType('services');
+      },
+    },
+    {
+      id: 'whatsapp',
+      image: '/banners/whatsapp.webp',
+      illustration: 'twemoji:graduation-cap',
+      /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
+           plainly that it is not affiliated with, endorsed by, or sponsored by
+           any university. A banner written in the institution's own voice
+           contradicts that, and App Review asks submitters to prove they are
+           authorised to use protected third-party material. Students
+           describing themselves claims nothing on anyone else's behalf. */
+        title: 'Better than the group chat',
+      subtitle: 'Searchable, and still here tomorrow',
+      detail: 'No scrolling four hundred messages to find who was selling a kettle.',
+      gradient:
+        'linear-gradient(135deg, rgba(37,99,235,0.92) 0%, rgba(168,85,247,0.9) 55%, rgba(34,197,94,0.9) 100%)',
+      ariaLabel: 'Better than the group chat — invite a friend to Wecycle',
+      onClick: () => { track(EVT.marketing_banner_tapped, { slide: 'whatsapp' }); onBannerAction?.('invite'); },
+    },
+  ];
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -1191,19 +1175,7 @@ export default function FeedScreen({
         </section>
       ) : (
             <section style={{ padding: '0 16px 16px' }}>
-        <UxIndiaBanner
-          onOpen={() => {
-            track(EVT.marketing_banner_tapped, { slide: 'uxindia' });
-            if (uxIndiaEvent) {
-              trackPostOpened('event', uxIndiaEvent.id, { source: 'feed_banner' });
-              onOpenEvent?.(uxIndiaEvent);
-            } else {
-              /* The event has not loaded yet, or is gone. The events screen is
-                 the honest destination — never a dead tap. */
-              onBannerAction?.('events');
-            }
-          }}
-        />
+        <MarketingBanner slides={bannerSlides} variant="wide" />
       </section>
       )}
 
@@ -1433,22 +1405,6 @@ export default function FeedScreen({
           {engine.modules.map((m, idx) => (
             <Fragment key={`mod-${m.spec.id}`}>
               {renderModule(m)}
-              {/* The partner spotlight, after the second row. High enough to
-                  find without hunting, late enough that the marketplace has
-                  already shown what it is for — putting a partner card above
-                  "Just dropped" teaches people the top of the feed is
-                  advertising, which is how you lose the top of the feed.
-                  Rendered only while the event actually exists and is still
-                  ahead of us; it disappears on its own the day after. */}
-              {idx === 1 && uxIndiaEvent && (
-                <UxIndiaSpotlight
-                  posterUrl={resolveEventPhoto(uxIndiaEvent)}
-                  onOpen={() => {
-                    trackPostOpened('event', uxIndiaEvent.id, { source: 'feed_spotlight' });
-                    onOpenEvent?.(uxIndiaEvent);
-                  }}
-                />
-              )}
               {idx === 2 && (
                 <StorefrontCTA onPostJob={() => {
                   track(EVT.marketing_banner_tapped, { slide: 'post_job_cta' });
