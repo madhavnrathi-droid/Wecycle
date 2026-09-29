@@ -312,12 +312,17 @@ widen the production key.
 ```bash
 npm install
 npm run dev              # http://localhost:3000
-npm test                 # 66 tests, node:test
+npm test                 # 79 tests, node:test
 npm run build            # production build — run before every deploy
 ```
 
 **Web:** Vercel. Deploys are **manual** — a push to `main` does not deploy.
 `npx vercel --prod`. See [docs/deploying.md](docs/deploying.md).
+
+**Function region is `sin1` (Singapore)**, set in [`vercel.json`](vercel.json).
+Appwrite is in Singapore and the members are in India; on Vercel's default
+(`iad1`, Washington) every database call crossed the Pacific and sending a
+message took 2–5 s. In `sin1` it takes well under one. Don't remove it.
 
 **Android:** see [docs/android.md](docs/android.md). The short version:
 `npm run build:cap && npx cap sync android`, bump `versionCode` in
