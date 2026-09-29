@@ -31,7 +31,7 @@
 
 import { ID, AppwriteException } from 'appwrite';
 import { account } from './client';
-import { rpc } from './rpc';
+import { rpc, clearServerAuth } from './rpc';
 
 export interface AuthUser { id: string; email: string | null; }
 export interface AuthSession { user: AuthUser; }
@@ -141,6 +141,8 @@ export const authAdapter = {
   },
 
   async signOut(): Promise<{ error: { message: string } | null }> {
+    /* The cached server JWT belongs to this session; it must not outlive it. */
+    clearServerAuth();
     try {
       await account().deleteSession({ sessionId: 'current' });
       emit('SIGNED_OUT', null);

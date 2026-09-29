@@ -109,6 +109,16 @@ export const EVT = {
   comment_posted:           'comment_posted',
   rsvp_toggled:             'rsvp_toggled',
 
+  /* ── Direct messages ───
+     message_sent carries is_first (a new conversation) — the ratio of first
+     messages to conversations that get a reply is the number that says
+     whether messaging is working. */
+  messages_opened:          'messages_opened',
+  conversation_opened:      'conversation_opened',
+  message_sent:             'message_sent',
+  message_failed:           'message_failed',
+  message_starter_used:     'message_starter_used',
+
   /* ── Event registration forms + organizer insights ─── */
   event_form_saved:         'event_form_saved',
   event_form_removed:       'event_form_removed',

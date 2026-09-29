@@ -1,5 +1,6 @@
 'use client';
 
+import TopBar from './TopBar';
 import CategoryIcon from '../components/CategoryIcon';
 import OutageNotice from './OutageNotice';
 import { OUTAGE_MODE } from '../lib/outage';
@@ -7,8 +8,7 @@ import SystemMessage from './SystemMessage';
 import { availableFirst, isRecentlyClosed } from '../lib/feed/rank';
 import { CATEGORIES as CATEGORY_LIST, normalizeCategory, categoryIdOf, matchesCategoryFilter } from '../lib/categories';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Menu, Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
-import { Wordmark } from './Brand';
+import { Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
 import {
   MARKETPLACE_ITEMS, OPPORTUNITIES, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
   type MarketplaceItem, type CommunityEvent, type LostItem,
@@ -51,6 +51,8 @@ interface FeedScreenProps {
   onPost: () => void;
   onOpenMenu: () => void;
   onOpenAccount: () => void;
+  /** The Messages button in the top bar. */
+  onOpenMessages: () => void;
   onOpenItem: (item: MarketplaceItem) => void;
   /** Open an event detail screen — used when an event card on the All tab is tapped. */
   onOpenEvent?: (event: CommunityEvent) => void;
@@ -117,7 +119,7 @@ const RAIL_FILTERS: Record<RailFilterId, {
 };
 
 export default function FeedScreen({
-  onPost, onOpenMenu, onOpenAccount, onOpenItem, onOpenEvent, onOpenLF,
+  onPost, onOpenMenu, onOpenAccount, onOpenMessages, onOpenItem, onOpenEvent, onOpenLF,
   onBannerAction, onOpenUser, onRequireAuth, onPostService, onSellItem,
 }: FeedScreenProps) {
   const { profile, user } = useAuth();
@@ -1028,48 +1030,7 @@ export default function FeedScreen({
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
       {/* ── TOP BAR ── */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 30,
-        /* Solid card background — no liquid-glass blur. */
-        background: 'var(--bg-card)',
-        padding: '14px 16px 10px',
-      }} className="mobile-only-nav">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            className="theme-toggle"
-            style={{ marginLeft: -8 }}
-          >
-            <Menu size={20} strokeWidth={1.8} />
-          </button>
-          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <Wordmark height={30} />
-          </span>
-          <button
-            aria-label="Your profile"
-            onClick={onOpenAccount}
-            style={{
-              width: 44, height: 44, borderRadius: '50%',
-              background: 'var(--bg-inset)',
-              border: 'none', cursor: 'pointer',
-              padding: 0, overflow: 'hidden',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-            suppressHydrationWarning
-          >
-            {mounted && (
-              <img
-                src={getAvatar(user?.id ?? 'guest')}
-                alt=""
-                width={34}
-                height={34}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            )}
-          </button>
-        </div>
-      </header>
+      <TopBar onOpenMenu={onOpenMenu} onOpenAccount={onOpenAccount} onOpenMessages={onOpenMessages} />
 
       {/* ── GREETING + MARKETING BANNER + DESKTOP-INLINE SEARCH ── */}
       <section className="feed-greeting-row" style={{ padding: '14px 20px 16px' }}>

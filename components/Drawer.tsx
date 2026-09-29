@@ -2,8 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import {
-  X, User, Settings, MessageSquare, Send, Bell,
-  Heart, LogOut, ChevronRight,
+  X, User, Settings, MessageSquare, Send, Bell, Heart, LogOut, ChevronRight, MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getAvatar } from '../lib/photos';
@@ -21,6 +20,7 @@ const SECTIONS: { items: { id: string; label: string; icon: IconCmp; desc?: stri
   {
     items: [
       { id: 'account',  label: 'Account',         icon: User,         desc: 'Profile & community' },
+      { id: 'messages', label: 'Messages',        icon: MessageCircle, desc: 'Your conversations' },
       { id: 'settings', label: 'Settings',        icon: Settings,     desc: 'Privacy, notifications' },
       { id: 'notifs',   label: 'Notifications',   icon: Bell,         desc: 'Manage alerts' },
     ],

@@ -215,24 +215,57 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
   }
 }
 
+/* ── The JWT, reused ────────────────────────────────────────────────────────
+ *
+ * Every server call proves who is calling with a short-lived Appwrite JWT.
+ * Minting one per call looked harmless until messaging: Appwrite allows a
+ * member 100 new JWTs an hour, and a conversation — sends, read receipts —
+ * plus the saves, likes and view counts around it would run through that and
+ * start failing mid-chat. A JWT lives 15 minutes; this reuses one for 10 and
+ * drops it on sign-out (a different member must never inherit it). */
+let cachedJwt: { token: string; uid: string; at: number } | null = null;
+const JWT_REUSE_MS = 10 * 60_000;
+
+async function jwtFor(uid: string | null): Promise<string> {
+  if (!uid) { cachedJwt = null; return ''; }
+  if (cachedJwt && cachedJwt.uid === uid && Date.now() - cachedJwt.at < JWT_REUSE_MS) return cachedJwt.token;
+  try {
+    const token = (await account().createJWT()).jwt;
+    cachedJwt = { token, uid, at: Date.now() };
+    return token;
+  } catch {
+    cachedJwt = null;
+    return '';
+  }
+}
+
+/** Forget the cached JWT — called on sign-out. */
+export function clearServerAuth(): void { cachedJwt = null; }
+
 /* These need data or authority a browser must not hold. See the note at the
-   top of this file for why each one is on this list. */
-async function serverRpc<T>(fn: string, args: Record<string, unknown>): Promise<RpcResult<T>> {
+   top of this file for why each one is on this list. Exported for features
+   that live outside the RPC vocabulary (messaging). */
+export async function serverRpc<T>(fn: string, args: Record<string, unknown>, uid?: string | null): Promise<RpcResult<T>> {
   try {
     /* A short-lived JWT, not a user id in the body — anyone can type a user id.
        The route asks Appwrite who this token belongs to and uses that, so a
        forged body cannot make the server act as someone else. */
-    let jwt = '';
-    try { jwt = (await account().createJWT()).jwt; } catch { /* signed out */ }
-
-    /* Same reason as /api/sigchi above: the native app has no server of its
-       own, so this has to be absolute there. Every save, like, RSVP and view
-       count goes through here. */
-    const res = await fetch(`${apiBase()}/api/rpc/${fn}`, {
+    const who = uid === undefined ? await me() : uid;
+    const call = async (jwt: string) => fetch(`${apiBase()}/api/rpc/${fn}`, {
+      /* Same reason as /api/sigchi above: the native app has no server of its
+         own, so this has to be absolute there. Every save, like, RSVP and view
+         count goes through here. */
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(jwt ? { 'X-Appwrite-JWT': jwt } : {}) },
       body: JSON.stringify(args),
     });
+    let res = await call(await jwtFor(who));
+    /* A cached token can be revoked early (password change, session ended
+       elsewhere). One retry with a fresh one, then report the failure. */
+    if (res.status === 401 && cachedJwt) {
+      cachedJwt = null;
+      res = await call(await jwtFor(who));
+    }
     const body = await res.json().catch(() => null);
     if (!res.ok) {
       return { data: null, error: { message: body?.message ?? `Request failed (${res.status})`, code: body?.code } };

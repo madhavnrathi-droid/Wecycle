@@ -1,14 +1,14 @@
 'use client';
 
+import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
-import { Menu, Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
-import { Wordmark } from './Brand';
+import { Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
 import { EVENTS, type CommunityEvent } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchEvents, onPostsChanged } from '../lib/liveData';
 import EmptyState from './EmptyState';
-import { resolveEventPhoto, getAvatar } from '../lib/photos';
+import { resolveEventPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
 import FitImage from './FitImage';
 import { useAuth } from '../lib/AuthContext';
@@ -16,6 +16,8 @@ import { useAuth } from '../lib/AuthContext';
 interface EventsScreenProps {
   onOpenMenu: () => void;
   onOpenAccount: () => void;
+  /** The Messages button in the top bar. */
+  onOpenMessages: () => void;
   onCreate: () => void;
   onOpenEvent: (event: CommunityEvent) => void;
   rsvpdEvents: Set<string>;
@@ -82,7 +84,7 @@ function withinTimeFilter(dateStr: string, filter: TimeFilter): boolean {
 
 /* ── SCREEN ──────────────────────────────────────── */
 
-export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOpenEvent, rsvpdEvents, onToggleRsvp }: EventsScreenProps) {
+export default function EventsScreen({ onOpenMenu, onOpenAccount, onOpenMessages, onCreate, onOpenEvent, rsvpdEvents, onToggleRsvp }: EventsScreenProps) {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -138,51 +140,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onCreate, onOp
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
       {/* ── TOP BAR ── */}
-      <header
-        style={{
-          position: 'sticky', top: 0, zIndex: 30,
-          /* Opaque. --bg-overlay is 88% alpha, so the feed showed
-             through the header as it scrolled past. */
-          background: 'var(--bg-card)',
-          padding: '14px 16px 10px',
-        }}
-        className="mobile-only-nav"
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            className="theme-toggle"
-            style={{ marginLeft: -8 }}
-          >
-            <Menu size={20} strokeWidth={1.8} />
-          </button>
-          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <Wordmark height={30} />
-          </span>
-          <button
-            aria-label="Your profile"
-            onClick={onOpenAccount}
-            style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'var(--bg-inset)',
-              border: 'none', cursor: 'pointer',
-              padding: 0, overflow: 'hidden',
-            }}
-            suppressHydrationWarning
-          >
-            {mounted && (
-              <img
-                src={getAvatar(user?.id ?? 'guest')}
-                alt=""
-                width={34}
-                height={34}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            )}
-          </button>
-        </div>
-      </header>
+      <TopBar onOpenMenu={onOpenMenu} onOpenAccount={onOpenAccount} onOpenMessages={onOpenMessages} />
 
       {/* ── PAGE TITLE ── */}
       <section style={{ padding: '14px 20px 12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>

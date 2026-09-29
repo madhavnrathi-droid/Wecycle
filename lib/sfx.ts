@@ -76,3 +76,14 @@ export function sfxTap() {
   if (!c) return;
   note(c, 660, 0, 0.07, 0.03, 'sine');
 }
+
+/** A message left — a short, soft upward blip. Only when the member has
+ *  chat sounds on (Settings → Notifications → Sound); a sound on every send
+ *  nobody asked for is an interruption, not polish. */
+export function sfxSend(enabled: boolean) {
+  if (!enabled || reduceMotion()) return;
+  const c = audio();
+  if (!c) return;
+  note(c, 880, 0, 0.09, 0.028, 'sine');      // A5
+  note(c, 1318.5, 0.05, 0.12, 0.022, 'sine'); // E6
+}

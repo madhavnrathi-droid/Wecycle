@@ -66,9 +66,12 @@ adapter. `hasSupabaseEnv` is misnamed for exactly this reason — it now means
 
 ## Adding an API
 
-API routes live in [`app/api/`](app/api/). The one to copy is
-[`app/api/rpc/[fn]/route.ts`](app/api/rpc/[fn]/route.ts), because it already
-solves the four problems every new route will have.
+API routes live in [`app/api/`](app/api/). The shared server helpers are in
+[`app/api/_lib/appwrite.ts`](app/api/_lib/appwrite.ts) — `callerId`, `cors`,
+`json`, `aw` (the server-key call) and `q` (query encoding). Import them; do not
+copy them. The route to model a new one on is
+[`app/api/rpc/[fn]/route.ts`](app/api/rpc/[fn]/route.ts), and a larger feature
+built the same way is [`app/api/_lib/messaging.ts`](app/api/_lib/messaging.ts).
 
 ### The four things every route must get right
 
@@ -90,7 +93,7 @@ for you.
 Android, `capacitor://localhost` on iOS. Every call from a phone to your route
 is cross-origin, and `X-Appwrite-JWT` is not a CORS-simple header, so the browser
 preflights it. Without an `OPTIONS` handler the route works perfectly on the
-website and fails on every phone. Copy the `cors` block and `OPTIONS` export.
+website and fails on every phone. Import `cors` from `_lib/appwrite.ts` and export an `OPTIONS` handler that returns it.
 
 **3. Call it with `apiBase()`, not a bare path.** `fetch('/api/x')` resolves to
 `https://localhost/api/x` inside the native app, where no API routes exist.
@@ -98,7 +101,7 @@ Use `` fetch(`${apiBase()}/api/x`) `` from [`lib/platform.ts`](lib/platform.ts):
 it is `''` on the web and `https://wecycle.page` inside the app.
 
 **4. Use the server key only after identifying the caller.** `APPWRITE_API_KEY`
-is server-only. The `aw()` helper in the rpc route wraps it. Never prefix it
+is server-only. The `aw()` helper in `_lib/appwrite.ts` wraps it. Never prefix it
 `NEXT_PUBLIC_`.
 
 ### Why these exist
@@ -113,6 +116,83 @@ testing on the website, where both work fine.
 The server SDK pulls in `undici`, which Next's webpack loader cannot parse.
 Adding it broke **every page**, not just the route. The rpc route uses plain
 `fetch` against the Appwrite REST API; do the same.
+
+---
+
+## Direct messages
+
+Members can message each other on Wecycle — text only, no images yet. One
+conversation per pair of people (like Instagram), optionally "about" a post.
+
+**Where it lives**
+
+| | |
+|---|---|
+| Server | [`app/api/_lib/messaging.ts`](app/api/_lib/messaging.ts) — `dm_send`, `dm_mark_read`, `dm_can_message`, dispatched from the rpc route |
+| Rules both ends share | [`lib/messaging/format.ts`](lib/messaging/format.ts) — body limits, subject encoding, the authenticity check, timeline grouping, conversation starters (unit-tested) |
+| Client store | [`lib/messaging/store.ts`](lib/messaging/store.ts) — inbox, threads, unread, optimistic send, realtime + polling, demo mode |
+| Screens | [`components/messages/`](components/messages/) — `MessagesScreen` (stack on phones, two panes ≥1024px), `Inbox`, `ChatThread`, `MessagesButton` (top-bar badge) |
+| Entry points | top-bar button on every tab ([`components/TopBar.tsx`](components/TopBar.tsx)), the drawer, and a Message button on listings, requests, events, lost & found and profiles |
+
+**How a message is written.** Only the server writes `conversations` and
+`messages`. Each row gets exactly two permissions — `read("user:A")` and
+`read("user:B")` — and nothing else, so nobody (not even the sender) can edit
+or delete a message, which is what makes a reported message evidence. A browser
+cannot do this: Appwrite only lets a client grant permissions to roles it holds.
+
+**Authenticity.** That permission pair is also how the client knows a row is
+real. The two tables still grant `create("users")` at table level (changing it
+needs a console key — see below), so a member *can* create rows there, but never
+one carrying another member's read permission. The client and server both ignore
+any row without the exact pair (`isGenuine`). There is a test proving a client
+cannot grant another member read access.
+
+**Server checks on every send:** body 1–2,000 chars after normalising; the
+content filter (`lib/contentFilter.ts`); sender not suspended; no block in
+either direction (`user_blocks` — the blocked side is told only "You can't
+message this account"); recipient's `profiles.allow_dms`, except that a member
+who switched DMs off can still get replies in a conversation they wrote in;
+20 messages a minute; 20 new conversations an hour; a post context must belong
+to one of the two members.
+
+**Ids.** A conversation's id is `md5("dm|" + lowerUserId + "|" + higherUserId)`
+— derived identically on client (`lib/messaging/conversationId.ts`) and server,
+so two first messages racing each other land in one conversation. A message's id
+is chosen by the client, which makes a retry idempotent and lets the optimistic
+bubble, the server's reply and the realtime echo all share one id.
+
+**Read receipts.** `dm_mark_read` stamps `messages.read_at` row by row (not the
+bulk endpoint) so each update is a realtime event — that is what turns "Sent"
+into "Seen" live.
+
+**What a conversation is about.** The existing columns carry it:
+`conversations.listing_id` holds the post id and `subject` holds
+`"<type>:<title>"` where type is `listing | request | lost_found | event`
+(`encodeSubject` / `decodeSubject`). It is the most recent post the pair talked
+about.
+
+**Tested on production** with throwaway accounts (all deleted afterwards): 33
+server checks including block, DMs-off, rate limits, the content filter,
+id-squatting and outsider access; realtime delivery of new messages,
+conversation updates and read receipts; and the client's own list queries.
+
+**Worth doing next**
+
+- **Remove `create("users")` from the `conversations` and `messages` tables**
+  (Appwrite console → Databases → wecycle → table → Settings → Permissions).
+  Nothing in the app needs it; the client already ignores rows it could create.
+- **Push notifications for messages.** There is no push sender on Appwrite yet
+  (the Supabase `push-fanout` function did this). An Appwrite Function on
+  `messages.*.create` that reads `push_subscriptions` and respects
+  `notification_prefs.categories.messages` is the natural home.
+- **Per-message post context** (`messages.ref_type`, `messages.ref_id`) so a
+  thread can show which post each message was about, not just the latest.
+- **"Delete chat for me"** needs per-member state (`hidden_by_a`, `hidden_by_b`
+  or a small `conversation_members` table).
+- **Photos in messages** were deliberately left out. When added, reuse the
+  storage adapter and give each file the same two-member read permission.
+- **Typing indicators** need an ephemeral channel; Appwrite Realtime has no
+  presence/broadcast, so this would be a Function or a third-party service.
 
 ---
 
@@ -263,6 +343,8 @@ See [docs/app-update-flow.md](docs/app-update-flow.md).
   the counter can leave a count one off.
 - **Not yet exercised on production:** storefront and the full realtime
   notification flow.
+- **Direct messages ship on the web first.** The phone apps get them with the
+  next native build; until then the Message buttons simply are not in them.
 - **`docs/backend.md` describes Supabase** and is kept for history; the
   Supabase project is still the rollback path.
 
@@ -286,6 +368,9 @@ app/                   the SPA shell (page.tsx) and the API routes (app/api/)
 components/            screens and UI components
 lib/                   data and domain logic
 lib/appwrite/          the backend adapter — read the section above
+lib/messaging/         direct messages: shared rules, client store, hooks
+components/messages/   the Messages screens
+app/api/_lib/          shared server helpers + the messaging server logic
 db/sqlserver/          THE schema source of truth
 db/appwrite/           Appwrite schema (generated), migration + admin tools
 android/  ios/         Capacitor native projects

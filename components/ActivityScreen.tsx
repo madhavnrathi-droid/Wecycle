@@ -1,16 +1,15 @@
 'use client';
 
+import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Menu, Eye, Bookmark, Share2, MessageCircle, Plus, Bell,
+import { Eye, Bookmark, Share2, MessageCircle, Plus, Bell,
   Clock, IndianRupee, MapPin, MoreHorizontal, Users, CalendarDays,
 } from 'lucide-react';
-import { Wordmark } from './Brand';
 import {
   MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS,
   type MarketplaceItem, type CommunityEvent,
 } from '../lib/mockData';
-import { resolveItemMedia, resolveEventPhoto, getAvatar } from '../lib/photos';
+import { resolveItemMedia, resolveEventPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
 import { useAuth } from '../lib/AuthContext';
 import {
@@ -28,17 +27,17 @@ const MY_UPLOAD_IDS = ['m1', 'm5', 'm10'];
 interface ActivityScreenProps {
   onOpenMenu: () => void;
   onOpenAccount: () => void;
+  /** The Messages button in the top bar. */
+  onOpenMessages: () => void;
   onCreateAlert: () => void;
   onEditAlert: (alert: WecycleAlert) => void;
 }
 
 export default function ActivityScreen({
-  onOpenMenu, onOpenAccount, onCreateAlert, onEditAlert,
+  onOpenMenu, onOpenAccount, onOpenMessages, onCreateAlert, onEditAlert,
 }: ActivityScreenProps) {
   const { user, isDemo } = useAuth();
   const mode = isDemo ? 'demo' : 'supabase';
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
   const [activeTab, setActiveTab] = useState<Tab>('stats');
   const [alerts, setAlerts] = useState<WecycleAlert[]>([]);
 
@@ -80,51 +79,7 @@ export default function ActivityScreen({
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
       {/* ── TOP BAR ── */}
-      <header
-        style={{
-          position: 'sticky', top: 0, zIndex: 30,
-          /* Opaque. --bg-overlay is 88% alpha, so the feed showed
-             through the header as it scrolled past. */
-          background: 'var(--bg-card)',
-          padding: '14px 16px 10px',
-        }}
-        className="mobile-only-nav"
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            className="theme-toggle"
-            style={{ marginLeft: -8 }}
-          >
-            <Menu size={20} strokeWidth={1.8} />
-          </button>
-          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <Wordmark height={30} />
-          </span>
-          <button
-            aria-label="Your profile"
-            onClick={onOpenAccount}
-            style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'var(--bg-inset)',
-              border: 'none', cursor: 'pointer',
-              padding: 0, overflow: 'hidden',
-            }}
-            suppressHydrationWarning
-          >
-            {mounted && (
-              <img
-                src={getAvatar(user?.id ?? 'guest')}
-                alt=""
-                width={34}
-                height={34}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            )}
-          </button>
-        </div>
-      </header>
+      <TopBar onOpenMenu={onOpenMenu} onOpenAccount={onOpenAccount} onOpenMessages={onOpenMessages} />
 
       {/* ── PAGE TITLE ── */}
       <section style={{ padding: '14px 20px 14px' }}>

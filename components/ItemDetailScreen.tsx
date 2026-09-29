@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle } from 'lucide-react';
+import { messagingAvailable } from '../lib/messaging/store';
 import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
@@ -237,6 +238,10 @@ interface ItemDetailScreenProps {
   onOpenItem?: (item: MarketplaceItem) => void;
   /** Jump to a Lost & Found item from the sponsored slot in the related shelf. */
   onOpenLF?: (item: LostItem & { photoUrls?: string[] }) => void;
+  /** Start a direct message with the poster about this post. When present
+   *  (and messaging is available), it is the primary action and email /
+   *  WhatsApp become the secondary ones. */
+  onMessage?: (item: MarketplaceItem) => void;
   /** When the viewer owns this post, inline editing turns on (fields become
    *  inputs in place, dirty-state CTAs replace Delete). No standalone Edit
    *  button — the post detail IS the editor. */
@@ -441,7 +446,7 @@ function linkBtn(color: string): React.CSSProperties {
   };
 }
 
-export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onMessage, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(itemProp.saved);
   const [reportOpen, setReportOpen] = useState(false);
@@ -939,6 +944,14 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
 
   const primaryActionLabel = actionLabel(action);
 
+  /* Messaging on Wecycle is the primary way to respond to a post when it is
+     available: it keeps the conversation next to the post, keeps phone
+     numbers private, and puts report and block one tap away. Not offered on a
+     closed post — there is nothing left to ask for — or to the owner. */
+  const [dmAvailable] = useState(() => messagingAvailable());
+  const canMessage = !!onMessage && dmAvailable && !isOwner && !item.isClosed;
+  const startMessage = () => { haptics.medium(); onMessage?.(item); };
+
   const handleContactClick = (link: ContactLink) => {
     if (!user) {
       onRequireAuth();
@@ -1073,6 +1086,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
         primaryActionLabel={primaryActionLabel}
         handleContactClick={handleContactClick}
         hasBoth={hasBoth}
+        canMessage={canMessage}
+        onMessage={startMessage}
         canManage={canManage}
         onDelete={onDelete}
         isAdmin={isAdmin}
@@ -1264,7 +1279,20 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             and nothing about self, so without !isOwner this put an "Email
             Madhav Rathi" button on Madhav's own listing. Third site with that
             same hole; the other two are the two action bars. */}
-        {!isOwner && !item.isClosed && (contactLinks.length > 0 || gate === 'sign-in') && (
+        {canMessage ? (
+          <button
+            aria-label={`Message ${item.user.name}`}
+            onClick={startMessage}
+            style={{
+              width: 36, height: 36, borderRadius: 999, border: 'none',
+              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <MessageCircle size={16} strokeWidth={2} />
+          </button>
+        ) : !isOwner && !item.isClosed && (contactLinks.length > 0 || gate === 'sign-in') && (
           <button
             aria-label={gate === 'sign-in'
               ? `Sign in to contact ${item.user.name}`
@@ -1842,68 +1870,111 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             </>
           ) : (
           <>
-          {/* ── Contact the seller — the ONLY thing in the sticky bar now.
-              Email is ALWAYS present (every member has an email on file); when
-              the seller also opts into WhatsApp the two CTAs split the row.
-              Save / share / report / admin-delete moved up to the title row. */}
-          {!item.isClosed && contactLinks.map(link => (
-            <button
-              key={link.channel}
-              onClick={() => {
-                if (!user) { onRequireAuth(); return; }
-                handleContactClick(link);
-              }}
-              aria-label={link.ariaLabel}
-              style={{
-                flex: 1, height: 52, borderRadius: 999,
-                background: link.channel === 'whatsapp' ? WA_FILL : 'var(--text-primary)',
-                color: link.channel === 'whatsapp' ? WA_INK : 'var(--bg-base)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-                letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              {link.channel === 'whatsapp' ? <WhatsAppGlyph size={15} /> : <Mail size={15} strokeWidth={2} />}
-              {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
-            </button>
-          ))}
-          {/* Signed out → the channels can't be resolved yet (get_contact needs
-              auth), so offer the thing they actually want and let sign-in be the
-              means. Showing "view profile" here told every pre-signup visitor
-              the seller was unreachable. */}
-          {!item.isClosed && gate === 'sign-in' && (
-            <button
-              onClick={onRequireAuth}
-              aria-label={`Sign in to contact ${item.user.name}`}
-              style={{
-                flex: 1, height: 52, borderRadius: 999,
-                background: 'var(--text-primary)', color: 'var(--bg-base)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              <Mail size={15} strokeWidth={2} />
-              Contact {item.isRequest ? 'requester' : 'seller'}
-            </button>
-          )}
-          {/* Genuinely nothing to offer: closed post, or a signed-in viewer and
-              an owner who shares no channel at all. */}
-          {(item.isClosed || gate === 'none') && (
-            <button
-              onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
-              aria-label={`View ${item.user.name}'s profile`}
-              style={{
-                flex: 1, height: 52, borderRadius: 999,
-                background: 'var(--text-primary)', color: 'var(--bg-base)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              View seller&rsquo;s profile
-            </button>
+          {canMessage ? (
+            /* ── Message on Wecycle, first. Email and WhatsApp stay beside it
+               as round secondary buttons for people who would rather use them —
+               nothing is taken away, the order just changes. */
+            <>
+              <button
+                onClick={startMessage}
+                aria-label={`${primaryActionLabel} — message ${item.user.name}`}
+                style={{
+                  flex: 1, minWidth: 0, height: 52, borderRadius: 999,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <MessageCircle size={16} strokeWidth={2} />
+                {primaryActionLabel}
+              </button>
+              {contactLinks.map(link => (
+                <button
+                  key={link.channel}
+                  onClick={() => {
+                    if (!user) { onRequireAuth(); return; }
+                    handleContactClick(link);
+                  }}
+                  aria-label={link.ariaLabel}
+                  style={{
+                    width: 52, height: 52, borderRadius: 999, flexShrink: 0,
+                    background: link.channel === 'whatsapp' ? WA_FILL : 'var(--bg-inset)',
+                    color: link.channel === 'whatsapp' ? WA_INK : 'var(--text-primary)',
+                    border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  {link.channel === 'whatsapp' ? <WhatsAppGlyph size={18} /> : <Mail size={18} strokeWidth={1.9} />}
+                </button>
+              ))}
+            </>
+          ) : (
+          <>
+            {/* ── Contact the seller — the ONLY thing in the sticky bar now.
+                Email is ALWAYS present (every member has an email on file); when
+                the seller also opts into WhatsApp the two CTAs split the row.
+                Save / share / report / admin-delete moved up to the title row. */}
+            {!item.isClosed && contactLinks.map(link => (
+              <button
+                key={link.channel}
+                onClick={() => {
+                  if (!user) { onRequireAuth(); return; }
+                  handleContactClick(link);
+                }}
+                aria-label={link.ariaLabel}
+                style={{
+                  flex: 1, height: 52, borderRadius: 999,
+                  background: link.channel === 'whatsapp' ? WA_FILL : 'var(--text-primary)',
+                  color: link.channel === 'whatsapp' ? WA_INK : 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
+                  letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {link.channel === 'whatsapp' ? <WhatsAppGlyph size={15} /> : <Mail size={15} strokeWidth={2} />}
+                {link.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+              </button>
+            ))}
+            {/* Signed out → the channels can't be resolved yet (get_contact needs
+                auth), so offer the thing they actually want and let sign-in be the
+                means. Showing "view profile" here told every pre-signup visitor
+                the seller was unreachable. */}
+            {!item.isClosed && gate === 'sign-in' && (
+              <button
+                onClick={onRequireAuth}
+                aria-label={`Sign in to contact ${item.user.name}`}
+                style={{
+                  flex: 1, height: 52, borderRadius: 999,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <Mail size={15} strokeWidth={2} />
+                Contact {item.isRequest ? 'requester' : 'seller'}
+              </button>
+            )}
+            {/* Genuinely nothing to offer: closed post, or a signed-in viewer and
+                an owner who shares no channel at all. */}
+            {(item.isClosed || gate === 'none') && (
+              <button
+                onClick={() => { if (!user) { onRequireAuth(); return; } onOpenStorefront?.(item.user); }}
+                aria-label={`View ${item.user.name}'s profile`}
+                style={{
+                  flex: 1, height: 52, borderRadius: 999,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                View seller&rsquo;s profile
+              </button>
+            )}
+          </>
           )}
           </>
           )}
@@ -1994,6 +2065,10 @@ interface DesktopLayoutProps {
   primaryActionLabel: string;
   handleContactClick: (link: ContactLink) => void;
   hasBoth: boolean;
+  /** Direct messages are the primary action — see canMessage in the main
+   *  component. */
+  canMessage: boolean;
+  onMessage: () => void;
   canManage: boolean;
   onDelete?: () => void | Promise<void>;
   isAdmin?: boolean;
@@ -2011,10 +2086,10 @@ function DesktopLayout({
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   onOpenItem, onOpenLF,
   contactLinks, gate, primaryActionLabel, handleContactClick, hasBoth,
+  canMessage, onMessage,
   canManage, onDelete, isAdmin, isOwner, heroSentinelRef, heroVisible, editState,
   adminEdit,
 }: DesktopLayoutProps) {
-  void primaryActionLabel;
   void hasBoth;
   const isOpportunity = item.kind === 'opportunity';
   const [reportOpen, setReportOpen] = useState(false);
@@ -2132,7 +2207,20 @@ function DesktopLayout({
                 <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
               </span>
             )}
-            {!item.isClosed && contactLinks.length > 0 && (
+            {canMessage ? (
+              <button
+                aria-label={`Message ${item.user.name}`}
+                onClick={onMessage}
+                style={{
+                  width: 36, height: 36, borderRadius: 999, border: 'none',
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <MessageCircle size={16} strokeWidth={2} />
+              </button>
+            ) : !item.isClosed && contactLinks.length > 0 && (
               <button
                 aria-label={contactLinks[0].ariaLabel}
                 onClick={() => handleContactClick(contactLinks[0])}
@@ -2602,6 +2690,43 @@ function DesktopLayout({
               >
                 View seller&rsquo;s profile
               </button>
+            ) : canMessage ? (
+              <>
+                <button
+                  onClick={onMessage}
+                  aria-label={`${primaryActionLabel} — message ${item.user.name}`}
+                  style={{
+                    /* 150, not 220: with email, WhatsApp, save, share and
+                       report beside it, 220 pushed report onto a line of
+                       its own. */
+                    flex: '1 1 150px', minWidth: 0, height: 52, borderRadius: 14,
+                    background: 'var(--text-primary)', color: 'var(--bg-base)',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <MessageCircle size={17} strokeWidth={2} />
+                  {primaryActionLabel}
+                </button>
+                {contactLinks.map(link => (
+                  <button
+                    key={link.channel}
+                    onClick={() => handleContactClick(link)}
+                    aria-label={link.ariaLabel}
+                    title={link.ariaLabel}
+                    style={{
+                      width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+                      background: link.channel === 'whatsapp' ? WA_FILL : 'var(--bg-inset)',
+                      color: link.channel === 'whatsapp' ? WA_INK : 'var(--text-primary)',
+                      border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    {link.channel === 'whatsapp' ? <WhatsAppGlyph size={18} /> : <Mail size={18} strokeWidth={1.9} />}
+                  </button>
+                ))}
+              </>
             ) : (
               <>
                 {contactLinks.map(link => (

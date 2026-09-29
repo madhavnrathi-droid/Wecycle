@@ -1,11 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users,
-  Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus,
-  BarChart3, ClipboardList, Pencil,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users, Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, BarChart3, ClipboardList, Pencil, MessageCircle } from 'lucide-react';
+import { messagingAvailable } from '../lib/messaging/store';
 import type { CommunityEvent, MarketplaceItem, User } from '../lib/mockData';
 import { resolveEventPhotos, getAvatar } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
@@ -56,6 +53,9 @@ interface EventDetailScreenProps {
   onRsvp: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
+  /** Message the organiser on Wecycle. RSVP stays the primary action; this
+   *  sits with the other ways to reach them. */
+  onMessage?: (event: CommunityEvent) => void;
   onDelete?: () => void | Promise<void>;
   /** Owner-only: open the metrics/attendees/responses screen. */
   onOpenInsights?: () => void;
@@ -83,7 +83,7 @@ function WhatsAppGlyph({ size = 14 }: { size?: number }) {
 
 
 export default function EventDetailScreen({
-  event, isRsvpd, isOwner, isAdmin, onBack, onRsvp, onRequireAuth, onOpenStorefront, onDelete,
+  event, isRsvpd, isOwner, isAdmin, onBack, onRsvp, onRequireAuth, onOpenStorefront, onMessage, onDelete,
   onOpenItem, onBrowseAll,
   onOpenInsights, onEditRegistration,
 }: EventDetailScreenProps) {
@@ -437,6 +437,8 @@ export default function EventDetailScreen({
   /* Signed-out viewers can't resolve channels (get_contact is auth-only),
      so they get a sign-in prompt instead of no button at all. */
   const gate = contactGate(!!user, contactLinks);
+  const [dmAvailable] = useState(() => messagingAvailable());
+  const canMessage = !!onMessage && dmAvailable && !isOwner && !!event.organizer?.id;
 
   return (
     <div className="screen-transition" style={{ paddingBottom: 140, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -792,6 +794,21 @@ export default function EventDetailScreen({
             <Heart size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
           </button>
 
+          {canMessage && (
+            <button
+              onClick={() => { haptics.light(); onMessage?.(event); }}
+              aria-label={`Message ${event.organizer?.name ?? 'the organizer'}`}
+              style={{
+                width: 52, height: 52, borderRadius: 999,
+                background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <MessageCircle size={18} strokeWidth={1.9} />
+            </button>
+          )}
           {/* Message organizer — one button per accepted channel. */}
           {(
             hasBoth ? (

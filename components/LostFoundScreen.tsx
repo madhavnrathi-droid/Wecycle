@@ -11,11 +11,12 @@
  * Cards are clickable and open a lightweight detail sheet. Contact actions
  * gate behind auth via the shared onRequireAuth + onOpenStorefront props. */
 
+import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Menu, Search, Plus, MapPin, AlertCircle, CheckCircle,
-  Mail, X, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, Share2,
+import { Search, Plus, MapPin, AlertCircle, CheckCircle,
+  Mail, X, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, Share2, MessageCircle,
 } from 'lucide-react';
+import { messagingAvailable } from '../lib/messaging/store';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
@@ -43,6 +44,8 @@ interface LostFoundScreenProps {
   onReport: (defaultStatus?: 'lost' | 'found') => void;
   onOpenMenu: () => void;
   onOpenAccount: () => void;
+  /** The Messages button in the top bar. */
+  onOpenMessages: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
   /** When provided, tapping a card delegates open-detail to the parent
@@ -63,7 +66,7 @@ function WhatsAppGlyph({ size = 14 }: { size?: number }) {
 }
 
 export default function LostFoundScreen({
-  onReport, onOpenMenu, onOpenAccount, onRequireAuth, onOpenStorefront, onOpenLF,
+  onReport, onOpenMenu, onOpenAccount, onOpenMessages, onRequireAuth, onOpenStorefront, onOpenLF,
 }: LostFoundScreenProps) {
   const { user, profile } = useAuth();
   const [filter, setFilter] = useState<StatusFilter>('all');
@@ -110,55 +113,7 @@ export default function LostFoundScreen({
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
       {/* ── TOP BAR ── */}
-      <header
-        className="mobile-only-nav"
-        style={{
-          position: 'sticky', top: 0, zIndex: 30,
-          /* Opaque. --bg-overlay is 88% alpha, so the feed showed
-             through the header as it scrolled past. */
-          background: 'var(--bg-card)',
-          padding: '14px 16px 10px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            className="theme-toggle"
-            style={{ width: 38, height: 38 }}
-          >
-            <Menu size={18} strokeWidth={1.8} />
-          </button>
-          <h1 style={{
-            margin: 0, flex: 1, textAlign: 'center',
-            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-            letterSpacing: '-0.01em', color: 'var(--text-primary)',
-          }}>
-            Lost &amp; Found
-          </h1>
-          <button
-            onClick={onOpenAccount}
-            aria-label="Account"
-            className="theme-toggle"
-            style={{
-              width: 38, height: 38, borderRadius: '50%', overflow: 'hidden',
-              background: profile?.avatar_color ?? 'var(--bg-inset)',
-              padding: 0,
-            }}
-          >
-            {user ? (
-              <img
-                src={getAvatar(user.id)}
-                alt=""
-                width={38} height={38}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              <span style={{ fontSize: 'calc(14px * var(--text-scale))' }}>·</span>
-            )}
-          </button>
-        </div>
-      </header>
+      <TopBar onOpenMenu={onOpenMenu} onOpenAccount={onOpenAccount} onOpenMessages={onOpenMessages} title="Lost & Found" />
 
       {/* ── GREETING + ACTION ── */}
       <section className="feed-greeting-row" style={{ padding: '14px 20px 14px' }}>
@@ -400,6 +355,8 @@ export interface LostFoundDetailSheetProps {
   onClose: () => void;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
+  /** Message the reporter on Wecycle — the primary action when available. */
+  onMessage?: (item: LostItem) => void;
   viewerName?: string;
   /** Owner controls — when supplied the sheet renders inline-editable fields
    *  with Save changes / Save & repost / Delete CTAs at the bottom. */
@@ -418,10 +375,14 @@ export interface LFSavePatch {
 }
 
 export function LostFoundDetailSheet({
-  item, onClose, onRequireAuth, onOpenStorefront, viewerName,
+  item, onClose, onRequireAuth, onOpenStorefront, onMessage, viewerName,
   isOwner, onSaveChanges, onSaveAndRepost, onDelete,
 }: LostFoundDetailSheetProps) {
   const { user } = useAuth();
+  /* A found wallet is exactly the conversation that should not need anyone's
+     phone number — messaging is the primary action here when available. */
+  const [dmAvailable] = useState(() => messagingAvailable());
+  const canMessage = !!onMessage && dmAvailable && !isOwner && item.status !== 'claimed';
   const { isDesktop } = useBreakpoint();
   const isLost = item.status === 'lost';
   /* Owner (reporter) contact resolved on demand — raw columns are locked down. */
@@ -995,6 +956,22 @@ export function LostFoundDetailSheet({
             )
           ) : null}
         </div>
+        {!isOwner && canMessage && (
+          <button
+            onClick={() => onMessage?.(item)}
+            aria-label={`Message ${item.user.name} about ${item.title}`}
+            style={{
+              width: '100%', height: 48, borderRadius: 14,
+              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              border: 'none', cursor: 'pointer',
+              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <MessageCircle size={16} strokeWidth={2} />
+            Message {item.user.name.split(' ')[0]}
+          </button>
+        )}
         {!isOwner && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(() => {
@@ -1003,6 +980,8 @@ export function LostFoundDetailSheet({
               a.channel === 'email' ? -1 : b.channel === 'email' ? 1 : 0,
             );
             if (ordered.length === 0) {
+              /* With Message above, an empty channel list needs no apology. */
+              if (canMessage) return null;
               /* Signed out is NOT the same as "no channel". get_contact needs
                  auth, so an empty list here usually just means we haven't been
                  allowed to look yet — telling a visitor the reporter can't be
@@ -1054,8 +1033,8 @@ export function LostFoundDetailSheet({
                        at 4.69:1, so it still reads as the WhatsApp button —
                        reinforced by the glyph and the word next to it — while
                        the label is actually legible. */
-                    background: isWa ? WA_FILL : 'var(--text-primary)',
-                    color: isWa ? WA_INK : 'var(--bg-base)',
+                    background: isWa ? WA_FILL : canMessage ? 'var(--bg-inset)' : 'var(--text-primary)',
+                    color: isWa ? WA_INK : canMessage ? 'var(--text-primary)' : 'var(--bg-base)',
                     border: 'none', cursor: 'pointer',
                     fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                     letterSpacing: '-0.01em',

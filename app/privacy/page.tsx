@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const UPDATED = 'June 6, 2026';
+const UPDATED = 'September 29, 2026';
 const CONTACT = 'wecycle.page@gmail.com';
 
 export default function PrivacyPolicy() {
@@ -36,6 +36,7 @@ export default function PrivacyPolicy() {
         <ul style={ul}>
           <li style={li}><strong>Account &amp; profile:</strong> your Manipal email address and a password you choose (stored only as a salted hash — we never see it); a one-time code emailed to you confirms the address when you sign up and lets you reset a forgotten password. Plus your display name, and — only if you choose to add them — your college ID, phone number, course, department, graduating year, and residence type.</li>
           <li style={li}><strong>Content you post:</strong> item listings, requests, events, lost &amp; found reports, comments, and any photos or videos you upload.</li>
+          <li style={li}><strong>Direct messages:</strong> the text of messages you send to other members, who you sent them to, when, whether they have been read, and — when a conversation starts from a post — which post it is about.</li>
           <li style={li}><strong>Contact preferences:</strong> whether you allow others to reach you by email and/or WhatsApp about your posts.</li>
           <li style={li}><strong>Support messages:</strong> anything you send us via feedback or email.</li>
         </ul>
@@ -51,7 +52,8 @@ export default function PrivacyPolicy() {
         <ul style={ul}>
           <li style={li}>To operate the marketplace, requests, events, and lost &amp; found features.</li>
           <li style={li}>To authenticate you and keep your account secure.</li>
-          <li style={li}>To let other members contact you about your posts, using the channels you enabled.</li>
+          <li style={li}>To let other members contact you about your posts — by direct message on Wecycle, and by email or WhatsApp if you enabled those channels.</li>
+          <li style={li}>To keep direct messages safe: we check messages for a short list of slurs and explicit terms before they are delivered, and limit how quickly new messages and conversations can be sent, to stop spam.</li>
           <li style={li}>To understand usage and improve the product (analytics).</li>
           <li style={li}>To respond to your support requests and enforce our policies and safety rules.</li>
         </ul>
@@ -65,11 +67,21 @@ export default function PrivacyPolicy() {
           you have explicitly enabled that contact channel; you can disable phone
           sharing and WhatsApp contact in Settings at any time.
         </p>
+        <p style={p}>
+          <strong>Direct messages are private to the two people in the
+          conversation.</strong> No other member can read them, and Wecycle
+          does not show them to anyone else. Moderators review a message only
+          when it is reported: a copy of the reported message is attached to the
+          report so it can be judged. You
+          can turn off direct messages from new people in Settings → Privacy, and
+          you can block anyone — blocking stops messages in both directions.
+        </p>
 
         <h2 style={h2}>4. Service providers we share data with</h2>
         <p style={p}>We use trusted processors who handle data on our behalf:</p>
         <ul style={ul}>
-          <li style={li}><strong>Supabase</strong> — authentication, database, and file storage.</li>
+          <li style={li}><strong>Appwrite</strong> — authentication, database (including direct messages), and file storage.</li>
+          <li style={li}><strong>Supabase</strong> — our previous database provider, which keeps a copy of data created before September 2026 as a backup until it is retired.</li>
           <li style={li}><strong>Vercel</strong> — application hosting and delivery.</li>
           <li style={li}><strong>Google</strong> (Analytics 4, Tag Manager) — usage analytics.</li>
           <li style={li}><strong>Microsoft</strong> (Clarity) — usability analytics and session replay.</li>
@@ -86,14 +98,16 @@ export default function PrivacyPolicy() {
           account and associated data at any time from <strong>Settings →
           Delete account</strong> inside the app, or by following the steps at{' '}
           <a href="/delete-account" style={link}>wecycle&apos;s account-deletion page</a>.
-          Deletion removes your profile and the posts tied to your account;
+          Deletion removes your profile, the posts tied to your account, and
+          your conversations — both sides of every direct-message thread you
+          were part of;
           backups are purged within 30 days. See the deletion page for full detail.
         </p>
 
         <h2 style={h2}>6. Your rights &amp; choices</h2>
         <ul style={ul}>
           <li style={li}>Access, correct, or update your profile information in the app at any time.</li>
-          <li style={li}>Control who can contact you via the contact toggles in Settings.</li>
+          <li style={li}>Control who can contact you via the contact toggles in Settings, turn direct messages off, and block members.</li>
           <li style={li}>Delete your account and data (Section 5).</li>
           <li style={li}>Opt out of analytics cookies via your browser/OS settings; you can also use Google Analytics&apos; opt-out tools.</li>
         </ul>
@@ -101,7 +115,7 @@ export default function PrivacyPolicy() {
         <h2 style={h2}>7. Security</h2>
         <p style={p}>
           We use industry-standard measures — encrypted transport (HTTPS),
-          row-level security on our database, and scoped access keys — to protect
+          per-record access permissions on our database, and scoped access keys — to protect
           your data. No method of transmission or storage is perfectly secure, but
           we work to safeguard your information.
         </p>

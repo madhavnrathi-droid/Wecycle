@@ -1,13 +1,13 @@
 'use client';
 
+import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import PostStamp from './PostStamp';
 import { SOLD_VISIBLE_DAYS } from '../lib/feed/rank';
-import { Menu, Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
-import { Wordmark } from './Brand';
+import { Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
 import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem, closedLabelFor } from '../lib/mockData';
 import { opportunityCompLabel } from '../lib/opportunity';
-import { resolveItemMedia, getEventPhoto, getAvatar, resolveLostFoundPhoto } from '../lib/photos';
+import { resolveItemMedia, getEventPhoto, resolveLostFoundPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
 import { useAuth } from '../lib/AuthContext';
 import { getEventMetrics } from '../lib/metrics';
@@ -30,6 +30,8 @@ type Tab = 'all' | 'requests' | 'shared' | 'events' | 'saved';
 interface InventoryScreenProps {
   onOpenMenu: () => void;
   onOpenAccount: () => void;
+  /** The Messages button in the top bar. */
+  onOpenMessages: () => void;
   onPostNew: () => void;
   onOpenItem: (item: MarketplaceItem) => void;
   /** Opens an event detail screen — used when an event card in Uploads is tapped */
@@ -53,7 +55,7 @@ type UploadEntry =
   | { kind: 'event'; event: CommunityEvent }
   | { kind: 'lostfound'; lf: LostItem };
 
-export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, onOpenItem, onOpenEvent, onOpenEventInsights, onOpenLF }: InventoryScreenProps) {
+export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessages, onPostNew, onOpenItem, onOpenEvent, onOpenEventInsights, onOpenLF }: InventoryScreenProps) {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -168,48 +170,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onPostNew, 
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
       {/* ── TOP BAR ── */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 30,
-        /* Opaque. --bg-overlay is 88% alpha, so the feed showed
-           through the header as it scrolled past. */
-        background: 'var(--bg-card)',
-        padding: '14px 16px 10px',
-      }} className="mobile-only-nav">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            className="theme-toggle"
-            style={{ marginLeft: -8 }}
-          >
-            <Menu size={20} strokeWidth={1.8} />
-          </button>
-          <span style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <Wordmark height={30} />
-          </span>
-          <button
-            aria-label="Profile"
-            onClick={onOpenAccount}
-            style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'var(--bg-inset)',
-              border: 'none', cursor: 'pointer',
-              padding: 0, overflow: 'hidden',
-            }}
-            suppressHydrationWarning
-          >
-            {mounted && (
-              <img
-                src={getAvatar(user?.id ?? 'guest')}
-                alt=""
-                width={34}
-                height={34}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            )}
-          </button>
-        </div>
-      </header>
+      <TopBar onOpenMenu={onOpenMenu} onOpenAccount={onOpenAccount} onOpenMessages={onOpenMessages} />
 
       {/* ── PAGE TITLE ── */}
       <section style={{ padding: '14px 20px 18px' }}>

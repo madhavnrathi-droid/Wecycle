@@ -20,10 +20,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { availableFirst } from '../lib/feed/rank';
 import PostStamp from './PostStamp';
 import { matchesCategoryFilter } from '../lib/categories';
-import {
-  ChevronLeft, MapPin, Calendar, Users, IndianRupee,
-  Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal,
-} from 'lucide-react';
+import { ChevronLeft, MapPin, Calendar, Users, IndianRupee, Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal, MessageCircle } from 'lucide-react';
+import { messagingAvailable } from '../lib/messaging/store';
 import ReportSheet from './ReportSheet';
 import ShareCardModal from './ShareCardModal';
 import { Share2 } from 'lucide-react';
@@ -53,6 +51,8 @@ interface StorefrontScreenProps {
   onOpenItem: (item: MarketplaceItem) => void;
   onOpenEvent: (event: CommunityEvent) => void;
   onOpenLF?: (item: LostItem) => void;
+  /** Start a direct message with this member. */
+  onMessage?: (user: User) => void;
 }
 
 type Tab = 'shared' | 'requests' | 'events' | 'lostfound';
@@ -73,10 +73,12 @@ interface PublicProfile {
 }
 
 export default function StorefrontScreen({
-  user, onBack, onOpenItem, onOpenEvent, onOpenLF,
+  user, onBack, onOpenItem, onOpenEvent, onOpenLF, onMessage,
 }: StorefrontScreenProps) {
   const { user: viewer } = useAuth();
   const isMe = !!viewer && viewer.id === user.id;
+  const [dmAvailable] = useState(() => messagingAvailable());
+  const canMessage = !!onMessage && dmAvailable && !isMe;
   const [storeCardOpen, setStoreCardOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -358,6 +360,24 @@ export default function StorefrontScreen({
           <StatTile value={receivedDisplay} label="Received" />
           <StatTile value={impactDisplay}   label="Impact"  />
         </div>
+
+        {/* Where Instagram puts it: under the profile, one tap to a chat. */}
+        {canMessage && (
+          <button
+            onClick={() => { haptics.light(); onMessage?.(user); }}
+            aria-label={`Message ${user.name}`}
+            style={{
+              marginTop: 14, width: '100%', height: 46, borderRadius: 999,
+              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              border: 'none', cursor: 'pointer',
+              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <MessageCircle size={16} strokeWidth={2} />
+            Message {user.name.split(' ')[0]}
+          </button>
+        )}
       </section>
 
       {/* ── PUBLIC INFO ──

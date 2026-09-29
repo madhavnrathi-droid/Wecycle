@@ -44,85 +44,20 @@
 import { NextResponse } from 'next/server';
 import { createHash, randomInt } from 'node:crypto';
 import { emailGateProblem } from '../../../../lib/emailDomain';
+import {
+  DB, aw, q, json, cors, callerId, serverConfigured, type Args, type Row,
+} from '../../_lib/appwrite';
+import { sendMessage, markConversationRead, canMessage } from '../../_lib/messaging';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? '';
-const PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT ?? '';
-const API_KEY = process.env.APPWRITE_API_KEY ?? '';
-const DB = process.env.NEXT_PUBLIC_APPWRITE_DB ?? 'wecycle';
-
-/* ── CORS ──────────────────────────────────────────────────────────────────
- *
- * The native builds are a static export served from the WebView's own origin —
- * https://localhost on Android, capacitor://localhost on iOS — so every call
- * to this route from a phone is cross-origin. Without these headers the
- * browser blocks the response and every save, like, RSVP and view count fails
- * on mobile while working perfectly on the website.
- *
- * Allow-Origin is * rather than a list because the native origins are
- * localhost, which is also every developer's machine, so a list buys nothing.
- * It is safe here because this route authorises on the Appwrite JWT in the
- * header and never on a cookie: a hostile page can make a browser send the
- * request, but cannot obtain a JWT for the user to put in it. Credentials are
- * deliberately not allowed, which is what keeps that true.
- *
- * X-Appwrite-JWT is not a CORS-simple header, so the preflight below is
- * required, not optional. */
-const cors: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Appwrite-JWT',
-  'Access-Control-Max-Age': '86400',
-};
-
+/* CORS, the JWT check and the server-key helper live in app/api/_lib/appwrite.ts
+   so a new route gets all three by importing them. The preflight below is not
+   optional: X-Appwrite-JWT is not a CORS-simple header, so every call from the
+   native apps is preflighted. */
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: cors });
-}
-
-const json = (body: unknown, status = 200) =>
-  NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store', ...cors } });
-
-type Args = Record<string, unknown>;
-type Row = Record<string, unknown>;
-
-/** A privileged call. Only ever made after the caller has been identified. */
-async function aw(method: string, path: string, body?: unknown) {
-  try {
-    const res = await fetch(ENDPOINT + path, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Appwrite-Project': PROJECT,
-        'X-Appwrite-Key': API_KEY,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      cache: 'no-store',
-    });
-    return { ok: res.ok, status: res.status, json: (await res.json().catch(() => null)) as Row | null };
-  } catch {
-    return { ok: false, status: 0, json: null };
-  }
-}
-
-const q = (...items: unknown[]): string =>
-  '?' + items.map(i => `queries[]=${encodeURIComponent(JSON.stringify(i))}`).join('&');
-
-/** Who is calling, according to Appwrite — not according to the request body. */
-async function callerId(jwt: string | null): Promise<string | null> {
-  if (!jwt) return null;
-  try {
-    const res = await fetch(`${ENDPOINT}/account`, {
-      headers: { 'X-Appwrite-Project': PROJECT, 'X-Appwrite-JWT': jwt },
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const u = (await res.json()) as { $id?: string };
-    return u?.$id ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /* Postgres filled these with DEFAULT now(). This route creates rows without
@@ -280,7 +215,7 @@ async function ensureProfile(uid: string, args: Args) {
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> }) {
-  if (!ENDPOINT || !PROJECT || !API_KEY) {
+  if (!serverConfigured()) {
     return json({ message: 'Server is not configured for Appwrite' }, 503);
   }
 
@@ -366,6 +301,39 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
             if (rows.length < 100) break;
           }
         }
+        /* Conversations go whole — both sides of every thread. Settings has
+           always promised that deleting an account removes its messages, and
+           a thread with one member's half cut out is not a record of
+           anything; it is a stranger's replies to nobody. */
+        for (const col of ['user_a', 'user_b']) {
+          for (;;) {
+            const page = await aw('GET', `/tablesdb/${DB}/tables/conversations/rows`
+              + q({ method: 'equal', attribute: col, values: [uid] }, { method: 'limit', values: [100] }));
+            const convs = (page.json?.rows as Array<{ $id: string }> | undefined) ?? [];
+            if (!convs.length) break;
+            for (const c of convs) {
+              for (;;) {
+                const msgs = await aw('GET', `/tablesdb/${DB}/tables/messages/rows`
+                  + q({ method: 'equal', attribute: 'conversation_id', values: [c.$id] }, { method: 'limit', values: [100] }));
+                const rows = (msgs.json?.rows as Array<{ $id: string }> | undefined) ?? [];
+                if (!rows.length) break;
+                for (const m of rows) await aw('DELETE', `/tablesdb/${DB}/tables/messages/rows/${m.$id}`);
+                if (rows.length < 100) break;
+              }
+              await aw('DELETE', `/tablesdb/${DB}/tables/conversations/rows/${c.$id}`);
+            }
+            if (convs.length < 100) break;
+          }
+        }
+        /* Anything left that they sent, in rows outside a conversation. */
+        for (;;) {
+          const page = await aw('GET', `/tablesdb/${DB}/tables/messages/rows`
+            + q({ method: 'equal', attribute: 'sender_id', values: [uid] }, { method: 'limit', values: [100] }));
+          const rows = (page.json?.rows as Array<{ $id: string }> | undefined) ?? [];
+          if (!rows.length) break;
+          for (const r of rows) await aw('DELETE', `/tablesdb/${DB}/tables/messages/rows/${r.$id}`);
+          if (rows.length < 100) break;
+        }
         await aw('DELETE', `/tablesdb/${DB}/tables/profile_contacts/rows/${uid}`);
         await aw('DELETE', `/tablesdb/${DB}/tables/profiles/rows/${uid}`);
         /* The account last: while it exists the member can still sign in and
@@ -406,6 +374,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
 
       case 'ensure_profile':
         return await ensureProfile(uid, args);
+
+      /* Direct messages. Sending is server-side for the same reason as the
+         toggles: a message must be readable by exactly two people, and a
+         browser can only grant permissions to itself. See _lib/messaging.ts. */
+      case 'dm_send':
+        return await sendMessage(uid, args);
+
+      case 'dm_mark_read':
+        return await markConversationRead(uid, args);
+
+      case 'dm_can_message':
+        return await canMessage(uid, args);
 
       default:
         return json({ message: `Unknown function ${fn}`, code: '42883' }, 404);

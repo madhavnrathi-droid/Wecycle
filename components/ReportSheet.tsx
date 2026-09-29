@@ -17,6 +17,11 @@ interface ReportSheetProps {
   targetUserId?: string;
   targetLabel?: string;
   onReported?: () => void;
+  /** The reported text itself, stored with the report. Needed for direct
+   *  messages: a message is readable by its two members only, so without a
+   *  copy in the report a moderator would be judging something they cannot
+   *  see. */
+  evidence?: string;
 }
 
 export default function ReportSheet({
@@ -27,6 +32,7 @@ export default function ReportSheet({
   targetUserId,
   targetLabel,
   onReported,
+  evidence,
 }: ReportSheetProps) {
   const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
@@ -122,7 +128,10 @@ export default function ReportSheet({
       targetId,
       targetUserId,
       reason: selectedReason,
-      details: details.trim() || undefined,
+      details: [
+        evidence ? `Reported message: “${evidence.slice(0, 600)}”` : null,
+        details.trim() || null,
+      ].filter(Boolean).join('\n\n') || undefined,
     });
     setLoading(false);
     if (ok) {
@@ -149,7 +158,7 @@ export default function ReportSheet({
     } else {
       setActionError('That report didn’t go through. Check your connection and try again.');
     }
-  }, [selectedReason, loading, user, isDemo, targetType, targetId, targetUserId, details, onReported, onClose]);
+  }, [selectedReason, loading, user, isDemo, targetType, targetId, targetUserId, details, evidence, onReported, onClose]);
 
   const handleBlock = useCallback(async () => {
     if (!targetUserId) return;

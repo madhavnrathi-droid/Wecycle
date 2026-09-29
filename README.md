@@ -20,6 +20,7 @@
 | **Lost & Found** | Report lost or found items, claim and return flows |
 | **Inventory** | Community-owned items members can borrow |
 | **Storefronts** | Every member has a public storefront collecting their listings |
+| **Direct messages** | Private one-to-one chat, started from any post or profile — realtime, read receipts, block and report. Text only for now. See [HANDOFF.md](HANDOFF.md#direct-messages) |
 | **Alerts** | "Tell me when someone posts X" — matched server-side, delivered in-app and via a push queue |
 | **Impact** | Per-user and per-community impact scores, CO₂ and money saved, leaderboards |
 
