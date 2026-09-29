@@ -31,6 +31,7 @@
 
 import { ID, AppwriteException } from 'appwrite';
 import { account } from './client';
+import { rpc } from './rpc';
 
 export interface AuthUser { id: string; email: string | null; }
 export interface AuthSession { user: AuthUser; }
@@ -107,9 +108,29 @@ export const authAdapter = {
     { email, password, options }: { email: string; password: string; options?: { data?: Record<string, unknown> } },
   ): Promise<AuthResult<{ user: AuthUser | null; session: AuthSession | null }>> {
     try {
-      const name = (options?.data?.full_name as string | undefined) ?? undefined;
+      const meta = options?.data ?? {};
+      const name = (meta.full_name as string | undefined) ?? undefined;
       await account().create({ userId: ID.unique(), email, password, name });
       await account().createEmailPasswordSession({ email, password });
+
+      /* The profile, BEFORE anyone is told the member exists. Postgres made it
+         with a trigger; Appwrite has none, and from the cutover until this was
+         added every new member got an account and no profile.
+
+         The ordering matters. AuthContext loads the profile the moment it hears
+         SIGNED_IN, and heals a missing one by creating it — but it does not have
+         the sign-up form's college and phone. Emitting first would let that
+         race win and the form's answers be dropped. Creating it here first means
+         the self-heal only ever finds a profile that already exists.
+
+         A failure is not fatal: the account and session are real, and the
+         self-heal in AuthContext will try again on load. */
+      try {
+        await rpc('ensure_profile', {
+          full_name: meta.full_name, college: meta.college, phone: meta.phone,
+        });
+      } catch { /* AuthContext heals it */ }
+
       const user = await currentUser();
       const session = user ? { user } : null;
       emit('SIGNED_IN', session);

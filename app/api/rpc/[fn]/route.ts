@@ -42,6 +42,8 @@
  */
 
 import { NextResponse } from 'next/server';
+import { createHash, randomInt } from 'node:crypto';
+import { emailGateProblem } from '../../../../lib/emailDomain';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -165,6 +167,116 @@ async function toggle(
       { value: 1 });
   }
   return true;
+}
+
+
+/* ── A new member's profile ────────────────────────────────────────────────
+ *
+ * Postgres had a trigger, auth.tr_users_make_profile, that created a profile the
+ * moment an account existed. Appwrite has no triggers, and nothing replaced it:
+ * from the cutover on 23 September every new member got an account and no
+ * profile. Three real people signed up into that gap.
+ *
+ * This is the replacement, and it is the same trigger's logic: username from
+ * the email's local part, the default community, the default notification
+ * preferences, and a membership row. It runs here rather than in the browser
+ * for two reasons — a profile must exist even if someone signs up without going
+ * through the app's form, and the Manipal rule the old trigger ALSO enforced has
+ * to be checked somewhere a client cannot skip.
+ */
+const DEFAULT_COMMUNITY = 'a4640775-4946-49b2-a5d8-2f35e57e0b1a'; // wecycle-global
+const DEFAULT_NOTIFICATION_PREFS = JSON.stringify({
+  channels: { inApp: true, sound: true, email: true, sms: false },
+  categories: {
+    messages: true, matches: true, events: true, marketplace: true,
+    lostFound: true, community: true, digest: true,
+  },
+  emailFrequency: 'realtime',
+  quietHours: { enabled: false, from: '22:00', to: '07:00' },
+});
+const COLLEGES = new Set(['SMI', 'MIT', 'TAPMI', 'MLHS', 'MIRM', 'MLS', 'DOC']);
+
+const initialsOf = (name: string): string =>
+  name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '?';
+
+/** The email's local part, as the old trigger derived it, kept to characters a
+ *  handle can hold. */
+const usernameBase = (email: string, uid: string): string => {
+  const local = (email.split('@')[0] ?? '').toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 30);
+  return local || `user_${uid.slice(0, 8)}`;
+};
+
+async function ensureProfile(uid: string, args: Args) {
+  const me = await aw('GET', `/users/${uid}`);
+  if (!me.ok || !me.json) return json({ message: 'Account not found' }, 404);
+  const email = String(me.json.email ?? '');
+  const accountName = String(me.json.name ?? '');
+
+  /* 'signin' semantics, deliberately, not 'signup': this decides who may HAVE a
+     profile, and grandfathered members and provisioned partners may, even
+     though neither may create a new account through the public form. */
+  const problem = emailGateProblem(email, 'signin');
+  if (problem) return json({ message: problem, code: 'email_not_allowed' }, 403);
+
+  const existing = await aw('GET', `/tablesdb/${DB}/tables/profiles/rows/${uid}`);
+  if (existing.ok) return json({ data: existing.json });
+
+  const fullName = String(args.full_name ?? accountName ?? '').trim();
+  const college = typeof args.college === 'string' && COLLEGES.has(args.college) ? args.college : undefined;
+  const now = new Date().toISOString();
+  const perms = [`read("any")`, `update("user:${uid}")`, `delete("user:${uid}")`];
+
+  /* usernames are unique; a collision gets a short numeric suffix. Tried a few
+     times rather than once, because two people called Aryan at one college is
+     the ordinary case, not the edge case. */
+  const base = usernameBase(email, uid);
+  let created: Row | null = null;
+  let lastError = '';
+  for (let attempt = 0; attempt < 6 && !created; attempt++) {
+    const username = attempt === 0 ? base : `${base.slice(0, 26)}${randomInt(100, 9999)}`;
+    const r = await aw('POST', `/tablesdb/${DB}/tables/profiles/rows`, {
+      rowId: uid,
+      data: {
+        username,
+        full_name: fullName || null,
+        initials: initialsOf(fullName || username),
+        avatar_color: '#6C63FF',
+        community_id: DEFAULT_COMMUNITY,
+        ...(college ? { college } : {}),
+        notification_prefs: DEFAULT_NOTIFICATION_PREFS,
+        joined_at: now,
+        updated_at: now,
+      },
+      permissions: perms,
+    });
+    if (r.ok) { created = r.json; break; }
+    lastError = String(r.json?.message ?? r.status);
+    /* A 409 on the ROW id means a concurrent call already made it — fine. */
+    if (r.status === 409 && !/username/i.test(lastError)) {
+      const again = await aw('GET', `/tablesdb/${DB}/tables/profiles/rows/${uid}`);
+      if (again.ok) return json({ data: again.json });
+    }
+  }
+  if (!created) return json({ message: `Could not create profile: ${lastError}` }, 500);
+
+  /* Contact details live apart from the public profile — see split-contacts.mjs.
+     The profile row is readable by anyone; this one by nobody but the server. */
+  const phone = typeof args.phone === 'string' && args.phone.trim() ? args.phone.trim() : null;
+  await aw('POST', `/tablesdb/${DB}/tables/profile_contacts/rows`, {
+    rowId: uid, data: { email, phone }, permissions: [],
+  });
+
+  /* The membership the old tr_profiles_biz trigger added whenever a profile had
+     a community. Hashed id, same convention as the migration, so a retry is a
+     no-op instead of a duplicate. */
+  const memberId = createHash('md5').update(`${DEFAULT_COMMUNITY}|${uid}`).digest('hex').slice(0, 32);
+  await aw('POST', `/tablesdb/${DB}/tables/community_members/rows`, {
+    rowId: memberId,
+    data: { community_id: DEFAULT_COMMUNITY, user_id: uid, role: 'member', joined_at: now },
+    permissions: perms,
+  });
+
+  return json({ data: created }, 201);
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> }) {
@@ -291,6 +403,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
         if (!r.ok) return json({ message: r.json?.message ?? 'Could not update', code: String(r.status) }, 500);
         return json({ data: until });
       }
+
+      case 'ensure_profile':
+        return await ensureProfile(uid, args);
 
       default:
         return json({ message: `Unknown function ${fn}`, code: '42883' }, 404);

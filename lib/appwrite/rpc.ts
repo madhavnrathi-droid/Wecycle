@@ -172,6 +172,7 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
     case 'get_contact':
     case 'delete_my_account':
     case 'admin_set_suspension':
+    case 'ensure_profile':
       return await serverRpc<T>(fn, args);
 
     /* This one already had a server endpoint before the migration — written

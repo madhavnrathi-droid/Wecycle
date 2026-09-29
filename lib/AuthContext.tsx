@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { supabase, rpcUntyped } from './supabase';
 import { fetchContact } from './liveData';
 import type { Profile } from './api/types';
 import { getDemoSession, clearDemoSession, onDemoSessionChange, type DemoSession, initialsOf } from './demoAuth';
@@ -23,13 +23,7 @@ import { clearBlockCache } from './moderation';
 
    Server-side the roster is one function; it used to be three copies of the
    same literal list. */
-export const ADMIN_EMAILS: ReadonlyArray<string> = [
-  'wecycle.page@gmail.com',
-  'madhav.n.rathi@gmail.com',
-  'madhav.smiblr2024@learner.manipal.edu',   /* Madhav Rathi */
-  'vidhi.smiblr2025@learner.manipal.edu',    /* Vidhi Nirzar Shah */
-  'kshama.smiblr2024@learner.manipal.edu',   /* kshama */
-] as const;
+import { ADMIN_EMAILS } from './adminEmails';
 /** Back-compat: callers that only need a single canonical address. */
 export const ADMIN_EMAIL = ADMIN_EMAILS[0];
 export function isAdminEmail(email?: string | null): boolean {
@@ -168,6 +162,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (loadGenRef.current !== myGen) return;   /* superseded while awaiting */
 
     if (!data) {
+      /* NO ROW is not the same as a slow load. The retries below were written
+         for Postgres, where a trigger created the profile a moment after the
+         account and the first read could simply beat it. Since the Appwrite
+         cutover nothing creates it at all, so retrying only waits for a row that
+         will never come — which is exactly how three members who joined after
+         23 September ended up with accounts and no profile.
+         So a missing row is created, once, and then read again. */
+      const noRow = (error as { code?: string } | null)?.code === 'PGRST116';
+      if (noRow && attempt === 0) {
+        const made = await rpcUntyped('ensure_profile', {});
+        if (loadGenRef.current !== myGen) return;
+        if (!made.error) { void loadRealProfile(uid, attempt + 1, myGen); return; }
+        // eslint-disable-next-line no-console
+        console.error('[wecycle] could not create the missing profile for', uid, made.error);
+      }
       if (attempt + 1 < PROFILE_LOAD_ATTEMPTS) {
         const delay = 250 * 2 ** attempt;      /* 250ms → 2s, ~3.75s total */
         setTimeout(() => {

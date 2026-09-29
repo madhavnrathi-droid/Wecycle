@@ -22,7 +22,7 @@
  * to all three.
  */
 
-import { ADMIN_EMAILS } from './AuthContext';
+import { ADMIN_EMAILS } from './adminEmails';
 
 /** Shown wherever we need to say what's required. */
 export const MANIPAL_DOMAIN_HINT = 'Manipal email only (e.g. …@learner.manipal.edu)';
