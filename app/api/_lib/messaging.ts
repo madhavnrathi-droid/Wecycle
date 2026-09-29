@@ -159,7 +159,12 @@ export async function canMessage(uid: string, args: Args) {
   return json({ data: { ok: false, code: p.code, message: p.message } });
 }
 
-/* ── dm_send { to | conversation_id, body, message_id, context? } ────────── */
+/* ── dm_send { to | conversation_id, body, message_id, context? } ──────────
+ *
+ * Every check that does not depend on another runs at once. Sending used to
+ * make nine database calls one after the other; from a function on another
+ * continent that was five seconds of "Sending…". Now it is the caller check,
+ * one parallel wave, then the writes. */
 export async function sendMessage(uid: string, args: Args) {
   const body = normalizeBody(String(args.body ?? ''));
   if (!body) return json({ message: 'Write a message first.', code: 'invalid' }, 400);
@@ -175,38 +180,50 @@ export async function sendMessage(uid: string, args: Args) {
   /* Who it is for. A conversation id is checked against its members; a bare
      `to` is a person. Either way, from here on the pair is what matters. */
   let peerId = String(args.to ?? '');
-  if (args.conversation_id) {
-    const conv = await getRow('conversations', String(args.conversation_id));
-    const a = String(conv?.user_a ?? ''), b = String(conv?.user_b ?? '');
-    if (!conv || !isGenuine(conv.$permissions, a, b) || (uid !== a && uid !== b)) {
+  if (!peerId && args.conversation_id) {
+    const c = await getRow('conversations', String(args.conversation_id));
+    const ca = String(c?.user_a ?? ''), cb = String(c?.user_b ?? '');
+    if (!c || !isGenuine(c.$permissions, ca, cb) || (uid !== ca && uid !== cb)) {
       return json({ message: 'Conversation not found', code: 'not_found' }, 404);
     }
-    peerId = uid === a ? b : a;
+    peerId = uid === ca ? cb : ca;
   }
-
-  const allowed = await policy(uid, peerId);
-  if (!allowed.ok) return json({ message: allowed.message, code: allowed.code }, allowed.status);
-
-  const ctx = await resolveContext(args.context, uid, peerId);
-  if (ctx === 'invalid') return json({ message: 'That post isn’t available.', code: 'bad_context' }, 400);
+  if (args.conversation_id && String(args.conversation_id) !== conversationIdFor(uid, peerId || '-')) {
+    return json({ message: 'Conversation not found', code: 'not_found' }, 404);
+  }
 
   const convId = conversationIdFor(uid, peerId);
   const [a, b] = orderedPair(uid, peerId);
   const perms = [readPerm(a), readPerm(b)];
   const now = new Date().toISOString();
+  const minuteAgo = new Date(Date.now() - 60_000).toISOString();
+  const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+
+  const [allowed, ctx, already, sentLastMinute, existingConv, chatsLastHour] = await Promise.all([
+    policy(uid, peerId),
+    resolveContext(args.context, uid, peerId),
+    getRow('messages', messageId),
+    countSince('messages', minuteAgo, { method: 'equal', attribute: 'sender_id', values: [uid] }),
+    getRow('conversations', convId),
+    Promise.all([
+      countSince('conversations', hourAgo, { method: 'equal', attribute: 'user_a', values: [uid] }),
+      countSince('conversations', hourAgo, { method: 'equal', attribute: 'user_b', values: [uid] }),
+    ]).then(([x, y]) => x + y),
+  ]);
 
   /* An idempotent retry: the client chose the id, so a resend after a dropped
-     response finds the message it already wrote rather than writing it twice. */
-  const already = await getRow('messages', messageId);
+     response finds the message it already wrote rather than writing it twice
+     — and is not refused by a limit the first attempt already counted in. */
   if (already) {
     if (already.sender_id === uid && already.conversation_id === convId && isGenuine(already.$permissions, a, b)) {
-      return json({ data: { conversation: await getRow('conversations', convId), message: already } });
+      return json({ data: { conversation: existingConv, message: already } });
     }
     return json({ message: 'Invalid message id', code: 'invalid' }, 409);
   }
 
-  const minuteAgo = new Date(Date.now() - 60_000).toISOString();
-  if (await countSince('messages', minuteAgo, { method: 'equal', attribute: 'sender_id', values: [uid] }) >= RATE_PER_MINUTE) {
+  if (!allowed.ok) return json({ message: allowed.message, code: allowed.code }, allowed.status);
+  if (ctx === 'invalid') return json({ message: 'That post isn’t available.', code: 'bad_context' }, 400);
+  if (sentLastMinute >= RATE_PER_MINUTE) {
     return json({ message: 'You’re sending messages very fast. Wait a moment and try again.', code: 'rate_limited' }, 429);
   }
 
@@ -218,15 +235,10 @@ export async function sendMessage(uid: string, args: Args) {
   };
 
   /* Get or create the conversation. */
-  let conv = await getRow('conversations', convId);
+  let conv = existingConv;
   let created = false;
   if (!conv) {
-    const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
-    const [asA, asB] = await Promise.all([
-      countSince('conversations', hourAgo, { method: 'equal', attribute: 'user_a', values: [uid] }),
-      countSince('conversations', hourAgo, { method: 'equal', attribute: 'user_b', values: [uid] }),
-    ]);
-    if (asA + asB >= NEW_CHATS_PER_HOUR) {
+    if (chatsLastHour >= NEW_CHATS_PER_HOUR) {
       return json({ message: 'You’ve started a lot of new chats in the last hour. Try again a little later.', code: 'rate_limited' }, 429);
     }
     const r = await aw('POST', T('conversations'), {
