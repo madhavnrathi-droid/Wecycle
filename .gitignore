@@ -34,6 +34,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# The TEMPLATE is the one .env file that must be tracked. .env* used to swallow
+# it, so the README's "cp .env.local.example .env.local" has never worked for
+# anyone who cloned the repo. It holds only public values and placeholders.
+!.env.local.example
 
 # vercel
 .vercel

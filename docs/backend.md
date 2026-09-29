@@ -1,3 +1,8 @@
+> **Historical.** This describes the **Supabase** backend Wecycle ran on until
+> 23 September 2026. Production now runs on **Appwrite** — see
+> [HANDOFF.md](../HANDOFF.md). The Supabase project still exists as the rollback
+> path, so this remains accurate for it; it is just no longer what users hit.
+
 # Wecycle Backend — Supabase
 
 Complete reference for the Supabase backend powering Wecycle.
