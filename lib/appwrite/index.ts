@@ -9,6 +9,7 @@
  * Two things here are not simple pass-throughs and are worth knowing about.
  */
 
+import { getActiveRoom } from '../rooms';
 import { appwriteClient, APPWRITE_DB, tables, toRows, type AnyRow } from './client';
 import { AppwriteQuery } from './queryBuilder';
 import { authAdapter } from './authAdapter';
@@ -50,7 +51,10 @@ class LeaderboardQuery implements PromiseLike<{ data: AnyRow[] | null; error: { 
   private async run() {
     try {
       const q = [Query.orderDesc('impact_score'), Query.limit(Math.max(this._limit, 100))];
-      if (this.communityId) q.unshift(Query.equal('community_id', [this.communityId]));
+      /* Ranked within a room — a leaderboard mixing campuses would rank people
+         against strangers they can never see, and list NMIMS members to
+         Manipal ones. */
+      q.unshift(Query.equal('community_id', [this.communityId ?? getActiveRoom().id]));
       const res = await tables().listRows({ databaseId: APPWRITE_DB, tableId: 'profiles', queries: q });
       const rows = toRows<AnyRow>(res.rows as AnyRow[]).map((r, i) => ({
         ...r,

@@ -11,6 +11,7 @@
  * Cards are clickable and open a lightweight detail sheet. Contact actions
  * gate behind auth via the shared onRequireAuth + onOpenStorefront props. */
 
+import { getActiveRoom, isPrivateRoom } from '../lib/rooms';
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, MapPin, AlertCircle, CheckCircle,
@@ -89,7 +90,7 @@ export default function LostFoundScreen({
   }, [mounted]);
 
   const allItems: LostItem[] = useMemo(
-    () => (mounted && isDemoMode() ? LOST_FOUND_ITEMS : liveItems),
+    () => (mounted && isDemoMode() ? (isPrivateRoom(getActiveRoom()) ? [] : LOST_FOUND_ITEMS) : liveItems),
     [mounted, liveItems],
   );
 

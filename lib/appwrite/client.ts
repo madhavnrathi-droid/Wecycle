@@ -31,6 +31,7 @@
 import { Client, Account, TablesDB, Storage, Functions } from 'appwrite';
 import { SERVER_FILLED_TIMESTAMPS } from './generatedDefaults';
 import { OWNER_COLUMN, PRIVATE_TO_OWNER } from './generatedOwnership';
+import { roomReadRole } from '../rooms';
 
 export const APPWRITE_ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? '';
 export const APPWRITE_PROJECT = process.env.NEXT_PUBLIC_APPWRITE_PROJECT ?? '';
@@ -148,6 +149,9 @@ export function fillServerDefaults(tableId: string, data: AnyRow): AnyRow {
  * Returns undefined when the table has no owner (categories, communities) so
  * the caller can omit the field rather than send an empty array, which Appwrite
  * reads as "no permissions at all".
+ *
+ * "Public" means public TO THE ROOM. A member of a private room (NMIMS) writes
+ * rows readable by that room's label, not by everyone — see lib/rooms.ts.
  */
 export function ownerPermissions(tableId: string, data: AnyRow, rowId?: string): string[] | undefined {
   const col = OWNER_COLUMN[tableId];
@@ -157,5 +161,5 @@ export function ownerPermissions(tableId: string, data: AnyRow, rowId?: string):
   if (typeof owner !== 'string' || !owner) return undefined;
   return PRIVATE_TO_OWNER.has(tableId)
     ? [`read("user:${owner}")`, `update("user:${owner}")`, `delete("user:${owner}")`]
-    : [`read("any")`, `update("user:${owner}")`, `delete("user:${owner}")`];
+    : [`read("${roomReadRole()}")`, `update("user:${owner}")`, `delete("user:${owner}")`];
 }

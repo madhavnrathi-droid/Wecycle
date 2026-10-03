@@ -24,6 +24,17 @@ import { clearBlockCache } from './moderation';
    Server-side the roster is one function; it used to be three copies of the
    same literal list. */
 import { ADMIN_EMAILS } from './adminEmails';
+import {
+  getActiveRoom, setActiveRoom, onRoomChange, roomById, MAHE_ROOM, type Room,
+} from './rooms';
+import { notifyPostsChanged } from './liveData';
+
+/* An admin looking at another room keeps looking at it across reloads in the
+   same tab; a new tab starts at home. Members never set it — they have one room. */
+const ROOM_VIEW_KEY = 'wecycle.room.view';
+const readRoomView = (): string | null => {
+  try { return sessionStorage.getItem(ROOM_VIEW_KEY); } catch { return null; }
+};
 /** Back-compat: callers that only need a single canonical address. */
 export const ADMIN_EMAIL = ADMIN_EMAILS[0];
 export function isAdminEmail(email?: string | null): boolean {
@@ -42,6 +53,13 @@ interface AuthContextValue {
   isDemo: boolean;
   /** True when the signed-in user is the wecycle admin account. */
   isAdmin: boolean;
+  /** The room on screen — the member's own campus (lib/rooms.ts). */
+  room: Room;
+  /** Rooms this account may switch between. One for members; every room for
+   *  admins, who moderate all of them. */
+  rooms: Room[];
+  /** Admins only: look at another room. A no-op for anyone else. */
+  switchRoom: (id: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -53,6 +71,9 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
   isDemo: false,
   isAdmin: false,
+  room: MAHE_ROOM,
+  rooms: [],
+  switchRoom: () => {},
 });
 
 /* Synthesize a `User`-shaped object from a demo session. */
@@ -132,6 +153,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadGenRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
+
+  /* ── Rooms ── */
+  const [room, setRoom] = useState<Room>(() => getActiveRoom());
+  const [rooms, setRooms] = useState<Room[]>([]);
+  /* Every screen that lists posts refetches on notifyPostsChanged, so a room
+     change is a posts change. */
+  useEffect(() => onRoomChange(r => { setRoom(r); notifyPostsChanged(); }), []);
+
+  /* The member's home room, then — once the server has confirmed what this
+     account may see and set the labels that let it — any room an admin was
+     looking at in this tab. */
+  const adoptRooms = async (homeId: string | null | undefined) => {
+    setActiveRoom(roomById(homeId).id);
+    const { data } = await rpcUntyped<{ home: string | null; rooms: string[] }>('sync_rooms', {});
+    const allowed = (data?.rooms ?? []).map(roomById);
+    setRooms(allowed);
+    const view = readRoomView();
+    if (view && allowed.length > 1 && allowed.some(r => r.id === view)) setActiveRoom(view);
+  };
+
+  const switchRoom = (id: string) => {
+    if (!rooms.some(r => r.id === id)) return;
+    try { sessionStorage.setItem(ROOM_VIEW_KEY, id); } catch { /* best effort */ }
+    setActiveRoom(id);
+  };
   const loadRealProfile = async (uid: string, attempt = 0, gen?: number) => {
     /* Generation guard: a sign-out, or a different user signing in, bumps the
        counter so any retry still in flight abandons instead of writing a stale
@@ -198,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: contact.email ?? null,
       phone: contact.phone ?? null,
     } as unknown as Profile);
+    void adoptRooms((data as { community_id?: string | null }).community_id);
   };
 
   const refreshProfile = async () => {
@@ -214,6 +261,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const reset = () => {
     loadGenRef.current++;   /* abandon any profile retry still pending */
+    /* Signed out is the public room — a private room is for its members. */
+    setRooms([]);
+    try { sessionStorage.removeItem(ROOM_VIEW_KEY); } catch { /* best effort */ }
+    setActiveRoom(MAHE_ROOM.id);
     setIsDemo(false);
     setUser(null);
     setProfile(null);
@@ -252,6 +303,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         /* Safe to call directly: this is the getSession() promise, not the
            onAuthStateChange callback, so no auth lock is held. */
         if (data.session?.user) void loadRealProfile(data.session.user.id);
+        /* Nobody signed in: the public room, whatever this device last showed. */
+        else setActiveRoom(MAHE_ROOM.id);
         setLoading(false);
       });
     }
@@ -279,6 +332,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => { void loadRealProfile(uid); }, 0);
       } else {
         setProfile(null);
+        setRooms([]);
+        setActiveRoom(MAHE_ROOM.id);
       }
     });
 
@@ -317,7 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, profile?.full_name, isAdmin, isDemo]);
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, refreshProfile, signOut, isDemo, isAdmin }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, refreshProfile, signOut, isDemo, isAdmin, room, rooms, switchRoom }}>
       {children}
     </AuthContext.Provider>
   );

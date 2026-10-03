@@ -116,7 +116,7 @@ export function hasCompleteDomain(email: string): boolean {
 }
 
 /** Attach a domain to whatever has been typed, replacing any partial one. */
-export function withDomain(email: string, domain: ManipalDomain): string {
+export function withDomain(email: string, domain: string): string {
   const local = localPartOf(email).trim();
   return local ? `${local}@${domain}` : '';
 }

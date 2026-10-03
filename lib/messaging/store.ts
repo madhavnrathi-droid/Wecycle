@@ -38,6 +38,7 @@ import { BACKEND } from '../supabase';
 import { isDemoMode } from '../demoMode';
 import { getBlockedUserIds, onBlocksChange } from '../moderation';
 import { USERS, MARKETPLACE_ITEMS, type User } from '../mockData';
+import { getActiveRoom, isPrivateRoom } from '../rooms';
 import {
   isGenuine, decodeSubject, normalizeBody, previewOf, MESSAGE_MAX,
   type ContextType, type TimelineMessage,
@@ -277,7 +278,12 @@ export function startMessaging(uid: string | null): void {
   startedFor = uid;
   set({ ...EMPTY, me: uid, status: 'loading' });
 
-  if (isDemoMode()) { demo.seed(uid); return; }
+  if (isDemoMode()) {
+    /* The sample chats are with Manipal members; a private room starts empty. */
+    if (isPrivateRoom(getActiveRoom())) set({ status: 'ready' });
+    else demo.seed(uid);
+    return;
+  }
 
   void refreshBlocked();
   stopFns.push(onBlocksChange(() => { void refreshBlocked(); }));

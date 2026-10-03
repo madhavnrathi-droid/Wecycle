@@ -125,9 +125,15 @@ export const authAdapter = {
 
          A failure is not fatal: the account and session are real, and the
          self-heal in AuthContext will try again on load. */
+      /* The campus, for a university with more than one (NMIMS). Saved on the
+         account first so that if the profile call below fails, the self-heal
+         that creates it later still puts the member in the right room. */
+      if (meta.campus) {
+        try { await account().updatePrefs({ prefs: { campus: meta.campus } }); } catch { /* sent below too */ }
+      }
       try {
         await rpc('ensure_profile', {
-          full_name: meta.full_name, college: meta.college, phone: meta.phone,
+          full_name: meta.full_name, college: meta.college, phone: meta.phone, campus: meta.campus,
         });
       } catch { /* AuthContext heals it */ }
 

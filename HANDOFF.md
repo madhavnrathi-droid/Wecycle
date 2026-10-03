@@ -196,6 +196,63 @@ conversation updates and read receipts; and the client's own list queries.
 
 ---
 
+## Rooms (campuses)
+
+Wecycle hosts more than one university. Each campus is a **room** with its own
+listings, requests, events, lost & found, people and messages; nobody sees
+another room. Defined in [`lib/rooms.ts`](lib/rooms.ts):
+
+| Room | `communities` id | Who | Visibility |
+|---|---|---|---|
+| Manipal (MAHE) | `a4640775-…` (the original `wecycle-global`) | `@learner.manipal.edu`, `@manipal.edu`, `@manipal.com` | **Public** — signed-out visitors browse it |
+| NMIMS Mumbai | `4f034552-…` | `@nmims.in` (students), `@nmims.edu` (faculty) + chose Mumbai | **Private** — label `nmimsmumbai` |
+| NMIMS Bengaluru | `9f7ef4bb-…` | same domains + chose Bengaluru | **Private** — label `nmimsbengaluru` |
+
+**How a member gets a room.** Sign-up asks "Where do you study?"; NMIMS then
+asks which campus (it is written to the account's prefs first, so a profile
+created later by the self-heal still lands right). `ensure_profile`
+([`app/api/rpc/[fn]/route.ts`](app/api/rpc/[fn]/route.ts)) decides the room
+from the **email domain** — a Manipal address can never join an NMIMS room, an
+NMIMS one never the Manipal room — writes `profiles.community_id`, and sets the
+account's Appwrite **label** via [`app/api/_lib/rooms.ts`](app/api/_lib/rooms.ts).
+Only the server can set labels. Campus is not editable in the app (Account shows
+it read-only); moving someone is a server-side change of `community_id`, label,
+and the `read("label:…")` on their rows.
+
+**The wall, twice:**
+1. *Database.* Everything a private-room member writes is readable by
+   `label:<room>` instead of `any` — `ownerPermissions()` in
+   [`lib/appwrite/client.ts`](lib/appwrite/client.ts) for client writes, the
+   server for profiles. **This only works once the content tables lose their
+   table-level `read("any")`** (Appwrite admits a reader if the table OR the row
+   allows it). [`db/appwrite/tools/room-permissions.mjs`](db/appwrite/tools/room-permissions.mjs)
+   does that, checking every row first; it needs a key with `tables.write`.
+2. *App.* Every read of `listings`/`requests`/`events`/`lost_found_reports`,
+   and every list/search of `profiles`, is filtered to the room on screen in
+   [`lib/appwrite/roomScope.ts`](lib/appwrite/roomScope.ts) (used by the query
+   builder); inserts are stamped with it. The community feed RPC and the
+   leaderboard filter the same way. **A new direct `tables().listRows` on a post
+   table must add `roomFilterFor`.**
+
+**Also room-aware:** direct messages are refused across rooms (server); the feed
+cache is keyed by room; signed-out devices always show the public room.
+**Admins** get every room's label (so moderation reaches everything) and a
+"Viewing …" switcher under the greeting; they still see one room at a time.
+
+**Known gaps**
+- **Photos are not walled.** Files upload readable by `any` and anonymous users
+  can list the buckets. Label-scoped files would not render: an `<img>` cannot
+  send the auth header, and the Appwrite session cookie is third-party on
+  wecycle.page and in the apps. Fix with an image proxy route (verify JWT +
+  room, stream with the server key) or a custom Appwrite domain under
+  wecycle.page so the cookie is first-party. The privacy policy says photos are
+  not private.
+- `event_rsvps` and `event_forms` keep table-level read (organisers and
+  attendees read them through the table) — they hold ids and form questions,
+  not post content.
+
+---
+
 ## Adding a table or a column
 
 The schema has **one source of truth**:
@@ -264,19 +321,19 @@ New members get a profile from `ensure_profile` in the rpc route — Appwrite ha
 no triggers, so this replaces the Postgres trigger that used to do it. Sign-up
 calls it; `AuthContext` also calls it if a signed-in member has no profile.
 
-### The Manipal gate — partly open
+### The college-email gate — partly open
 
 Postgres enforced "Manipal emails only" with a trigger that could not be
-bypassed. On Appwrite:
+bypassed. The rule is now "Manipal or NMIMS" (see Rooms). On Appwrite:
 
 - The sign-up form checks it (client-side, bypassable).
 - `ensure_profile` checks it server-side and **refuses a profile** to anyone
   else, so an outsider account cannot post, message or appear anywhere.
 - **Account creation itself is not gated.** Someone calling the Appwrite API
-  directly can still create a non-Manipal account; it is just useless to them.
+  directly can still create an account on another domain; it is just useless to them.
 
 Closing that needs an **Appwrite Function** on the `users.*.create` event that
-deletes non-Manipal accounts. The rule to use is `emailGateProblem()` in
+deletes accounts the gate refuses. The rule to use is `emailGateProblem()` in
 [`lib/emailDomain.ts`](lib/emailDomain.ts), which is now server-safe.
 
 ---
@@ -312,7 +369,7 @@ widen the production key.
 ```bash
 npm install
 npm run dev              # http://localhost:3000
-npm test                 # 79 tests, node:test
+npm test                 # 86 tests, node:test
 npm run build            # production build — run before every deploy
 ```
 
@@ -374,6 +431,7 @@ components/            screens and UI components
 lib/                   data and domain logic
 lib/appwrite/          the backend adapter — read the section above
 lib/messaging/         direct messages: shared rules, client store, hooks
+lib/rooms.ts           campuses (rooms): who belongs where, the room on screen
 components/messages/   the Messages screens
 app/api/_lib/          shared server helpers + the messaging server logic
 db/sqlserver/          THE schema source of truth

@@ -5,6 +5,7 @@ import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Buildin
 import { useAuth } from '../lib/AuthContext';
 import { updateDemoSession, type Residence } from '../lib/demoAuth';
 import { COLLEGES, normalizeCollege } from '../lib/colleges';
+import { roomById } from '../lib/rooms';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
 
@@ -19,6 +20,10 @@ interface AccountScreenProps {
 
 export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProps) {
   const { profile, user, signOut, isDemo, refreshProfile } = useAuth();
+  /* The member's own campus — not the room on screen, which an admin can
+     switch. NMIMS members have a campus, not one of Manipal's college codes. */
+  const homeRoom = roomById((profile as { community_id?: string | null } | null)?.community_id);
+  const nmims = homeRoom.university === 'NMIMS';
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -417,7 +422,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                 margin: '2px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
-                {college || 'No college set'}{collegeId ? ` · ${collegeId}` : ''}
+                {nmims ? homeRoom.name : (college || 'No college set')}{collegeId ? ` · ${collegeId}` : ''}
               </p>
             </div>
           </div>
@@ -556,6 +561,20 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           {/* College — the same required field as sign-up, editable here.
               Replaces the old "Department" select, which pointed at a column
               sign-up was writing free text into; see lib/colleges.ts. */}
+          {nmims ? (
+            <div className="field">
+              <span className="field-label">
+                <Building2 size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                Campus
+              </span>
+              <div className="form-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} aria-readonly="true">
+                {homeRoom.name}
+              </div>
+              <span className="field-hint" style={{ lineHeight: 1.5 }}>
+                Your campus is your room — only {homeRoom.name} sees your posts. Moved campus? Send feedback from the menu and we’ll move you.
+              </span>
+            </div>
+          ) : (
           <div className="field">
             <label htmlFor="acc-college" className="field-label">
               <Building2 size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
@@ -575,6 +594,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               ))}
             </select>
           </div>
+          )}
 
           {/* Residence as visual chips */}
           <div>

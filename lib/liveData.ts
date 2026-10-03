@@ -15,6 +15,7 @@
  * empty arrays and create throws a friendly error.
  */
 
+import { getActiveRoom, MAHE_ROOM } from './rooms';
 import { supabase, hasSupabaseEnv, rpcUntyped } from './supabase';
 import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData';
 import { listingToComp } from './opportunity';
@@ -170,9 +171,14 @@ export function readFeedCache(): FeedCache | null {
   try {
     const raw = window.localStorage.getItem(FEED_CACHE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { at?: number; data?: FeedCache };
+    const parsed = JSON.parse(raw) as { at?: number; room?: string; data?: FeedCache };
     if (!parsed?.data || typeof parsed.at !== 'number') return null;
     if (Date.now() - parsed.at > FEED_CACHE_TTL) return null;
+    /* A cache belongs to the room it was fetched in. Without this, an NMIMS
+       member on a phone that last showed the Manipal feed would see it again
+       for a moment — exactly what separate rooms must never do. Caches from
+       before rooms existed carry no room and were all Manipal. */
+    if ((parsed.room ?? MAHE_ROOM.id) !== getActiveRoom().id) return null;
     return parsed.data;
   } catch {
     return null;
@@ -182,7 +188,7 @@ export function readFeedCache(): FeedCache | null {
 export function writeFeedCache(data: FeedCache): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ at: Date.now(), data }));
+    window.localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ at: Date.now(), room: getActiveRoom().id, data }));
   } catch {
     /* quota exceeded / private mode — caching is best-effort, ignore */
   }

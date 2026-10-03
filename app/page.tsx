@@ -1,5 +1,6 @@
 'use client';
 
+import { getActiveRoom } from '../lib/rooms';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
@@ -590,7 +591,11 @@ export default function WecycleApp() {
     if (typeof nav.share === 'function') {
       nav.share({
         title: 'Wecycle',
-        text: 'Join me on Wecycle — circulate resources in our community.',
+        /* In a private room, the invite says which one — and which email gets
+           you in — or the friend signs up and lands in the wrong room. */
+        text: getActiveRoom().university === 'NMIMS'
+          ? `Join ${getActiveRoom().name} on Wecycle — our campus’s own room to buy, borrow and give away. Sign up with your @nmims.in email.`
+          : 'Join me on Wecycle — circulate resources in our community.',
         url: shareUrl,
       }).catch(() => {});
     } else if (nav.clipboard?.writeText) {

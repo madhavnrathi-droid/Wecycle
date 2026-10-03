@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const UPDATED = 'September 29, 2026';
+const UPDATED = 'October 3, 2026';
 const CONTACT = 'wecycle.page@gmail.com';
 
 export default function PrivacyPolicy() {
@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
         <h2 style={h2}>1. Information we collect</h2>
         <p style={p}><strong>Information you provide</strong></p>
         <ul style={ul}>
-          <li style={li}><strong>Account &amp; profile:</strong> your Manipal email address and a password you choose (stored only as a salted hash — we never see it); a one-time code emailed to you confirms the address when you sign up and lets you reset a forgotten password. Plus your display name, and — only if you choose to add them — your college ID, phone number, course, department, graduating year, and residence type.</li>
+          <li style={li}><strong>Account &amp; profile:</strong> your college email address (Manipal or NMIMS) and a password you choose (stored only as a salted hash — we never see it); a one-time code emailed to you confirms the address when you sign up and lets you reset a forgotten password. Plus your display name, your campus (NMIMS members choose Mumbai or Bengaluru when they sign up), and — only if you choose to add them — your college ID, phone number, course, department, graduating year, and residence type.</li>
           <li style={li}><strong>Content you post:</strong> item listings, requests, events, lost &amp; found reports, comments, and any photos or videos you upload.</li>
           <li style={li}><strong>Direct messages:</strong> the text of messages you send to other members, who you sent them to, when, whether they have been read, and — when a conversation starts from a post — which post it is about.</li>
           <li style={li}><strong>Contact preferences:</strong> whether you allow others to reach you by email and/or WhatsApp about your posts.</li>
@@ -66,6 +66,19 @@ export default function PrivacyPolicy() {
           turn on. Your email and phone are only shared with another member when
           you have explicitly enabled that contact channel; you can disable phone
           sharing and WhatsApp contact in Settings at any time.
+        </p>
+        <p style={p}>
+          <strong>Each campus is its own room.</strong> Wecycle hosts more than
+          one university, and members only ever see their own campus. At NMIMS,
+          each campus (Mumbai, Bengaluru) is a private room: your profile and
+          everything you post there are visible only to signed-in members of the
+          same campus — not to other campuses, other universities, or anyone
+          signed out. The Manipal room is visible to visitors who are not signed
+          in, as it always has been. <strong>Photos are the exception:</strong>{' '}
+          they are stored apart from your posts and are not private — anyone with
+          a photo&rsquo;s link, or technical access to our photo storage, can open
+          it. Don&rsquo;t put anything in a photo you wouldn&rsquo;t want seen
+          outside your campus.
         </p>
         <p style={p}>
           <strong>Direct messages are private to the two people in the

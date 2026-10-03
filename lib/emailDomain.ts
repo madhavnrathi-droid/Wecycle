@@ -23,6 +23,13 @@
  */
 
 import { ADMIN_EMAILS } from './adminEmails';
+import { isNmimsEmail } from './rooms';
+
+/* ── NMIMS ──
+ * Since October 2026 Wecycle also hosts NMIMS (Mumbai and Bengaluru), each
+ * campus in a private room of its own — see lib/rooms.ts. NMIMS addresses pass
+ * the gate the same way Manipal ones do: by domain, suffix-matched. Which
+ * campus is the member's choice at sign-up; the domain only says "NMIMS". */
 
 /** Shown wherever we need to say what's required. */
 export const MANIPAL_DOMAIN_HINT = 'Manipal email only (e.g. …@learner.manipal.edu)';
@@ -90,6 +97,9 @@ export function isPartnerEmail(email: string): boolean {
  *  happens to also match the correct spelling can't misfire on a valid
  *  address (that bug shipped once — `manipa?l?` matches "manipal"). */
 const TYPO_SUGGESTIONS: ReadonlyArray<[RegExp, string]> = [
+  [/^nmims\.(ac\.in|co\.in|com|co|net|org|in\.in)$/i, 'nmims.in'],
+  [/^nmims\.(ed|eud|edu\.in)$/i, 'nmims.edu'],
+  [/^(nmim|nimms|nmmis|nmsims|nmi?ms)\.in$/i, 'nmims.in'],
   [/^learner\.manip[a-z]*\.[a-z.]*$/i, 'learner.manipal.edu'],
   [/^learners?\.manipal.*$/i, 'learner.manipal.edu'],
   [/^lea?rn?er\.manip.*$/i, 'learner.manipal.edu'],
@@ -173,7 +183,7 @@ export function emailGateProblem(
   /* Valid (or exempt) wins outright — check this BEFORE typo-guessing, or a
      suggestion pattern that also matches the correct spelling would reject a
      perfectly good address. */
-  if (isManipalEmail(trimmed)) return null;
+  if (isManipalEmail(trimmed) || isNmimsEmail(trimmed)) return null;
 
   /* Getting back into an account you already have is not signing up, and
      neither is signing into one the team provisioned for you. Only 'signin'
@@ -187,13 +197,14 @@ export function emailGateProblem(
   const suggestion = manipalTypoSuggestion(trimmed);
   if (suggestion) return `Did you mean @${suggestion}?`;
 
+
   const domain = emailDomainOf(trimmed);
   const named = domain ? `@${domain} addresses` : 'That address';
   if (purpose === 'signin') {
-    return `${named} can’t sign in — Wecycle accounts use your Manipal email. Already a member? Use the help link below.`;
+    return `${named} can’t sign in — Wecycle accounts use your college email (Manipal or NMIMS). Already a member? Use the help link below.`;
   }
   if (purpose === 'reset') {
-    return `${named} can’t be used here — reset the password on your Manipal email instead. Already a member on this address? Use the help link below.`;
+    return `${named} can’t be used here — reset the password on your college email instead. Already a member on this address? Use the help link below.`;
   }
-  return `${named} can’t be used. Wecycle is Manipal-only — sign up with your Manipal email (e.g. …@learner.manipal.edu).`;
+  return `${named} can’t be used. Sign up with your college email — Manipal (…@learner.manipal.edu) or NMIMS (…@nmims.in).`;
 }

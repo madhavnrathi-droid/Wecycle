@@ -862,7 +862,7 @@ function InventoryEmpty({ tab, onPostNew, signedIn }: { tab: Tab; onPostNew: () 
       <EmptyState
         icon="🗂️"
         prompt="Your posts will live here"
-        sub="Anything you share, request or organise shows up on this screen, along with its views and saves. Join with your Manipal email to start one."
+        sub="Anything you share, request or organise shows up on this screen, along with its views and saves. Join with your college email to start one."
         cta={{ label: 'Join Wecycle', onClick: onPostNew }}
       />
     );

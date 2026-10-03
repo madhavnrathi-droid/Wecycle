@@ -34,6 +34,7 @@
 import { createHash } from 'node:crypto';
 import { DB, aw, q, json, rowsOf, type Args, type Row } from './appwrite';
 import { findObjectionable, objectionableMessage } from '../../../lib/contentFilter';
+import { roomById } from '../../../lib/rooms';
 import {
   MESSAGE_MAX, normalizeBody, previewOf, encodeSubject, isGenuine, readPerm,
   orderedPair, isValidRowId, isContextType, CONTEXT_SOURCE, type ContextType,
@@ -101,6 +102,13 @@ async function policy(uid: string, peerId: string): Promise<Allowed | Refusal> {
   ]);
 
   if (!peer) return { ok: false, status: 404, code: 'not_found', message: 'This account isn’t on Wecycle any more.' };
+
+  /* Rooms are separate (lib/rooms.ts): a conversation never crosses one. Said
+     as vaguely as a block, because "that person is at another campus" is
+     itself something a private room keeps to itself. */
+  if (roomById(me?.community_id as string | undefined).id !== roomById(peer.community_id as string | undefined).id) {
+    return { ok: false, status: 403, code: 'unavailable', message: 'You can’t message this account.' };
+  }
 
   const until = me?.suspended_until ? Date.parse(String(me.suspended_until)) : 0;
   if (until && until > Date.now()) {

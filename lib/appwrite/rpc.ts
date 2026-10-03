@@ -37,6 +37,7 @@
 import { ID, Query } from 'appwrite';
 import { tables, account, fillServerDefaults, APPWRITE_DB, toRows, type AnyRow } from './client';
 import { apiBase } from '../platform';
+import { getActiveRoom } from '../rooms';
 
 interface RpcResult<T> { data: T | null; error: { message: string; code?: string } | null; }
 
@@ -124,7 +125,9 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
           Query.limit(Math.max(1, Math.min(limit, 100))),
         ];
         if (a._before) q.push(Query.lessThan('posted_at', a._before as string));
-        if (a._community_id) q.unshift(Query.equal('community_id', [a._community_id as string]));
+        /* Always the room on screen — see lib/rooms.ts. A caller-supplied
+           community id is ignored rather than trusted to agree. */
+        q.unshift(Query.equal('community_id', [getActiveRoom().id]));
         const res = await list('listings', q);
         return ok(toRows(res.rows as AnyRow[])) as RpcResult<T>;
       } catch (e) { return fail(e); }
@@ -173,6 +176,7 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
     case 'delete_my_account':
     case 'admin_set_suspension':
     case 'ensure_profile':
+    case 'sync_rooms':
       return await serverRpc<T>(fn, args);
 
     /* This one already had a server endpoint before the migration — written

@@ -1,6 +1,9 @@
 'use client';
 
 import TopBar from './TopBar';
+import RoomChip from './RoomChip';
+import RoomWelcome from './RoomWelcome';
+import { isPrivateRoom } from '../lib/rooms';
 import CategoryIcon from '../components/CategoryIcon';
 import OutageNotice from './OutageNotice';
 import { OUTAGE_MODE } from '../lib/outage';
@@ -122,7 +125,7 @@ export default function FeedScreen({
   onPost, onOpenMenu, onOpenAccount, onOpenMessages, onOpenItem, onOpenEvent, onOpenLF,
   onBannerAction, onOpenUser, onRequireAuth, onPostService, onSellItem,
 }: FeedScreenProps) {
-  const { profile, user } = useAuth();
+  const { profile, user, room, rooms } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -199,11 +202,14 @@ export default function FeedScreen({
     let cancelled = false;
 
     if (isDemoMode()) {
-      setItems(MARKETPLACE_ITEMS);
-      setOpportunities(OPPORTUNITIES);
+      /* The demo's sample posts are Manipal's. A demo in a private room shows
+         that room as it really starts out: empty. */
+      const sample = !isPrivateRoom(room);
+      setItems(sample ? MARKETPLACE_ITEMS : []);
+      setOpportunities(sample ? OPPORTUNITIES : []);
       setRequests([]);
-      setEvents(EVENTS);
-      setLostFound(LOST_FOUND_ITEMS);
+      setEvents(sample ? EVENTS : []);
+      setLostFound(sample ? LOST_FOUND_ITEMS : []);
       setLoading(false);
       return;
     }
@@ -251,11 +257,16 @@ export default function FeedScreen({
         writeFeedCache({ items: i, opportunities: o, requests: r, events: e, lostFound: l });
       });
     };
+    /* A different room is a different feed: drop what the last one showed
+       before anything paints, so not a single card from another campus
+       survives the switch. Results still in flight for the old room are
+       discarded by `cancelled`, which the cleanup set when the room changed. */
+    setItems([]); setOpportunities([]); setRequests([]); setEvents([]); setLostFound([]);
     load(true);
     /* Refetch the instant someone posts (same tab) — no cache reseed/flicker. */
     const off = onPostsChanged(() => load(false));
     return () => { cancelled = true; off(); };
-  }, [mounted]);
+  }, [mounted, room.id]);
 
   /* Hydrate the user's existing saves so the heart shows filled for any
      post they've previously saved. Refetched on every post-change in case
@@ -371,6 +382,11 @@ export default function FeedScreen({
     () => (user ? { id: user.id, college: myCollege, location: null } : null),
     [user?.id, myCollege],
   );
+  /* Nothing at all to show in this room — no listing, job, request, event or
+     lost-and-found report. */
+  const nothingToShow =
+    items.length + opportunities.length + requests.length + events.length + lostFound.length === 0;
+
   const engine = useFeedEngine({
     items, requests, opportunities, events, lostFound, blocked,
     viewer,
@@ -1062,11 +1078,14 @@ export default function FeedScreen({
               fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
             }} suppressHydrationWarning>
               {showValueProp
-                ? 'Free to use, no commission — just verified Manipal students.'
+                ? `Free to use, no commission — just verified ${room.university === 'NMIMS' ? room.name : 'Manipal'} students.`
                 : mounted && new Date().toLocaleDateString('en-US', {
                     weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
                   })}
             </p>
+            {mounted && user && (isPrivateRoom(room) || rooms.length > 1) && (
+              <div style={{ marginTop: 8 }}><RoomChip /></div>
+            )}
           </div>
 
         </div>
@@ -1375,13 +1394,29 @@ export default function FeedScreen({
             </Fragment>
           ))}
 
-          {!loading && engine.modules.length === 0 && (
+          {/* A private room that has never had a post gets a welcome made for
+              that moment (RoomWelcome); a quiet day anywhere else keeps the
+              light one-liner.
+
+              Judged on the posts, not on engine.modules: the engine always
+              lays out its rails and an empty rail renders nothing, so "no
+              modules" never happened and this state never showed. */}
+          {!loading && nothingToShow && (isPrivateRoom(room) ? (
+              <RoomWelcome
+                room={room}
+                onPost={onPost}
+                onShare={() => onBannerAction?.('share')}
+                onRequest={() => onBannerAction?.('request')}
+                onLostFound={() => onBannerAction?.('lost-found')}
+                onInvite={() => onBannerAction?.('invite')}
+              />
+            ) : (
             <EmptyState
               prompt="Looks like the feed's just sprouting. Be the first to share something!"
               sub="Post a free find, a borrow request, or an event — your community's waiting."
               cta={{ label: 'Post the first thing', onClick: onPost }}
             />
-          )}
+          ))}
         </div>
       ) : (
         /* ══ PRODUCT GRID: category / search / focused tab ══ */
@@ -1432,6 +1467,18 @@ export default function FeedScreen({
                     sub="Hire someone for a job, or put your own skill up. Paid, unpaid or volunteer."
                     cta={{ label: 'Post a job or a skill', onClick: onPost }}
                   />
+                );
+              }
+              if (isPrivateRoom(room)) {
+                return (
+                  <RoomWelcome
+                room={room}
+                onPost={onPost}
+                onShare={() => onBannerAction?.('share')}
+                onRequest={() => onBannerAction?.('request')}
+                onLostFound={() => onBannerAction?.('lost-found')}
+                onInvite={() => onBannerAction?.('invite')}
+              />
                 );
               }
               return (

@@ -26,6 +26,7 @@
  * and people stop scrolling. Two short, named rails read as a sample.
  */
 
+import { getActiveRoom } from '../lib/rooms';
 import { useEffect, useState } from 'react';
 import RelatedRail, { type RailCard } from './RelatedRail';
 import { fetchMarketplaceItems } from '../lib/liveData';
@@ -90,7 +91,7 @@ export default function EventDiscoverShelf({ onOpenItem, onBrowseAll }: EventDis
       {(loading || rest.length > 0) && (
         <RelatedRail
           title="While you're here"
-          subtitle="Buy, borrow and swap with people at MAHE"
+          subtitle={`Buy, borrow and swap with people at ${getActiveRoom().university === 'NMIMS' ? getActiveRoom().name : 'MAHE'}`}
           cards={toCards(rest, 'recent')}
           loading={loading}
           cta={onBrowseAll ? { label: 'Browse all', onClick: onBrowseAll } : undefined}

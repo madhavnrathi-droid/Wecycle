@@ -25,6 +25,7 @@
  * link copy. Never throws — a tainted canvas re-renders without remote photos.
  */
 
+import { getActiveRoom } from './rooms';
 import { haptics } from './haptics';
 
 export type ShareCardKind = 'item' | 'request' | 'job' | 'event' | 'lost' | 'found' | 'storefront';
@@ -2039,7 +2040,7 @@ function panelCells(spec: ShareCardSpec, t: Theme): { label: string; value: stri
   }
   /* One cell alone looks like a mistake next to the reference's paired panel, so
      fall back to the board name rather than leaving a lopsided box. */
-  if (out.length === 1) out.push({ label: 'On', value: 'Wecycle · MAHE' });
+  if (out.length === 1) out.push({ label: 'On', value: `Wecycle · ${getActiveRoom().university === 'NMIMS' ? getActiveRoom().name : 'MAHE'}` });
   return out;
 }
 

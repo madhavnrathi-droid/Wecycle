@@ -48,6 +48,7 @@ import {
   DB, aw, q, json, cors, callerId, serverConfigured, type Args, type Row,
 } from '../../_lib/appwrite';
 import { sendMessage, markConversationRead, canMessage } from '../../_lib/messaging';
+import { roomForNewMember, syncRoomLabels, roomReadPerm } from '../../_lib/rooms';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -119,7 +120,6 @@ async function toggle(
  * through the app's form, and the Manipal rule the old trigger ALSO enforced has
  * to be checked somewhere a client cannot skip.
  */
-const DEFAULT_COMMUNITY = 'a4640775-4946-49b2-a5d8-2f35e57e0b1a'; // wecycle-global
 const DEFAULT_NOTIFICATION_PREFS = JSON.stringify({
   channels: { inApp: true, sound: true, email: true, sms: false },
   categories: {
@@ -154,12 +154,25 @@ async function ensureProfile(uid: string, args: Args) {
   if (problem) return json({ message: problem, code: 'email_not_allowed' }, 403);
 
   const existing = await aw('GET', `/tablesdb/${DB}/tables/profiles/rows/${uid}`);
-  if (existing.ok) return json({ data: existing.json });
+  if (existing.ok) {
+    await syncRoomLabels(uid, me.json, existing.json);
+    return json({ data: existing.json });
+  }
+
+  /* Which room — see lib/rooms.ts. Manipal by email; NMIMS by email plus the
+     campus the member chose. An NMIMS member with no campus gets no profile
+     until they choose one, rather than a profile in the wrong room. */
+  const room = await roomForNewMember(uid, email, args.campus);
+  if (!room) return json({ message: 'Choose your NMIMS campus to finish signing up.', code: 'campus_required' }, 409);
 
   const fullName = String(args.full_name ?? accountName ?? '').trim();
-  const college = typeof args.college === 'string' && COLLEGES.has(args.college) ? args.college : undefined;
+  /* College codes are Manipal's schools; NMIMS members are identified by room. */
+  const college = room.university === 'MAHE' && typeof args.college === 'string' && COLLEGES.has(args.college)
+    ? args.college : undefined;
   const now = new Date().toISOString();
-  const perms = [`read("any")`, `update("user:${uid}")`, `delete("user:${uid}")`];
+  /* Readable by the member's room only — everyone, for the public Manipal
+     room; the room's label for a private one. */
+  const perms = [roomReadPerm(room), `update("user:${uid}")`, `delete("user:${uid}")`];
 
   /* usernames are unique; a collision gets a short numeric suffix. Tried a few
      times rather than once, because two people called Aryan at one college is
@@ -176,7 +189,7 @@ async function ensureProfile(uid: string, args: Args) {
         full_name: fullName || null,
         initials: initialsOf(fullName || username),
         avatar_color: '#6C63FF',
-        community_id: DEFAULT_COMMUNITY,
+        community_id: room.id,
         ...(college ? { college } : {}),
         notification_prefs: DEFAULT_NOTIFICATION_PREFS,
         joined_at: now,
@@ -194,6 +207,10 @@ async function ensureProfile(uid: string, args: Args) {
   }
   if (!created) return json({ message: `Could not create profile: ${lastError}` }, 500);
 
+  /* The label is what opens a private room's rows to its member. Set before
+     the response, so the app's very first feed fetch can already see them. */
+  await syncRoomLabels(uid, me.json, created);
+
   /* Contact details live apart from the public profile — see split-contacts.mjs.
      The profile row is readable by anyone; this one by nobody but the server. */
   const phone = typeof args.phone === 'string' && args.phone.trim() ? args.phone.trim() : null;
@@ -204,10 +221,10 @@ async function ensureProfile(uid: string, args: Args) {
   /* The membership the old tr_profiles_biz trigger added whenever a profile had
      a community. Hashed id, same convention as the migration, so a retry is a
      no-op instead of a duplicate. */
-  const memberId = createHash('md5').update(`${DEFAULT_COMMUNITY}|${uid}`).digest('hex').slice(0, 32);
+  const memberId = createHash('md5').update(`${room.id}|${uid}`).digest('hex').slice(0, 32);
   await aw('POST', `/tablesdb/${DB}/tables/community_members/rows`, {
     rowId: memberId,
-    data: { community_id: DEFAULT_COMMUNITY, user_id: uid, role: 'member', joined_at: now },
+    data: { community_id: room.id, user_id: uid, role: 'member', joined_at: now },
     permissions: perms,
   });
 
@@ -374,6 +391,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
 
       case 'ensure_profile':
         return await ensureProfile(uid, args);
+
+      /* Labels follow the member's room (and admin standing) — and the
+         response is the rooms this account may view, which is what the
+         admin room switcher lists. Called once per session. */
+      case 'sync_rooms': {
+        const user = await aw('GET', `/users/${uid}`);
+        if (!user.ok || !user.json) return json({ message: 'Account not found' }, 404);
+        const profile = await aw('GET', `/tablesdb/${DB}/tables/profiles/rows/${uid}`);
+        const rooms = await syncRoomLabels(uid, user.json, profile.ok ? profile.json : null);
+        return json({ data: { home: profile.ok ? profile.json?.community_id ?? null : null, rooms: rooms.map(r => r.id) } });
+      }
 
       /* Direct messages. Sending is server-side for the same reason as the
          toggles: a message must be readable by exactly two people, and a

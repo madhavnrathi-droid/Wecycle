@@ -42,7 +42,7 @@ import { OUTAGE_MODE } from '../lib/outage';
 import {
   Mail, User, ArrowLeft, KeyRound, Loader2, Phone, Lock, Eye, EyeOff,
   GraduationCap, LifeBuoy, MailWarning, WandSparkles,
-  AlertTriangle,
+  AlertTriangle, MapPin,
 } from 'lucide-react';
 import Modal from './Modal';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
@@ -54,6 +54,9 @@ import {
   validatePassword, passwordStrength, humanAuthError, MIN_PASSWORD_LENGTH,
 } from '../lib/password';
 import { emailGateProblem, isManipalEmail } from '../lib/emailDomain';
+import {
+  CAMPUS_ROOMS, isNmimsEmail, NMIMS_STUDENT_DOMAIN, NMIMS_FACULTY_DOMAIN, type University,
+} from '../lib/rooms';
 import { REQUIRE_EMAIL_CONFIRMATION } from '../lib/authConfig';
 import { tenDigits, isAcceptable, toE164 } from '../lib/phone';
 import { COLLEGES } from '../lib/colleges';
@@ -173,6 +176,11 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const [pending, setPending] = useState<Pending>(null);
 
   const [name, setName] = useState('');
+  /* Which university, and — for NMIMS — which campus. The campus is the room
+     the member joins (lib/rooms.ts), so it is asked, never guessed: NMIMS uses
+     the same addresses on every campus. */
+  const [university, setUniversity] = useState<University>('MAHE');
+  const [campus, setCampus] = useState('');
   const [college, setCollege] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -194,7 +202,8 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
      is a helpful first draft, not an owner: once someone has corrected it,
      picking a different college must not overwrite what they typed. */
   const emailEdited = useRef(false);
-  const buildingEmail = mode === 'signup' && !resetting;
+  const buildingEmail = mode === 'signup' && !resetting && university === 'MAHE';
+  const nmimsSignup = mode === 'signup' && !resetting && university === 'NMIMS';
   const facultyAddress = emailDomain === FACULTY_DOMAIN;
 
   /* Offer the two campus domains on sign-in and reset, but only while the
@@ -261,6 +270,9 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     emailEdited.current = v.trim().length > 0;
     setEmail(v);
     setEmailChecked(false);
+    /* Typed an NMIMS address on the Manipal form: they are at NMIMS, so the
+       form follows rather than refusing them. */
+    if (isNmimsEmail(v)) setUniversity('NMIMS');
     const at = v.lastIndexOf('@');
     if (at >= 0) {
       const d = v.slice(at + 1);
@@ -337,7 +349,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     setStep('credentials');
     setResetting(false);
     setPending(null);
-    setName(''); setCollege(''); setEmail('');
+    setName(''); setCollege(''); setEmail(''); setUniversity('MAHE'); setCampus('');
     setPhone(''); setTermsAgreed(false); setEmailChecked(false);
     setPassword(''); setPassword2(''); setShowPassword(false); setCode('');
     pendingPassword.current = '';
@@ -361,9 +373,19 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
      us an OTP email — and enforced again by a trigger on auth.users so the API
      can't be called around it. Only surfaced once the address is well-formed,
      so it doesn't nag mid-typing. */
-  const domainProblem = emailOk
+  const gateProblem = emailOk
     ? emailGateProblem(email, resetting ? 'reset' : mode)
     : null;
+  /* On sign-up the address must also match the university chosen, because
+     the university decides the room. */
+  const universityProblem = !gateProblem && emailOk && mode === 'signup' && !resetting
+    ? (university === 'NMIMS' && !isNmimsEmail(email)
+        ? `Use your NMIMS email — …@${NMIMS_STUDENT_DOMAIN} for students, …@${NMIMS_FACULTY_DOMAIN} for faculty.`
+        : university === 'MAHE' && isNmimsEmail(email)
+          ? 'That’s an NMIMS address — choose NMIMS above.'
+          : null)
+    : null;
+  const domainProblem = gateProblem ?? universityProblem;
   const domainOk = !domainProblem;
   /* Returning to a sign-up whose code never got entered — see
      isStaleIncompleteSignup. Only worth saying on the sign-up form. */
@@ -383,8 +405,10 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const credentialsReady =
     resetting ? emailOk && domainOk
     : mode === 'signup'
-      ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk && !!college
-        && (emailDomain === FACULTY_DOMAIN || !!joiningYear)
+      ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk
+        && (university === 'NMIMS'
+          ? !!campus
+          : !!college && (emailDomain === FACULTY_DOMAIN || !!joiningYear))
         && emailCheckSatisfied && !passwordProblem && passwordsMatch
       /* Sign-in: don't judge the password, just require something typed —
          the server is the authority on whether it's right. */
@@ -407,7 +431,8 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const signupMetadata = () => ({
     full_name: name.trim() || undefined,
     initials: name.trim() ? initialsOf(name) : undefined,
-    college: college || undefined,
+    college: university === 'MAHE' ? college || undefined : undefined,
+    campus: university === 'NMIMS' ? campus || undefined : undefined,
     ...(toE164(phone) ? { phone: toE164(phone) as string } : {}),
 
   });
@@ -555,6 +580,8 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
           mode,
           has_name: !!name.trim(),
           college,
+          university,
+          campus: campus || undefined,
           has_phone: !!toE164(phone),
         });
         if (!REQUIRE_EMAIL_CONFIRMATION) {
@@ -826,16 +853,44 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
 
             <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               {resetting
-                ? 'Enter your Manipal email and we’ll send a code. Once it’s confirmed you can pick a new password.'
+                ? 'Enter your college email and we’ll send a code. Once it’s confirmed you can pick a new password.'
                 : mode === 'signin'
-                  ? 'Sign in with your Manipal email and password.'
+                  ? 'Sign in with your college email and password.'
                   : REQUIRE_EMAIL_CONFIRMATION
                     ? 'Create your account. We’ll email one code to confirm your address — after that it’s just your password.'
-                    : 'Create your account with your Manipal email and a password. No code to wait for — you’re in straight away.'}
+                    : 'Create your account with your college email and a password. No code to wait for — you’re in straight away.'}
             </p>
 
-            {/* Manipal-only notice — stated up front on sign-up so nobody
-                fills the whole form before finding out. */}
+            {/* Where they study — first, because it decides the rest of the form
+                AND the room they join. Two options, both visible: a choice this
+                consequential should not hide inside a dropdown. */}
+            {mode === 'signup' && !resetting && (
+              <div className="field">
+                <span id="auth-university-label" className="field-label">
+                  <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                  Where do you study? <span className="required" aria-hidden="true">*</span>
+                </span>
+                <div role="radiogroup" aria-labelledby="auth-university-label" className="auth-choice-row">
+                  {([['MAHE', 'Manipal', 'MAHE Bengaluru'], ['NMIMS', 'NMIMS', 'Mumbai · Bengaluru']] as const).map(([u, label, sub]) => (
+                    <button
+                      key={u}
+                      type="button"
+                      role="radio"
+                      aria-checked={university === u}
+                      className="auth-choice"
+                      data-on={university === u || undefined}
+                      onClick={() => { setUniversity(u); setError(null); }}
+                    >
+                      <span className="auth-choice-title">{label}</span>
+                      <span className="auth-choice-sub">{sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Who may join — stated up front so nobody fills the whole form
+                before finding out. */}
             {mode === 'signup' && !resetting && (
               <div style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10,
@@ -849,12 +904,22 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 }}>
                   <GraduationCap size={16} strokeWidth={1.9} />
                 </span>
-                <span style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
-                  <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Manipal students &amp; staff only.</strong>{' '}
-                  Sign up with your Manipal address — <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@learner.manipal.edu</span>{' '}
-                  or <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@manipal.edu</span>. Personal
-                  addresses like Gmail won’t work.
-                </span>
+                {university === 'NMIMS' ? (
+                  <span style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                    <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>NMIMS students &amp; staff only.</strong>{' '}
+                    Your campus gets a private room of its own — only people from your campus can
+                    see what’s posted there. Sign up with{' '}
+                    <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@{NMIMS_STUDENT_DOMAIN}</span>{' '}
+                    or <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@{NMIMS_FACULTY_DOMAIN}</span>.
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                    <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Manipal students &amp; staff only.</strong>{' '}
+                    Sign up with your Manipal address — <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@learner.manipal.edu</span>{' '}
+                    or <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>…@manipal.edu</span>. Personal
+                    addresses like Gmail won’t work.
+                  </span>
+                )}
               </div>
             )}
 
@@ -884,7 +949,37 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 actually matters here — which MAHE school you're at — and both
                 were optional, so most profiles carried nothing usable. A fixed
                 list can be filtered and grouped; free text can't. */}
-            {mode === 'signup' && !resetting && (
+            {/* NMIMS: the campus is the room. Radio cards rather than a select —
+                there are two, and each says what choosing it means. */}
+            {nmimsSignup && (
+              <div className="field">
+                <span id="auth-campus-label" className="field-label">
+                  <MapPin size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                  Campus <span className="required" aria-hidden="true">*</span>
+                </span>
+                <div role="radiogroup" aria-labelledby="auth-campus-label" aria-required="true" className="auth-choice-row">
+                  {CAMPUS_ROOMS.NMIMS.map(r => (
+                    <button
+                      key={r.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={campus === r.key}
+                      className="auth-choice"
+                      data-on={campus === r.key || undefined}
+                      onClick={() => setCampus(r.key)}
+                    >
+                      <span className="auth-choice-title">{r.campus}</span>
+                      <span className="auth-choice-sub">Only {r.name} sees your posts</span>
+                    </button>
+                  ))}
+                </div>
+                <span className="field-hint" style={{ lineHeight: 1.5 }}>
+                  You can’t switch campus later, so pick the one you’re at.
+                </span>
+              </div>
+            )}
+
+            {mode === 'signup' && !resetting && university === 'MAHE' && (
               <div className="field">
                 <label htmlFor="auth-college" className="field-label">
                   <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
@@ -910,7 +1005,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 mis-keyed address that fails silently at the mailbox and one that
                 cannot be got wrong. Hidden for faculty, whose addresses carry no
                 year at all. */}
-            {mode === 'signup' && !resetting && !facultyAddress && (
+            {mode === 'signup' && !resetting && university === 'MAHE' && !facultyAddress && (
               <div className="field">
                 <label htmlFor="auth-joinyear" className="field-label">
                   <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
@@ -1001,6 +1096,31 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                       : 'Built from your name, college and intake year. Edit it if yours differs.'}
                   </span>
                 </>
+              ) : nmimsSignup ? (
+                <>
+                  {/* No address builder for NMIMS: their addresses do not follow
+                      one published pattern, so the member types it. */}
+                  <input
+                    id="auth-email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    className="form-input"
+                    placeholder={`yourname@${NMIMS_STUDENT_DOMAIN}`}
+                    value={email}
+                    maxLength={80}
+                    onChange={e => changeEmail(e.target.value)}
+                    autoComplete="username"
+                    aria-invalid={!!domainProblem}
+                    aria-describedby={domainProblem ? 'auth-email-problem' : 'auth-email-help'}
+                    required
+                  />
+                  {!domainProblem && (
+                    <span id="auth-email-help" className="field-hint" style={{ lineHeight: 1.5 }}>
+                      Students: @{NMIMS_STUDENT_DOMAIN} · Faculty: @{NMIMS_FACULTY_DOMAIN}
+                    </span>
+                  )}
+                </>
               ) : (
                 <input
                   id="auth-email"
@@ -1008,7 +1128,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   type="email"
                   inputMode="email"
                   className="form-input"
-                  placeholder="you@learner.manipal.edu"
+                  placeholder="you@learner.manipal.edu or @nmims.in"
                   value={email}
                   maxLength={80}
                   /* Editing the address retracts the "I've checked it" tick —
@@ -1045,7 +1165,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 * in with a half-typed one. */}
               {showDomainChips && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                  {DOMAINS.map(d => (
+                  {[...DOMAINS, NMIMS_STUDENT_DOMAIN, NMIMS_FACULTY_DOMAIN].map(d => (
                     <button
                       key={d}
                       type="button"
@@ -1069,7 +1189,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 <span id="auth-email-problem" className="field-hint" style={{ color: 'var(--accent-rose-ink)' }}>
                   {domainProblem}
                 </span>
-              ) : emailOk && isManipalEmail(email) && mode === 'signup' && !resetting
+              ) : emailOk && (isManipalEmail(email) || isNmimsEmail(email)) && mode === 'signup' && !resetting
                   && REQUIRE_EMAIL_CONFIRMATION ? (
                 /* Echo the address back rather than just saying "recognised".
                    The domain is already proven; what's left to get wrong is the

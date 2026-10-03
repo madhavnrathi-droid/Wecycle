@@ -7995,3 +7995,56 @@ summary::-webkit-details-marker { display: none; }
   .dm-bubble-new, .dm-jump, .dm-menu, .dm-badge { animation: none; }
   .dm-skel::after { animation: none; }
 }
+
+/* ── Sign-up: university and campus choices ──────────────────────────────────
+   Two-up radio cards. The choice decides which room the member joins, so both
+   options are visible at once with a line saying what each means; selection is
+   the same mint + ink pair the nav uses, so "chosen" looks the same everywhere. */
+.auth-choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.auth-choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-height: 56px; padding: 10px 13px;
+  border-radius: 14px; border: none; cursor: pointer;
+  background: var(--bg-inset); color: var(--text-primary);
+  text-align: left; font: inherit;
+  transition: background 140ms ease, transform 120ms ease;
+}
+.auth-choice:active { transform: scale(0.98); }
+.auth-choice:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.auth-choice[data-on] { background: #C4EFD6; color: #0A5C2A; }
+.auth-choice-title { font-size: calc(14px * var(--text-scale)); font-weight: 650; letter-spacing: -0.01em; }
+.auth-choice-sub { font-size: calc(12px * var(--text-scale)); color: var(--text-muted); line-height: 1.35; }
+.auth-choice[data-on] .auth-choice-sub { color: #0A5C2A; }
+
+/* ── The room you're in ──────────────────────────────────────────────────────
+   A quiet chip under the greeting. Private rooms carry a lock, because "only
+   your campus can see this" is the promise the member was made at sign-up. */
+.room-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 10px; border-radius: 999px;
+  background: #C4EFD6; color: #0A5C2A;
+  font-size: calc(12px * var(--text-scale)); font-weight: 650; letter-spacing: -0.005em;
+  border: none; font-family: inherit;
+}
+button.room-chip { cursor: pointer; }
+button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ── A room with nothing in it yet ── */
+.room-empty {
+  margin: 8px 16px 24px;
+  padding: 28px 22px 24px;
+  border-radius: 24px;
+  background: var(--bg-card);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 28px rgba(14,14,8,0.06);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+}
+.room-empty h2 { margin: 0; font-size: calc(22px * var(--text-scale)); font-weight: 650; letter-spacing: -0.025em; line-height: 1.2; }
+.room-empty p { margin: 0; font-size: calc(14px * var(--text-scale)); line-height: 1.55; color: var(--text-secondary); max-width: 460px; }
+.room-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.room-empty-ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.room-empty-idea {
+  height: 32px; padding: 0 12px; border-radius: 999px; border: none; cursor: pointer;
+  background: var(--bg-inset); color: var(--text-primary); font: inherit;
+  font-size: calc(13px * var(--text-scale)); font-weight: 500;
+}
+.room-empty-idea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

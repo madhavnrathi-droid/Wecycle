@@ -1,5 +1,6 @@
 'use client';
 
+import { getActiveRoom } from '../lib/rooms';
 import { useState } from 'react';
 import {
   Settings, Share2, TrendingUp, Award, ArrowUpRight,
@@ -347,7 +348,7 @@ function CommunityImpactTab() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: '0 0 1px', fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
-            Manipal Academy of Higher Education
+            {getActiveRoom().university === 'NMIMS' ? getActiveRoom().name : 'Manipal Academy of Higher Education'}
           </p>
           <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
             1,847 members · since 2023

@@ -32,6 +32,8 @@
 
 import { Query, ID } from 'appwrite';
 import { tables, toRow, toRows, toPayload, fillServerDefaults, ownerPermissions, APPWRITE_DB, type AnyRow } from './client';
+import { getActiveRoom } from '../rooms';
+import { ROOM_TABLES, roomFilterFor } from './roomScope';
 
 export interface Result<T> { data: T | null; error: { message: string; code?: string } | null; }
 
@@ -189,7 +191,8 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
 
   /* ── execution ── */
   private queries(): string[] {
-    const q = [...this.filters, ...this.orders];
+    const room = this.mode === 'select' ? roomFilterFor(this.table, this.idFilter !== null) : null;
+    const q = [...(room ? [room] : []), ...this.filters, ...this.orders];
     if (this._limit != null) q.push(Query.limit(this._limit));
     if (this._offset != null) q.push(Query.offset(this._offset));
     return q;
@@ -214,6 +217,8 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
           for (const row of this.payload) {
             const { rowId, data } = toPayload(row);
             fillServerDefaults(this.table, data);
+            /* A post goes to the room it was written in. */
+            if (ROOM_TABLES.has(this.table)) data.community_id = getActiveRoom().id;
             const id = rowId ?? ID.unique();
             /* Without this the author of a new post cannot edit or delete it:
                tables grant create and never update, because granting update

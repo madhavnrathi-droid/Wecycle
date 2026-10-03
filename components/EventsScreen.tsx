@@ -1,5 +1,6 @@
 'use client';
 
+import { getActiveRoom, isPrivateRoom } from '../lib/rooms';
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import { Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
@@ -105,7 +106,7 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onOpenMessages
   }, [mounted]);
 
   const allEvents: CommunityEvent[] = useMemo(
-    () => (mounted && isDemoMode() ? EVENTS : liveEvents),
+    () => (mounted && isDemoMode() ? (isPrivateRoom(getActiveRoom()) ? [] : EVENTS) : liveEvents),
     [mounted, liveEvents],
   );
 
