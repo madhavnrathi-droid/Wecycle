@@ -2,7 +2,8 @@
 /**
  * room-permissions.mjs — make private rooms private in the database.
  *
- *   set -a && . db/appwrite/appwrite.env && set +a     # needs a key with tables.write
+ *   set -a && . db/appwrite/appwrite.env && set +a     # needs a key with tables.write:
+ *                                                      # add APPWRITE_ADMIN_KEY=… to that file
  *   node db/appwrite/tools/room-permissions.mjs          # dry run: report only
  *   node db/appwrite/tools/room-permissions.mjs --apply  # change the tables
  *   node db/appwrite/tools/room-permissions.mjs --apply --dm   # also lock DM tables
@@ -37,7 +38,9 @@
 
 const ENDPOINT = process.env.APPWRITE_ENDPOINT;
 const PROJECT = process.env.APPWRITE_PROJECT;
-const KEY = process.env.APPWRITE_KEY;
+/* A separate line for the short-lived console key, so the runtime key in the
+   same file is never overwritten and nothing has to be restored afterwards. */
+const KEY = process.env.APPWRITE_ADMIN_KEY || process.env.APPWRITE_KEY;
 const DB = process.env.APPWRITE_DB || 'wecycle';
 const APPLY = process.argv.includes('--apply');
 const DM = process.argv.includes('--dm');
