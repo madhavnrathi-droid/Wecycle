@@ -253,7 +253,11 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
           for (const rowId of ids) {
             await tables().deleteRow({ databaseId: APPWRITE_DB, tableId: this.table, rowId });
           }
-          return { data: [] as T[], error: null };
+          /* The rows removed, as PostgREST's `.delete().select()` returns them.
+             This returned [] — so every caller checking "did anything get
+             deleted?" (all the post deletes do) reported failure after a
+             delete that had worked, and put the post back on screen. */
+          return { data: ids.map(id => ({ id })) as unknown as T[], error: null };
         }
         default: {
           const res = await tables().listRows({

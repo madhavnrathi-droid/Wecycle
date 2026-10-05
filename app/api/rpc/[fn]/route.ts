@@ -49,6 +49,7 @@ import {
 } from '../../_lib/appwrite';
 import { sendMessage, markConversationRead, canMessage } from '../../_lib/messaging';
 import { roomForNewMember, syncRoomLabels, roomReadPerm } from '../../_lib/rooms';
+import { deletePost, deleteComment } from '../../_lib/deletion';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -391,6 +392,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
 
       case 'ensure_profile':
         return await ensureProfile(uid, args);
+
+      /* Deleting a post or a comment — by its author, or by an admin — with
+         everything that hung off it. See _lib/deletion.ts. */
+      case 'delete_post':
+        return await deletePost(uid, args);
+
+      case 'delete_comment':
+        return await deleteComment(uid, args);
 
       /* Labels follow the member's room (and admin standing) — and the
          response is the rooms this account may view, which is what the

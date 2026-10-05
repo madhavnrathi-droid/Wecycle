@@ -13,7 +13,7 @@
 
 import { assertClean } from './contentFilter';
 import { USERS, type User } from './mockData';
-import { supabase } from './supabase';
+import { supabase, rpcUntyped, BACKEND } from './supabase';
 import type { FeedEntityType } from './api/feed';
 
 export interface Comment {
@@ -227,6 +227,12 @@ export async function removeComment(
   postId: string, commentId: string, _entityType: FeedEntityType, isDemo: boolean,
 ): Promise<boolean> {
   if (isDemo) return deleteComment(postId, commentId);
+  /* Appwrite: through the server, which lets an admin remove anyone's comment
+     and takes the replies with it — there is no cascade to do that here. */
+  if (BACKEND === 'appwrite') {
+    const { error } = await rpcUntyped('delete_comment', { id: commentId });
+    return !error;
+  }
   const { error } = await supabase.from('comments').delete().eq('id', commentId);
   return !error;
 }

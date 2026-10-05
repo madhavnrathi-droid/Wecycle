@@ -16,7 +16,7 @@
  */
 
 import { getActiveRoom, MAHE_ROOM } from './rooms';
-import { supabase, hasSupabaseEnv, rpcUntyped } from './supabase';
+import { supabase, hasSupabaseEnv, rpcUntyped, BACKEND } from './supabase';
 import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData';
 import { listingToComp } from './opportunity';
 import type { CompressedMedia } from './mediaCompression';
@@ -1318,6 +1318,11 @@ export async function deleteEvent(id: string) {
      events row, the organizer-delete storage policy can no longer verify
      ownership and the objects would orphan. */
   await purgeEventFormUploads(id);
+  if (BACKEND === 'appwrite') {
+    try { await deleteOnServer('event', id); }
+    catch (e) { removedIds.delete(id); notifyPostsChanged(); throw e; }
+    return;
+  }
   const { data, error } = await supabase.from('events').delete().eq('id', id).select('id');
   if (error || !data || data.length === 0) {
     removedIds.delete(id);
@@ -1686,12 +1691,29 @@ export async function updateEventMedia(
   notifyPostsChanged();
 }
 
+/* ── Deleting on Appwrite ──────────────────────────────────────────────────
+ * Through the server (app/api/_lib/deletion.ts), not a browser-side delete,
+ * for two reasons. An admin removing someone else's post is refused by the
+ * row's permissions — only its author may delete it — and the server is where
+ * "is this an admin" can actually be checked. And Appwrite has no cascade, so
+ * the post's comments, likes, saves and RSVPs (many owned by other members)
+ * are only removable with the server key. */
+async function deleteOnServer(kind: 'listing' | 'request' | 'lostfound' | 'event', id: string): Promise<void> {
+  const { error } = await rpcUntyped('delete_post', { kind, id });
+  if (error) throw new Error(error.message || 'Could not delete. Try again.');
+}
+
 export async function deleteListingById(id: string) {
   if (!hasSupabaseEnv) throw new Error('Backend not configured');
   /* Optimistic: hide it from every read immediately, then refresh so the
      inventory updates the instant we pop back — no waiting on the round-trip. */
   removedIds.add(id);
   notifyPostsChanged();
+  if (BACKEND === 'appwrite') {
+    try { await deleteOnServer('listing', id); }
+    catch (e) { removedIds.delete(id); notifyPostsChanged(); throw e; }
+    return;
+  }
   /* `.select('id')` makes the delete return the rows it removed. If RLS
      silently blocked it (0 rows), we'd otherwise get a false success — so we
      surface that as an error and un-hide the item. */
@@ -1715,6 +1737,11 @@ export async function deletePostById(id: string, kind: 'listing' | 'request' | '
     'listings';
   removedIds.add(id);
   notifyPostsChanged();
+  if (BACKEND === 'appwrite') {
+    try { await deleteOnServer(kind, id); }
+    catch (e) { removedIds.delete(id); notifyPostsChanged(); throw e; }
+    return;
+  }
   const { data, error } = await supabase.from(table).delete().eq('id', id).select('id');
   if (error || !data || data.length === 0) {
     removedIds.delete(id);

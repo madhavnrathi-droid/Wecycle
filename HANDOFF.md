@@ -407,6 +407,15 @@ See [docs/app-update-flow.md](docs/app-update-flow.md).
   notification flow.
 - **Direct messages ship on the web first.** The phone apps get them with the
   next native build; until then the Message buttons simply are not in them.
+- **Deleting goes through the server.** `delete_post` / `delete_comment`
+  ([`app/api/_lib/deletion.ts`](app/api/_lib/deletion.ts)) let the author or an
+  admin (ADMIN_EMAILS, or `profiles.role` admin/owner) delete, then remove what
+  Postgres used to cascade: comments and replies, likes, saves, RSVPs, forms,
+  notifications; an admin delete marks open reports on it actioned. It also
+  deletes the post's photos — **but the runtime key has no `files.*` scope**,
+  so until one is added, photos of deleted posts stay in storage.
+- **Admin edits of other people's posts** fail the same way deletes did (rows
+  are author-only for update); they need a server route like delete's.
 - **`docs/backend.md` describes Supabase** and is kept for history; the
   Supabase project is still the rollback path.
 
