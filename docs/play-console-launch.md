@@ -57,8 +57,9 @@ populated app and never touches real member data. Change both together if you ro
 
 ## 3. Store listing (copy-paste)
 
-- **App name (≤30):** `Wecycle`
-- **Short description (≤80):** `Share, lend and find what you need on campus. Less waste, more reuse.`
+- **App name (≤30):** `Wecycle: Campus Marketplace` — **not** bare `Wecycle`; see the
+  impersonation note below.
+- **Short description (≤80):** `Buy, borrow & give away on campus. Free, no commission, students only.`
 - **Full description (≤4000):**
 ```
 Wecycle is your campus circular-economy hub — a place to share what you don't need, find what you do, and keep good stuff out of landfills.
@@ -70,7 +71,26 @@ Wecycle is your campus circular-economy hub — a place to share what you don't 
 • Reach people directly — connect over email or WhatsApp; no middlemen, no fees.
 
 Built for students, by students. Reduce waste, save money, and build a more resourceful campus — one shared item at a time.
+
+Wecycle is an independent platform built by students in India. It is not affiliated with, endorsed by, or connected to any other organisation, app or service called Wecycle or WeCycle.
 ```
+
+### Impersonation policy — October 2026
+
+Play rejected the listing under the **Impersonation** policy, citing the title
+`Wecycle` and the feature graphic (a large green "Wecycle" wordmark on a
+pink/orange collage). "Wecycle" is already an established name elsewhere —
+Stichting OPEN's national e-waste brand in the Netherlands, and *WeCycle* by
+Tanbel Inc., a community rent-and-lend app on the App Store — so an automated
+check reads a bare "Wecycle" title and wordmark as someone else's brand.
+
+The fix used: a descriptive title, a feature graphic with **no wordmark and no
+third-party imagery** (`play-assets/feature-graphic.png`, built from the app's
+own voxel illustration), and a non-affiliation line in the full description.
+If Play rejects that too, the options are an appeal backed by a trademark
+filing in our own name, or a store name that does not contain "Wecycle".
+Repeated rejections count against the account, so do not resubmit the same
+assets.
 - **App category:** `Shopping` (alternatives: Lifestyle, Social)
 - **Tags:** marketplace, community, reuse, students, sustainability
 - **Contact email:** `madhav.n.rathi@gmail.com`
@@ -81,7 +101,7 @@ Built for students, by students. Reduce waste, save money, and build a more reso
 | Asset | Spec | Status |
 |---|---|---|
 | App icon | 512×512 PNG, 32-bit | available at `/icons/icon-512.png` — reuse it |
-| Feature graphic | 1024×500 PNG/JPG | **NEEDED** — ask me to generate one |
+| Feature graphic | 1024×500 PNG/JPG | `play-assets/feature-graphic.png` (24-bit PNG, no wordmark — see the impersonation note) |
 | Phone screenshots | 2–8, PNG/JPG, 16:9 or 9:16, min 320px side | **NEEDED** — use your own screen captures (feed, a listing, lost & found, events) |
 | (optional) 7"/10" tablet shots | — | skip |
 
