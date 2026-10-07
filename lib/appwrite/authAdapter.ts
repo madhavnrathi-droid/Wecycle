@@ -43,6 +43,11 @@ type Listener = (event: Event, session: AuthSession | null) => void;
 const listeners = new Set<Listener>();
 let current: AuthSession | null = null;
 
+/* The account id an emailed code belongs to, by address — createEmailToken
+   returns it and createSession needs it back. In memory: a code outliving a
+   reload is re-requested, which the reset screen already offers. */
+const pendingOtp = new Map<string, string>();
+
 function emit(event: Event, session: AuthSession | null): void {
   current = session;
   for (const l of [...listeners]) {
@@ -161,11 +166,71 @@ export const authAdapter = {
     }
   },
 
+  /* ── Emailed codes: "Forgot password?" ──────────────────────────────────
+   *
+   * Supabase's signInWithOtp / verifyOtp, answered by Appwrite's email token:
+   * createEmailToken mails a one-time code and returns the account's id;
+   * createSession with that id and the code signs the member in. The app's
+   * reset screens (email → code → new password) are unchanged.
+   *
+   * These were missing from the adapter entirely, so "Forgot password? Set a
+   * new one" called a function that did not exist and failed for everyone
+   * from the Appwrite cutover on.
+   *
+   * Appwrite makes an account for an address it has never seen, where
+   * Supabase's shouldCreateUser:false would not. That is acceptable here:
+   * the code still has to be read from that inbox, the sign-up gate checked
+   * the domain before anything was sent, and a profile is only ever made by
+   * ensure_profile, which checks the domain again on the server. It also
+   * keeps the reset honest about enumeration — every address gets the same
+   * "a code is on its way". */
+  async signInWithOtp(
+    { email }: { email: string; options?: Record<string, unknown> },
+  ): Promise<AuthResult<Record<string, never>>> {
+    try {
+      const token = await account().createEmailToken({ userId: ID.unique(), email: email.trim().toLowerCase() });
+      pendingOtp.set(email.trim().toLowerCase(), token.userId);
+      return { data: {}, error: null };
+    } catch (e) {
+      return { data: {}, error: err(e) };
+    }
+  },
+
+  async verifyOtp(
+    { email, token }: { email: string; token: string; type?: string },
+  ): Promise<AuthResult<{ user: AuthUser | null; session: AuthSession | null }>> {
+    const userId = pendingOtp.get(email.trim().toLowerCase());
+    if (!userId) {
+      return { data: { user: null, session: null }, error: { message: 'That code has expired — request a new one.', code: 'otp_expired' } };
+    }
+    try {
+      try { await account().deleteSession({ sessionId: 'current' }); } catch { /* none to clear */ }
+      await account().createSession({ userId, secret: token.trim() });
+      pendingOtp.delete(email.trim().toLowerCase());
+      const user = await currentUser();
+      const session = user ? { user } : null;
+      emit('SIGNED_IN', session);
+      return { data: { user, session }, error: null };
+    } catch (e) {
+      return { data: { user: null, session: null }, error: err(e) };
+    }
+  },
+
   async updateUser(
     attrs: { password?: string; email?: string; data?: Record<string, unknown> },
   ): Promise<AuthResult<{ user: AuthUser | null }>> {
     try {
-      if (attrs.password) await account().updatePassword({ password: attrs.password });
+      /* On the server, not account().updatePassword: Appwrite refuses a
+         password change without the OLD password for any account that has
+         one — which is every member, imported with their bcrypt hash — so
+         neither "set a new password" after a reset code nor Settings →
+         Change password could ever succeed. The server sets it for the
+         member its JWT identifies; Change password still checks the current
+         password first, on its own screen. */
+      if (attrs.password) {
+        const r = await rpc('set_password', { password: attrs.password });
+        if (r.error) return { data: { user: null }, error: { message: r.error.message, code: r.error.code } };
+      }
       const user = await currentUser();
       emit('USER_UPDATED', user ? { user } : null);
       return { data: { user }, error: null };

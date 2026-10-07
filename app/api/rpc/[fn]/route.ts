@@ -395,6 +395,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
 
       /* Deleting a post or a comment — by its author, or by an admin — with
          everything that hung off it. See _lib/deletion.ts. */
+      /* A new password for the member the JWT identifies. Appwrite's own
+         account endpoint demands the old password from anyone who has one —
+         every member — which broke both reset-by-code and Change password.
+         The session is the proof: a reset session comes from reading the
+         emailed code, and Change password re-checks the current password on
+         its own screen before calling this. */
+      case 'set_password': {
+        const password = String(args.password ?? '');
+        if (password.length < 8) return json({ message: 'Use at least 8 characters.', code: 'weak_password' }, 400);
+        if (password.length > 256) return json({ message: 'That password is too long.', code: 'weak_password' }, 400);
+        const r = await aw('PATCH', `/users/${uid}/password`, { password });
+        if (!r.ok) return json({ message: String(r.json?.message ?? 'Could not set the password.'), code: String(r.json?.type ?? r.status) }, r.status === 400 ? 400 : 502);
+        return json({ data: true });
+      }
+
       case 'delete_post':
         return await deletePost(uid, args);
 

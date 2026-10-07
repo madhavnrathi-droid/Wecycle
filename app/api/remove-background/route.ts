@@ -141,7 +141,38 @@ async function upstreamError(res: Response): Promise<string | undefined> {
   }
 }
 
+/* ── CORS, for the native apps ──
+   The apps call this from their WebView's own origin — capacitor://localhost
+   on iOS, https://localhost on Android — so their requests are cross-origin.
+   The same-origin guard below already let them through, but without these
+   headers the WebView then refused to hand the response to the app: the photo
+   picker's "Remove background" failed on every phone while working on the
+   website. Only origins the guard admits are echoed back. */
+function corsFor(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin');
+  let originHost: string | null = null;
+  try { originHost = origin ? new URL(origin).host : null; } catch { /* malformed */ }
+  const allowed = !!origin && (originHost === 'localhost' || originHost === req.headers.get('host'));
+  return {
+    ...(allowed ? { 'Access-Control-Allow-Origin': origin as string } : {}),
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+}
+
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 204, headers: corsFor(req) });
+}
+
 export async function POST(req: Request) {
+  const res = await removeBackground(req);
+  for (const [k, v] of Object.entries(corsFor(req))) res.headers.set(k, v);
+  return res;
+}
+
+async function removeBackground(req: Request): Promise<NextResponse> {
   const available = PROVIDERS.filter(p => keyFor(p) !== null);
   if (available.length === 0) {
     return NextResponse.json(
