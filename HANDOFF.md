@@ -321,6 +321,24 @@ New members get a profile from `ensure_profile` in the rpc route — Appwrite ha
 no triggers, so this replaces the Postgres trigger that used to do it. Sign-up
 calls it; `AuthContext` also calls it if a signed-in member has no profile.
 
+### Passwords and emailed codes
+
+- **Forgot password** uses Appwrite's emailed one-time code:
+  `signInWithOtp` → `account.createEmailToken`, `verifyOtp` →
+  `account.createSession` (in [`lib/appwrite/authAdapter.ts`](lib/appwrite/authAdapter.ts)).
+  Codes are 6 digits and last **15 minutes**. Appwrite creates an account for
+  an address it has never seen; harmless here because `ensure_profile` gates
+  profiles by domain on the server.
+- **Setting a password** (after a reset code, or Settings → Change password)
+  goes through the server: `set_password` in the rpc route, for the member
+  the JWT identifies. `account.updatePassword` cannot be used — Appwrite
+  demands the old password from any account that has one, which is every
+  member (imported bcrypt hashes).
+- **Email delivery is Appwrite's default sender.** Whether it reaches
+  Manipal/NMIMS (Microsoft 365) inboxes rather than junk has not been verified
+  with a real mailbox; if it does not, configure custom SMTP in the console
+  (Settings → SMTP).
+
 ### The college-email gate — partly open
 
 Postgres enforced "Manipal emails only" with a trigger that could not be
