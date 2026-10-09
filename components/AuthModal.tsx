@@ -1641,7 +1641,34 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
         {/* ── Help ──
            Opens the user's mail app with the subject prefilled. Available on
            every step, since the step you're stuck on is the one you need help
-           with. A plain mailto anchor so it works in the native shell too. */}
+           with. A plain mailto anchor so it works in the native shell too.
+
+           The sign-up form asks a different question: the person stuck there
+           usually has no college address at all — a faculty guest, a partner
+           business. The team onboards those by hand (PARTNER_EMAILS in
+           lib/emailDomain.ts), so this is how they ask. */}
+        {mode === 'signup' && step === 'credentials' && !resetting ? (
+          <p style={{
+            alignSelf: 'center', margin: '2px 0 0', textAlign: 'center',
+            color: 'var(--text-muted)',
+            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, lineHeight: 1.5,
+          }}>
+            No manipal.edu email?{' '}
+            <a
+              href={`mailto:${HELP_EMAIL}?subject=${encodeURIComponent(
+                'Wecycle — joining without a manipal.edu email',
+              )}&body=${encodeURIComponent(
+                'Hi Wecycle team,\n\nI’d like to join Wecycle but don’t have a manipal.edu email.\n\nName:\nEmail I’d like to use:\nWho I am (student, faculty, business…):\n',
+              )}`}
+              style={{
+                color: 'var(--text-primary)', fontWeight: 600,
+                textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3,
+              }}
+            >
+              Contact us
+            </a>
+          </p>
+        ) : (
         <a
           href={`mailto:${HELP_EMAIL}?subject=${encodeURIComponent('Wecycle — help signing in')}`}
           style={{
@@ -1658,6 +1685,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
           <LifeBuoy size={13} strokeWidth={2} />
           Trouble signing in? Email us
         </a>
+        )}
       </form>
     </Modal>
   );

@@ -85,6 +85,7 @@ export const LEGACY_MEMBER_EMAILS: ReadonlyArray<string> = [
  * added here alone gets past the app and is refused by the database. */
 export const PARTNER_EMAILS: ReadonlyArray<string> = [
   'noolucollective.team@gmail.com',   /* Noolu Collective */
+  'shubham@madcatdesignhouse.com',    /* Madcat Design House */
 ] as const;
 
 /** True when the address is an onboarded partner rather than a member. */

@@ -82,3 +82,13 @@ test('the query builder scopes posts and lists of people to the room on screen',
   setActiveRoom(MAHE_ROOM.id);
   assert.ok((roomFilterFor('listings', false) ?? '').includes(MAHE_ROOM.id));
 });
+
+test('onboarded partners sign in and reset, but the public sign-up form still refuses them', () => {
+  for (const addr of ['shubham@madcatdesignhouse.com', 'Shubham@MadcatDesignHouse.com ']) {
+    assert.equal(emailGateProblem(addr, 'signin'), null, addr);
+    assert.equal(emailGateProblem(addr, 'reset'), null, addr);
+    assert.ok(emailGateProblem(addr, 'signup'), addr);
+  }
+  /* the domain is not what is trusted, the one address is */
+  assert.ok(emailGateProblem('someone.else@madcatdesignhouse.com', 'signin'));
+});
