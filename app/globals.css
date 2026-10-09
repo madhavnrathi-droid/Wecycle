@@ -8393,3 +8393,7 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
   .detail-flow > .hero-sentinel ~ *,
   .detail-flow > .hero-sentinel ~ .detail-actionbar { animation: none; }
 }
+
+/* Storefront tiles: two lines of title. Every tile is the same shape now, so
+   there is room, and "Toothless Dragon crochet…" was cutting the noun. */
+.masonry-shell .feed-card-title { -webkit-line-clamp: 2; }

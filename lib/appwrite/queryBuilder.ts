@@ -81,6 +81,8 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
   private mode: 'select' | 'insert' | 'update' | 'delete' | 'upsert' = 'select';
   private payload: AnyRow[] = [];
   private wantCount = false;
+  /** PostgREST's head:true — the count only, no rows. */
+  private wantHead = false;
   /** Only an id filter lets a write skip the "list first" round trip. */
   private idFilter: string | string[] | null = null;
   private otherFilters = 0;
@@ -88,9 +90,10 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
   constructor(private table: string) {}
 
   /* ── shaping ── */
-  select(sel = '*', opts?: { count?: 'exact' | 'planned' | 'estimated' }): this {
+  select(sel = '*', opts?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }): this {
     if (this.mode === 'select') this.mode = 'select';
     if (opts?.count) this.wantCount = true;
+    if (opts?.head) this.wantHead = true;
     if (sel.includes('(')) this.embeds = parseSelect(sel, this.table).embeds;
     return this;
   }
@@ -275,12 +278,53 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
           return { data: ids.map(id => ({ id })) as unknown as T[], error: null };
         }
         default: {
+          /* Count only: one row is enough for Appwrite to report the total. */
+          if (this.wantHead) {
+            const room = roomFilterFor(this.table, this.idFilter !== null);
+            const res = await tables().listRows({
+              databaseId: APPWRITE_DB, tableId: this.table,
+              queries: [...(room ? [room] : []), ...this.filters, Query.limit(1)],
+            });
+            return { data: [] as T[], error: null, count: res.total };
+          }
           const res = await tables().listRows({
             databaseId: APPWRITE_DB, tableId: this.table, queries: this.queries(),
           });
           let rows = toRows<AnyRow>(res.rows as AnyRow[]);
+          let total = res.total;
+          /* ── No limit means ALL of them ──
+             PostgREST returns every matching row when a query has no
+             .limit(); Appwrite returns the first 25 and stops. Every query
+             written against Supabase without a limit has been silently capped
+             at 25 since the cutover — a seller with 47 listings showed 25 on
+             their storefront. Keep reading, 100 at a time on a cursor, until
+             a short page says there are no more. Capped at 5,000 rows so a
+             runaway query can't page forever. */
+          if (this._limit == null && rows.length >= 25 && res.total > rows.length) {
+            const PAGE = 100;
+            const room = roomFilterFor(this.table, this.idFilter !== null);
+            const base = [...(room ? [room] : []), ...this.filters, ...this.orders];
+            const all: AnyRow[] = [];
+            let cursor: string | null = null;
+            for (let page = 0; page < 50; page++) {
+              const r = await tables().listRows({
+                databaseId: APPWRITE_DB, tableId: this.table,
+                queries: [
+                  ...base,
+                  Query.limit(PAGE),
+                  ...(cursor ? [Query.cursorAfter(cursor)] : this._offset != null ? [Query.offset(this._offset)] : []),
+                ],
+              });
+              const got = r.rows as AnyRow[];
+              all.push(...got);
+              total = r.total;
+              if (got.length < PAGE) break;
+              cursor = String(got[got.length - 1].$id);
+            }
+            rows = toRows<AnyRow>(all);
+          }
           if (this.embeds.length) rows = await stitch(rows, this.embeds);
-          return { data: rows as T[], error: null, count: res.total };
+          return { data: rows as T[], error: null, count: total };
         }
       }
     } catch (e) {

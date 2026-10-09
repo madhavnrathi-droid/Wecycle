@@ -446,11 +446,18 @@ export default function StorefrontScreen({
                     the sort. And staggered tile heights put every price on a
                     different baseline, which is exactly the comparison a
                     marketplace grid exists to make easy. */}
-                {filteredUploads.map((item, idx) => (
+                {/* One shape for every tile. The tiles used to cycle through
+                    five ratios (portrait, square, tall, landscape) inside this
+                    strict grid, and a grid row is as tall as its tallest
+                    member — so every shorter tile left a hole under it, the
+                    gaps the storefront was full of. A uniform ratio is also
+                    the point the note above makes: prices on one baseline.
+                    0.82, the same as the Lost & Found tiles below, and close
+                    to the 4:5 most phone photos are shot at. */}
+                {filteredUploads.map(item => (
                   <ItemTile
                     key={item.id}
                     item={item}
-                    variant={(['portrait','square','tall','landscape','portrait'] as const)[idx % 5]}
                     onClick={() => onOpenItem(item)}
                   />
                 ))}
@@ -730,10 +737,10 @@ const RATIOS = {
 } as const;
 
 function ItemTile({
-  item, variant, onClick,
+  item, variant = 'portrait', onClick,
 }: {
   item: MarketplaceItem;
-  variant: keyof typeof RATIOS;
+  variant?: keyof typeof RATIOS;
   onClick: () => void;
 }) {
   /* First slide as a thumbnail — use the video poster if the first media is a clip. */
@@ -753,10 +760,14 @@ function ItemTile({
       <div className="feed-card-overlay">
         <p className="feed-card-title">{item.title}</p>
         <div className="feed-card-meta">
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <MapPin size={10} strokeWidth={2} />
-            {item.location}
-          </span>
+          {/* A pin with no place after it reads as missing data, so it only
+              appears with a location. The empty span keeps the price right. */}
+          {item.location ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, minWidth: 0 }}>
+              <MapPin size={10} strokeWidth={2} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.location}</span>
+            </span>
+          ) : <span aria-hidden="true" />}
           <span className="feed-card-price">
             {isPriced
               ? <><IndianRupee size={9} strokeWidth={2.5} style={{ display: 'inline', verticalAlign: '-1px' }} />{item.price}</>
