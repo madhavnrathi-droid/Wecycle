@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { track, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
+import { useSheet } from '../lib/useSheet';
 
 export type PostKind = 'share' | 'service' | 'request' | 'event' | 'report-lf';
 
@@ -43,17 +44,26 @@ const POST_OPTIONS: { id: PostKind; icon: string; label: string; desc: string; c
 export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
   /* Fire-once when the sheet opens — the parent decides whether to mount us. */
   useEffect(() => { track(EVT.post_picker_opened); }, []);
+  /* Mounted only while shown, so it is always "open" here; closing animates
+     out first and then tells the parent. */
+  const { sheetRef, backdropRef, requestClose, dragProps } = useSheet({ open: true, onClose });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') requestClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [requestClose]);
   return (
     <>
-      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
+      <div ref={backdropRef} className="modal-backdrop" onClick={requestClose} aria-hidden="true" />
       <div
+        ref={sheetRef}
         className="modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="post-sheet-title"
       >
         {/* drag handle */}
-        <div className="mobile-only" style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}>
+        <div className="mobile-only sheet-grab" {...dragProps} style={{ ...dragProps.style, display: 'flex', justifyContent: 'center', padding: '8px 0 6px', marginBottom: -6 }}>
           <div style={{
             width: 36, height: 4,
             background: 'var(--border-strong)',
@@ -61,14 +71,14 @@ export default function PostSheet({ onClose, onSelect }: PostSheetProps) {
           }} aria-hidden="true" />
         </div>
 
-        <div className="modal-header">
+        <div className="modal-header" onPointerDown={dragProps.onPointerDown}>
           <div style={{ flex: 1 }}>
             <h2 id="post-sheet-title" className="modal-title">Create a post</h2>
             <p style={{ margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
               What would you like to do?
             </p>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close dialog">
+          <button className="modal-close" onClick={requestClose} aria-label="Close dialog">
             <X size={18} strokeWidth={2} />
           </button>
         </div>

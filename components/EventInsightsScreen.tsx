@@ -29,6 +29,7 @@ import { isDemoMode } from '../lib/demoMode';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
+import { useGlide } from '../lib/useGlide';
 
 interface EventInsightsScreenProps {
   event: CommunityEvent;
@@ -41,6 +42,8 @@ type Tab = 'attendees' | 'responses';
 export default function EventInsightsScreen({ event, onBack, onOpenUser }: EventInsightsScreenProps) {
   const { isDesktop } = useBreakpoint();
   const [tab, setTab] = useState<Tab>('attendees');
+  /* The selected tab's pill travels between tabs — see lib/useGlide.ts. */
+  const tabsGlideRef = useGlide(tab);
   const [attendees, setAttendees] = useState<EventAttendee[]>([]);
   const [commentCount, setCommentCount] = useState(0);
   const [form, setForm] = useState<EventFormRecord | null>(null);
@@ -172,7 +175,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
         </div>
 
         {/* ── Tabs ── */}
-        <div className="segmented" style={{ marginBottom: 16, maxWidth: 420 }}>
+        <div className="segmented" ref={tabsGlideRef} style={{ marginBottom: 16, maxWidth: 420 }}>
           <button
             onClick={() => { setTab('attendees'); track(EVT.insights_tab_changed, { event_id: event.id, tab: 'attendees' }); }}
             aria-pressed={tab === 'attendees'}

@@ -17,6 +17,7 @@ import type { DeepLinkPost } from '../../lib/liveData';
 import { blockUser, unblockUser } from '../../lib/moderation';
 import { haptics } from '../../lib/haptics';
 import { sfxSend } from '../../lib/sfx';
+import { moments } from '../../lib/moments';
 import { getSettings } from '../../lib/settings';
 import { track, EVT } from '../../lib/analytics';
 import { collegeName } from '../../lib/colleges';
@@ -141,6 +142,10 @@ export default function ChatThread({ conversationId, onBack, onOpenProfile, onOp
       const last = messages[messages.length - 1];
       if (last && (last.senderId === me || atBottom.current)) scrollToBottom(true);
       else if (last) setNewBelow(true);
+      /* A reply landed while this chat is open: a light tick, and the chime if
+         the member turned message sounds on. Not for their own sends — those
+         already have their own sound — and not for history loading above. */
+      if (last && last.senderId !== me && !seen.current.has(last.id)) moments.replyReceived();
     }
     firstId.current = f;
     lastId.current = l;

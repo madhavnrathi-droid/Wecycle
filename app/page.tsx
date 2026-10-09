@@ -1003,6 +1003,7 @@ export default function WecycleApp() {
             active={activeScreen}
             onChange={setActiveScreen}
             onPost={() => requireAuth('post-picker')}
+            postOpen={modal === 'post-picker'}
           />
 
           {/* ── DRAWER ── */}

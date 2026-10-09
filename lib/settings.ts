@@ -37,6 +37,13 @@ export interface QuietHours {
 export interface AppearanceSettings {
   theme: ThemeMode;
   largerText: boolean;
+  /* Sounds that answer something the member just did — a post going live, an
+   * item marked sold, a save. Unset means "the platform default": on in the
+   * iOS/Android apps, where the phone's silent switch already governs them,
+   * and off on the web, where a page that makes noise is a surprise. These are
+   * not the chime in notifications.channels.sound: that one ANNOUNCES other
+   * people's activity, which is an interruption; these confirm your own. */
+  actionSounds?: boolean;
 }
 
 export interface PrivacySettings {

@@ -22,6 +22,7 @@ import {
   type DealType, type RentPeriod,
 } from '../../lib/dealTypes';
 import { haptics } from '../../lib/haptics';
+import { markJustPosted } from '../../lib/moments';
 
 /* The taxonomy lives in lib/categories — one list for the chips, the rails and
    every post form. This file used to carry its own copy, which had already
@@ -229,7 +230,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
       onClose();
       /* After the sheet is closed and the form is clear, so the detail screen
          does not open behind a modal that is still unmounting. */
-      if (created) onPosted?.(created);
+      if (created) { markJustPosted(created.id); onPosted?.(created); }
     } catch (err) {
       haptics.error();
       track(EVT.post_form_failed, {

@@ -32,6 +32,9 @@ import PhotoEditDialog from './PhotoEditDialog';
 import { isDemoMode } from '../lib/demoMode';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
+import { moments, consumeJustPosted } from '../lib/moments';
+import { toast } from '../lib/toast';
+import { getActiveRoom } from '../lib/rooms';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES, closedLabelFor } from '../lib/mockData';
 import { normalizeCategory, categoryLabel, categoryIdOf } from '../lib/categories';
@@ -39,6 +42,7 @@ import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
 import { transitionStyle } from '../lib/viewTransition';
+import AmbientArt from './AmbientArt';
 import { Logomark } from './Brand';
 import { WA_FILL, WA_INK } from '../lib/whatsapp';
 import {
@@ -446,7 +450,30 @@ function linkBtn(color: string): React.CSSProperties {
   };
 }
 
+/** The first still photo in a media list — a video entry's poster counts. */
+function firstPhotoSrc(media: ReadonlyArray<string | { kind?: string; src: string; poster?: string }>): string | null {
+  for (const m of media) {
+    if (typeof m === 'string') return m;
+    if (m.poster) return m.poster;
+  }
+  return null;
+}
+
 export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onMessage, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+  /* The post-live moment: the form that just published this marked it, and
+     this is where the member is looking now. The hero lands and rings once,
+     the chime plays, and a toast names where it went live. The success haptic
+     already fired at the moment of posting, so it isn't repeated here. */
+  useEffect(() => {
+    if (!consumeJustPosted(itemProp.id)) return;
+    const t = window.setTimeout(() => {
+      const hero = Array.from(document.querySelectorAll<HTMLElement>('[data-hero]'))
+        .find(el => el.dataset.hero === itemProp.id && el.offsetParent !== null) ?? null;
+      moments.postLive(hero, { haptic: false });
+      toast(`Live in ${getActiveRoom().name}`, { tone: 'success' });
+    }, 280);
+    return () => window.clearTimeout(t);
+  }, [itemProp.id]);
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(itemProp.saved);
   const [reportOpen, setReportOpen] = useState(false);
@@ -862,8 +889,9 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     if (isLive) incrementListingView(item.id);
   }, [item.id]);
 
-  const handleToggleSave = () => {
+  const handleToggleSave = (e?: React.MouseEvent<HTMLElement>) => {
     if (!user) { onRequireAuth(); return; }
+    if (saved) moments.unsaved(); else moments.saved(e?.currentTarget);
     setSaved(s => !s); // optimistic
     if (!isDemoMode()) {
       toggleListingSave(item.id).catch(() => setSaved(s => !s)); // revert on failure
@@ -1132,7 +1160,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   }
 
   return (
-    <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div className="screen-transition detail-flow" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%', position: 'relative', isolation: 'isolate' }}>
+      <AmbientArt src={firstPhotoSrc(displayPhotos)} />
 
       {/* ── HEADER (mobile back) ── */}
       <header
@@ -1226,7 +1255,9 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           padding: 'calc(8px + env(safe-area-inset-top, 0px)) 12px 8px',
           display: 'flex', alignItems: 'center', gap: 8,
           transform: heroVisible ? 'translateY(-100%)' : 'translateY(0)',
-          transition: 'transform 200ms ease',
+          transition: heroVisible
+            ? 'transform var(--dur-2) var(--ease-exit)'
+            : 'transform var(--dur-3) var(--ease-enter)',
           /* Pointer events only when visible — prevents ghost tap targets */
           pointerEvents: heroVisible ? 'none' : 'auto',
         }}
@@ -1331,7 +1362,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
                interpolates into this frame instead of the page cutting, so the
                thing that was tapped is visibly the thing that opened. */
             ...transitionStyle(item.id),
-          }}>
+          }} data-hero={item.id}>
             <PhotoCarousel
               photos={displayPhotos}
               aspectRatio={heroAspect}
@@ -1388,7 +1419,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
         </section>
       ) : null}
       {/* Sentinel: when this leaves the viewport the sticky title bar appears */}
-      <div ref={heroSentinelRef} style={{ height: 0, margin: 0 }} aria-hidden="true" />
+      <div ref={heroSentinelRef} className="hero-sentinel" style={{ height: 0, margin: 0 }} aria-hidden="true" />
 
       {/* ── TITLE + META ──
          Owner-edit mode breaks the meta into one-field-per-row so each
@@ -1724,7 +1755,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
       )}
 
       {/* ── ACTION BAR ── */}
-      <section style={{
+      <section className="detail-actionbar" style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 430,
         /* ── Give the scrim room to actually be a scrim ──
@@ -2148,7 +2179,8 @@ function DesktopLayout({
   } = editState;
   void setSaved; /* save state is driven through onToggleSave now */
   return (
-    <div className="screen-transition" style={{ background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div className="screen-transition" style={{ background: 'var(--bg-base)', minHeight: '100%', position: 'relative', isolation: 'isolate' }}>
+      <AmbientArt src={firstPhotoSrc(photos)} />
       {/* Slim top bar: breadcrumb always visible + title/price/CTA fade in after hero */}
       <header role="banner" style={{
         position: 'sticky', top: 0, zIndex: 30,
@@ -2273,7 +2305,7 @@ function DesktopLayout({
             borderRadius: 20,
             overflow: 'hidden',
             background: 'var(--bg-inset)',
-          }}>
+          }} data-hero={item.id}>
             <PhotoCarousel
               photos={photos}
               aspectRatio={heroAspect}

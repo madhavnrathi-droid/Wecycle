@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { lockBodyScroll } from '../lib/bodyLock';
+import { useSheet } from '../lib/useSheet';
 
 interface ModalProps {
   open: boolean;
@@ -21,13 +22,14 @@ interface ModalProps {
 export default function Modal({
   open, onClose, title, children, footer, maxWidth,
 }: ModalProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
+  /* Presence, exit and drag-to-dismiss — see lib/useSheet.ts. The sheet's ref
+     doubles as the focus-trap container. */
+  const { present, sheetRef: modalRef, backdropRef, requestClose, dragProps } = useSheet({ open, onClose });
+  /* The latest close, without retriggering the keyboard effect on every parent
+     re-render (a stale closure there once stole focus on each keystroke). */
+  const requestCloseRef = useRef(requestClose);
+  useEffect(() => { requestCloseRef.current = requestClose; }, [requestClose]);
   const previousFocusRef = useRef<HTMLElement | null>(null);
-
-  /* Keep the latest onClose without retriggering the effect every parent re-render.
-     (Stale-closure bug otherwise stole focus from inputs on each keystroke.) */
-  const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   /* Body scroll lock — ref-counted so a full-page surface layered above
      (e.g. the form builder) can hold its own lock without the restore order
@@ -60,7 +62,7 @@ export default function Modal({
       if (document.querySelector('[data-fbs]')) return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        onCloseRef.current();
+        requestCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -86,11 +88,11 @@ export default function Modal({
     };
   }, [open]);  /* ← intentionally NOT depending on onClose */
 
-  if (!open) return null;
+  if (!present) return null;
 
   return (
     <>
-      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
+      <div ref={backdropRef} className="modal-backdrop" onClick={requestClose} aria-hidden="true" />
       <div
         ref={modalRef}
         className="modal"
@@ -100,8 +102,8 @@ export default function Modal({
         style={maxWidth ? { maxWidth } : undefined}
         tabIndex={-1}
       >
-        {/* Mobile drag handle (purely decorative) */}
-        <div className="mobile-only" style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}>
+        {/* Mobile drag handle — a real one now: drag it (or the header) down. */}
+        <div className="mobile-only sheet-grab" {...dragProps} style={{ ...dragProps.style, display: 'flex', justifyContent: 'center', padding: '8px 0 6px', marginBottom: -6 }}>
           <div style={{
             width: 36, height: 4,
             background: 'var(--border-strong)',
@@ -109,9 +111,9 @@ export default function Modal({
           }} aria-hidden="true" />
         </div>
 
-        <div className="modal-header">
+        <div className="modal-header" onPointerDown={dragProps.onPointerDown}>
           <h2 id="modal-title" className="modal-title">{title}</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close dialog">
+          <button className="modal-close" onClick={requestClose} aria-label="Close dialog">
             <X size={18} strokeWidth={2} />
           </button>
         </div>

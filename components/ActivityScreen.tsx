@@ -18,6 +18,7 @@ import {
 } from '../lib/alerts';
 import { getPostMetrics, getEventMetrics, summarizeCombined } from '../lib/metrics';
 import { isDemoMode } from '../lib/demoMode';
+import { useGlide } from '../lib/useGlide';
 
 type Tab = 'stats' | 'alerts' | 'inbox';
 
@@ -39,6 +40,8 @@ export default function ActivityScreen({
   const { user, isDemo } = useAuth();
   const mode = isDemo ? 'demo' : 'supabase';
   const [activeTab, setActiveTab] = useState<Tab>('stats');
+  /* The selected tab's pill travels between tabs — see lib/useGlide.ts. */
+  const tabsGlideRef = useGlide(activeTab);
   const [alerts, setAlerts] = useState<WecycleAlert[]>([]);
 
   /* Load + subscribe to alerts changes (Realtime for supabase, custom event for demo) */
@@ -101,7 +104,7 @@ export default function ActivityScreen({
       <section style={{ padding: '0 16px 16px' }}>
         {/* Tracks come from the stylesheet — see InventoryScreen for why a
             fixed repeat(N, 1fr) truncates the longest label. */}
-        <div className="segmented">
+        <div className="segmented" ref={tabsGlideRef}>
           <button
             onClick={() => setActiveTab('stats')}
             aria-pressed={activeTab === 'stats'}

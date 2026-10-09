@@ -199,11 +199,52 @@
   --radius-2xl: 24px;
   --radius-pill: 999px;
 
-  /* Motion */
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* ── Motion ─────────────────────────────────────────────────────────────
+   *
+   * Five durations, three curves, two springs. Every transition and one-shot
+   * animation in the app draws from these; nothing else picks its own number.
+   * The app had grown fifteen durations and twelve curves (one of them,
+   * --ease-spring, defined twice with different values), which is why some
+   * sheets bounced and others glided, and why nothing felt like one product.
+   *
+   *   --dur-1  100ms  press feedback, colour flips — inside the 0.1 s that
+   *                   reads as instant
+   *   --dur-2  160ms  hover, chips, toggles; and the EXIT of any --dur-3 enter
+   *   --dur-3  240ms  sheets, menus, crossfades, a photo arriving
+   *   --dur-4  360ms  card → detail, an item landing in a list, the heart
+   *   --dur-5  520ms  celebration only (post live, sold) — one per screen
+   *
+   * Exits run at about two-thirds of their enter: leaving should never be
+   * the slow part. Ambient loops (shimmer, the banner drift) keep their own
+   * long periods; they are atmosphere, not responses.
+   *
+   * The springs are physical ones written out as linear() curves:
+   *   snappy  stiffness 520, damping 34, mass 1 — ζ 0.75, ~3% overshoot,
+   *           settles in ~240ms. Presses, inserts, snap-backs.
+   *   bouncy  stiffness 380, damping 20, mass 1 — ζ 0.51, ~15% overshoot,
+   *           settles in ~400ms. The heart and the SOLD stamp, nothing else.
+   * linear() needs Safari 17.2; older WebKit gets the cubic fallbacks below,
+   * because an unsupported value inside `transition` would void the whole
+   * declaration and leave the element with no transition at all. */
+  --dur-1: 100ms;
+  --dur-2: 160ms;
+  --dur-3: 240ms;
+  --dur-4: 360ms;
+  --dur-5: 520ms;
+  /* What every movement becomes under prefers-reduced-motion: a plain 120ms
+     crossfade, so the change is still shown — just not performed. */
+  --dur-reduced: 120ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --spring-snappy: cubic-bezier(0.25, 1.15, 0.5, 1);
+  --spring-bouncy: cubic-bezier(0.3, 1.45, 0.45, 1);
+
+  /* The older names, kept so nothing breaks, and pointed at the system. */
+  --ease-spring: var(--spring-snappy);
+  --ease-smooth: var(--ease-standard);
+  --ease-out: var(--ease-enter);
+  --ease-in: var(--ease-exit);
 
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -211,6 +252,27 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.06);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
   --shadow-accent: 0 4px 24px rgba(184, 240, 0, 0.30);
+}
+
+/* The real springs, where the engine can draw them. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring-snappy: linear(0, 0.2348 7.5%, 0.6235 16.4%, 0.8854 25.3%, 1.0094 33.6%,
+      1.0373 40.2%, 1.0302 48%, 1.0056 64.3%, 0.9993 80.2%, 1);
+    --spring-bouncy: linear(0, 0.1925 6.6%, 0.6408 15.5%, 1.0151 24.6%, 1.1376 30.6%,
+      1.1659 35.4%, 1.1394 41.1%, 0.9978 57.3%, 0.9688 64.8%, 0.9726 73.3%,
+      1.0035 92.7%, 1);
+  }
+}
+
+/* Asked for less motion: nothing overshoots, nothing travels far. The
+   per-component blocks further down swap their moves for crossfades; this one
+   makes sure anything they missed at least settles without a bounce. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --spring-snappy: var(--ease-standard);
+    --spring-bouncy: var(--ease-standard);
+  }
 }
 
 .dark {
@@ -481,7 +543,7 @@ body {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-smooth);
+  transition: transform var(--dur-3) var(--ease-spring), box-shadow var(--dur-3) var(--ease-smooth);
 }
 
 .card:active {
@@ -517,7 +579,7 @@ body {
   border-radius: var(--radius-pill);
   border: none;
   cursor: pointer;
-  transition: all 0.18s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   white-space: nowrap;
   user-select: none;
   -webkit-user-select: none;
@@ -622,7 +684,7 @@ body {
   padding: 12px 16px;
   width: 100%;
   outline: none;
-  transition: border-color 0.15s var(--ease-smooth);
+  transition: border-color var(--dur-2) var(--ease-smooth);
 }
 
 .input:focus { border-color: var(--accent-lime); }
@@ -637,7 +699,7 @@ body {
   padding: 10px 16px 10px 40px;
   width: 100%;
   outline: none;
-  transition: all 0.15s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
 }
 .search-input:focus {
   border-color: var(--accent-lime);
@@ -709,12 +771,12 @@ body {
   100% { transform: translateX(-50%); }
 }
 
-.animate-slide-up { animation: slide-up 0.4s var(--ease-spring) forwards; }
-.animate-slide-down { animation: slide-down 0.35s var(--ease-smooth) forwards; }
-.animate-fade-in { animation: fade-in 0.3s var(--ease-smooth) forwards; }
-.animate-scale-in { animation: scale-in 0.3s var(--ease-spring) forwards; }
+.animate-slide-up { animation: slide-up var(--dur-4) var(--ease-spring) forwards; }
+.animate-slide-down { animation: slide-down var(--dur-4) var(--ease-smooth) forwards; }
+.animate-fade-in { animation: fade-in var(--dur-4) var(--ease-smooth) forwards; }
+.animate-scale-in { animation: scale-in var(--dur-4) var(--ease-spring) forwards; }
 .animate-pulse-glow { animation: pulse-glow 2s infinite; }
-.animate-count-up { animation: count-up 0.4s var(--ease-spring) forwards; }
+.animate-count-up { animation: count-up var(--dur-4) var(--ease-spring) forwards; }
 
 .skeleton {
   background: linear-gradient(90deg,
@@ -723,7 +785,11 @@ body {
     var(--bg-inset) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  /* Invisible for the first 300ms, then fades in. A load faster than that
+     never shows a loading state at all, which is what keeps quick screens
+     from flickering grey → content. */
+  animation: fade-in var(--dur-3) var(--ease-standard) 300ms backwards,
+             shimmer 1.5s linear 300ms infinite;
   border-radius: var(--radius-md);
 }
 
@@ -732,11 +798,11 @@ body {
    ═══════════════════════════════════════════════ */
 
 .screen-transition {
-  animation: fade-in 0.25s var(--ease-smooth);
+  animation: fade-in var(--dur-3) var(--ease-smooth);
 }
 
 .press-scale {
-  transition: transform 0.15s var(--ease-spring);
+  transition: transform var(--dur-2) var(--ease-spring);
 }
 .press-scale:active { transform: scale(0.96); }
 
@@ -1193,7 +1259,7 @@ section.mobile-only { display: block; }
      the page surface IS the banner's background. */
   background: transparent;
   overflow: hidden;
-  transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: transform var(--dur-3) var(--ease-enter);
   display: flex;
 }
 .marketing-banner-slide:focus-visible {
@@ -1444,7 +1510,7 @@ section.mobile-only { display: block; }
   color: #FFFFFF;
   border-radius: 50%;
   opacity: 0;
-  transition: opacity 240ms ease, transform 240ms ease;
+  transition: opacity var(--dur-3) var(--ease-standard), transform var(--dur-3) var(--ease-standard);
 }
 .marketing-banner-compact .marketing-banner-arrow {
   width: 22px; height: 22px;
@@ -1503,7 +1569,7 @@ section.mobile-only { display: block; }
   border: none;
   padding: 0;
   cursor: pointer;
-  transition: width 220ms ease, background 220ms ease;
+  transition: width var(--dur-3) var(--ease-standard), background var(--dur-3) var(--ease-standard);
 }
 .marketing-banner-dot::after {
   content: '';
@@ -1607,7 +1673,7 @@ section.mobile-only { display: block; }
   margin-top: -8px; /* (thumb 22 - track 8) / -2 ≈ centers it */
   cursor: grab;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform var(--dur-1) var(--ease-standard), box-shadow var(--dur-1) var(--ease-standard);
 }
 .duration-slider::-moz-range-thumb {
   width: 22px;
@@ -1617,7 +1683,7 @@ section.mobile-only { display: block; }
   border: 3px solid var(--neon);
   cursor: grab;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform var(--dur-1) var(--ease-standard), box-shadow var(--dur-1) var(--ease-standard);
 }
 
 .duration-slider:active::-webkit-slider-thumb,
@@ -1686,7 +1752,7 @@ section.mobile-only { display: block; }
   border-radius: 14px;
   cursor: pointer;
   min-width: 0;
-  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  transition: background var(--dur-2) var(--ease-standard), border-color var(--dur-2) var(--ease-standard), transform var(--dur-2) var(--ease-standard);
 }
 .user-search-card:hover {
   background: var(--bg-card-hover);
@@ -1758,7 +1824,7 @@ section.mobile-only { display: block; }
   border: 2px solid transparent;
   pointer-events: none;
   z-index: 5;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition: border-color var(--dur-3) var(--ease-standard), box-shadow var(--dur-3) var(--ease-standard);
 }
 .inventory-card[data-stroke="marketplace"]::after {
   border-color: #22C55E;             /* mint green */
@@ -1887,7 +1953,7 @@ section.mobile-only { display: block; }
   padding: 10px 14px;
   margin: 0;
   outline: none;
-  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition: background var(--dur-2) var(--ease-standard), border-color var(--dur-2) var(--ease-standard), box-shadow var(--dur-2) var(--ease-standard);
   -webkit-appearance: none;
   appearance: none;
 }
@@ -1995,7 +2061,7 @@ section.mobile-only { display: block; }
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard);
 }
 .listing-type-chip:hover {
   color: var(--text-primary);
@@ -2022,7 +2088,7 @@ section.mobile-only { display: block; }
   padding: 10px 14px;
   color: var(--accent-amber-ink);
   font-weight: 700;
-  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition: background var(--dur-2) var(--ease-standard), border-color var(--dur-2) var(--ease-standard), box-shadow var(--dur-2) var(--ease-standard);
 }
 .price-input-wrap:hover { border-color: var(--edit-border-hover); }
 .price-input-wrap:focus-within {
@@ -2070,7 +2136,7 @@ section.mobile-only { display: block; }
   font-size: calc(14px * var(--text-scale));
   font-weight: 500;
   color: var(--text-primary);
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background var(--dur-2) var(--ease-standard), border-color var(--dur-2) var(--ease-standard);
 }
 .inline-edit-toggle:hover { border-color: var(--edit-border-hover); }
 .inline-edit-toggle input[type="checkbox"] {
@@ -2202,7 +2268,7 @@ section.mobile-only { display: block; }
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.18s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   user-select: none;
 }
 
@@ -2344,7 +2410,7 @@ section.mobile-only { display: block; }
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   z-index: 50;
-  animation: fade-in 0.2s var(--ease-smooth);
+  animation: fade-in var(--dur-3) var(--ease-smooth);
 }
 
 .bottom-sheet {
@@ -2359,7 +2425,7 @@ section.mobile-only { display: block; }
   border: 1px solid var(--border-default);
   border-bottom: none;
   z-index: 51;
-  animation: slide-up 0.35s var(--ease-spring);
+  animation: slide-up var(--dur-4) var(--ease-spring);
   padding-bottom: max(16px, var(--safe-bottom));
 }
 
@@ -2442,7 +2508,7 @@ section.mobile-only { display: block; }
   font-weight: 600;
   padding: 8px 10px;
   border-radius: var(--radius-pill);
-  transition: all 0.15s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -2471,7 +2537,7 @@ section.mobile-only { display: block; }
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
-  transition: all 0.2s var(--ease-smooth);
+  transition: all var(--dur-3) var(--ease-smooth);
 }
 .theme-toggle:hover { color: var(--text-primary); background: var(--bg-inset); }
 .theme-toggle:active { transform: scale(0.92); }
@@ -2620,7 +2686,7 @@ section.mobile-only { display: block; }
   .lift:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
-    transition: transform 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-smooth);
+    transition: transform var(--dur-3) var(--ease-spring), box-shadow var(--dur-3) var(--ease-smooth);
   }
 }
 
@@ -2733,7 +2799,7 @@ section.mobile-only { display: block; }
   padding: 11px 14px;
   outline: none;
   font-family: inherit;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color var(--dur-2), background var(--dur-2);
   -webkit-appearance: none;
   appearance: none;
 }
@@ -2777,7 +2843,7 @@ section.mobile-only { display: block; }
   border: 1.5px solid var(--border-subtle);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   color: var(--text-secondary);
   text-align: center;
   font-family: inherit;
@@ -2805,7 +2871,7 @@ section.mobile-only { display: block; }
   border: 1.5px dashed var(--border-default);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--dur-2);
   color: var(--text-secondary);
 }
 .dropzone:hover {
@@ -2824,7 +2890,7 @@ section.mobile-only { display: block; }
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: 300; /* Z_LAYER.dialog */
-  animation: fade-in 0.18s var(--ease-smooth);
+  animation: fade-in var(--dur-2) var(--ease-smooth);
 }
 
 /* Default (mobile): bottom sheet */
@@ -2845,7 +2911,7 @@ section.mobile-only { display: block; }
   max-height: 92svh;
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   border-bottom: none;
-  animation: slide-up 0.30s var(--ease-spring);
+  animation: sheet-in var(--dur-4) var(--ease-enter);
   padding-bottom: max(16px, var(--safe-bottom));
 }
 
@@ -2860,7 +2926,7 @@ section.mobile-only { display: block; }
     max-height: 86vh;
     border-radius: var(--radius-2xl);
     border-bottom: 1px solid var(--border-subtle);
-    animation: scale-in 0.20s var(--ease-spring);
+    animation: dialog-in var(--dur-3) var(--ease-enter);
     padding-bottom: 0;
   }
 }
@@ -2891,7 +2957,7 @@ section.mobile-only { display: block; }
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
-  transition: background 0.15s;
+  transition: background var(--dur-2);
 }
 .modal-close:hover { background: var(--bg-inset); }
 
@@ -2984,7 +3050,7 @@ img[src*="/storage/v1/object/public/"] {
   border: none;
   padding: 0;
   cursor: pointer;
-  transition: width 0.2s, background 0.2s;
+  transition: width var(--dur-3), background var(--dur-3);
   pointer-events: auto;
   box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.15);
 }
@@ -3023,7 +3089,7 @@ img[src*="/storage/v1/object/public/"] {
   backdrop-filter: blur(6px);
   z-index: 3;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity var(--dur-3);
 }
 .carousel-arrow:disabled { opacity: 0 !important; cursor: default; }
 .carousel-arrow-prev { left: 8px; }
@@ -3105,8 +3171,8 @@ img[src*="/storage/v1/object/public/"] {
   font-family: inherit;
   /* background + transform included so the drag-over state eases in rather
      than snapping — see .photo-empty[data-dropping]. */
-  transition: border-color 0.15s var(--ease-smooth), color 0.15s,
-              background 0.15s var(--ease-smooth), transform 0.15s var(--ease-smooth);
+  transition: border-color var(--dur-2) var(--ease-smooth), color var(--dur-2),
+              background var(--dur-2) var(--ease-smooth), transform var(--dur-2) var(--ease-smooth);
 }
 .photo-empty:hover { border-color: var(--text-primary); color: var(--text-primary); }
 .photo-empty-title { font-size: calc(15px * var(--text-scale)); font-weight: 600; }
@@ -3122,7 +3188,7 @@ img[src*="/storage/v1/object/public/"] {
   border: 1px solid var(--border-default); background: var(--bg-surface);
   color: var(--text-primary); font-family: inherit;
   font-size: calc(13px * var(--text-scale)); font-weight: 600; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--dur-2), border-color var(--dur-2);
 }
 .photo-actions button:hover:not(:disabled) { border-color: #22C55E; color: #16A34A; }
 .photo-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -3140,7 +3206,7 @@ img[src*="/storage/v1/object/public/"] {
   overflow: hidden; background: var(--bg-inset);
   border: 2px solid var(--border-subtle);
   cursor: pointer; padding: 0;
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color var(--dur-2), transform var(--dur-2);
 }
 .photo-thumb.is-active {
   border-color: #22C55E;
@@ -3189,7 +3255,7 @@ img[src*="/storage/v1/object/public/"] {
   justify-content: center;
   cursor: pointer;
   border: 1.5px dashed var(--border-default);
-  transition: all 0.15s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   flex-direction: column;
   gap: 4px;
   color: var(--text-secondary);
@@ -3256,7 +3322,7 @@ img[src*="/storage/v1/object/public/"] {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(4px);
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background var(--dur-2) var(--ease-standard), transform var(--dur-2) var(--ease-standard);
 }
 @media (hover: hover) {
   .photo-picker-cut:hover { background: rgba(0, 0, 0, 0.78); transform: scale(1.05); }
@@ -3280,7 +3346,7 @@ img[src*="/storage/v1/object/public/"] {
   background: rgba(0,0,0,0.4);
   backdrop-filter: blur(4px);
   z-index: 400; /* Z_LAYER.dialogNested */
-  animation: fade-in 0.18s ease;
+  animation: fade-in var(--dur-2) var(--ease-standard);
 }
 /* The picker sheet now appears at the TOP of the open modal panel,
    not at the bottom of the viewport — so users don't have to scroll
@@ -3295,7 +3361,7 @@ img[src*="/storage/v1/object/public/"] {
   padding: calc(20px + var(--safe-top)) 16px 16px;
   z-index: 401; /* Z_LAYER.dialogNested panel */
   box-shadow: 0 14px 36px rgba(0,0,0,0.18);
-  animation: slide-down 0.22s var(--ease-smooth);
+  animation: slide-down var(--dur-3) var(--ease-smooth);
   display: flex; flex-direction: column;
 }
 @keyframes slide-down {
@@ -3373,7 +3439,7 @@ img[src*="/storage/v1/object/public/"] {
   color: var(--text-secondary);
   background: var(--bg-inset);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: border-color var(--dur-2), color var(--dur-2), background var(--dur-2);
   flex-shrink: 0;
 }
 .photo-bg-toggle:hover {
@@ -3429,7 +3495,7 @@ img[src*="/storage/v1/object/public/"] {
   border: 1.5px solid transparent;
   border-radius: 14px;
   cursor: pointer;
-  transition: all 0.15s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   font-family: inherit;
 }
 .residence-chip:hover {
@@ -3468,7 +3534,7 @@ img[src*="/storage/v1/object/public/"] {
   padding: 12px 16px 12px 42px;
   outline: none;
   font-family: inherit;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: background var(--dur-2), border-color var(--dur-2), box-shadow var(--dur-2);
   -webkit-appearance: none;
   appearance: none;
 }
@@ -3540,7 +3606,7 @@ img[src*="/storage/v1/object/public/"] {
   font-size: calc(13px * var(--text-scale));
   font-weight: 500;
   color: var(--text-secondary);
-  transition: all 0.18s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   font-family: inherit;
   /* Keep tab labels on a single line — when there are 4+ tabs ("Uploads ·
      12" / "Requests · 3" / "Events · 1" / "Lost & Found · 2") the words
@@ -3570,6 +3636,37 @@ img[src*="/storage/v1/object/public/"] {
   background: var(--text-primary);
   color: var(--bg-base);
   font-weight: 600;
+}
+
+/* ── The travelling pill (lib/useGlide.ts) ──
+   Once the hook has measured the row, the fill moves off the buttons and onto
+   one ::before that slides between them. Absolutely positioned, so it is not a
+   grid item, and it scrolls with the tabs in the scrolling variant. The
+   buttons sit above it; their ink crossfades as it arrives. */
+.segmented[data-glide] { position: relative; }
+.segmented[data-glide]::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--glide-w, 0px);
+  transform: translateX(var(--glide-x, 0px));
+  opacity: var(--glide-o, 0);
+  border-radius: 999px;
+  background: var(--text-primary);
+  pointer-events: none;
+  transition:
+    transform var(--dur-4) var(--spring-snappy),
+    width var(--dur-4) var(--spring-snappy),
+    opacity var(--dur-2) var(--ease-standard);
+}
+.segmented[data-glide="still"]::before { transition: none; }
+.segmented[data-glide] button { position: relative; z-index: 1; transition: color var(--dur-3) var(--ease-standard), transform var(--dur-1) var(--ease-standard); }
+.segmented[data-glide] button[data-active] { background: transparent; }
+.segmented[data-glide] button:active { transform: scale(0.96); }
+@media (prefers-reduced-motion: reduce) {
+  .segmented[data-glide]::before { transition: opacity var(--dur-reduced) linear; }
 }
 
 /* Scrollable variant — content-sized tabs that scroll horizontally when a long
@@ -3613,7 +3710,7 @@ img[src*="/storage/v1/object/public/"] {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s var(--ease-smooth);
+  transition: all var(--dur-2) var(--ease-smooth);
   font-family: inherit;
 }
 .pill:hover { color: var(--text-primary); }
@@ -3691,7 +3788,7 @@ img[src*="/storage/v1/object/public/"] {
   width: 100%;
   text-align: left;
   font-family: inherit;
-  transition: transform 0.2s var(--ease-spring);
+  transition: transform var(--dur-3) var(--ease-spring);
   display: block;
 }
 .feed-card:active { transform: scale(0.98); }
@@ -3719,14 +3816,14 @@ img[src*="/storage/v1/object/public/"] {
   color: #5C5950;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  transition: transform 0.15s var(--ease-spring);
+  transition: transform var(--dur-2) var(--ease-spring);
 }
 .feed-card-save[data-saved] {
   color: #ED2E50;
   /* Satisfying spring "pop" the moment a card is saved — pairs with the
      success haptic fired in FeedScreen.handleToggleSave for a combined
      tactile + visual confirmation, the way iOS pairs Taptic + animation. */
-  animation: heart-pop 0.42s var(--ease-spring);
+  animation: heart-pop var(--dur-4) var(--ease-spring);
 }
 .feed-card-save:active { transform: scale(0.88); }
 
@@ -4057,7 +4154,7 @@ img[src*="/storage/v1/object/public/"] {
           mask-size: contain;
   /* The icon pops on the same bounce, a touch quicker, so it lands just before
      the pill finishes and the two read as one gesture rather than two. */
-  transition: transform 260ms cubic-bezier(0.3, 1.7, 0.5, 1);
+  transition: transform var(--dur-3) var(--spring-bouncy);
 }
 .nav-ico--plus { --ico: url(/icons/nav/plus.png); width: 28px; height: 28px; }
 
@@ -4082,8 +4179,8 @@ img[src*="/storage/v1/object/public/"] {
   cursor: pointer;
   color: var(--nav-rest);
   transition:
-    color 200ms ease-out,
-    transform 0.15s var(--ease-spring);
+    color var(--dur-3) var(--ease-enter),
+    transform var(--dur-2) var(--ease-spring);
 }
 .bottom-nav-btn[data-active] {
   /* The pill behind the button is the background; painting one here too would
@@ -4137,8 +4234,8 @@ img[src*="/storage/v1/object/public/"] {
      move; if more life is wanted, add it to the icon pop below, which has no
      edge to hit. */
   transition:
-    transform 340ms cubic-bezier(0.3, 1.25, 0.45, 1),
-    opacity 180ms ease-out;
+    transform var(--dur-4) var(--spring-snappy),
+    opacity var(--dur-2) var(--ease-enter);
   pointer-events: none;
 }
 /* Unlit on Account / Impact / Activity — the pill fades out where it stands
@@ -4187,7 +4284,7 @@ img[src*="/storage/v1/object/public/"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s var(--ease-spring);
+  transition: transform var(--dur-2) var(--ease-spring);
   flex-shrink: 0;
 }
 .bottom-nav-post:active { transform: scale(0.92); }
@@ -4196,7 +4293,7 @@ img[src*="/storage/v1/object/public/"] {
    who has asked for less motion should get the state change without the
    journey — the colour and the lift still tell them what happened. */
 @media (prefers-reduced-motion: reduce) {
-  .bottom-nav-slider { transition: opacity 120ms linear; }
+  .bottom-nav-slider { transition: opacity var(--dur-1) linear; }
   .nav-ico,
   .bottom-nav-btn,
   .bottom-nav-post { transition: none; }
@@ -4268,15 +4365,18 @@ img[src*="/storage/v1/object/public/"] {
    that motion should explain a relationship and then get out of the way. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 220ms;
-  animation-timing-function: var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1));
+  animation-duration: var(--dur-3);
+  animation-timing-function: var(--ease-smooth, var(--ease-standard));
 }
 
 /* The image itself moves and resizes rather than cross-fading, which is what
    makes it read as one object travelling instead of two pictures swapping. */
 ::view-transition-group(*) {
-  animation-duration: 300ms;
-  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  animation-duration: var(--dur-4);
+  /* The enter curve: most of the distance in the first third, then a long
+     settle — the App Store card-expand feel. Standard easing spread the move
+     evenly and the photo seemed to drift rather than be carried. */
+  animation-timing-function: var(--ease-enter);
 }
 
 /* Someone who asked for less motion gets the cut. lib/viewTransition.ts also
@@ -4302,7 +4402,7 @@ img[src*="/storage/v1/object/public/"] {
   background: rgba(10, 10, 6, 0.4);
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
-  animation: fade-in 160ms var(--ease-smooth);
+  animation: fade-in var(--dur-2) var(--ease-smooth);
 }
 
 .cardmenu {
@@ -4318,7 +4418,7 @@ img[src*="/storage/v1/object/public/"] {
   background: var(--bg-surface);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.22);
-  animation: slide-up 240ms var(--ease-spring);
+  animation: slide-up var(--dur-3) var(--ease-spring);
   outline: none;
 }
 @media (min-width: 700px) {
@@ -4328,7 +4428,7 @@ img[src*="/storage/v1/object/public/"] {
     transform: translate(-50%, -50%);
     border-radius: 20px;
     max-width: 360px;
-    animation: scale-in 180ms var(--ease-spring);
+    animation: scale-in var(--dur-2) var(--ease-spring);
   }
 }
 
@@ -4360,7 +4460,7 @@ img[src*="/storage/v1/object/public/"] {
   font-weight: 550;
   color: var(--text-primary);
   text-align: left;
-  transition: background 120ms ease-out;
+  transition: background var(--dur-1) var(--ease-enter);
 }
 .cardmenu-item:active { background: var(--bg-inset); }
 @media (hover: hover) { .cardmenu-item:hover { background: var(--bg-inset); } }
@@ -4416,7 +4516,7 @@ img[src*="/storage/v1/object/public/"] {
      from the thumbnail and the spacing, and the row only paints a background
      when it is actually being pressed. */
   background: transparent;
-  transition: background 140ms ease-out, transform 120ms var(--ease-smooth);
+  transition: background var(--dur-1) var(--ease-enter), transform var(--dur-1) var(--ease-smooth);
 }
 .crow[data-pressed] { transform: scale(0.99); background: var(--bg-inset); }
 @media (hover: hover) { .crow:hover { background: var(--bg-inset); } }
@@ -4538,7 +4638,7 @@ img[src*="/storage/v1/object/public/"] {
   border-radius: var(--radius-xl, 18px);
   background: var(--bg-surface);
   box-shadow: inset 0 0 0 1px var(--border-subtle);
-  transition: transform 0.18s var(--ease-spring), box-shadow 0.18s ease-out;
+  transition: transform var(--dur-2) var(--ease-spring), box-shadow var(--dur-2) var(--ease-enter);
 }
 .seller-card:active { transform: scale(0.97); }
 @media (hover: hover) {
@@ -4610,7 +4710,7 @@ img[src*="/storage/v1/object/public/"] {
   z-index: 200; /* Z_LAYER.drawer */
   display: flex;
   flex-direction: column;
-  animation: drawer-slide-in 0.25s var(--ease-out);
+  animation: drawer-slide-in var(--dur-3) var(--ease-out);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.20);
 }
 @keyframes drawer-slide-in {
@@ -4629,7 +4729,7 @@ img[src*="/storage/v1/object/public/"] {
   cursor: pointer;
   color: inherit;
   font-family: inherit;
-  transition: background 0.15s;
+  transition: background var(--dur-2);
 }
 .drawer-item:hover { background: var(--bg-inset); }
 .drawer-item:active { background: var(--bg-card-hover); }
@@ -4661,7 +4761,7 @@ img[src*="/storage/v1/object/public/"] {
   color: var(--text-secondary);
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--dur-2), color var(--dur-2);
 }
 .drawer-footer-btn:hover {
   background: var(--bg-card);
@@ -4684,7 +4784,7 @@ img[src*="/storage/v1/object/public/"] {
   font-weight: 700;
   font-size: calc(13px * var(--text-scale));
   text-decoration: none;
-  transition: top 0.15s;
+  transition: top var(--dur-2);
 }
 .skip-link:focus {
   top: 8px;
@@ -4722,7 +4822,7 @@ textarea:focus-visible {
   background: var(--border-default);
   border: none;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--dur-3);
   flex-shrink: 0;
 }
 .toggle::after {
@@ -4733,7 +4833,7 @@ textarea:focus-visible {
   height: 20px;
   border-radius: 50%;
   background: #fff;
-  transition: transform 0.2s var(--ease-spring);
+  transition: transform var(--dur-3) var(--ease-spring);
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 .toggle[aria-pressed="true"] {
@@ -4786,7 +4886,7 @@ textarea:focus-visible {
   font-size: calc(13px * var(--text-scale));
   font-weight: 500;
   color: var(--text-secondary);
-  transition: all 0.15s;
+  transition: all var(--dur-2);
   font-family: inherit;
 }
 .tabs button[aria-selected="true"] {
@@ -4863,7 +4963,7 @@ textarea:focus-visible {
 }
 .glass-strong { background: var(--glass-bg-strong); }
 .glass-interactive {
-  transition: transform 0.22s var(--ease-glass), box-shadow 0.22s var(--ease-glass);
+  transition: transform var(--dur-3) var(--ease-glass), box-shadow var(--dur-3) var(--ease-glass);
 }
 .glass-interactive:active { transform: scale(0.96); }
 
@@ -4979,7 +5079,7 @@ textarea:focus-visible {
     transparent 68%
   );
   transform: translateX(-130%);
-  transition: transform 0.65s var(--ease-glass);
+  transition: transform var(--dur-5) var(--ease-glass);
   pointer-events: none;
   z-index: 1;
 }
@@ -4989,7 +5089,7 @@ textarea:focus-visible {
 @media (hover: hover) and (pointer: fine) {
   .card,
   .card-elevated {
-    transition: transform 0.3s var(--ease-glass), box-shadow 0.3s var(--ease-glass);
+    transition: transform var(--dur-4) var(--ease-glass), box-shadow var(--dur-4) var(--ease-glass);
   }
   .card:hover,
   .card-elevated:hover {
@@ -5023,7 +5123,7 @@ textarea:focus-visible {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
 }
-.motion-rise { animation: glass-rise 0.5s var(--ease-glass) backwards; }
+.motion-rise { animation: glass-rise var(--dur-5) var(--ease-glass) backwards; }
 
 /* ═══════════════════════════════════════════════
    MOTION REFINEMENT  (slower · smoother · Apple HIG)
@@ -5036,10 +5136,10 @@ textarea:focus-visible {
    ═══════════════════════════════════════════════ */
 
 :root {
-  /* Gentler than the original 1.56 overshoot — calmer settle */
-  --ease-spring: cubic-bezier(0.34, 1.26, 0.54, 1);
-  /* Apple's emphasized deceleration for enter/move transitions */
-  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Both names now resolve to the motion system at the top of the file. This
+     block used to redefine --ease-spring with a different overshoot, so the
+     same token meant two things depending on where in the cascade you read it. */
+  --ease-emphasized: var(--ease-enter);
 }
 
 /* Nav: the press scale is a touch softer here than the base rule. The button's
@@ -5049,24 +5149,38 @@ textarea:focus-visible {
 .bottom-nav-btn:active,
 .bottom-nav-post:active { transform: scale(0.94); }
 
-/* Sheets & dialogs ease in more gently */
-.modal { animation: slide-up 0.44s var(--ease-emphasized); }
+/* ── Sheets & dialogs arrive ──
+   The sheet rises on the `translate` property, not `transform`. It is centred
+   with transform: translateX(-50%), so any keyframe on `transform` has to
+   repeat that offset to keep it centred — which is why `slide-up` is defined
+   twice in this file, the second copy with the -50% baked in. `translate` and
+   `scale` compose with the centring instead of restating it, and
+   lib/useSheet.ts drives the exit and the drag on the same property, so
+   arriving, dragging and leaving all move one coordinate. */
+@keyframes sheet-in  { from { translate: 0 100%; } to { translate: 0 0; } }
+@keyframes dialog-in { from { opacity: 0; scale: 0.96; } to { opacity: 1; scale: 1; } }
+.modal { animation: sheet-in var(--dur-4) var(--ease-enter); }
 @media (min-width: 1024px) {
-  .modal { animation: scale-in 0.34s var(--ease-emphasized); }
+  .modal { animation: dialog-in var(--dur-3) var(--ease-enter); }
 }
-.modal-backdrop { animation: fade-in 0.32s var(--ease-smooth); }
+.modal-backdrop { animation: fade-in var(--dur-3) var(--ease-standard); }
+.sheet-grab:active { cursor: grabbing; }
 
-/* Sheet/dialog content reveals in a soft top-down cascade */
-.modal-body > * { animation: glass-rise 0.5s var(--ease-emphasized) both; }
-.modal-body > *:nth-child(1) { animation-delay: 0.05s; }
-.modal-body > *:nth-child(2) { animation-delay: 0.10s; }
-.modal-body > *:nth-child(3) { animation-delay: 0.15s; }
-.modal-body > *:nth-child(4) { animation-delay: 0.20s; }
-.modal-body > *:nth-child(5) { animation-delay: 0.25s; }
-.modal-body > *:nth-child(n+6) { animation-delay: 0.30s; }
+/* Content deals in after the sheet starts moving: 30ms apart, the first six,
+   on the same arrival as rails and grids. */
+.modal-body > * { animation: glass-rise var(--dur-3) var(--ease-enter) backwards; animation-delay: 210ms; }
+.modal-body > *:nth-child(1) { animation-delay: 60ms; }
+.modal-body > *:nth-child(2) { animation-delay: 90ms; }
+.modal-body > *:nth-child(3) { animation-delay: 120ms; }
+.modal-body > *:nth-child(4) { animation-delay: 150ms; }
+.modal-body > *:nth-child(5) { animation-delay: 180ms; }
+@media (prefers-reduced-motion: reduce) {
+  .modal { animation: fade-in var(--dur-reduced) linear; }
+  .modal-body > * { animation: none; }
+}
 
 /* Screen entrance: a touch slower + calmer */
-.motion-rise { animation: glass-rise 0.44s var(--ease-emphasized) backwards; }
+.motion-rise { animation: glass-rise var(--dur-4) var(--ease-emphasized) backwards; }
 
 /* Specular sweep: slower, glossier roll */
 .bottom-nav-post::after { transition: transform 0.85s var(--ease-emphasized); }
@@ -5075,7 +5189,7 @@ textarea:focus-visible {
 @media (hover: hover) and (pointer: fine) {
   .card,
   .card-elevated {
-    transition: transform 0.4s var(--ease-emphasized), box-shadow 0.4s var(--ease-emphasized);
+    transition: transform var(--dur-4) var(--ease-emphasized), box-shadow var(--dur-4) var(--ease-emphasized);
   }
   .card:hover,
   .card-elevated:hover { transform: translateY(-4px); }
@@ -5084,15 +5198,15 @@ textarea:focus-visible {
 /* Pill buttons: smoother spring press */
 .btn {
   transition:
-    transform 0.24s var(--ease-spring),
-    background 0.2s var(--ease-smooth),
-    box-shadow 0.2s var(--ease-smooth);
+    transform var(--dur-3) var(--ease-spring),
+    background var(--dur-3) var(--ease-smooth),
+    box-shadow var(--dur-3) var(--ease-smooth);
 }
 .btn:active { transform: scale(0.96); }
 
 /* Segmented selection glides instead of snapping */
 .segmented button {
-  transition: color 0.25s var(--ease-emphasized), background 0.25s var(--ease-emphasized);
+  transition: color var(--dur-3) var(--ease-emphasized), background var(--dur-3) var(--ease-emphasized);
 }
 
 /* ═══════════════════════════════════════════════
@@ -5101,8 +5215,8 @@ textarea:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+    animation-duration: var(--dur-1) !important;
+    transition-duration: var(--dur-1) !important;
   }
 }
 
@@ -5126,7 +5240,7 @@ textarea:focus-visible {
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+  transition: background var(--dur-2) var(--ease-standard), border-color var(--dur-2) var(--ease-standard), transform var(--dur-1) var(--ease-standard);
 }
 .ss-trigger:hover { background: var(--bg-inset); }
 .ss-trigger:active { transform: scale(0.97); }
@@ -5161,7 +5275,7 @@ textarea:focus-visible {
   inset: 0;
   background: rgba(10, 10, 6, 0.45);
   z-index: 90;
-  animation: fade-in 0.2s ease;
+  animation: fade-in var(--dur-3) var(--ease-standard);
 }
 .ss-content {
   position: fixed;
@@ -5178,7 +5292,7 @@ textarea:focus-visible {
   border-radius: 22px 22px 0 0;
   padding: 20px 20px calc(22px + var(--safe-bottom));
   box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.28);
-  animation: slide-up 0.32s var(--ease-emphasized);
+  animation: slide-up var(--dur-4) var(--ease-emphasized);
 }
 @media (min-width: 768px) {
   .ss-content {
@@ -5187,7 +5301,7 @@ textarea:focus-visible {
     transform: translate(-50%, -50%);
     border: 1px solid var(--border-subtle);
     border-radius: 20px;
-    animation: scale-in 0.24s var(--ease-emphasized);
+    animation: scale-in var(--dur-3) var(--ease-emphasized);
   }
 }
 
@@ -5320,7 +5434,7 @@ textarea:focus-visible {
      turned the strip into a row of containers rather than a row of things.
      The selection is the only state that needs a surface. */
   background: transparent;
-  transition: transform 0.16s var(--ease-spring), background 0.16s, box-shadow 0.16s;
+  transition: transform var(--dur-2) var(--ease-spring), background var(--dur-2), box-shadow var(--dur-2);
 }
 /* The voxel icon inside the plate. 40 in a 56 leaves the art breathing room
    without letting it rattle around.
@@ -5432,7 +5546,7 @@ textarea:focus-visible {
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
-  transition: color 0.15s;
+  transition: color var(--dur-2);
   /* 26.8px tall as written — the smallest control on the page, sitting one
      thumb-width from a scroll surface, so a miss scrolled the feed instead.
      The text stays where it is; the reach grows around it. */
@@ -5558,7 +5672,9 @@ textarea:focus-visible {
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
   overflow: hidden;
-  transition: transform 120ms var(--ease-smooth), box-shadow 0.16s var(--ease-smooth);
+  /* Release is the spring: the card settles back with the snappy spring's
+     small overshoot after the finger lifts, the way an iOS card does. */
+  transition: transform var(--dur-3) var(--spring-snappy), box-shadow var(--dur-2) var(--ease-standard);
 }
 @media (hover: hover) {
   .pcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
@@ -5566,7 +5682,12 @@ textarea:focus-visible {
 /* Driven by the tap guard's own press state, never :active — :active lights up
    the moment a finger lands, including on the finger that is about to scroll,
    so the feed used to flicker as it moved. 0.985 and ~120ms: felt, not seen. */
-.pcard[data-pressed] { transform: scale(0.985); }
+.pcard[data-pressed] {
+  /* Press is quick and linear-feeling — under 0.1 s, so it reads as the card
+     answering the finger, not as an animation. 0.975: felt more than seen. */
+  transform: scale(0.975);
+  transition: transform var(--dur-1) var(--ease-standard), box-shadow var(--dur-2) var(--ease-standard);
+}
 
 .pcard-open {
   display: flex;
@@ -5665,7 +5786,7 @@ textarea:focus-visible {
   height: 5px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.55);
-  transition: width 140ms var(--ease-smooth), background-color 140ms var(--ease-smooth);
+  transition: width var(--dur-1) var(--ease-smooth), background-color var(--dur-1) var(--ease-smooth);
 }
 /* The active dot lengthens rather than only brightening — position survives a
    glance, and it reads without relying on a brightness difference alone. */
@@ -5732,7 +5853,7 @@ textarea:focus-visible {
     color: #fff;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 140ms var(--ease-smooth);
+    transition: opacity var(--dur-1) var(--ease-smooth);
     z-index: 3;
   }
   .cmedia-arrow--prev { left: 6px; }
@@ -5826,7 +5947,7 @@ textarea:focus-visible {
   padding: 0;
   color: #17150F;
   cursor: pointer;
-  transition: transform 0.12s var(--ease-spring), color 0.15s;
+  transition: transform var(--dur-1) var(--ease-spring), color var(--dur-2);
 }
 .pcard-save::before {
   content: '';
@@ -6174,7 +6295,7 @@ textarea:focus-visible {
   /* The floor under the shader, so the first paint is never a white flash and
      a lost context is never a hole. */
   background: #0B0704;
-  transition: transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: transform var(--dur-3) var(--ease-enter);
 }
 .uxib:active { transform: scale(0.99); }
 .uxib:focus-visible {
@@ -6344,7 +6465,7 @@ textarea:focus-visible {
   background: #F7F3EE;
   /* No shadow. The card is already the darkest thing on the page and a shadow
      under a light disc on near-black draws a grey smudge, not depth. */
-  transition: transform 200ms var(--ease-spring), background 200ms;
+  transition: transform var(--dur-3) var(--ease-spring), background var(--dur-3);
   flex: 0 0 auto;
 }
 .uxib:hover .uxib-go { transform: translate(1px, -1px); }
@@ -6403,7 +6524,7 @@ textarea:focus-visible {
   background:
     linear-gradient(180deg, rgba(168, 221, 0, 0.14) 0%, rgba(168, 221, 0, 0.06) 100%),
     var(--bg-card);
-  transition: transform 0.14s var(--ease-spring);
+  transition: transform var(--dur-1) var(--ease-spring);
 }
 .sell-nudge:active { transform: scale(0.985); }
 .sell-nudge-ico {
@@ -6455,7 +6576,7 @@ textarea:focus-visible {
   letter-spacing: -0.01em;
   color: var(--text-primary);
   white-space: nowrap;
-  transition: background 0.14s, color 0.14s;
+  transition: background var(--dur-1), color var(--dur-1);
 }
 .sell-nudge:hover .sell-nudge-go {
   background: var(--text-primary);
@@ -6526,7 +6647,7 @@ textarea:focus-visible {
   background: var(--text-primary);
   box-shadow: var(--shadow-md);
   white-space: nowrap;
-  transition: transform 0.14s var(--ease-spring), box-shadow 0.14s;
+  transition: transform var(--dur-1) var(--ease-spring), box-shadow var(--dur-1);
 }
 .sf-cta-btn:hover  { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
 .sf-cta-btn:active { transform: scale(0.96); }
@@ -6672,7 +6793,7 @@ textarea:focus-visible {
   font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
-  transition: transform 0.14s var(--ease-spring), opacity 0.15s;
+  transition: transform var(--dur-1) var(--ease-spring), opacity var(--dur-2);
 }
 .ev-row-cta:active { transform: scale(0.95); }
 .ev-row-cta[data-going] { background: #16A34A; color: #fff; }
@@ -6754,7 +6875,27 @@ textarea:focus-visible {
   height: 100%;
   object-fit: contain;
   display: block;
-  transition: transform 0.35s var(--ease-smooth);
+  transition: transform var(--dur-4) var(--ease-enter), opacity var(--dur-3) var(--ease-standard);
+}
+.fit-img-bg { transition: opacity var(--dur-3) var(--ease-standard); }
+/* Still downloading: hidden, a touch large, so arriving reads as settling. */
+.fit-img[data-pending] .fit-img-fg { opacity: 0; transform: scale(1.03); }
+.fit-img[data-pending] .fit-img-bg { opacity: 0; }
+/* The sheen waits 300ms — a photo that arrives faster never shows a loading
+   state at all, which is what keeps a fast feed from flickering. */
+.fit-img[data-pending]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.38) 50%, transparent 70%);
+  background-size: 220% 100%;
+  opacity: 0;
+  animation: fade-in var(--dur-3) var(--ease-standard) 300ms forwards,
+             shimmer 1.4s linear 300ms infinite;
+  pointer-events: none;
+}
+.dark .fit-img[data-pending]::after {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.07) 50%, transparent 70%);
 }
 /* Background-removed products are transparent: a blurred copy of transparency
    is nothing, so give them the clean white bed they were designed against. */
@@ -6763,7 +6904,9 @@ textarea:focus-visible {
 .dark .fit-img-bg { opacity: 0.45; }
 
 @media (prefers-reduced-motion: reduce) {
-  .fit-img-fg { transition: none; }
+  .fit-img-fg { transition: opacity var(--dur-reduced) linear; }
+  .fit-img[data-pending] .fit-img-fg { transform: none; }
+  .fit-img[data-pending]::after { animation: none; }
 }
 
 /* Drag-and-drop target state for the photo picker (desktop). The box already
@@ -6802,7 +6945,7 @@ textarea:focus-visible {
    on the summary itself; this rotates our own icon in its place. */
 .details-chevron {
   flex-shrink: 0;
-  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--dur-2) var(--ease-standard);
 }
 details[open] > summary .details-chevron { transform: rotate(90deg); }
 summary::-webkit-details-marker { display: none; }
@@ -6996,7 +7139,7 @@ summary::-webkit-details-marker { display: none; }
   font-size: calc(13px * var(--text-scale));
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.16s var(--ease-spring), filter 0.16s ease;
+  transition: transform var(--dur-2) var(--ease-spring), filter var(--dur-2) var(--ease-standard);
 }
 .scratch-btn:active { transform: scale(0.96); }
 @media (hover: hover) {
@@ -7180,7 +7323,7 @@ summary::-webkit-details-marker { display: none; }
   text-align: left;
   cursor: pointer;
   font: inherit;
-  transition: transform 0.22s var(--ease-emphasized);
+  transition: transform var(--dur-3) var(--ease-emphasized);
 }
 .uxi-spot:active { transform: scale(0.988); }
 
@@ -7333,7 +7476,7 @@ summary::-webkit-details-marker { display: none; }
      would hide the fallback instead of replacing it. EmberShader flips this to
      1 on its first successful paint and back to 0 if the context is lost. */
   opacity: 0;
-  transition: opacity 260ms ease-out;
+  transition: opacity var(--dur-3) var(--ease-enter);
 }
 @media (prefers-reduced-motion: reduce) {
   .ember-canvas { transition: none; }
@@ -7702,7 +7845,7 @@ summary::-webkit-details-marker { display: none; }
   padding: 10px 16px;
   background: transparent; border: none; cursor: pointer;
   text-align: left; font: inherit; color: inherit;
-  transition: background 120ms ease;
+  transition: background var(--dur-1) var(--ease-standard);
 }
 .dm-list-item:hover { background: var(--bg-inset); }
 .dm-list-item[aria-current="true"] { background: var(--bg-inset); }
@@ -7753,7 +7896,7 @@ summary::-webkit-details-marker { display: none; }
   font: inherit; font-size: calc(14px * var(--text-scale)); font-weight: 600; letter-spacing: -0.01em;
   background: var(--text-primary); color: var(--bg-base);
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition: transform var(--dur-1) var(--ease-standard), opacity var(--dur-1) var(--ease-standard);
 }
 .dm-btn:active { transform: scale(0.97); }
 .dm-btn--soft { background: var(--bg-inset); color: var(--text-primary); }
@@ -7865,8 +8008,14 @@ summary::-webkit-details-marker { display: none; }
 /* Three emoji or fewer, on their own: drawn large, without a bubble. */
 .dm-bubble.dm-emoji { background: transparent !important; padding: 0 2px; font-size: calc(36px * var(--text-scale)); line-height: 1.15; }
 
-.dm-bubble-new { animation: dm-rise 200ms var(--ease-emphasized, cubic-bezier(0.22,1,0.36,1)); }
-@keyframes dm-rise { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+/* A new bubble grows out of its own corner — yours from the composer side
+   (bottom-right), theirs from the avatar side — on the snappy spring, the way
+   WhatsApp and iMessage make a sent message feel physically handed over. */
+.dm-bubble-new { animation: dm-rise var(--dur-4) var(--spring-snappy); }
+.dm-row.mine .dm-bubble-new   { transform-origin: 100% 100%; }
+.dm-row.theirs .dm-bubble-new { transform-origin: 0% 100%; }
+@keyframes dm-rise { from { opacity: 0; transform: translateY(10px) scale(0.86); } }
+@media (prefers-reduced-motion: reduce) { .dm-bubble-new { animation: fade-in var(--dur-reduced) linear; } }
 
 .dm-meta { font-size: calc(11.5px * var(--text-scale)); color: var(--text-muted); margin: 3px 4px 0; }
 .dm-meta--failed { color: var(--accent-rose-ink); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: flex-end; }
@@ -7891,7 +8040,7 @@ summary::-webkit-details-marker { display: none; }
   font: inherit; font-size: 13px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 6px;
   box-shadow: var(--shadow-md);
-  animation: dm-rise 180ms var(--ease-emphasized, ease-out);
+  animation: dm-rise var(--dur-2) var(--ease-emphasized, var(--ease-enter));
 }
 
 /* ── Composer ── */
@@ -7913,7 +8062,7 @@ summary::-webkit-details-marker { display: none; }
   border: none; cursor: pointer; font: inherit;
   font-size: calc(14px * var(--text-scale)); font-weight: 500;
   background: var(--dm-mint); color: var(--dm-ink);
-  transition: transform 120ms ease;
+  transition: transform var(--dur-1) var(--ease-standard);
 }
 .dm-starter:active { transform: scale(0.96); }
 .dm-starter:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
@@ -7934,7 +8083,7 @@ summary::-webkit-details-marker { display: none; }
   border: none; cursor: pointer;
   background: var(--dm-ink); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  transition: transform 140ms var(--ease-emphasized, ease-out), background 140ms ease, color 140ms ease;
+  transition: transform var(--dur-1) var(--ease-emphasized, var(--ease-enter)), background var(--dur-1) var(--ease-standard), color var(--dur-1) var(--ease-standard);
 }
 .dm-send:disabled { background: var(--bg-inset); color: var(--text-muted); cursor: default; }
 .dm-send:not(:disabled):active { transform: scale(0.9); }
@@ -7956,7 +8105,7 @@ summary::-webkit-details-marker { display: none; }
   background: var(--bg-card); border-radius: 16px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.14);
   z-index: 5;
-  animation: dm-rise 160ms var(--ease-emphasized, ease-out);
+  animation: dm-rise var(--dur-2) var(--ease-emphasized, var(--ease-enter));
 }
 .dm-menu button {
   width: 100%; display: flex; align-items: center; gap: 10px;
@@ -7978,7 +8127,7 @@ summary::-webkit-details-marker { display: none; }
   font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
   font-variant-numeric: tabular-nums;
   box-sizing: border-box;
-  animation: dm-pop 260ms var(--ease-emphasized, ease-out);
+  animation: dm-pop var(--dur-3) var(--ease-emphasized, var(--ease-enter));
 }
 @keyframes dm-pop { from { transform: scale(0.4); opacity: 0; } }
 
@@ -7990,6 +8139,21 @@ summary::-webkit-details-marker { display: none; }
   gap: 8px;
 }
 .app-topbar-end { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+/* Scroll state — see TopBar.tsx. */
+.app-topbar-host {
+  transition: box-shadow var(--dur-3) var(--ease-standard);
+}
+.app-topbar-host[data-scrolled] {
+  box-shadow: 0 1px 0 var(--border-subtle), 0 10px 22px -18px rgba(0, 0, 0, 0.35);
+}
+.app-topbar > :nth-child(2) {
+  transition: scale var(--dur-3) var(--ease-standard);
+  transform-origin: 50% 50%;
+}
+.app-topbar-host[data-scrolled] .app-topbar > :nth-child(2) { scale: 0.92; }
+@media (prefers-reduced-motion: reduce) {
+  .app-topbar > :nth-child(2) { transition: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .dm-bubble-new, .dm-jump, .dm-menu, .dm-badge { animation: none; }
@@ -8007,7 +8171,7 @@ summary::-webkit-details-marker { display: none; }
   border-radius: 14px; border: none; cursor: pointer;
   background: var(--bg-inset); color: var(--text-primary);
   text-align: left; font: inherit;
-  transition: background 140ms ease, transform 120ms ease;
+  transition: background var(--dur-1) var(--ease-standard), transform var(--dur-1) var(--ease-standard);
 }
 .auth-choice:active { transform: scale(0.98); }
 .auth-choice:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
@@ -8048,3 +8212,184 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
   font-size: calc(13px * var(--text-scale)); font-weight: 500;
 }
 .room-empty-idea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOTION · ARRIVALS
+   ═══════════════════════════════════════════════════════════════════════════
+   A rail or grid arrives the way a hand deals cards: the first six rise 10px
+   and fade in, 30ms apart (150ms from first to last); everything after the
+   sixth arrives with the sixth. Six is about one screen of cards — past that,
+   a stagger is the reader waiting for an animation to reach them.
+
+   It runs when an element is INSERTED, never on re-render: React keeps the
+   keyed nodes, so a refetch that changes a price does not replay the deal. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.rail-track > .rail-item,
+.pgrid > * {
+  /* backwards, never both: a held final frame (transform: none) would sit on
+     top of the card's own press and hover transforms for the life of the
+     page. backwards only holds the FIRST frame, during the delay. */
+  animation: rise-in var(--dur-3) var(--ease-enter) backwards;
+  animation-delay: 150ms;
+}
+.rail-track > .rail-item:nth-child(1), .pgrid > :nth-child(1) { animation-delay: 0ms; }
+.rail-track > .rail-item:nth-child(2), .pgrid > :nth-child(2) { animation-delay: 30ms; }
+.rail-track > .rail-item:nth-child(3), .pgrid > :nth-child(3) { animation-delay: 60ms; }
+.rail-track > .rail-item:nth-child(4), .pgrid > :nth-child(4) { animation-delay: 90ms; }
+.rail-track > .rail-item:nth-child(5), .pgrid > :nth-child(5) { animation-delay: 120ms; }
+@media (prefers-reduced-motion: reduce) {
+  .rail-track > .rail-item, .pgrid > * { animation: fade-in var(--dur-reduced) linear both; animation-delay: 0ms !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOAST — see components/Toaster.tsx
+   ═══════════════════════════════════════════════════════════════════════════
+   A dark pill, the one inverted surface in the app, so it reads as "the system
+   speaking" over any content in either theme. Sits just above the dock on a
+   phone (the dock is ~76px + the home-indicator inset), centred and floating
+   higher on wider screens where the dock is a small pill. */
+.toaster {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(86px + var(--safe-bottom, 0px));
+  z-index: 600; /* Z_LAYER.toast */
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+@media (min-width: 768px) { .toaster { bottom: 96px; } }
+.toast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(440px, 100%);
+  min-height: 44px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 999px;
+  background: #16170F;
+  color: #F6F5EE;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.14);
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 560;
+  letter-spacing: -0.005em;
+  touch-action: none;
+  user-select: none;
+}
+.dark .toast { background: #F3F2EA; color: #14150E; }
+.toast-ico {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--accent-lime);
+  color: #0C0C0B;
+}
+.toast[data-tone="error"] .toast-ico { background: var(--accent-rose); color: #fff; }
+.toast-text { min-width: 0; line-height: 1.3; }
+.toast-action {
+  margin-left: 4px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease-standard), transform var(--dur-1) var(--ease-standard);
+}
+.dark .toast-action { background: rgba(0, 0, 0, 0.08); }
+.toast-action:active { transform: scale(0.96); }
+
+/* ── The SOLD stamp, when it is news ──
+   Only a stamp the member just applied (data-fresh, see PostStamp) is
+   performed: it comes down from 170% onto the photo on the bouncy spring, the
+   one place besides the heart that is allowed to overshoot, and the ink
+   arrives a third of the way in, the way a real stamp lands before it marks.
+   `scale` composes with the stamp's own rotate(-9deg) transform. */
+@keyframes stamp-drop {
+  0%   { scale: 1.7; opacity: 0; }
+  32%  { opacity: 1; }
+  100% { scale: 1; opacity: 1; }
+}
+.pcard-stamp[data-fresh] { animation: stamp-drop var(--dur-5) var(--spring-bouncy) backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .pcard-stamp[data-fresh] { animation: fade-in var(--dur-reduced) linear both; }
+}
+
+/* ── Ambient art (components/AmbientArt.tsx) ──
+   The listing photo at 60px blur and 1.8× saturation, scaled past the edges so
+   the blur has no rim, masked to fade out by the time the description starts.
+   50% in light, 34% in dark — enough to tint, never enough to compete with the
+   title or drop body text below AA (the text sits on the faded end). It fades
+   in over --dur-5 so it arrives after the photo, as a consequence of it. */
+.ambient-art {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: min(78vh, 680px);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.8) 45%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.8) 45%, transparent 100%);
+}
+.ambient-art > span {
+  position: absolute;
+  inset: -14%;
+  /* Zoomed into the middle of the photo before blurring. Campus listings are
+     shot against walls and beds; averaged whole, a blue kurta on a white wall
+     comes out white. The subject is almost always central, so 240% of the
+     centre IS the subject — the wash carries the garment, not the wall. */
+  background-size: 240% auto;
+  background-repeat: no-repeat;
+  background-position: center 52%;
+  filter: blur(60px) saturate(1.8);
+  opacity: 0.5;
+  animation: ambient-in var(--dur-5) var(--ease-standard) both;
+}
+.dark .ambient-art > span { opacity: 0.34; }
+@keyframes ambient-in { from { opacity: 0; } }
+@media (prefers-reduced-transparency: reduce) { .ambient-art { display: none; } }
+
+/* ── The plus becomes a close mark while the picker is open ──
+   45° on the bouncy spring, so the button answers "what does pressing me do
+   now?" — the Instagram/Threads compose button. The fill deepens a step so the
+   open state reads at a glance. */
+.bottom-nav-post .nav-ico--plus { transition: rotate var(--dur-4) var(--spring-bouncy); }
+.bottom-nav-post[data-open] .nav-ico--plus { rotate: 45deg; }
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-post .nav-ico--plus { transition: none; }
+}
+
+/* ── A listing opening: the photo flies, the details deal in ──
+   Everything after the hero rises 10px and fades, 40ms apart, while the photo
+   is still travelling from the card — the App Store's "the card became this
+   page" rhythm. The hero is never in this list: it is the shared element, and
+   animating it would hand the transition an invisible frame to fly into. */
+.detail-flow > .hero-sentinel ~ * { animation: rise-in var(--dur-3) var(--ease-enter) backwards; animation-delay: 160ms; }
+.detail-flow > .hero-sentinel + * { animation-delay: 40ms; }
+.detail-flow > .hero-sentinel + * + * { animation-delay: 80ms; }
+.detail-flow > .hero-sentinel + * + * + * { animation-delay: 120ms; }
+/* The action bar is centred with transform: translateX(-50%), which the
+   cascade's transform keyframes would overwrite mid-animation. It rises on its
+   own, from below the screen, on `translate` — which composes with that. */
+@keyframes actionbar-in { from { translate: 0 110%; } to { translate: 0 0; } }
+.detail-flow > .hero-sentinel ~ .detail-actionbar {
+  animation: actionbar-in var(--dur-4) var(--ease-enter) backwards;
+  animation-delay: 140ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail-flow > .hero-sentinel ~ *,
+  .detail-flow > .hero-sentinel ~ .detail-actionbar { animation: none; }
+}

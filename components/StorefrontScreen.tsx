@@ -40,6 +40,7 @@ import OnlineBadge from './OnlineBadge';
 import { useAuth } from '../lib/AuthContext';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv, supabase } from '../lib/supabase';
+import { useGlide } from '../lib/useGlide';
 import {
   fetchListingsByUser, fetchEventsByUser, fetchLostFoundByUser,
   fetchMyRequests, fetchProfileStats, fetchContact, onPostsChanged, type ProfileStats,
@@ -215,6 +216,10 @@ export default function StorefrontScreen({
   ];
 
   const [tab, setTab] = useState<Tab>('shared');
+
+  /* The selected tab's pill travels between tabs — see lib/useGlide.ts. */
+
+  const tabsGlideRef = useGlide(tab);
   /* If the active tab loses its data (e.g. user deletes last event while on
    * the Events tab), fall back to Shared — otherwise the masonry just sits
    * empty and the user can't tell why. */
@@ -391,6 +396,7 @@ export default function StorefrontScreen({
       <div style={{ padding: '0 16px 12px' }}>
         <div
           className="segmented storefront-tabs"
+          ref={tabsGlideRef}
           role="tablist"
           style={{ maxWidth: 640, marginInline: 'auto' }}
         >

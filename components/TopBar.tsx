@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Wordmark } from './Brand';
 import { useAuth } from '../lib/AuthContext';
@@ -33,9 +33,28 @@ export default function TopBar({ onOpenMenu, onOpenAccount, onOpenMessages, titl
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  /* ── At rest, flat; with content under it, a surface ──
+     The bar has no edge while the page is at the top, so the first screen
+     reads as one sheet. Once anything scrolls beneath it, a hairline and a
+     soft shadow fade in and the wordmark settles to 92% — the iOS large-title
+     behaviour, so "you have scrolled" is felt without a single line of copy.
+     Listens to the scroll container the screens share, passively. */
+  const barRef = useRef<HTMLElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const host = barRef.current?.closest('.scroll-shell') as HTMLElement | null;
+    const target: HTMLElement | Window = host ?? window;
+    const read = () => setScrolled((host ? host.scrollTop : window.scrollY) > 6);
+    read();
+    target.addEventListener('scroll', read, { passive: true });
+    return () => target.removeEventListener('scroll', read);
+  }, []);
+
   return (
     <header
-      className="mobile-only-nav"
+      ref={barRef}
+      className="mobile-only-nav app-topbar-host"
+      data-scrolled={scrolled || undefined}
       style={{
         position: 'sticky', top: 0, zIndex: 30,
         background: 'var(--bg-card)',

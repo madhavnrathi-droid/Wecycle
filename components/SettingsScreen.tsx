@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../lib/AuthContext';
 import { supabase, rpcUntyped } from '../lib/supabase';
 import { track, EVT } from '../lib/analytics';
+import { actionSoundsOn, sfxLive } from '../lib/sfx';
 import { openLegal, LEGAL_TERMS, LEGAL_PRIVACY, LEGAL_RULES } from '../lib/legal';
 
 interface SettingsScreenProps {
@@ -83,6 +84,8 @@ export default function SettingsScreen({
     /* Apply text-size change instantly so the screen reflows under the user's
        finger — they don't have to wait for the next paint or close the tab. */
     if (patch.largerText !== undefined) applyLargerText(patch.largerText);
+    /* Turning sounds on plays one, so the switch demonstrates what it does. */
+    if (patch.actionSounds === true) setTimeout(sfxLive, 60);
   };
   /* Privacy + contact prefs are local-first (instant UI) but ALSO mirrored to
      the user's profile row so they actually take effect server-side — the
@@ -211,6 +214,9 @@ export default function SettingsScreen({
         <Card>
           <Row label="Larger text" hint="Bump readable body copy across the app.">
             <Toggle on={settings.appearance.largerText} onChange={(v) => setAppearance({ largerText: v })} />
+          </Row>
+          <Row label="Sounds for your actions" hint="A soft chime when your post goes live or an item is sold. Messages from others have their own setting below.">
+            <Toggle on={settings.appearance.actionSounds ?? actionSoundsOn()} onChange={(v) => setAppearance({ actionSounds: v })} />
           </Row>
         </Card>
       </Section>

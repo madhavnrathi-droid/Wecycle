@@ -39,6 +39,10 @@ export const Z_LAYER = {
   dialogNested: 400,
   /** Share-card preview — the last thing you open, over everything. */
   shareCard: 500,
+  /** Toasts. A confirmation of something you just did has to be readable
+   *  whatever is open — including over the share card that caused it. Never
+   *  interactive enough to trap anything: it dismisses itself. */
+  toast: 600,
 } as const;
 
 /** Backdrops sit at the band, the panel one above it. */

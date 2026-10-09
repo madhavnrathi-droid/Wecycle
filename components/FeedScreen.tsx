@@ -34,6 +34,8 @@ import { getSettings, onSettingsChange } from '../lib/settings';
 import { getBlockedUserIds, onBlocksChange } from '../lib/moderation';
 import { track, trackPostOpened, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
+import { moments } from '../lib/moments';
+import { play, DUR, SPRING } from '../lib/motion';
 import EmptyState from './EmptyState';
 import MarketingBanner, { type BannerSlide } from './MarketingBanner';
 import UserSearchResults from './UserSearchResults';
@@ -49,6 +51,7 @@ import type { SellerSummary, PlacedModule, ModuleId, CardVariant } from '../lib/
 import SellerCard from './SellerCard';
 import CompactRow from './CompactRow';
 import CardMenu, { useLongPress } from './CardMenu';
+import { useGlide } from '../lib/useGlide';
 
 interface FeedScreenProps {
   onPost: () => void;
@@ -141,6 +144,8 @@ export default function FeedScreen({
      next visit reseeds this default — that's the "every new session starts
      on the storefront" behaviour. */
   const [activeType, setActiveType] = useState<'all' | 'requests' | 'shared' | 'services'>('all');
+  /* The selected tab's pill travels between tabs — see lib/useGlide.ts. */
+  const typeTabsRef = useGlide(activeType);
   /* Which merchandising rail "See all" came from.
    *
    * Every one of these rails used to hand off to setActiveType('shared') and
@@ -285,7 +290,7 @@ export default function FeedScreen({
   /* Single toggle handler shared by every card. Optimistically flips
      the local set, fires the Supabase RPC, and reverts on failure. Demo
      mode skips the RPC and just keeps the local heart state. */
-  const handleToggleSave = (listingId: string) => {
+  const handleToggleSave = (listingId: string, anchor?: Element | null) => {
     /* Saving is account-bound — it lives in the `saves` table. Flipping the
        heart locally for a signed-out visitor filled the icon and then dropped
        it on the next tab switch (savedIds only rehydrates for a signed-in
@@ -293,8 +298,9 @@ export default function FeedScreen({
        sign in instead of pretending it worked. */
     if (!user && !isDemoMode()) { onRequireAuth?.(); return; }
     const wasSaved = savedIds.has(listingId);
-    /* Saving feels rewarding (success pop); un-saving is a quieter tick. */
-    haptics.favorite(!wasSaved);
+    /* Saving pops, ticks and — once a session — bursts; un-saving is quieter.
+       The choreography lives in lib/moments.ts. */
+    if (wasSaved) moments.unsaved(); else moments.saved(anchor);
     track(EVT.save_toggled, { post_id: listingId, saved: !wasSaved });
     if (!wasSaved) {
       const it = [...items, ...requests, ...opportunities].find(i => i.id === listingId);
@@ -657,7 +663,7 @@ export default function FeedScreen({
       hidePrice={hidePrice}
       badgeKind={badgeKind}
       isMine={!!user && it.user?.id === user.id}
-      onToggleSave={() => handleToggleSave(it.id)}
+      onToggleSave={(anchor) => handleToggleSave(it.id, anchor)}
       onLongPress={() => setMenuItem(it)}
       onClick={() => {
         trackPostOpened('item', it.id, { source, is_request: !!it.isRequest });
@@ -1243,7 +1249,7 @@ export default function FeedScreen({
 
       {/* ── TYPE TABS: all / requests / shared / services & opportunities ── */}
       <section style={{ padding: '0 16px 14px' }}>
-        <div className="segmented segmented--scroll">
+        <div className="segmented segmented--scroll" ref={typeTabsRef}>
           <button
             onClick={() => { setActiveType('all'); setRailFilter(null); track(EVT.feed_tab_changed, { tab: 'all' }); }}
             aria-pressed={activeType === 'all'}
@@ -1351,7 +1357,20 @@ export default function FeedScreen({
               type="button"
               className="cat-tile"
               data-active={activeCategory === cat.id || undefined}
-              onClick={() => { setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id }); }}
+              onClick={(e) => {
+                /* A small hop of the illustration and a selection tick — the
+                   Zomato/Swiggy cuisine-tile answer. Scripted from the tap, so
+                   the default "All" never hops just because the page loaded. */
+                if (activeCategory !== cat.id) {
+                  haptics.selection();
+                  play(e.currentTarget.querySelector('.cat-tile-ico'), [
+                    { transform: 'none' },
+                    { transform: 'translateY(-5px) scale(1.06)', offset: 0.38 },
+                    { transform: 'none' },
+                  ], { duration: DUR[4], easing: SPRING.snappy });
+                }
+                setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id });
+              }}
             >
               <span className="cat-tile-ico" aria-hidden="true">
                 <CategoryIcon id={cat.id} src={(cat as { iconSrc?: string }).iconSrc} emoji={cat.icon} size={56} />
@@ -1721,7 +1740,7 @@ function ProductCard({
 }: {
   item: MarketplaceItem;
   isSaved: boolean;
-  onToggleSave: () => void;
+  onToggleSave: (anchor?: Element | null) => void;
   onClick: () => void;
   /** Opens the contextual sheet. Optional: cards outside the feed (search
    *  results, a storefront) have no ranker to teach. */
@@ -1846,7 +1865,7 @@ function ProductCard({
           data-saved={isSaved || undefined}
           aria-label={isSaved ? 'Unsave' : 'Save'}
           aria-pressed={isSaved}
-          onClick={e => { e.stopPropagation(); onToggleSave(); }}
+          onClick={e => { e.stopPropagation(); onToggleSave(e.currentTarget); }}
         >
           <Heart size={17} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
         </button>

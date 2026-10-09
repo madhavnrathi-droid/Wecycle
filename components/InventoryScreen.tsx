@@ -3,6 +3,8 @@
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import PostStamp from './PostStamp';
+import { moments, markJustSold, clearJustSold } from '../lib/moments';
+import { toast } from '../lib/toast';
 import { SOLD_VISIBLE_DAYS } from '../lib/feed/rank';
 import { Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
 import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem, closedLabelFor } from '../lib/mockData';
@@ -24,6 +26,7 @@ import { getDemoUploads, getDemoRequests, deleteDemoPost, updateDemoPost } from 
 import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import { priceChip, fromListingType } from '../lib/dealTypes';
+import { useGlide } from '../lib/useGlide';
 
 type Tab = 'all' | 'requests' | 'shared' | 'events' | 'saved';
 
@@ -60,6 +63,8 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const [activeTab, setActiveTab] = useState<Tab>('all');
+  /* The selected tab's pill travels between tabs — see lib/useGlide.ts. */
+  const tabsGlideRef = useGlide(activeTab);
   const [query, setQuery] = useState('');
 
   /* My real uploads + requests from Supabase (live mode), refetched whenever
@@ -230,7 +235,7 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
             three of the five. The stylesheet sizes tracks to their labels and
             scrolls if they genuinely cannot fit; a filter has to be readable
             to be usable. */}
-        <div className="segmented">
+        <div className="segmented" ref={tabsGlideRef}>
           <button
             onClick={() => setActiveTab('all')}
             aria-pressed={activeTab === 'all'}
@@ -334,9 +339,18 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
                         updateDemoPost(entry.item.id, { isClosed: true });
                       } else {
                         try {
+                          /* Marked before the call so the stamp that mounts on
+                             the refetch knows to drop in rather than sit there. */
+                          markJustSold(entry.item.id);
                           if (entry.item.isRequest) await markRequestCompleted(entry.item.id);
                           else                      await markListingSold(entry.item.id);
+                          moments.sold();
+                          toast(isListing
+                            ? `Marked ${completeLabel.toLowerCase()}. It stays up for ${SOLD_VISIBLE_DAYS} days, stamped.`
+                            : `Marked ${completeLabel.toLowerCase()}.`, { tone: 'success' });
                         } catch (e) {
+                          clearJustSold(entry.item.id);
+                          moments.failed();
                           /* Surface the failure — silent failures here gave the
                            * impression nothing happened, then the post would
                            * reappear and confuse the user. */
@@ -541,7 +555,7 @@ function InventoryCard({
               </span>
             </div>
           </button>
-          {item.isClosed && <PostStamp label={closedLabelFor(item)} />}
+          {item.isClosed && <PostStamp label={closedLabelFor(item)} postId={item.id} />}
         </article>
         {completeLabel && (
           <CompleteButton
@@ -604,7 +618,7 @@ function InventoryCard({
             used to change only the chip underneath — the card itself stayed in
             full colour, so the one screen where you took the action was the
             one screen that did not show its result. */}
-        {item.isClosed && <PostStamp label={closedLabelFor(item)} />}
+        {item.isClosed && <PostStamp label={closedLabelFor(item)} postId={item.id} />}
       </div>
       {completeLabel && (
         <CompleteButton

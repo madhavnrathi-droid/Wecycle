@@ -14,6 +14,8 @@ interface BottomNavProps {
   active: Screen;
   onChange: (screen: Screen) => void;
   onPost: () => void;
+  /** The post picker is open — the plus turns into a close mark. */
+  postOpen?: boolean;
 }
 
 /* ── One green, not four ───────────────────────────────────────────────────
@@ -76,7 +78,7 @@ const SLOTS: {
   { key: 'inventory',  screen: 'inventory',  label: 'Inventory',    icon: 'inventory', col: 5 },
 ];
 
-export default function BottomNav({ active, onChange, onPost }: BottomNavProps) {
+export default function BottomNav({ active, onChange, onPost, postOpen }: BottomNavProps) {
   /* Wraps the parent's onChange so we get a single source of nav events. */
   const navigate = (next: Screen) => {
     if (next === active) return;
@@ -117,7 +119,9 @@ export default function BottomNav({ active, onChange, onPost }: BottomNavProps) 
         <button
           onClick={() => { haptics.medium(); onPost(); }}
           aria-label="Create post"
+          aria-expanded={postOpen || undefined}
           className="bottom-nav-post"
+          data-open={postOpen || undefined}
         >
           {/* The same plus the icon set draws inside a ring — the ring cropped
               off, because this button already is one. */}

@@ -78,7 +78,7 @@ function iconifyUrl(key: string): string {
 }
 
 export default function MarketingBanner({
-  slides, variant = 'compact', intervalMs = 4000,
+  slides, variant = 'compact', intervalMs = 6000,
 }: MarketingBannerProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -166,6 +166,13 @@ export default function MarketingBanner({
          latched `paused` true forever and the carousel never advanced again.
          Skipping a tick is self-healing; a stuck boolean isn't. */
       if (sectionRef.current?.matches(':hover')) return;
+      /* Someone typing — in search, a form, anywhere — is reading what they
+         type, and a slide changing at the edge of their eye pulls at it. Hold
+         still until the field loses focus. (Same self-healing skip as hover.) */
+      const focused = document.activeElement as HTMLElement | null;
+      if (focused && (focused.matches('input, textarea, select') || focused.isContentEditable)) return;
+      /* Off-screen, nobody is watching it: don't scroll a track out of view. */
+      if (document.hidden) return;
       setActive(prev => {
         const next = prev >= maxIndex ? 0 : prev + 1;
         const track = trackRef.current;

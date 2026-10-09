@@ -66,8 +66,63 @@ function getRNBridge(): ReactNativeWebViewBridge | null {
 let enabled = true;
 export function setHapticsEnabled(on: boolean) { enabled = on; }
 
+/* ── Never two at once ──
+ * A save that also completes a step, or a post that lands while a sheet snaps,
+ * would otherwise fire two patterns inside a few milliseconds — which the hand
+ * reads as one muddy buzz. Taps get a 40ms floor; the notification patterns
+ * (success / warning / error) get 400ms, because each is a deliberate
+ * two-or-three-pulse signal and a second one inside that window is noise. */
+const NOTIFY = new Set<HapticStyle>(['success', 'warning', 'error']);
+let lastAt = 0;
+let lastNotifyAt = 0;
+let selectionStarted = false;
+
+/* Capacitor's plugin, loaded only inside the native shell. On the web the
+   plugin would fall back to navigator.vibrate, which path 3 below already does. */
+type CapHaptics = typeof import('@capacitor/haptics');
+let capHaptics: Promise<CapHaptics | null> | null = null;
+function nativeHaptics(): Promise<CapHaptics | null> | null {
+  if (capHaptics) return capHaptics;
+  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  if (!cap?.isNativePlatform?.()) return null;
+  capHaptics = import('@capacitor/haptics').catch(() => null);
+  return capHaptics;
+}
+
 function fire(style: HapticStyle) {
   if (!enabled || typeof window === 'undefined') return;
+  const now = Date.now();
+  if (now - lastAt < 40) return;
+  if (NOTIFY.has(style) && now - lastNotifyAt < 400) return;
+  lastAt = now;
+  if (NOTIFY.has(style)) lastNotifyAt = now;
+
+  /* 0. The Capacitor shell — the iOS and Android apps as they ship today.
+     WKWebView has no navigator.vibrate and there is no Expo bridge, so before
+     this branch every haptic in the iOS app was silent: seventy call sites,
+     none of them felt. The plugin drives UIFeedbackGenerator directly. */
+  const native = nativeHaptics();
+  if (native) {
+    void native.then(mod => {
+      if (!mod) return;
+      const { Haptics, ImpactStyle, NotificationType } = mod;
+      const run: Record<HapticStyle, () => Promise<void>> = {
+        /* iOS only creates the selection generator in selectionStart(); a
+           selectionChanged() before it is silently dropped. Start once, keep it. */
+        selection: () => (selectionStarted
+          ? Haptics.selectionChanged()
+          : Haptics.selectionStart().then(() => { selectionStarted = true; return Haptics.selectionChanged(); })),
+        light:     () => Haptics.impact({ style: ImpactStyle.Light }),
+        medium:    () => Haptics.impact({ style: ImpactStyle.Medium }),
+        heavy:     () => Haptics.impact({ style: ImpactStyle.Heavy }),
+        success:   () => Haptics.notification({ type: NotificationType.Success }),
+        warning:   () => Haptics.notification({ type: NotificationType.Warning }),
+        error:     () => Haptics.notification({ type: NotificationType.Error }),
+      };
+      return run[style]().catch(() => {});
+    });
+    return;
+  }
 
   /* 1. Native bridge first — this is the ONLY path that works on iOS. */
   const bridge = getRNBridge();

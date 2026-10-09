@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "../lib/AuthContext";
 import { SITE_URL } from "../lib/siteUrl";
 import NativeInit from "../components/NativeInit";
+import Toaster from "../components/Toaster";
 import "./globals.css";
 
 /* Microsoft Clarity project ID. Hard-coded because Clarity's snippet is
@@ -198,6 +199,8 @@ export default function RootLayout({
           />
         </noscript>
         <AuthProvider>{children}</AuthProvider>
+        {/* One shared toast for every "that worked" — see lib/toast.ts. */}
+        <Toaster />
         {/* The session splash that stood here is gone. It held a full-screen
             overlay for 1400ms and then faded for another 640ms, so better than
             two seconds of every new session were spent looking at a logo
