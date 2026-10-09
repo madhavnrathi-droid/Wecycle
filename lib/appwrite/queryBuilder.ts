@@ -34,6 +34,7 @@ import { Query, ID } from 'appwrite';
 import { tables, toRow, toRows, toPayload, fillServerDefaults, ownerPermissions, APPWRITE_DB, type AnyRow } from './client';
 import { getActiveRoom } from '../rooms';
 import { ROOM_TABLES, roomFilterFor } from './roomScope';
+import { parseSelect, type Embed } from './selectParser';
 
 export interface Result<T> { data: T | null; error: { message: string; code?: string } | null; }
 
@@ -49,21 +50,26 @@ const asError = (e: unknown): { message: string; code?: string } => {
   };
 };
 
-type Embed = { key: string; table: string; fk: string };
-
-/** `select('*, listing:listings(*)')` -> the embeds, and the plain columns. */
-function parseSelect(sel: string): { embeds: Embed[] } {
-  const embeds: Embed[] = [];
-  const re = /(?:([a-z_]+):)?([a-z_]+)\(([^)]*)\)/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(sel))) {
-    const key = m[1] ?? m[2];
-    const table = m[2];
-    /* listing:listings(*) means "the row in `listings` whose id is my
-       listing_id". Singularising the table is how PostgREST infers it too. */
-    embeds.push({ key, table, fk: `${table.replace(/ies$/, 'y').replace(/s$/, '')}_id` });
+/** One batched query per embedded table, not one per row — at every level. */
+async function stitch(rows: AnyRow[], embeds: Embed[]): Promise<AnyRow[]> {
+  for (const em of embeds) {
+    const ids = [...new Set(rows.map(r => r[em.fk]).filter((v): v is string => typeof v === 'string'))];
+    if (!ids.length) { for (const r of rows) r[em.key] = null; continue; }
+    const found: AnyRow[] = [];
+    /* Appwrite caps the values in one equal() at 100. */
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const res = await tables().listRows({
+        databaseId: APPWRITE_DB, tableId: em.table,
+        queries: [Query.equal('$id', chunk), Query.limit(chunk.length)],
+      });
+      found.push(...toRows<AnyRow>(res.rows as AnyRow[]));
+    }
+    if (em.children.length) await stitch(found, em.children);
+    const byId = new Map(found.map(r => [String(r.id), r]));
+    for (const r of rows) r[em.key] = byId.get(String(r[em.fk])) ?? null;
   }
-  return { embeds };
+  return rows;
 }
 
 export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
@@ -85,7 +91,7 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
   select(sel = '*', opts?: { count?: 'exact' | 'planned' | 'estimated' }): this {
     if (this.mode === 'select') this.mode = 'select';
     if (opts?.count) this.wantCount = true;
-    if (sel.includes('(')) this.embeds = parseSelect(sel).embeds;
+    if (sel.includes('(')) this.embeds = parseSelect(sel, this.table).embeds;
     return this;
   }
 
@@ -235,7 +241,13 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
                 });
             out.push(r as AnyRow);
           }
-          return { data: toRows<T>(out), error: null };
+          /* `.insert(row).select('*, user:profiles!…(…)')` hands back the new
+             post with its poster attached, as PostgREST does — or the post just
+             made would show its own author as "Wecycle member". */
+          const rows = toRows<AnyRow>(out);
+          /* The write happened; a failed lookup of the poster must not report it as failed. */
+          if (this.embeds.length) await stitch(rows, this.embeds).catch(() => rows);
+          return { data: rows as T[], error: null };
         }
         case 'update': {
           const { data } = toPayload(this.payload[0] ?? {});
@@ -246,7 +258,10 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
               databaseId: APPWRITE_DB, tableId: this.table, rowId, data,
             }) as AnyRow);
           }
-          return { data: toRows<T>(out), error: null };
+          const rows = toRows<AnyRow>(out);
+          /* The write happened; a failed lookup of the poster must not report it as failed. */
+          if (this.embeds.length) await stitch(rows, this.embeds).catch(() => rows);
+          return { data: rows as T[], error: null };
         }
         case 'delete': {
           const ids = await this.listIds();
@@ -264,28 +279,13 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
             databaseId: APPWRITE_DB, tableId: this.table, queries: this.queries(),
           });
           let rows = toRows<AnyRow>(res.rows as AnyRow[]);
-          if (this.embeds.length) rows = await this.stitch(rows);
+          if (this.embeds.length) rows = await stitch(rows, this.embeds);
           return { data: rows as T[], error: null, count: res.total };
         }
       }
     } catch (e) {
       return { data: null, error: asError(e) };
     }
-  }
-
-  /** One batched query per embedded table, not one per row. */
-  private async stitch(rows: AnyRow[]): Promise<AnyRow[]> {
-    for (const em of this.embeds) {
-      const ids = [...new Set(rows.map(r => r[em.fk]).filter((v): v is string => typeof v === 'string'))];
-      if (!ids.length) { for (const r of rows) r[em.key] = null; continue; }
-      const res = await tables().listRows({
-        databaseId: APPWRITE_DB, tableId: em.table,
-        queries: [Query.equal('$id', ids), Query.limit(ids.length)],
-      });
-      const byId = new Map(toRows<AnyRow>(res.rows as AnyRow[]).map(r => [String(r.id), r]));
-      for (const r of rows) r[em.key] = byId.get(String(r[em.fk])) ?? null;
-    }
-    return rows;
   }
 }
 
