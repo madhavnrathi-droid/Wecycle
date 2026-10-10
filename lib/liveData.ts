@@ -46,6 +46,8 @@ export interface JoinedProfile {
      signal a campus marketplace has. It is one of the columns the profiles
      SELECT allow-list already permits, unlike email and phone. */
   college?: string | null;
+  /** When the member joined — for "21d on Wecycle" on the storefront. */
+  joined_at?: string | null;
 }
 
 interface ListingRow {
@@ -102,7 +104,11 @@ export function profileToUser(p: JoinedProfile | null | undefined, fallbackId: s
     color: p?.avatar_color || '#6C63FF',
     role: p?.role || 'Member',
     community: 'Wecycle',
-    joinedDaysAgo: 0,
+    /* -1 when the row didn't carry a join date — the storefront then says
+       nothing rather than "0d on Wecycle". */
+    joinedDaysAgo: p?.joined_at
+      ? Math.max(0, Math.floor((Date.now() - Date.parse(p.joined_at)) / 86_400_000))
+      : -1,
     itemsShared: 0,
     itemsReceived: 0,
     impactScore: 0,
@@ -248,7 +254,7 @@ const SELECT_WITH_JOINS = `
   *,
   user:profiles!listings_user_id_fkey(
     id, username, full_name, initials, avatar_url, avatar_color, role,
-    is_online, contact_email_enabled, contact_whatsapp_enabled, college
+    is_online, contact_email_enabled, contact_whatsapp_enabled, college, joined_at
   ),
   category:categories(id, label, icon)
 `;

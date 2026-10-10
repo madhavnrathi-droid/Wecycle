@@ -251,6 +251,18 @@ export default function StorefrontScreen({
     [requests, category],
   );
 
+  /* Only the categories this seller actually has. Eight fixed chips meant a
+     crochet shop offered "Electronics" and "Vehicles", each a tap to an empty
+     page. With one category (or none) there is nothing to filter, so the row
+     disappears. */
+  const chipCategories = useMemo(() => {
+    const pool = tab === 'requests'
+      ? requests.map(r => r.item ?? null).filter(Boolean)
+      : uploads;
+    return CATEGORIES.filter(c => c.id === 'all'
+      || pool.some(i => matchesCategoryFilter(i as MarketplaceItem, c.id)));
+  }, [tab, requests, uploads]);
+
   return (
     <div className="screen-transition" style={{ paddingBottom: 80, background: 'var(--bg-base)', minHeight: '100%' }}>
 
@@ -334,7 +346,7 @@ export default function StorefrontScreen({
             <p style={{
               margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
             }}>
-              {user.role} · {user.community} · {user.joinedDaysAgo}d on Wecycle
+              {[user.role, user.college, joinedLabel(user.joinedDaysAgo)].filter(Boolean).join(' · ')}
             </p>
             {user.badges.length > 0 && (
               <div style={{
@@ -415,10 +427,10 @@ export default function StorefrontScreen({
       </div>
 
       {/* ── CATEGORY CHIPS (Shared + Requests tabs share these) ── */}
-      {(tab === 'shared' || tab === 'requests') && (
+      {(tab === 'shared' || tab === 'requests') && chipCategories.length > 2 && (
         <section style={{ padding: '0 0 12px' }}>
           <div className="chip-row">
-            {CATEGORIES.slice(0, 8).map(cat => (
+            {chipCategories.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setCategory(cat.id)}
@@ -735,6 +747,16 @@ const RATIOS = {
   square:    '1.00',
   landscape: '1.20',
 } as const;
+
+/** "21d on Wecycle", "3 mo on Wecycle" — or nothing when the join date isn't
+ *  known (-1), rather than the "0d" every seller used to show. */
+function joinedLabel(days: number): string | null {
+  if (days == null || days < 0) return null;
+  if (days < 1) return 'new on Wecycle';
+  if (days < 60) return `${days}d on Wecycle`;
+  if (days < 730) return `${Math.round(days / 30)} mo on Wecycle`;
+  return `${Math.floor(days / 365)} yr on Wecycle`;
+}
 
 function ItemTile({
   item, variant = 'portrait', onClick,
