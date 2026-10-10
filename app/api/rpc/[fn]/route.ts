@@ -50,6 +50,7 @@ import {
 import { sendMessage, markConversationRead, canMessage } from '../../_lib/messaging';
 import { roomForNewMember, syncRoomLabels, roomReadPerm } from '../../_lib/rooms';
 import { deletePost, deleteComment } from '../../_lib/deletion';
+import { updatePost } from '../../_lib/editing';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -412,6 +413,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
 
       case 'delete_post':
         return await deletePost(uid, args);
+
+      /* Changing a post — the fallback the browser uses when Appwrite refuses
+         the write, i.e. an admin editing someone else's. See _lib/editing.ts. */
+      case 'update_post':
+        return await updatePost(uid, args);
 
       case 'delete_comment':
         return await deleteComment(uid, args);

@@ -74,7 +74,7 @@ async function deleteMedia(row: Row): Promise<void> {
   }));
 }
 
-async function callerIsAdmin(uid: string): Promise<boolean> {
+export async function callerIsAdmin(uid: string): Promise<boolean> {
   const [user, profile] = await Promise.all([
     aw('GET', `/users/${uid}`),
     aw('GET', `${T('profiles')}/${uid}`),

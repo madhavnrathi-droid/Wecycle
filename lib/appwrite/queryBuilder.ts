@@ -35,6 +35,7 @@ import { tables, toRow, toRows, toPayload, fillServerDefaults, ownerPermissions,
 import { getActiveRoom } from '../rooms';
 import { ROOM_TABLES, roomFilterFor } from './roomScope';
 import { parseSelect, type Embed } from './selectParser';
+import { serverRpc } from './rpc';
 
 export interface Result<T> { data: T | null; error: { message: string; code?: string } | null; }
 
@@ -49,6 +50,28 @@ const asError = (e: unknown): { message: string; code?: string } => {
     code: any?.type ?? (any?.code != null ? String(any.code) : undefined),
   };
 };
+
+/* ── A post the caller does not own ─────────────────────────────────────────
+ *
+ * Rows are updatable only by their author, so an admin's edit to someone
+ * else's post — a corrected title, a hide, a SOLD stamp — is refused here with
+ * a 401, and the editor said "Couldn't save" to the one account whose job is
+ * fixing posts. The server can check "is this an admin" and this browser
+ * cannot, so a refused write to a post goes there (app/api/_lib/editing.ts,
+ * which keeps the same table list). An author's own edit never takes this
+ * path: it succeeds on the first try. */
+const SERVER_EDITABLE = new Set(['listings', 'requests', 'lost_found_reports', 'events']);
+
+async function updateOne(table: string, rowId: string, data: AnyRow): Promise<AnyRow> {
+  try {
+    return await tables().updateRow({ databaseId: APPWRITE_DB, tableId: table, rowId, data }) as AnyRow;
+  } catch (e) {
+    if ((e as { code?: number }).code !== 401 || !SERVER_EDITABLE.has(table)) throw e;
+    const res = await serverRpc<AnyRow>('update_post', { table, id: rowId, data });
+    if (res.error || !res.data) throw { message: res.error?.message ?? 'Could not save', type: res.error?.code };
+    return res.data;
+  }
+}
 
 /** One batched query per embedded table, not one per row — at every level. */
 async function stitch(rows: AnyRow[], embeds: Embed[]): Promise<AnyRow[]> {
@@ -256,11 +279,7 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
           const { data } = toPayload(this.payload[0] ?? {});
           const ids = await this.listIds();
           const out: AnyRow[] = [];
-          for (const rowId of ids) {
-            out.push(await tables().updateRow({
-              databaseId: APPWRITE_DB, tableId: this.table, rowId, data,
-            }) as AnyRow);
-          }
+          for (const rowId of ids) out.push(await updateOne(this.table, rowId, data));
           const rows = toRows<AnyRow>(out);
           /* The write happened; a failed lookup of the poster must not report it as failed. */
           if (this.embeds.length) await stitch(rows, this.embeds).catch(() => rows);

@@ -98,13 +98,20 @@ const REVIEW_EMAIL = 'playreview@wecycle.page';
 const REVIEW_PASSWORD = 'WecycleReview2026';
 const HELP_EMAIL = 'wecycle.page@gmail.com';
 
+/* Sign up is the front door: most people opening this sheet are new. A device
+   that has signed in (or finished signing up) before remembers it and opens on
+   Sign in instead — see rememberHasAccount. */
 function readStoredMode(): AuthMode {
-  if (typeof window === 'undefined') return 'signin';
+  if (typeof window === 'undefined') return 'signup';
   try {
-    return localStorage.getItem(AUTH_MODE_KEY) === 'signup' ? 'signup' : 'signin';
+    return localStorage.getItem(AUTH_MODE_KEY) === 'signin' ? 'signin' : 'signup';
   } catch {
-    return 'signin';
+    return 'signup';
   }
+}
+
+function rememberHasAccount() {
+  try { localStorage.setItem(AUTH_MODE_KEY, 'signin'); } catch { /* private mode */ }
 }
 
 /* ── Abandoned sign-ups ───────────────────────────────────────────────────
@@ -170,7 +177,7 @@ function clearIncompleteSignup() {
 
 export default function AuthModal({ open, onClose, startInReset, initialEmail }: AuthModalProps) {
   const [step, setStep] = useState<Step>('credentials');
-  const [mode, setMode] = useState<AuthMode>('signin');
+  const [mode, setMode] = useState<AuthMode>('signup');
   /* Forgot / set-a-password flow — collects email only, ends at 'newpassword'. */
   const [resetting, setResetting] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
@@ -476,6 +483,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     clearIncompleteSignup();
     track(EVT.password_set, { context: 'signup' });
     track(EVT.login, { method: 'signup' });
+    rememberHasAccount();
     handleClose();
   };
 
@@ -601,6 +609,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
       if (err) throw err;
       clearIncompleteSignup();
       track(EVT.login, { method: 'password' });
+      rememberHasAccount();
       handleClose();
     } catch (err) {
       const msg = (err as Error)?.message ?? '';
@@ -681,6 +690,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
         pendingPassword.current = '';
         clearIncompleteSignup();
         track(EVT.login, { method: 'signup' });
+        rememberHasAccount();
         handleClose();
         return;
       }
@@ -706,6 +716,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
       clearIncompleteSignup();
       track(EVT.password_set, { context: resetting || pending === 'reset' ? 'reset' : 'signup' });
       track(EVT.login, { method: 'password_set' });
+      rememberHasAccount();
       handleClose();
     } catch (err) {
       fail('set_password', err, 'reset');
@@ -794,7 +805,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                 padding: 3,
                 gap: 2,
               }}>
-                {(['signin', 'signup'] as AuthMode[]).map(m => (
+                {(['signup', 'signin'] as AuthMode[]).map(m => (
                   <button
                     key={m}
                     type="button"
