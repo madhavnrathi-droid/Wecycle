@@ -632,7 +632,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
       if (
         REQUIRE_EMAIL_CONFIRMATION && mode === 'signin' && !resetting && (
           /email not confirmed/i.test(msg) ||
-          (/invalid login credentials/i.test(msg) && isIncompleteSignup(email))
+          (/invalid (login )?credentials|user_invalid_credentials/i.test(msg) && isIncompleteSignup(email))
         )
       ) {
         try {

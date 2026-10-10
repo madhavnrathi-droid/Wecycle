@@ -241,7 +241,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setProfile({
       ...(data as unknown as Record<string, unknown>),
-      email: contact.email ?? null,
+      /* Members with no contact row still have an account address. Only this
+         member's, though: `user` is the render's copy, and in the moment
+         between one account and the next it can still be the previous one. */
+      email: contact.email ?? (user?.id === uid ? user.email : null) ?? null,
       phone: contact.phone ?? null,
     } as unknown as Profile);
     void adoptRooms((data as { community_id?: string | null }).community_id);

@@ -44,9 +44,51 @@ const listeners = new Set<Listener>();
 let current: AuthSession | null = null;
 
 /* The account id an emailed code belongs to, by address — createEmailToken
-   returns it and createSession needs it back. In memory: a code outliving a
-   reload is re-requested, which the reset screen already offers. */
-const pendingOtp = new Map<string, string>();
+   returns it and createSession needs it back. It used to live in memory only,
+   so a member who switched to their mail app to read the code and came back to
+   a reloaded tab (iOS does this freely) was told the code had expired while it
+   sat valid in their inbox. Kept in sessionStorage for as long as Appwrite's
+   code lives — 15 minutes — and it is only an account id, never the code. */
+const PENDING_OTP_PREFIX = 'wecycle.pendingOtp.';
+const OTP_TTL_MS = 15 * 60_000;
+
+const memoryPendingOtp = new Map<string, { userId: string; at: number }>();
+
+function setPendingOtp(email: string, userId: string): void {
+  const norm = email.trim().toLowerCase();
+  const entry = { userId, at: Date.now() };
+  memoryPendingOtp.set(norm, entry);
+  try {
+    sessionStorage.setItem(`${PENDING_OTP_PREFIX}${norm}`, JSON.stringify(entry));
+  } catch { /* private browsing or SSR */ }
+}
+
+function getPendingOtp(email: string): string | undefined {
+  const norm = email.trim().toLowerCase();
+  let entry = memoryPendingOtp.get(norm);
+  if (!entry) {
+    try {
+      const raw = sessionStorage.getItem(`${PENDING_OTP_PREFIX}${norm}`);
+      if (raw) {
+        entry = JSON.parse(raw);
+      }
+    } catch { /* ignore */ }
+  }
+  if (!entry) return undefined;
+  if (Date.now() - entry.at > OTP_TTL_MS) {
+    deletePendingOtp(norm);
+    return undefined;
+  }
+  return entry.userId;
+}
+
+function deletePendingOtp(email: string): void {
+  const norm = email.trim().toLowerCase();
+  memoryPendingOtp.delete(norm);
+  try {
+    sessionStorage.removeItem(`${PENDING_OTP_PREFIX}${norm}`);
+  } catch { /* ignore */ }
+}
 
 function emit(event: Event, session: AuthSession | null): void {
   current = session;
@@ -68,14 +110,93 @@ const toUser = (a: { $id: string; email?: string }): AuthUser => ({
   email: a.email || null,
 });
 
+/* Worth asking again only when the request never got an answer (no status) or
+   the server failed (5xx). A wrong password, a rate limit, an existing account
+   are answers — repeating them changes nothing, and for the rate limit makes
+   it worse. */
+const transient = (e: unknown): boolean => {
+  const status = (e as AppwriteException)?.code;
+  return !status || status >= 500;
+};
+
+const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 async function currentUser(): Promise<AuthUser | null> {
   try {
     return toUser(await account().get());
-  } catch {
+  } catch (e) {
     /* No session is the ordinary case for a signed-out visitor, not an error
-       worth surfacing — Supabase returns { user: null } here too. */
-    return null;
+       worth surfacing — Supabase returns { user: null } here too. A dropped
+       request is not that case: on a flaky connection it signed a member out
+       for one failed read, so it gets one more go. */
+    if (!transient(e)) return null;
+    try {
+      await pause(200);
+      return toUser(await account().get());
+    } catch {
+      return null;
+    }
   }
+}
+
+/* A stale session makes createEmailPasswordSession fail with "session already
+   active" rather than signing the new person in — which reads to the user as a
+   wrong password. */
+async function endSession(): Promise<void> {
+  try { await account().deleteSession({ sessionId: 'current' }); } catch { /* none to clear */ }
+}
+
+/** Sign in, retrying only failures a retry can fix. Throws the last error. */
+async function openSession(email: string, password: string, tries: number): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await account().createEmailPasswordSession({ email, password });
+      return;
+    } catch (e) {
+      if (attempt >= tries || !transient(e)) throw e;
+      await pause(250 * attempt);
+    }
+  }
+}
+
+const alreadyExists = (e: unknown): boolean => {
+  const a = e as AppwriteException;
+  return a?.type === 'user_already_exists' || a?.code === 409;
+};
+
+/* The last steps of a sign-up, once a session exists.
+
+   The profile, BEFORE anyone is told the member exists. Postgres made it with
+   a trigger; Appwrite has none, and from the cutover until this was added every
+   new member got an account and no profile.
+
+   The ordering matters. AuthContext loads the profile the moment it hears
+   SIGNED_IN, and heals a missing one by creating it — but it does not have the
+   sign-up form's college and phone. Emitting first would let that race win and
+   the form's answers be dropped. Creating it here first means the self-heal
+   only ever finds a profile that already exists.
+
+   A failure is not fatal: the account and session are real, and the self-heal
+   in AuthContext will try again on load. */
+async function finishSignUp(
+  meta: Record<string, unknown>,
+): Promise<AuthResult<{ user: AuthUser | null; session: AuthSession | null }>> {
+  /* The campus, for a university with more than one (NMIMS). Saved on the
+     account first so that if the profile call below fails, the self-heal that
+     creates it later still puts the member in the right room. */
+  if (meta.campus) {
+    try { await account().updatePrefs({ prefs: { campus: meta.campus } }); } catch { /* sent below too */ }
+  }
+  try {
+    await rpc('ensure_profile', {
+      full_name: meta.full_name, college: meta.college, phone: meta.phone, campus: meta.campus,
+    });
+  } catch { /* AuthContext heals it */ }
+
+  const user = await currentUser();
+  const session = user ? { user } : null;
+  emit('SIGNED_IN', session);
+  return { data: { user, session }, error: null };
 }
 
 export const authAdapter = {
@@ -95,11 +216,13 @@ export const authAdapter = {
     { email, password }: { email: string; password: string },
   ): Promise<AuthResult<{ user: AuthUser | null; session: AuthSession | null }>> {
     try {
-      /* A stale session makes createEmailPasswordSession fail with "session
-         already active" rather than signing the new person in — which reads to
-         the user as a wrong password. */
-      try { await account().deleteSession({ sessionId: 'current' }); } catch { /* none to clear */ }
-      await account().createEmailPasswordSession({ email, password });
+      /* The cached server JWT belongs to whoever was signed in before. */
+      clearServerAuth();
+      await endSession();
+      /* Every stored address is lower-case (checked across all accounts on
+         10 Oct 2026), so a capital typed on a phone keyboard must not read as
+         a wrong password. */
+      await openSession(email.trim().toLowerCase(), password, 2);
       const user = await currentUser();
       const session = user ? { user } : null;
       emit('SIGNED_IN', session);
@@ -113,39 +236,30 @@ export const authAdapter = {
     { email, password, options }: { email: string; password: string; options?: { data?: Record<string, unknown> } },
   ): Promise<AuthResult<{ user: AuthUser | null; session: AuthSession | null }>> {
     try {
+      clearServerAuth();
+      const cleanEmail = email.trim().toLowerCase();
       const meta = options?.data ?? {};
       const name = (meta.full_name as string | undefined) ?? undefined;
-      await account().create({ userId: ID.unique(), email, password, name });
-      await account().createEmailPasswordSession({ email, password });
+      await endSession();
 
-      /* The profile, BEFORE anyone is told the member exists. Postgres made it
-         with a trigger; Appwrite has none, and from the cutover until this was
-         added every new member got an account and no profile.
-
-         The ordering matters. AuthContext loads the profile the moment it hears
-         SIGNED_IN, and heals a missing one by creating it — but it does not have
-         the sign-up form's college and phone. Emitting first would let that
-         race win and the form's answers be dropped. Creating it here first means
-         the self-heal only ever finds a profile that already exists.
-
-         A failure is not fatal: the account and session are real, and the
-         self-heal in AuthContext will try again on load. */
-      /* The campus, for a university with more than one (NMIMS). Saved on the
-         account first so that if the profile call below fails, the self-heal
-         that creates it later still puts the member in the right room. */
-      if (meta.campus) {
-        try { await account().updatePrefs({ prefs: { campus: meta.campus } }); } catch { /* sent below too */ }
-      }
       try {
-        await rpc('ensure_profile', {
-          full_name: meta.full_name, college: meta.college, phone: meta.phone, campus: meta.campus,
-        });
-      } catch { /* AuthContext heals it */ }
+        await account().create({ userId: ID.unique(), email: cleanEmail, password, name });
+      } catch (createErr) {
+        if (!alreadyExists(createErr)) throw createErr;
+        /* The account is already there — most often from an earlier sign-up
+           that dropped after the account was made but before the session or
+           the profile. With the same password, that is this person finishing
+           what they started: sign them in and complete it, instead of telling
+           them to go and sign in. With a different password it is exactly the
+           "already has an account" it always was. */
+        try { await openSession(cleanEmail, password, 1); } catch { throw createErr; }
+        return await finishSignUp(meta);
+      }
 
-      const user = await currentUser();
-      const session = user ? { user } : null;
-      emit('SIGNED_IN', session);
-      return { data: { user, session }, error: null };
+      /* The account exists from here; a dropped session request must not
+         strand it without one. */
+      await openSession(cleanEmail, password, 3);
+      return await finishSignUp(meta);
     } catch (e) {
       return { data: { user: null, session: null }, error: err(e) };
     }
@@ -163,6 +277,13 @@ export const authAdapter = {
       emit('SIGNED_OUT', null);
       const a = e as AppwriteException;
       return a?.code === 401 ? { error: null } : { error: err(e) };
+    } finally {
+      /* The SDK's own copy of the session, kept in localStorage where the
+         session cookie cannot be set — which is the native apps. AFTER the
+         delete, never before: the delete request needs it to say which
+         session to end, and clearing it first left the session alive on the
+         server while the phone believed it had signed out. */
+      try { window.localStorage.removeItem('cookieFallback'); } catch { /* ignore */ }
     }
   },
 
@@ -189,7 +310,7 @@ export const authAdapter = {
   ): Promise<AuthResult<Record<string, never>>> {
     try {
       const token = await account().createEmailToken({ userId: ID.unique(), email: email.trim().toLowerCase() });
-      pendingOtp.set(email.trim().toLowerCase(), token.userId);
+      setPendingOtp(email.trim().toLowerCase(), token.userId);
       return { data: {}, error: null };
     } catch (e) {
       return { data: {}, error: err(e) };
@@ -199,14 +320,15 @@ export const authAdapter = {
   async verifyOtp(
     { email, token }: { email: string; token: string; type?: string },
   ): Promise<AuthResult<{ user: AuthUser | null; session: AuthSession | null }>> {
-    const userId = pendingOtp.get(email.trim().toLowerCase());
+    const userId = getPendingOtp(email.trim().toLowerCase());
     if (!userId) {
       return { data: { user: null, session: null }, error: { message: 'That code has expired — request a new one.', code: 'otp_expired' } };
     }
     try {
+      clearServerAuth();
       try { await account().deleteSession({ sessionId: 'current' }); } catch { /* none to clear */ }
       await account().createSession({ userId, secret: token.trim() });
-      pendingOtp.delete(email.trim().toLowerCase());
+      deletePendingOtp(email.trim().toLowerCase());
       const user = await currentUser();
       const session = user ? { user } : null;
       emit('SIGNED_IN', session);

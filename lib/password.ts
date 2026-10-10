@@ -101,18 +101,25 @@ export function passwordStrength(pw: string): { score: PasswordStrength; label: 
   return { score: clamped, label: ['Too short', 'Okay', 'Good', 'Strong'][clamped] };
 }
 
-/* ── Supabase error → human copy ──────────────────────────────────────────
- * Verified strings from the live project (see the auth tests):
+/* ── Auth error → human copy ──────────────────────────────────────────────
+ * Supabase's strings and Appwrite's both (lib/auth.test.ts covers each).
+ * Supabase, verified from the live project:
  *   wrong password        → "Invalid login credentials"  (invalid_credentials)
  *   short password        → "Password should be at least 6 characters."
  *   unverified email      → "Email not confirmed"
  *   repeat OTP too soon   → "For security purposes, you can only request this after N seconds"
+ * Appwrite, verified against the live project:
+ *   wrong password        → "Invalid credentials. Please check the email and password." (user_invalid_credentials)
+ *   existing account      → "A user with the same id, email, or phone already exists in this project." (user_already_exists)
+ *   short password        → "Invalid `password` param: Password must be between 8 and 256 characters long."
+ * and, from Appwrite's documentation (not reproduced — it takes a burst of tries):
+ *   too many attempts     → "Rate limit for the current endpoint has been exceeded. …"
  */
 export function humanAuthError(raw: string | undefined | null, mode: 'signin' | 'signup' | 'reset'): string {
   const m = (raw ?? '').toLowerCase();
   if (!m) return 'Something went wrong — please try again.';
 
-  if (m.includes('invalid login credentials')) {
+  if (m.includes('invalid login credentials') || m.includes('invalid credentials') || m.includes('user_invalid_credentials')) {
     /* Quote the control by the words actually printed on it (AuthModal's
        "Forgot password? Set a new one") — naming a button that isn't there
        sends people hunting for it. */
@@ -123,17 +130,21 @@ export function humanAuthError(raw: string | undefined | null, mode: 'signin' | 
   if (m.includes('email not confirmed')) {
     return 'Confirm your email first — we sent you a code when you signed up.';
   }
-  if (m.includes('user already registered') || m.includes('already been registered')) {
+  if (m.includes('user already registered') || m.includes('already been registered') || m.includes('already exists') || m.includes('user_already_exists')) {
     return 'That email already has an account — sign in instead, or reset the password.';
   }
-  if (m.includes('password should be at least')) {
+  if (m.includes('password should be at least') || m.includes('password must be between') || m.includes('password must be at least')) {
     return `Use at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
   if (m.includes('weak') && m.includes('password')) {
     return 'That password is too easy to guess — try a longer one.';
   }
   if (m.includes('for security purposes') || m.includes('rate limit') || m.includes('too many')) {
-    return 'We’ve sent too many emails just now — wait a minute and try again.';
+    /* Appwrite rate-limits sign-in attempts too, and "too many emails" is
+       nonsense to someone who has only been typing a password. */
+    return mode === 'signin'
+      ? 'Too many tries just now — wait a minute and try again.'
+      : 'We’ve sent too many emails just now — wait a minute and try again.';
   }
   /* GoTrue returns ONE error for a mistyped code and an expired one:
      "Token has expired or is invalid" (otp_expired). Saying "expired" sends

@@ -16,7 +16,9 @@ Supabase's built-in sender allows **2 emails an hour** and can't be raised witho
 
 Nothing can be left half-finished: the account and the password are written together. Because nothing verifies the address, the read-back checkbox is the only typo check there is, so it's required rather than advisory, and it retracts itself if the address is edited afterwards.
 
-A repeat sign-up returns `422 user_already_exists` → "That email already has an account — sign in instead, or reset the password."
+A repeat sign-up with the **same password** finishes as a sign-in (on Appwrite: `409 user_already_exists`, then a session with that password, then `ensure_profile`) — it is almost always someone whose first sign-up dropped after the account was made. With a **different password** it is refused: "That email already has an account — sign in instead, or reset the password."
+
+Emails are lower-cased before sign-up and sign-in; every stored address is lower-case, so a capital typed on a phone keyboard is not a wrong password. Sign-in and the post-sign-up session retry only failures a retry can fix (no response, or a 5xx) — never a wrong password or a rate limit.
 
 ### Sign up — confirmation ON
 1. As above, minus the read-back checkbox (verifying the code *is* the check).

@@ -60,7 +60,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
       const { error: authErr } = await supabase.auth.signInWithPassword({ email, password: current });
       if (authErr) {
         setError(
-          /invalid login credentials/i.test(authErr.message)
+          /invalid (login )?credentials/i.test(authErr.message)
             ? 'That current password isn’t right. If you never set one, use “I don’t know my current password”.'
             : humanAuthError(authErr.message, 'signin'),
         );
