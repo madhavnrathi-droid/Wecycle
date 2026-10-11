@@ -53,6 +53,10 @@ export interface Order {
 
 export interface OrdersState {
   me: string | null;
+  /** Whether the orders table exists, known before anyone signs in — so a
+   *  signed-out visitor is offered Order (and asked to sign in) only when
+   *  ordering can actually work. null = not checked yet. */
+  available: boolean | null;
   /** `unavailable`: the orders table isn't there yet. The feature hides
    *  itself rather than offering a button that can only fail, and appears on
    *  its own the first load after the table is created — no release needed. */
@@ -62,7 +66,7 @@ export interface OrdersState {
   codes: Record<string, string>;
 }
 
-const EMPTY: OrdersState = { me: null, status: 'idle', orders: {}, codes: {} };
+const EMPTY: OrdersState = { me: null, available: null, status: 'idle', orders: {}, codes: {} };
 let state: OrdersState = EMPTY;
 const listeners = new Set<() => void>();
 
@@ -145,7 +149,7 @@ export function startOrders(uid: string | null): void {
   stopOrders();
   if (!uid || !ordersAvailable()) return;
   startedFor = uid;
-  set({ ...EMPTY, me: uid, status: 'loading' });
+  set({ ...EMPTY, available: state.available, me: uid, status: 'loading' });
 
   if (isDemoMode()) { demo.seed(uid); return; }
 
@@ -173,7 +177,23 @@ export function stopOrders(): void {
   stopFns = [];
   startedFor = null;
   demo.seeded = false;
-  if (state !== EMPTY) set(EMPTY);
+  if (state !== EMPTY) set({ ...EMPTY, available: state.available });
+}
+
+/** Is ordering possible at all? One anonymous read: a missing table answers
+ *  404, anything else means it exists (a guest just can't see any rows). */
+let probing = false;
+export function probeOrdersAvailable(): void {
+  if (state.available !== null || probing) return;
+  if (isDemoMode()) { set({ available: true }); return; }
+  if (!ordersAvailable()) { set({ available: false }); return; }
+  probing = true;
+  tables().listRows({ databaseId: APPWRITE_DB, tableId: 'orders', queries: [Query.limit(1)] })
+    .then(() => set({ available: true }))
+    .catch((e: { code?: number; type?: string }) => {
+      set({ available: !(e?.code === 404 || /not_found/.test(String(e?.type ?? ''))) });
+    })
+    .finally(() => { probing = false; });
 }
 
 export async function loadOrders(): Promise<void> {
@@ -188,7 +208,7 @@ export async function loadOrders(): Promise<void> {
     if (state.me !== me) return;
     const rows = [...asBuyer.rows, ...asSeller.rows] as unknown as Row[];
     const orders = rows.map(toOrder).filter((o): o is Order => !!o);
-    set(s => ({ status: 'ready', orders: Object.fromEntries([...Object.values(s.orders), ...orders].map(o => [o.id, o])) }));
+    set(s => ({ status: 'ready', available: true, orders: Object.fromEntries([...Object.values(s.orders), ...orders].map(o => [o.id, o])) }));
     upsert(orders);
   } catch (e) {
     /* A dropped connection: no orders to show is the honest state, and
@@ -196,7 +216,7 @@ export async function loadOrders(): Promise<void> {
        see `unavailable`. */
     if (state.me !== me) return;
     const err = e as { code?: number; type?: string };
-    if (err?.code === 404 || /not_found/.test(String(err?.type ?? ''))) set({ status: 'unavailable' });
+    if (err?.code === 404 || /not_found/.test(String(err?.type ?? ''))) set({ status: 'unavailable', available: false });
     else set({ status: state.status === 'loading' ? 'error' : state.status });
   }
 }
@@ -234,6 +254,49 @@ export function ordersAs(s: OrdersState, role: Role): Order[] {
 export function waitingOnMe(s: OrdersState): number {
   return Object.values(s.orders).filter(o =>
     (o.sellerId === s.me && o.status === 'requested') || (o.buyerId === s.me && o.status === 'ready')).length;
+}
+
+/* ── The store's view ─────────────────────────────────────────────────────
+ *
+ * What a seller running a shop needs from their orders: what's new, what's in
+ * hand, what's waiting to be collected, what's finished — and, inside each,
+ * the most urgent first. */
+export type Bucket = 'all' | 'new' | 'active' | 'ready' | 'done' | 'cancelled';
+
+export const BUCKET_LABEL: Record<Bucket, string> = {
+  all: 'All', new: 'New', active: 'In progress', ready: 'Ready', done: 'Done', cancelled: 'Cancelled',
+};
+
+export function bucketOf(o: Order): Exclude<Bucket, 'all'> {
+  switch (o.status) {
+    case 'requested': return 'new';
+    case 'confirmed':
+    case 'making':    return 'active';
+    case 'ready':     return 'ready';
+    case 'done':      return 'done';
+    default:          return 'cancelled';
+  }
+}
+
+const due = (o: Order): number => (o.readyBy ? Date.parse(o.readyBy) : Number.POSITIVE_INFINITY);
+
+/** Most urgent first: open orders by bucket (new, ready, in progress), then by
+ *  ready-by date, then oldest first — a request that has waited longest is the
+ *  one to answer. Finished ones after, newest first. */
+export function sortForStore(list: Order[]): Order[] {
+  const rank: Record<Exclude<Bucket, 'all'>, number> = { new: 0, ready: 1, active: 2, done: 3, cancelled: 4 };
+  return [...list].sort((a, b) => {
+    const ra = rank[bucketOf(a)], rb = rank[bucketOf(b)];
+    if (ra !== rb) return ra - rb;
+    if (ra <= 2) return due(a) - due(b) || Date.parse(a.createdAt) - Date.parse(b.createdAt);
+    return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+  });
+}
+
+export function bucketCounts(list: Order[]): Record<Bucket, number> {
+  const c: Record<Bucket, number> = { all: list.length, new: 0, active: 0, ready: 0, done: 0, cancelled: 0 };
+  for (const o of list) c[bucketOf(o)]++;
+  return c;
 }
 
 /** Chat message ids that are order steps, for drawing them as quiet updates. */
@@ -341,26 +404,63 @@ const demo = {
   seed(me: string) {
     if (this.seeded) return;
     this.seeded = true;
-    /* One order waiting on the member as a seller, so the seller's side can
-       be seen without a second phone: someone has asked for one of their
-       demo uploads. */
-    const mine = getDemoUploads().find(i => i.listingType === 'sell' && typeof i.price === 'number');
-    const buyer = USERS[3];
-    if (mine && buyer) {
+    set({ available: true });
+    /* A small shop's week, so the store view can be seen without a second
+       phone: orders from five classmates on the member's own demo uploads, one
+       in every state — and one thing the member has ordered themselves. */
+    const uploads = getDemoUploads();
+    const photoOf = (i: (typeof uploads)[number]) => resolveItemMedia(i).find((m): m is string => typeof m === 'string') ?? null;
+    const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+    const inDays = (d: number) => { const x = new Date(Date.now() + d * 86_400_000); x.setHours(12, 0, 0, 0); return x.toISOString(); };
+    const plan: Array<{ who: number; status: OrderStatus; placed: number; qty?: number; note?: string; readyBy?: number; pickup?: string; verified?: boolean; by?: 'me' | 'them' }> = [
+      { who: 3, status: 'requested', placed: 20, note: 'Could I pick it up this evening?' },
+      { who: 4, status: 'requested', placed: 140, qty: 2, note: 'One in blue if you can' },
+      { who: 5, status: 'confirmed', placed: 60 * 26, readyBy: 2 },
+      { who: 6, status: 'making', placed: 60 * 50, readyBy: -1, note: 'For a birthday on Friday!' },
+      { who: 7, status: 'ready', placed: 60 * 72, readyBy: 0, pickup: 'Library steps, after 5' },
+      { who: 8, status: 'done', placed: 60 * 24 * 5, verified: true },
+      { who: 9, status: 'cancelled', placed: 60 * 24 * 3, by: 'them' },
+    ];
+    const orders: Order[] = [];
+    plan.forEach((p, n) => {
+      const item = uploads[n % Math.max(1, uploads.length)];
+      const buyer = USERS[p.who % USERS.length];
+      if (!item || !buyer || buyer.id === me) return;
       rememberPeer({ id: buyer.id, name: buyer.name, initials: buyer.initials, color: buyer.color, avatarUrl: null, college: null, allowDms: true });
       const conversationId = conversationIdFor(me, buyer.id);
-      const at = new Date(Date.now() - 20 * 60_000).toISOString();
-      const msg = demoPostMessage(conversationId, buyer.id, buyer.id, requestText({
-        title: mine.title, price: mine.price ?? null, quantity: 1, note: 'Could I pick it up this evening?', sellerFirst: '',
-      }));
-      const photo = resolveItemMedia(mine).find((m): m is string => typeof m === 'string') ?? null;
-      upsert([{
-        id: 'demo-order-in', listingId: mine.id, sellerId: me, buyerId: buyer.id, conversationId,
-        title: mine.title, photoUrl: photo, price: mine.price ?? null, quantity: 1, note: 'Could I pick it up this evening?',
-        status: 'requested', readyBy: null, pickup: null, verified: false, cancelledBy: null,
-        history: [{ type: 'requested', by: buyer.id, at, msg }], createdAt: at, updatedAt: at,
-      }]);
+      const at = ago(p.placed);
+      const msg = n < 2 ? demoPostMessage(conversationId, buyer.id, buyer.id, requestText({
+        title: item.title, price: item.price ?? null, quantity: p.qty ?? 1, note: p.note, sellerFirst: '',
+      })) : undefined;
+      const history: OrderEvent[] = [{ type: 'requested', by: buyer.id, at, ...(msg ? { msg } : {}) }];
+      const step = (type: OrderEvent['type'], by: string, minLater: number) => history.push({ type, by, at: ago(Math.max(1, p.placed - minLater)) });
+      if (['confirmed', 'making', 'ready', 'done'].includes(p.status)) step('confirm', me, 30);
+      if (['making', 'ready', 'done'].includes(p.status)) step('making', me, 60 * 6);
+      if (['ready', 'done'].includes(p.status)) step('ready', me, 60 * 20);
+      if (p.status === 'done') step('done', me, 60 * 30);
+      if (p.status === 'cancelled') step('cancel', p.by === 'me' ? me : buyer.id, 60);
+      orders.push({
+        id: `demo-order-${n}`, listingId: item.id, sellerId: me, buyerId: buyer.id, conversationId,
+        title: item.title, photoUrl: photoOf(item), price: item.price ?? null, quantity: p.qty ?? 1, note: p.note ?? null,
+        status: p.status, readyBy: p.readyBy !== undefined ? inDays(p.readyBy) : null, pickup: p.pickup ?? null,
+        verified: !!p.verified, cancelledBy: p.status === 'cancelled' ? (p.by === 'me' ? me : buyer.id) : null,
+        history, createdAt: at, updatedAt: history[history.length - 1].at,
+      });
+    });
+    /* And one the member is waiting to collect. */
+    const seller = USERS[0];
+    if (seller && seller.id !== me) {
+      rememberPeer({ id: seller.id, name: seller.name, initials: seller.initials, color: seller.color, avatarUrl: null, college: null, allowDms: true });
+      const at = ago(60 * 30);
+      orders.push({
+        id: 'demo-order-buy', listingId: 'm8', sellerId: seller.id, buyerId: me, conversationId: conversationIdFor(me, seller.id),
+        title: 'Noise-Cancelling Desk Fan', photoUrl: null, price: 800, quantity: 1, note: null,
+        status: 'ready', readyBy: inDays(0), pickup: 'Vyas Bhawan gate', verified: false, cancelledBy: null,
+        history: [{ type: 'requested', by: me, at }, { type: 'confirm', by: seller.id, at: ago(60 * 25) }, { type: 'ready', by: seller.id, at: ago(45) }],
+        createdAt: at, updatedAt: ago(45),
+      });
     }
+    upsert(orders);
     set({ status: 'ready' });
   },
   code(orderId: string): string {
@@ -374,7 +474,7 @@ const demo = {
     if (existing) return { ok: true, order: existing, conversationId: existing.conversationId };
     const conversationId = conversationIdFor(me, item.seller.id);
     const now = new Date().toISOString();
-    const id = `demo-order-${++this.seq}`;
+    const id = `demo-order-new-${++this.seq}`;
     const msg = demoPostMessage(conversationId, item.seller.id, me, requestText({
       title: item.title, price: item.price, quantity, note, sellerFirst: item.seller.name.split(/\s+/)[0],
     }));

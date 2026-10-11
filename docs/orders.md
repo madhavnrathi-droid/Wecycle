@@ -37,8 +37,11 @@ come from each order's `history`.
 | Client store, realtime, demo backend | `lib/orders/store.ts` |
 | Order sheet | `components/orders/OrderSheet.tsx` |
 | Card pinned in the chat | `components/orders/OrderCard.tsx` (in `ChatThread`) |
-| Inventory → Orders tab | `components/orders/OrdersList.tsx` |
-| "Order" on a listing | `ItemDetailScreen` (items for sale, not your own) |
+| Actions (shared by card, row, sheet) | `components/orders/OrderActions.tsx` |
+| Full order sheet | `components/orders/OrderDetailSheet.tsx` |
+| Inventory → Orders (the store's counter) | `components/orders/OrdersManager.tsx` |
+| Pills / counts / labels that pop on change | `components/orders/Pop.tsx` |
+| "Order" + Message · Email · WhatsApp on a listing | `components/ContactChannels.tsx` in `ItemDetailScreen` |
 
 ## The table
 
@@ -61,3 +64,33 @@ loaded.
 "seller" a few seconds later, and Inventory → Orders has one incoming order to
 try the seller's side. Against the real backend, use throwaway users and the
 local dev server (see the probe pattern in HANDOFF.md → Messaging).
+
+## The store's counter (Inventory → Orders)
+
+Shown to anyone who sells something (so a student running a store sees where
+orders will land before the first one) and to anyone who has ordered. Selling
+and Buying sides; filters with live counts (New · In progress · Ready · Done ·
+Cancelled); most urgent first — new requests, then ready ones awaiting
+collection, then work in hand by ready-by date, oldest request first. Each row:
+who, when it came in, total, status, ready-by (or pickup once ready, or
+"Overdue"), and the next step plus a chat button right on the row. A tap opens
+the full order sheet: placed date, quantity, total, note, ready-by, pickup,
+handover proof, the full history, and every action. "Handed over" from a row
+opens the sheet straight at the pickup-code field.
+
+## Contact row on a listing
+
+Always the same order, always all of them, labelled: **Order** (or the post's
+own action) · **Message** · **Email** · **WhatsApp**. A channel the seller
+hasn't shared stays visible but faded and explains itself when tapped
+("Priya hasn't shared WhatsApp. Message them on Wecycle instead."). Signed
+out, every channel leads to sign-in.
+
+## Motion
+
+After HyperFrames' press-release-spring, spring-pop-entrance, scale-swap and
+waterfall rules, on Wecycle's tokens: presses squeeze linearly (`--dur-1`) and
+spring back on `--spring-bouncy`; a status, count or label pops only when it
+CHANGES (`Pop.tsx`), never on first paint; rows arrive on `--ease-enter` with a
+45 ms stagger capped at 8; progress fills slide in from the left; a handover
+stamps a lime check. Reduced motion turns all of it off.

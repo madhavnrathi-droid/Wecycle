@@ -27,8 +27,8 @@ import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import { priceChip, fromListingType } from '../lib/dealTypes';
 import { useGlide } from '../lib/useGlide';
-import OrdersList from './orders/OrdersList';
-import { useOrders, waitingOnMe, type Order } from '../lib/orders/store';
+import OrdersManager from './orders/OrdersManager';
+import { useOrders, waitingOnMe } from '../lib/orders/store';
 
 type Tab = 'all' | 'orders' | 'requests' | 'shared' | 'events' | 'saved';
 
@@ -45,8 +45,8 @@ interface InventoryScreenProps {
   onOpenEventInsights?: (event: CommunityEvent) => void;
   /** Opens the Lost & Found detail sheet (lifted to app/page.tsx). */
   onOpenLF?: (item: LostItem) => void;
-  /** Opens the chat an order lives in. */
-  onOpenOrder?: (order: Order, peerId: string) => void;
+  /** Opens the chat with the other person on an order. */
+  onOpenOrderChat?: (peerId: string) => void;
 }
 
 const MY_UPLOAD_IDS = ['m1', 'm5', 'm10'];
@@ -62,7 +62,7 @@ type UploadEntry =
   | { kind: 'event'; event: CommunityEvent }
   | { kind: 'lostfound'; lf: LostItem };
 
-export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessages, onPostNew, onOpenItem, onOpenEvent, onOpenEventInsights, onOpenLF, onOpenOrder }: InventoryScreenProps) {
+export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessages, onPostNew, onOpenItem, onOpenEvent, onOpenEventInsights, onOpenLF, onOpenOrderChat }: InventoryScreenProps) {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -118,12 +118,15 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
     if (activeTab === 'events' && !hasEvents) setActiveTab('all');
   }, [activeTab, hasEvents]);
 
-  /* Orders: a tab once there is something in it, like Events — a member who
-     has never bought or sold anything doesn't need an empty one. The count is
+  /* Orders: there for anyone who sells — a student running a store needs to
+     know where orders will land before the first one does — and for anyone
+     who has ordered something. Not for a member with neither. The count is
      what is waiting on them: new requests to answer, ready ones to collect. */
   const os = useOrders();
   const orderCount = Object.keys(os.orders).length;
-  const hasOrders = !!onOpenOrder && orderCount > 0;
+  const sellsThings = useMemo(() => (isDemoMode() ? getDemoUploads() : myLiveUploads)
+    .some(i => i.listingType === 'sell' && !i.isRequest && i.kind !== 'opportunity'), [myLiveUploads, demoTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hasOrders = !!onOpenOrderChat && os.available !== false && (orderCount > 0 || sellsThings);
   const waiting = waitingOnMe(os);
   useEffect(() => {
     if (activeTab === 'orders' && !hasOrders) setActiveTab('all');
@@ -311,8 +314,8 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
 
       {/* ── GRID ── (or the orders list) */}
       <section style={{ padding: '0 12px' }}>
-        {activeTab === 'orders' && onOpenOrder ? (
-          <OrdersList onOpen={onOpenOrder} />
+        {activeTab === 'orders' && onOpenOrderChat ? (
+          <OrdersManager onOpenChat={onOpenOrderChat} />
         ) : entries.length === 0 ? (
           <InventoryEmpty tab={activeTab} onPostNew={onPostNew} signedIn={!!user} />
         ) : (

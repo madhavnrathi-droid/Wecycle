@@ -78,7 +78,7 @@ import type { WecycleAlert } from '../lib/alerts';
 import {
   startMessaging, openConversationWith, rememberPeer, peerFromUser, type MessageTarget,
 } from '../lib/messaging/store';
-import { startOrders, getOrdersState, openOrderFor, type Order } from '../lib/orders/store';
+import { startOrders, getOrdersState, openOrderFor } from '../lib/orders/store';
 import { primePostPreview } from '../lib/messaging/useMessaging';
 import { conversationIdFor } from '../lib/messaging/conversationId';
 import type { DeepLinkPost } from '../lib/liveData';
@@ -221,7 +221,7 @@ export default function WecycleApp() {
     track(EVT.order_sheet_opened, { priced: typeof it.price === 'number' });
     setOrderItem(it);
   };
-  const openOrderFromList = (order: Order, peerId: string) => { void order; openOrderChat(peerId); };
+
 
   /* Back from a profile or post that was opened from a chat → the chat. */
   useEffect(() => {
@@ -1012,7 +1012,7 @@ export default function WecycleApp() {
                 onOpenEvent={setOpenEvent}
                 onOpenEventInsights={setInsightsEvent}
                 onOpenLF={(lf) => setOpenLF(lf)}
-                onOpenOrder={openOrderFromList}
+                onOpenOrderChat={openOrderChat}
               />
             )}
             {activeScreen === 'account' && (

@@ -8566,3 +8566,221 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
 }
 /* Inside the card the inset fill is the card itself, so soft buttons step up a layer. */
 .ord-card .dm-btn--soft { background: var(--bg-card); }
+
+/* ═══════════════════════════════════════════════
+   ORDERS — store view, order sheet, contact row, and their motion.
+
+   Motion follows two rules (after HyperFrames' press-release-spring,
+   spring-pop-entrance, scale-swap and waterfall rules):
+     · a press is input, a release is output — a short linear squeeze, then
+       the bouncy spring carries it back with a little overshoot;
+     · arrivals settle smoothly; only a CHANGE of state pops on the spring.
+   Every number is a token; reduced motion turns all of it off.
+   ═══════════════════════════════════════════════ */
+
+/* Press → release */
+.ord-press {
+  transition:
+    transform var(--dur-4) var(--spring-bouncy),
+    background-color var(--dur-2) var(--ease-standard),
+    opacity var(--dur-2) var(--ease-standard);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.ord-press:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.94);
+  transition-duration: var(--dur-1);
+  transition-timing-function: linear;
+}
+
+/* A state arriving: the new pill / count pops in on the spring. */
+@keyframes ord-pop { from { transform: scale(0.55); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.ord-pop { animation: ord-pop var(--dur-4) var(--spring-bouncy) backwards; }
+/* A label or line being replaced: a short rise into place. */
+@keyframes ord-swap { from { transform: translateY(6px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+.ord-swap { display: inline-block; animation: ord-swap var(--dur-3) var(--spring-snappy) backwards; }
+
+/* The five steps: a track, and a fill that slides in from the left. */
+.ord-steps li, .ord-steps li[data-on] { height: auto; background: none; display: flex; flex-direction: column; gap: 6px; }
+.ord-steps li > i {
+  position: relative; display: block; height: 3px; border-radius: 3px;
+  background: var(--border-default); overflow: hidden;
+}
+.ord-steps li > i::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--accent-lime-dim);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform var(--dur-4) var(--spring-snappy);
+  transition-delay: calc(var(--i, 0) * 40ms);
+}
+.ord-steps li[data-on] > i::after { transform: scaleX(1); }
+.ord-card[data-status="done"] .ord-steps li > i::after,
+.ord-detail .ord-steps li > i::after { background: var(--accent-lime-dim); }
+.ord-steps--labelled li > i { height: 4px; }
+.ord-steps--labelled li > span { font-size: 10.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.ord-steps--labelled li[data-on] > span { color: var(--text-secondary); }
+.ord-steps--labelled li[aria-current] > span { color: var(--text-primary); }
+
+/* The menu and panels open from where they were asked for. */
+@keyframes ord-menu-in { from { transform: translateY(-4px) scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
+.ord-menu { transform-origin: top right; animation: ord-menu-in var(--dur-3) var(--spring-snappy) backwards; }
+.ord-menu button svg { flex-shrink: 0; color: var(--text-secondary); }
+@keyframes ord-panel-in { from { transform: translateY(-6px); opacity: 0; } to { transform: none; opacity: 1; } }
+.ord-panel { animation: ord-panel-in var(--dur-4) var(--spring-snappy) backwards; }
+
+/* Handed over: a stamp. */
+.ord-actions-wrap { position: relative; display: flex; flex-direction: column; gap: 10px; }
+.ord-stamp {
+  position: absolute; left: 50%; top: 50%; z-index: 6;
+  width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 999px;
+  background: var(--accent-lime); color: var(--text-on-accent);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: ord-stamp-in var(--dur-5) var(--spring-bouncy) backwards, ord-stamp-out var(--dur-4) var(--ease-exit) forwards;
+  animation-delay: 0s, 900ms;
+}
+@keyframes ord-stamp-in { from { transform: scale(0.3) rotate(-14deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ord-stamp-out { to { transform: scale(0.85); opacity: 0; } }
+
+/* ── The store's list ── */
+.ord-filters { align-self: stretch; }
+.ord-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px;
+  background: var(--bg-inset); color: var(--text-secondary);
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; vertical-align: 1px;
+}
+.ord-count[data-hot] { background: var(--accent-lime); color: var(--text-on-accent); }
+
+.ord-mlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+@keyframes ord-row-in { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.ord-mrow {
+  position: relative;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 8px;
+  padding: 2px 6px 2px 0; border-radius: 18px;
+  animation: ord-row-in var(--dur-4) var(--ease-enter) backwards;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+.ord-mrow + .ord-mrow::before {
+  content: ''; position: absolute; top: -1px; left: 70px; right: 8px; height: 1px; background: var(--border-subtle);
+}
+.ord-mrow[data-waiting] { background: color-mix(in srgb, var(--accent-lime-surface) 62%, transparent); }
+.ord-mrow[data-waiting]::before, .ord-mrow[data-waiting] + .ord-mrow::before { display: none; }
+.ord-mrow-main {
+  min-width: 0; display: flex; align-items: center; gap: 12px;
+  padding: 10px 6px 10px 8px; border: none; background: none; border-radius: 16px;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.ord-mrow-main:focus-visible { outline: 2px solid var(--focus-ring); }
+.ord-mrow-main img, .ord-mrow-main .ord-thumb-ph { width: 52px; height: 52px; border-radius: 14px; }
+.ord-mrow-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ord-mrow-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.ord-mrow-top .ord-row-title { flex: 1; min-width: 0; }
+.ord-mrow-amt { flex-shrink: 0; font-size: calc(14px * var(--text-scale)); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ord-row-sub b { color: var(--text-primary); font-weight: 600; }
+.ord-mrow-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.ord-pill--sm { padding: 3px 7px; font-size: 10px; }
+.ord-due { font-size: calc(12px * var(--text-scale)); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.ord-due[data-overdue] { color: var(--accent-rose-ink); font-weight: 600; }
+
+.ord-row-actions { position: relative; display: flex; align-items: center; gap: 6px; }
+.ord-btn--sm {
+  height: 40px; padding: 0 14px; border: none; border-radius: 999px; cursor: pointer;
+  background: var(--text-primary); color: var(--bg-base);
+  font: inherit; font-size: calc(13px * var(--text-scale)); font-weight: 650; white-space: nowrap;
+}
+.ord-btn--sm:disabled { opacity: 0.55; }
+.ord-icon-btn--sm { width: 40px; height: 40px; }
+.ord-mrow[data-waiting] .ord-icon-btn--sm { background: var(--bg-card); }
+.ord-error--row { position: absolute; right: 0; top: calc(100% + 2px); font-size: 11.5px; white-space: nowrap; }
+.ord-empty--inline { padding: 24px 12px; }
+
+/* Narrow phones: the actions drop under the text, so names and dates aren't
+   squeezed to an ellipsis by the buttons. */
+@media (max-width: 520px) {
+  .ord-mrow { grid-template-columns: minmax(0, 1fr); }
+  .ord-row-actions { padding: 0 0 10px 72px; }
+  .ord-mrow + .ord-mrow::before { left: 72px; }
+}
+
+/* A new order waiting on you: its pill rings twice, then rests. */
+@keyframes ord-ring { from { box-shadow: 0 0 0 0 var(--accent-lime); } to { box-shadow: 0 0 0 7px transparent; } }
+.ord-mrow[data-waiting] .ord-pill { animation: ord-ring var(--dur-5) var(--ease-standard) 2; animation-delay: var(--dur-3); }
+
+/* ── The order sheet ── */
+.ord-detail { display: flex; flex-direction: column; gap: 18px; }
+.ord-detail-head { display: flex; align-items: flex-start; gap: 10px; }
+.ord-detail-item {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;
+  padding: 0; border: none; background: none; border-radius: 14px;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.ord-detail-item:disabled { cursor: default; }
+.ord-detail-item img, .ord-detail-item .ord-thumb-ph { width: 60px; height: 60px; border-radius: 16px; }
+.ord-person { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; background: var(--bg-inset); }
+.ord-person-role { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.ord-person-name { font-size: calc(15px * var(--text-scale)); font-weight: 650; letter-spacing: -0.01em; }
+.ord-facts { margin: 0; display: flex; flex-direction: column; }
+.ord-facts > div {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  padding: 11px 2px; box-shadow: inset 0 -1px 0 var(--border-subtle);
+}
+.ord-facts dt { font-size: calc(13.5px * var(--text-scale)); color: var(--text-secondary); }
+.ord-facts dd { margin: 0; text-align: right; font-size: calc(14px * var(--text-scale)); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ord-facts dd[data-overdue] { color: var(--accent-rose-ink); }
+.ord-facts .ord-facts-note { flex-direction: column; align-items: stretch; gap: 4px; }
+.ord-facts .ord-facts-note dd { text-align: left; font-weight: 400; white-space: pre-wrap; line-height: 1.45; }
+.ord-muted { color: var(--text-muted); font-weight: 500; }
+.ord-timeline { list-style: none; margin: 0; padding: 0 0 0 16px; position: relative; }
+.ord-timeline::before { content: ''; position: absolute; left: 4px; top: 10px; bottom: 12px; width: 2px; border-radius: 2px; background: var(--border-subtle); }
+.ord-timeline li { position: relative; padding: 4px 0 10px 8px; display: flex; flex-direction: column; gap: 1px; }
+.ord-timeline li::before {
+  content: ''; position: absolute; left: -16px; top: 9px; width: 10px; height: 10px; border-radius: 999px;
+  background: var(--bg-card); box-shadow: inset 0 0 0 2px var(--border-default);
+}
+.ord-timeline li[data-latest]::before { background: var(--accent-lime); box-shadow: 0 0 0 3px var(--accent-lime-surface); }
+.ord-timeline-what { font-size: calc(13.5px * var(--text-scale)); font-weight: 600; }
+.ord-timeline-what em { font-style: normal; font-weight: 500; color: var(--text-muted); }
+.ord-timeline-when { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ord-actions-wrap--sheet .ord-actions { gap: 8px; }
+.ord-actions-wrap--sheet .ord-btn { height: 46px; flex: 1 1 auto; }
+.ord-actions-wrap--sheet .ord-code { height: 46px; line-height: 46px; flex: 0 0 auto; justify-content: center; background: var(--bg-inset); }
+.ord-actions-wrap--sheet .ord-actions { flex-wrap: nowrap; }
+.ord-actions-wrap--sheet .ord-btn { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── How to reach the seller: Order · Message · Email · WhatsApp ── */
+.cc { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; }
+.cc-primary {
+  flex: 1 1 auto; min-width: 0; height: 52px; border: none; border-radius: 999px; cursor: pointer;
+  background: var(--text-primary); color: var(--bg-base);
+  font: inherit; font-size: calc(14.5px * var(--text-scale)); font-weight: 650; letter-spacing: -0.01em;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px;
+}
+.cc-primary span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-channels { display: flex; gap: 4px; flex-shrink: 0; }
+.cc-ch {
+  width: 54px; padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; color: var(--text-primary);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.cc-ch-icon {
+  width: 40px; height: 40px; border-radius: 999px; background: var(--bg-inset);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity var(--dur-2) var(--ease-standard);
+}
+.cc-ch[data-tone="wa"] .cc-ch-icon { background: #00863C; color: #FFFFFF; }
+.cc-ch-label { font-size: 10.5px; font-weight: 600; color: var(--text-secondary); line-height: 1.2; white-space: nowrap; }
+.cc-ch[data-off] .cc-ch-icon { opacity: 0.36; }
+.cc-ch[data-off] .cc-ch-label { color: var(--text-muted); }
+.cc-ch:focus-visible { outline: none; }
+.cc-ch:focus-visible .cc-ch-icon, .cc-primary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cc--desktop .cc-primary { border-radius: 14px; }
+.cc--desktop { flex: 1 1 340px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ord-pop, .ord-swap, .ord-mrow, .ord-menu, .ord-panel, .ord-stamp, .ord-mrow[data-waiting] .ord-pill { animation: none; }
+  .ord-steps li > i::after, .ord-press { transition: none; }
+}
+.ord-sheet-send[data-sent] { background: var(--accent-lime); color: var(--text-on-accent); }
+.ord-stamp--sm { width: 40px; height: 40px; margin: -20px 0 0 -20px; left: 24px; }

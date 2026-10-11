@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle, ShoppingBag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle } from 'lucide-react';
 import { messagingAvailable } from '../lib/messaging/store';
-import { useOrders, ordersAvailable, openOrderFor } from '../lib/orders/store';
+import { useOrders, ordersAvailable, openOrderFor, probeOrdersAvailable } from '../lib/orders/store';
+import ContactChannels from './ContactChannels';
 import { isOrderable } from '../lib/orders/model';
 import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
@@ -990,10 +991,11 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
      open for this item gets a way back to it instead of a second order. */
   const [ordersOn] = useState(() => ordersAvailable());
   const os = useOrders();
-  /* Only once this member's orders have loaded: that is the proof the
-     orders table exists. Until then — or signed out — Message stays the
-     primary action, so nobody is offered a button that can only fail. */
-  const canOrder = !!onOrder && ordersOn && os.status === 'ready' && canMessage && !item.isRequest
+  /* Only once ordering is known to work — the orders table answers. Until
+     then Message stays the primary action, so nobody is offered a button
+     that can only fail. Signed out, Order shows and asks for sign-in. */
+  useEffect(() => { if (ordersOn) probeOrdersAvailable(); }, [ordersOn]);
+  const canOrder = !!onOrder && ordersOn && os.available === true && canMessage && !item.isRequest
     && isOrderable({ kind: item.kind ?? 'item', listing_type: item.listingType, status: 'active' });
   const myOpenOrder = canOrder ? openOrderFor(os, item.id) : null;
   const orderLabel = myOpenOrder ? 'View order' : 'Order';
@@ -1923,95 +1925,24 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             </>
           ) : (
           <>
-          {canOrder ? (
-            /* ── Order first, for things for sale. Message stays one tap away
-               as a round button, with email and WhatsApp beside it. */
-            <>
-              <button
-                onClick={startOrder}
-                aria-label={myOpenOrder ? `View your order for ${item.title}` : `Order ${item.title} from ${item.user.name}`}
-                style={{
-                  flex: 1, minWidth: 0, height: 52, borderRadius: 999,
-                  background: 'var(--text-primary)', color: 'var(--bg-base)',
-                  border: 'none', cursor: 'pointer',
-                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                <ShoppingBag size={16} strokeWidth={2} />
-                {orderLabel}
-              </button>
-              <button
-                onClick={startMessage}
-                aria-label={`Message ${item.user.name}`}
-                style={{
-                  width: 52, height: 52, borderRadius: 999, flexShrink: 0,
-                  background: 'var(--bg-inset)', color: 'var(--text-primary)',
-                  border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <MessageCircle size={18} strokeWidth={1.9} />
-              </button>
-              {contactLinks.map(link => (
-                <button
-                  key={link.channel}
-                  onClick={() => {
-                    if (!user) { onRequireAuth(); return; }
-                    handleContactClick(link);
-                  }}
-                  aria-label={link.ariaLabel}
-                  style={{
-                    width: 52, height: 52, borderRadius: 999, flexShrink: 0,
-                    background: link.channel === 'whatsapp' ? WA_FILL : 'var(--bg-inset)',
-                    color: link.channel === 'whatsapp' ? WA_INK : 'var(--text-primary)',
-                    border: 'none', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  {link.channel === 'whatsapp' ? <WhatsAppGlyph size={18} /> : <Mail size={18} strokeWidth={1.9} />}
-                </button>
-              ))}
-            </>
-          ) : canMessage ? (
-            /* ── Message on Wecycle, first. Email and WhatsApp stay beside it
-               as round secondary buttons for people who would rather use them —
-               nothing is taken away, the order just changes. */
-            <>
-              <button
-                onClick={startMessage}
-                aria-label={`${primaryActionLabel} — message ${item.user.name}`}
-                style={{
-                  flex: 1, minWidth: 0, height: 52, borderRadius: 999,
-                  background: 'var(--text-primary)', color: 'var(--bg-base)',
-                  border: 'none', cursor: 'pointer',
-                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                <MessageCircle size={16} strokeWidth={2} />
-                {primaryActionLabel}
-              </button>
-              {contactLinks.map(link => (
-                <button
-                  key={link.channel}
-                  onClick={() => {
-                    if (!user) { onRequireAuth(); return; }
-                    handleContactClick(link);
-                  }}
-                  aria-label={link.ariaLabel}
-                  style={{
-                    width: 52, height: 52, borderRadius: 999, flexShrink: 0,
-                    background: link.channel === 'whatsapp' ? WA_FILL : 'var(--bg-inset)',
-                    color: link.channel === 'whatsapp' ? WA_INK : 'var(--text-primary)',
-                    border: 'none', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  {link.channel === 'whatsapp' ? <WhatsAppGlyph size={18} /> : <Mail size={18} strokeWidth={1.9} />}
-                </button>
-              ))}
-            </>
+          {canMessage ? (
+            /* ── Order (on things for sale) or the post's own action, then
+               every way to reach the seller in a fixed order with labels —
+               Message on Wecycle, Email, WhatsApp. See ContactChannels. */
+            <ContactChannels
+              variant="mobile"
+              sellerName={item.user.name}
+              primary={canOrder
+                ? { kind: 'order', label: orderLabel, onClick: startOrder,
+                    ariaLabel: myOpenOrder ? `View your order for ${item.title}` : `Order ${item.title} from ${item.user.name}` }
+                : { kind: 'message', label: primaryActionLabel, onClick: startMessage,
+                    ariaLabel: `${primaryActionLabel} — message ${item.user.name}` }}
+              onMessage={startMessage}
+              links={contactLinks}
+              signedIn={!!user}
+              onRequireAuth={onRequireAuth}
+              onLink={handleContactClick}
+            />
           ) : (
           <>
             {/* ── Contact the seller — the ONLY thing in the sticky bar now.
@@ -2798,74 +2729,22 @@ function DesktopLayout({
                 View seller&rsquo;s profile
               </button>
             ) : canMessage ? (
-              <>
-                {canOrder ? (
-                  <>
-                    <button
-                      onClick={onOrder}
-                      aria-label={orderLabel === 'Order' ? `Order ${item.title} from ${item.user.name}` : `View your order for ${item.title}`}
-                      style={{
-                        flex: '1 1 150px', minWidth: 0, height: 52, borderRadius: 14,
-                        background: 'var(--text-primary)', color: 'var(--bg-base)',
-                        border: 'none', cursor: 'pointer',
-                        fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      }}
-                    >
-                      <ShoppingBag size={17} strokeWidth={2} />
-                      {orderLabel}
-                    </button>
-                    <button
-                      onClick={onMessage}
-                      aria-label={`Message ${item.user.name}`}
-                      title={`Message ${item.user.name}`}
-                      style={{
-                        width: 52, height: 52, borderRadius: 14, flexShrink: 0,
-                        background: 'var(--bg-inset)', color: 'var(--text-primary)',
-                        border: 'none', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >
-                      <MessageCircle size={18} strokeWidth={1.9} />
-                    </button>
-                  </>
-                ) : (
-                <button
-                  onClick={onMessage}
-                  aria-label={`${primaryActionLabel} — message ${item.user.name}`}
-                  style={{
-                    /* 150, not 220: with email, WhatsApp, save, share and
-                       report beside it, 220 pushed report onto a line of
-                       its own. */
-                    flex: '1 1 150px', minWidth: 0, height: 52, borderRadius: 14,
-                    background: 'var(--text-primary)', color: 'var(--bg-base)',
-                    border: 'none', cursor: 'pointer',
-                    fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}
-                >
-                  <MessageCircle size={17} strokeWidth={2} />
-                  {primaryActionLabel}
-                </button>
-                )}
-                {contactLinks.map(link => (
-                  <button
-                    key={link.channel}
-                    onClick={() => handleContactClick(link)}
-                    aria-label={link.ariaLabel}
-                    title={link.ariaLabel}
-                    style={{
-                      width: 52, height: 52, borderRadius: 14, flexShrink: 0,
-                      background: link.channel === 'whatsapp' ? WA_FILL : 'var(--bg-inset)',
-                      color: link.channel === 'whatsapp' ? WA_INK : 'var(--text-primary)',
-                      border: 'none', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    {link.channel === 'whatsapp' ? <WhatsAppGlyph size={18} /> : <Mail size={18} strokeWidth={1.9} />}
-                  </button>
-                ))}
-              </>
+              /* Same row as on a phone — see ContactChannels. Save, share and
+                 report follow it as before. */
+              <ContactChannels
+                variant="desktop"
+                sellerName={item.user.name}
+                primary={canOrder
+                  ? { kind: 'order', label: orderLabel, onClick: onOrder,
+                      ariaLabel: orderLabel === 'Order' ? `Order ${item.title} from ${item.user.name}` : `View your order for ${item.title}` }
+                  : { kind: 'message', label: primaryActionLabel, onClick: onMessage,
+                      ariaLabel: `${primaryActionLabel} — message ${item.user.name}` }}
+                onMessage={onMessage}
+                links={contactLinks}
+                signedIn={gate !== 'sign-in'}
+                onRequireAuth={onRequireAuth}
+                onLink={handleContactClick}
+              />
             ) : (
               <>
                 {contactLinks.map(link => (

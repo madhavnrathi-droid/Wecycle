@@ -6,7 +6,7 @@
    into than in a form, so the form doesn't try. */
 
 import { useEffect, useRef, useState } from 'react';
-import { Minus, Plus, Package } from 'lucide-react';
+import { Minus, Plus, Package, Check } from 'lucide-react';
 import Modal from '../Modal';
 import type { MarketplaceItem } from '../../lib/mockData';
 import { resolveItemMedia } from '../../lib/photos';
@@ -15,6 +15,14 @@ import { placeOrder } from '../../lib/orders/store';
 import { NOTE_MAX, QTY_MAX, orderTotal, rupees } from '../../lib/orders/model';
 import { haptics } from '../../lib/haptics';
 import { track, EVT } from '../../lib/analytics';
+import { DUR } from '../../lib/motion';
+import { useChangeCount } from './Pop';
+
+/* The quantity ticks over with a small pop each time it changes. */
+function PopCountPlain({ value }: { value: number }) {
+  const n = useChangeCount(value);
+  return <span key={n} className={n ? 'ord-pop' : undefined} style={{ display: 'inline-block' }}>{value}</span>;
+}
 
 interface OrderSheetProps {
   item: MarketplaceItem | null;
@@ -27,12 +35,15 @@ export default function OrderSheet({ item, onClose, onPlaced }: OrderSheetProps)
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  /* Sent: the button becomes a tick for a beat before the chat opens, so the
+     order visibly goes somewhere instead of the sheet just vanishing. */
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!item) return;
-    setQty(1); setNote(''); setError(null); setBusy(false);
+    setQty(1); setNote(''); setError(null); setBusy(false); setSent(false);
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!item) return null;
@@ -60,7 +71,8 @@ export default function OrderSheet({ item, onClose, onPlaced }: OrderSheetProps)
     }
     haptics.success();
     track(EVT.order_placed, { quantity: qty, has_note: !!note.trim(), priced });
-    onPlaced(res.conversationId, item);
+    setSent(true);
+    window.setTimeout(() => onPlaced(res.conversationId, item), DUR[4] + DUR[2]);
   };
 
   return (
@@ -72,8 +84,10 @@ export default function OrderSheet({ item, onClose, onPlaced }: OrderSheetProps)
       footer={
         <div className="ord-sheet-foot">
           {error && <p className="ord-error" role="alert">{error}</p>}
-          <button type="button" className="dm-btn ord-sheet-send" onClick={() => { void submit(); }} disabled={busy} aria-busy={busy}>
-            {busy ? 'Sending…' : `Send order to ${first}`}
+          <button type="button" className="ord-press dm-btn ord-sheet-send" data-sent={sent || undefined} onClick={() => { void submit(); }} disabled={busy || sent} aria-busy={busy}>
+            {sent
+              ? <span key="sent" className="ord-pop" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Check size={18} strokeWidth={2.6} /> Sent</span>
+              : busy ? 'Sending…' : `Send order to ${first}`}
           </button>
           <p className="ord-fine">
             {first} gets this as a message. You’ll agree payment and pickup together in the chat.
@@ -96,11 +110,11 @@ export default function OrderSheet({ item, onClose, onPlaced }: OrderSheetProps)
           <div className="ord-qty">
             <span id="ord-qty-label">Quantity</span>
             <div className="ord-stepper" role="group" aria-labelledby="ord-qty-label">
-              <button type="button" onClick={() => { haptics.selection(); setQty(q => Math.max(1, q - 1)); }} disabled={qty <= 1} aria-label="One fewer">
+              <button type="button" className="ord-press" onClick={() => { haptics.selection(); setQty(q => Math.max(1, q - 1)); }} disabled={qty <= 1} aria-label="One fewer">
                 <Minus size={16} strokeWidth={2.2} />
               </button>
-              <output aria-live="polite">{qty}</output>
-              <button type="button" onClick={() => { haptics.selection(); setQty(q => Math.min(QTY_MAX, q + 1)); }} disabled={qty >= QTY_MAX} aria-label="One more">
+              <output aria-live="polite"><PopCountPlain value={qty} /></output>
+              <button type="button" className="ord-press" onClick={() => { haptics.selection(); setQty(q => Math.min(QTY_MAX, q + 1)); }} disabled={qty >= QTY_MAX} aria-label="One more">
                 <Plus size={16} strokeWidth={2.2} />
               </button>
             </div>
