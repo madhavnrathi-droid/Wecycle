@@ -14,6 +14,8 @@ import { LinkChip, LinkedText, PhotoLinkBadge, openExternal } from './PostLink';
 import OnlineBadge from './OnlineBadge';
 import CommentsSection from './CommentsSection';
 import RelatedShelf from './RelatedShelf';
+import { BrandStoreLink } from './brand/BrandPromo';
+import { brandForUser } from '../lib/brands';
 import type { LostItem } from '../lib/mockData';
 import { useBreakpoint } from '../lib/useBreakpoint';
 import { useNaturalAspect } from '../lib/useNaturalAspect';
@@ -985,6 +987,9 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   const [dmAvailable] = useState(() => messagingAvailable());
   const canMessage = !!onMessage && dmAvailable && !isOwner && !item.isClosed;
   const startMessage = () => { haptics.medium(); onMessage?.(item); };
+  /* A featured brand's product shows the brand's store in place of the
+     seller row (lib/brands.ts). */
+  const itemBrand = brandForUser(item.user.id);
 
   /* Ordering: for things for sale, it leads, and messaging steps to the side
      — ordering opens that same chat anyway. Someone with an order already
@@ -1682,57 +1687,63 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
          chevron) opens the storefront. Adds a chevron-right hint at the end
          so the affordance is obvious. */}
       <section style={{ padding: '20px 20px 0' }}>
-        <button
-          type="button"
-          onClick={() => onOpenStorefront?.(item.user)}
-          aria-label={`View ${item.user.name}'s profile`}
-          disabled={!onOpenStorefront}
-          style={{
-            all: 'unset',
-            cursor: onOpenStorefront ? 'pointer' : 'default',
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '14px 14px',
-            width: '100%',
-            boxSizing: 'border-box',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 16,
-          }}
-        >
-          <div style={{
-            width: 40, height: 40, borderRadius: '50%',
-            overflow: 'hidden',
-            background: item.user.color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))',
-            flexShrink: 0,
-          }}>
-            <img
-              src={getAvatar(item.user.id)}
-              alt=""
-              width={40}
-              height={40}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-            <p style={{
-              margin: 0, display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
+        {/* A featured brand's product leads back to the brand's store, not to
+            a personal profile — see components/brand/BrandPromo.tsx. */}
+        {itemBrand && onOpenStorefront ? (
+          <BrandStoreLink brand={itemBrand} onOpen={() => onOpenStorefront(item.user)} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => onOpenStorefront?.(item.user)}
+            aria-label={`View ${item.user.name}'s profile`}
+            disabled={!onOpenStorefront}
+            style={{
+              all: 'unset',
+              cursor: onOpenStorefront ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 14px',
+              width: '100%',
+              boxSizing: 'border-box',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 16,
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: '50%',
+              overflow: 'hidden',
+              background: item.user.color,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))',
+              flexShrink: 0,
             }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {item.user.name}
-              </span>
-              <OnlineBadge isOnline={item.user.isOnline} />
-            </p>
-            <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
-              {item.user.role} · View profile
-            </p>
-          </div>
-          {onOpenStorefront && (
-            <ChevronRight size={16} strokeWidth={1.8} color="var(--text-muted)" />
-          )}
-        </button>
+              <img
+                src={getAvatar(item.user.id)}
+                alt=""
+                width={40}
+                height={40}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
+              <p style={{
+                margin: 0, display: 'flex', alignItems: 'center', gap: 8,
+                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
+              }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.user.name}
+                </span>
+                <OnlineBadge isOnline={item.user.isOnline} />
+              </p>
+              <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+                {item.user.role} · View profile
+              </p>
+            </div>
+            {onOpenStorefront && (
+              <ChevronRight size={16} strokeWidth={1.8} color="var(--text-muted)" />
+            )}
+          </button>
+        )}
 
         {/* The address in plain text, outside the button so it can be selected
             and copied — some people would rather paste it into their own mail
@@ -2129,6 +2140,7 @@ function DesktopLayout({
 }: DesktopLayoutProps) {
   void hasBoth;
   const isOpportunity = item.kind === 'opportunity';
+  const itemBrand = brandForUser(item.user.id);
   const [reportOpen, setReportOpen] = useState(false);
   /* Same derivation as the mobile layout — see the comment there. */
   const photoLink = item.linkOnPhoto && item.linkUrl ? item.linkUrl : null;
@@ -2588,48 +2600,52 @@ function DesktopLayout({
           )}
 
           {/* Owner card — tappable to open the storefront */}
-          <button
-            type="button"
-            onClick={() => onOpenStorefront?.(item.user)}
-            aria-label={`View ${item.user.name}'s profile`}
-            style={{
-              all: 'unset', boxSizing: 'border-box', cursor: onOpenStorefront ? 'pointer' : 'default',
-              display: 'flex', alignItems: 'center', gap: 14,
-              padding: '14px 16px',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 14,
-            }}
-          >
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%',
-              overflow: 'hidden',
-              background: item.user.color,
-              flexShrink: 0,
-            }}>
-              <img
-                src={getAvatar(item.user.id)}
-                alt=""
-                width={44} height={44}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
-            <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-              <p style={{
-                margin: 0, display: 'flex', alignItems: 'center', gap: 8,
-                fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
+          {itemBrand && onOpenStorefront ? (
+            <BrandStoreLink brand={itemBrand} onOpen={() => onOpenStorefront(item.user)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpenStorefront?.(item.user)}
+              aria-label={`View ${item.user.name}'s profile`}
+              style={{
+                all: 'unset', boxSizing: 'border-box', cursor: onOpenStorefront ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '14px 16px',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 14,
+              }}
+            >
+              <div style={{
+                width: 44, height: 44, borderRadius: '50%',
+                overflow: 'hidden',
+                background: item.user.color,
+                flexShrink: 0,
               }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.user.name}
-                </span>
-                <OnlineBadge isOnline={item.user.isOnline} />
-              </p>
-              <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
-                {item.user.role} · View profile
-              </p>
-            </div>
-            <ChevronRight size={18} strokeWidth={1.8} color="var(--text-muted)" />
-          </button>
+                <img
+                  src={getAvatar(item.user.id)}
+                  alt=""
+                  width={44} height={44}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
+                <p style={{
+                  margin: 0, display: 'flex', alignItems: 'center', gap: 8,
+                  fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
+                }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.user.name}
+                  </span>
+                  <OnlineBadge isOnline={item.user.isOnline} />
+                </p>
+                <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
+                  {item.user.role} · View profile
+                </p>
+              </div>
+              <ChevronRight size={18} strokeWidth={1.8} color="var(--text-muted)" />
+            </button>
+          )}
 
           {/* Action buttons — inline on desktop, no fixed bar.
               Same one-layout rule as the phone bar: saving is a status line,

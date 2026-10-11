@@ -129,6 +129,18 @@ export const EVT = {
   order_step:               'order_step',
   order_step_failed:        'order_step_failed',
 
+  /* ── Brands (lib/brands.ts) ───
+     The questions: do brand pages get visited, from where (home spotlight,
+     a product's "Visit the store", a shared /b/ link), and do visits turn
+     into product opens and orders? */
+  brand_opened:             'brand_opened',
+  brand_section_jump:       'brand_section_jump',
+  brand_item_opened:        'brand_item_opened',
+  brand_order_tapped:       'brand_order_tapped',
+  brand_shared:             'brand_shared',
+  /* Sign-up and Account: a member said they run a business. */
+  shop_mode_set:            'shop_mode_set',
+
   /* ── Event registration forms + organizer insights ─── */
   event_form_saved:         'event_form_saved',
   event_form_removed:       'event_form_removed',

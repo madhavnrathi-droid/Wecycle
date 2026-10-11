@@ -15,6 +15,7 @@
  * empty arrays and create throws a friendly error.
  */
 
+import { shopNameOf } from './shops';
 import { getActiveRoom, MAHE_ROOM } from './rooms';
 import { supabase, hasSupabaseEnv, rpcUntyped, BACKEND } from './supabase';
 import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData';
@@ -36,6 +37,8 @@ export interface JoinedProfile {
   avatar_url?: string | null;
   avatar_color?: string | null;
   role?: string | null;
+  /* A shop's name when role is 'Student business' — see lib/shops.ts. */
+  bio?: string | null;
   is_online?: boolean | null;
   email?: string | null;
   phone?: string | null;
@@ -103,6 +106,7 @@ export function profileToUser(p: JoinedProfile | null | undefined, fallbackId: s
     initials: p?.initials || 'W',
     color: p?.avatar_color || '#6C63FF',
     role: p?.role || 'Member',
+    shop: shopNameOf(p) ?? undefined,
     community: 'Wecycle',
     /* -1 when the row didn't carry a join date — the storefront then says
        nothing rather than "0d on Wecycle". */
@@ -253,7 +257,7 @@ export function mapListingRow(row: ListingRow): MarketplaceItem {
 const SELECT_WITH_JOINS = `
   *,
   user:profiles!listings_user_id_fkey(
-    id, username, full_name, initials, avatar_url, avatar_color, role,
+    id, username, full_name, initials, avatar_url, avatar_color, role, bio,
     is_online, contact_email_enabled, contact_whatsapp_enabled, college, joined_at
   ),
   category:categories(id, label, icon)
@@ -946,7 +950,7 @@ export function mapRequestRow(row: RequestRowLite): MarketplaceItem {
 const REQUEST_SELECT = `
   *,
   user:profiles!requests_user_id_fkey(
-    id, username, full_name, initials, avatar_url, avatar_color, role,
+    id, username, full_name, initials, avatar_url, avatar_color, role, bio,
     is_online, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
@@ -1000,7 +1004,7 @@ export async function fetchMyRequests(userId: string): Promise<MarketplaceItem[]
 const EVENT_SELECT = `
   *,
   organizer:profiles!events_organizer_id_fkey(
-    id, username, full_name, initials, avatar_url, avatar_color, role,
+    id, username, full_name, initials, avatar_url, avatar_color, role, bio,
     is_online, contact_email_enabled, contact_whatsapp_enabled
   ),
   form:event_forms(id)
@@ -1340,7 +1344,7 @@ export async function deleteEvent(id: string) {
 const LF_SELECT = `
   *,
   user:profiles!lost_found_reports_user_id_fkey(
-    id, username, full_name, initials, avatar_url, avatar_color, role,
+    id, username, full_name, initials, avatar_url, avatar_color, role, bio,
     is_online, contact_email_enabled, contact_whatsapp_enabled
   )
 `;
@@ -2056,7 +2060,7 @@ export async function fetchMySaves(userId: string): Promise<MarketplaceItem[]> {
       listing:listings!saves_listing_id_fkey(
         *,
         user:profiles!listings_user_id_fkey(
-          id, username, full_name, initials, avatar_url, avatar_color, role,
+          id, username, full_name, initials, avatar_url, avatar_color, role, bio,
           is_online, contact_email_enabled, contact_whatsapp_enabled
         ),
         category:categories(id, label, icon)

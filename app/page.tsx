@@ -79,6 +79,8 @@ import {
   startMessaging, openConversationWith, rememberPeer, peerFromUser, type MessageTarget,
 } from '../lib/messaging/store';
 import { startOrders, getOrdersState, openOrderFor } from '../lib/orders/store';
+import { brandByHandle, brandForUser } from '../lib/brands';
+import { shopNameOf } from '../lib/shops';
 import { primePostPreview } from '../lib/messaging/useMessaging';
 import { conversationIdFor } from '../lib/messaging/conversationId';
 import type { DeepLinkPost } from '../lib/liveData';
@@ -124,12 +126,26 @@ export default function WecycleApp() {
   /* Storefront takes over the viewport when set — clicking any author avatar
      or owner card lands here. Cleared on back. */
   const [openStorefront, setOpenStorefront] = useState<User | null>(null);
+  /* The store a product was opened from. Back from that product goes back to
+     the store — how Amazon and Swiggy behave, and the only way browsing a
+     brand's range one product at a time is bearable. */
+  const [storeReturn, setStoreReturn] = useState<User | null>(null);
+  const openItemFromStore = (item: MarketplaceItem) => {
+    setStoreReturn(openStorefront);
+    setOpenStorefront(null);
+    setOpenItem(item);
+  };
+  const closeItem = () => {
+    setOpenItem(null);
+    if (storeReturn) { setOpenStorefront(storeReturn); setStoreReturn(null); }
+  };
   /* Opening a storefront must clear any open item/event first — otherwise the
      `if (openItem)` early-return below wins and the storefront never renders.
      This is THE fix for "clicking a user's name does nothing". */
   const openStorefrontFor = (u: User) => {
     setOpenItem(null);
     setOpenEvent(null);
+    setStoreReturn(null);
     setOpenStorefront(u);
     /* THE second-most-important conversion event after contact_clicked —
      * if users browse storefronts, the marketplace has the "people" texture
@@ -247,7 +263,7 @@ export default function WecycleApp() {
        honours the owner's share prefs. */
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, initials, avatar_color, role, is_online, contact_email_enabled, contact_whatsapp_enabled')
+      .select('id, full_name, initials, avatar_color, role, bio, is_online, contact_email_enabled, contact_whatsapp_enabled')
       .eq('id', userId)
       .single();
     if (error || !data) return false;
@@ -257,6 +273,7 @@ export default function WecycleApp() {
       initials: string | null;
       avatar_color: string | null;
       role: string | null;
+      bio: string | null;
       is_online: boolean | null;
       contact_email_enabled: boolean | null;
       contact_whatsapp_enabled: boolean | null;
@@ -267,6 +284,7 @@ export default function WecycleApp() {
       initials: p.initials || 'W',
       color: p.avatar_color || '#6C63FF',
       role: p.role || 'Member',
+      shop: shopNameOf(p) ?? undefined,
       community: 'Wecycle',
       joinedDaysAgo: 0,
       itemsShared: 0,
@@ -576,6 +594,22 @@ export default function WecycleApp() {
     /* Deep link: `/?p=<id>` opens that post's detail directly (powers the
        shareable product links). We fetch the single post by id and route it
        to the right screen, then strip the param so refresh/back is clean. */
+    /* `/?b=<handle>` (what /b/<handle> redirects to) opens a brand's store. */
+    const brandHandle = params.get('b');
+    const linkedBrand = brandByHandle(brandHandle);
+    if (linkedBrand) {
+      openUserById(linkedBrand.ownerId).then(ok => {
+        if (ok) track(EVT.brand_opened, { brand: linkedBrand.handle, source: 'link' });
+      }).catch(() => { /* ignore */ });
+    }
+    if (brandHandle) {
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('b');
+        window.history.replaceState({}, '', u.toString());
+      } catch { /* ignore */ }
+    }
+
     const postId = params.get('p');
     if (postId) {
       fetchPostById(postId).then(found => {
@@ -700,7 +734,7 @@ export default function WecycleApp() {
         if (await openUserById(peerId)) { setMessagesOpen(null); setMessagesReturn(back); }
       }}
       onOpenPost={(post, convId) => {
-        setOpenItem(null); setOpenEvent(null); setOpenStorefront(null); setOpenLF(null);
+        setOpenItem(null); setOpenEvent(null); setOpenStorefront(null); setOpenLF(null); setStoreReturn(null);
         if (post.kind === 'item' || post.kind === 'request') setOpenItem(post.data);
         else if (post.kind === 'event') setOpenEvent(post.data);
         else setOpenLF(post.data);
@@ -710,7 +744,7 @@ export default function WecycleApp() {
       onBrowse={() => {
         closeMessages();
         clearSubStack();
-        setOpenItem(null); setOpenEvent(null); setOpenStorefront(null); setOpenLF(null);
+        setOpenItem(null); setOpenEvent(null); setOpenStorefront(null); setOpenLF(null); setStoreReturn(null);
         setActiveScreen('feed');
       }}
     />
@@ -730,7 +764,7 @@ export default function WecycleApp() {
             <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
               <ItemDetailScreen
                 item={openItem}
-                onBack={() => setOpenItem(null)}
+                onBack={closeItem}
                 onRequireAuth={() => setModal('auth')}
                 onOpenStorefront={openStorefrontFor}
                 onOpenItem={setOpenItem}
@@ -768,10 +802,11 @@ export default function WecycleApp() {
               <StorefrontScreen
                 user={openStorefront}
                 onBack={() => setOpenStorefront(null)}
-                onOpenItem={(item) => { setOpenStorefront(null); setOpenItem(item); }}
+                onOpenItem={openItemFromStore}
                 onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
                 onOpenLF={(lf) => { setOpenStorefront(null); setOpenLF(lf); }}
                 onMessage={messageUser}
+                onOrder={orderItemFlow}
               />
             </main>
           </div>
@@ -1109,10 +1144,10 @@ export default function WecycleApp() {
              On mobile these branches don't render (the early-return takeover
              up top fires instead). */}
           {isDesktop && openItem && (
-            <DesktopDetailModal onClose={() => setOpenItem(null)} ariaLabel={openItem.title}>
+            <DesktopDetailModal onClose={closeItem} ariaLabel={openItem.title}>
               <ItemDetailScreen
                 item={openItem}
-                onBack={() => setOpenItem(null)}
+                onBack={closeItem}
                 onRequireAuth={() => setModal('auth')}
                 onOpenStorefront={openStorefrontFor}
                 onOpenItem={setOpenItem}
@@ -1172,14 +1207,15 @@ export default function WecycleApp() {
           )}
 
           {isDesktop && openStorefront && (
-            <DesktopDetailModal onClose={() => setOpenStorefront(null)} ariaLabel={`${openStorefront.name}'s storefront`}>
+            <DesktopDetailModal onClose={() => setOpenStorefront(null)} ariaLabel={brandForUser(openStorefront.id)?.name ?? openStorefront.shop ?? `${openStorefront.name}'s storefront`}>
               <StorefrontScreen
                 user={openStorefront}
                 onBack={() => setOpenStorefront(null)}
-                onOpenItem={(item) => { setOpenStorefront(null); setOpenItem(item); }}
+                onOpenItem={openItemFromStore}
                 onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
                 onOpenLF={(lf) => { setOpenStorefront(null); setOpenLF(lf); }}
                 onMessage={messageUser}
+                onOrder={orderItemFlow}
               />
             </DesktopDetailModal>
           )}

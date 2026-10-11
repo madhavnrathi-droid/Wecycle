@@ -25,6 +25,8 @@ export interface User {
   initials: string;
   color: string; // avatar bg color
   role: string;
+  /** The shop's name, when this member runs a student business (lib/shops.ts). */
+  shop?: string;
   community: string;
   joinedDaysAgo: number;
   itemsShared: number;

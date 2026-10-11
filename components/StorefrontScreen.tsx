@@ -23,6 +23,9 @@ import { matchesCategoryFilter } from '../lib/categories';
 import { ChevronLeft, MapPin, Calendar, Users, IndianRupee, Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal, MessageCircle } from 'lucide-react';
 import { messagingAvailable } from '../lib/messaging/store';
 import ReportSheet from './ReportSheet';
+import BrandScreen from './brand/BrandScreen';
+import { brandForUser } from '../lib/brands';
+import { shopNameOf } from '../lib/shops';
 import ShareCardModal from './ShareCardModal';
 import { Share2 } from 'lucide-react';
 import { haptics } from '../lib/haptics';
@@ -54,6 +57,28 @@ interface StorefrontScreenProps {
   onOpenLF?: (item: LostItem) => void;
   /** Start a direct message with this member. */
   onMessage?: (user: User) => void;
+  /** Order a product — only a brand page offers this from the range. */
+  onOrder?: (item: MarketplaceItem) => void;
+}
+
+/* A member the team features as a brand (lib/brands.ts) opens as the brand's
+   store; everyone else gets their storefront. Decided here, at the one door
+   every route to a profile goes through, so no caller has to know. */
+export default function StorefrontScreen(props: StorefrontScreenProps) {
+  const brand = brandForUser(props.user.id);
+  if (brand) {
+    return (
+      <BrandScreen
+        brand={brand}
+        owner={props.user}
+        onBack={props.onBack}
+        onOpenItem={props.onOpenItem}
+        onMessage={props.onMessage}
+        onOrder={props.onOrder}
+      />
+    );
+  }
+  return <PersonStorefront {...props} />;
 }
 
 type Tab = 'shared' | 'requests' | 'events' | 'lostfound';
@@ -73,7 +98,7 @@ interface PublicProfile {
   showPhone?: boolean;
 }
 
-export default function StorefrontScreen({
+function PersonStorefront({
   user, onBack, onOpenItem, onOpenEvent, onOpenLF, onMessage,
 }: StorefrontScreenProps) {
   const { user: viewer } = useAuth();
@@ -130,6 +155,9 @@ export default function StorefrontScreen({
   );
   const [lostFound, setLostFound] = useState<LostItem[]>([]);
   const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
+  /* A student business shows its shop's name, run by the member. Taken from
+     the row that opened the page, then confirmed from the profile itself. */
+  const [shop, setShop] = useState<string | null>(user.shop ?? null);
 
   /* Live storefront stats — refetched whenever a post lands so the Shared
      counter updates the instant the user creates / deletes a post. */
@@ -148,7 +176,7 @@ export default function StorefrontScreen({
          object joined onto listing rows doesn't carry the academic info. */
       supabase
         .from('profiles')
-        .select('college_id, college, graduating_year, course, department, residence, show_phone_on_profile')
+        .select('college_id, college, graduating_year, course, department, residence, show_phone_on_profile, role, bio')
         .eq('id', user.id)
         .single()
         .then(async ({ data }) => {
@@ -161,7 +189,10 @@ export default function StorefrontScreen({
             college: string | null;
             residence: 'day_scholar' | 'hosteler' | null;
             show_phone_on_profile: boolean | null;
+            role: string | null;
+            bio: string | null;
           };
+          setShop(shopNameOf(d));
           /* email/phone are column-locked — resolve via the get_contact RPC.
              `user` here is the storefront's subject: own row returns full
              contact; others' are filtered by their share prefs. */
@@ -283,7 +314,7 @@ export default function StorefrontScreen({
           fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
           color: 'var(--text-primary)',
         }}>
-          {isMe ? 'Your storefront' : `${user.name.split(' ')[0]}'s storefront`}
+          {shop ?? (isMe ? 'Your storefront' : `${user.name.split(' ')[0]}'s storefront`)}
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {/* Promote the shop. Available to anyone viewing — a storefront worth
@@ -339,10 +370,15 @@ export default function StorefrontScreen({
               <span style={{
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
-                {user.name}
+                {shop ?? user.name}
               </span>
               <OnlineBadge isOnline={user.isOnline} />
             </div>
+            {shop && (
+              <p style={{ margin: '3px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Run by {user.name}
+              </p>
+            )}
             <p style={{
               margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
             }}>

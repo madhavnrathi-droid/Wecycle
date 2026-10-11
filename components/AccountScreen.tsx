@@ -1,5 +1,7 @@
 'use client';
 
+import { isBusinessRole, cleanShopName, shopFields, SHOP_NAME_MAX } from '../lib/shops';
+import { brandForUser } from '../lib/brands';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
@@ -36,6 +38,13 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
   const [course, setCourse] = useState('');
   const [college, setCollege] = useState<string>('');
   const [residence, setResidence] = useState<Residence | ''>('');
+  /* A student business: role + shop name on the profile (lib/shops.ts).
+     Written only once touched — `bio` holds a partner collective's
+     description too, and an untouched form must not blank it. */
+  const ownBrand = brandForUser(user?.id);
+  const [isShop, setIsShop] = useState(false);
+  const [shopName, setShopName] = useState('');
+  const shopTouched = useRef(false);
 
   /* Auto-save status — drives the tiny indicator in the header. We replaced
      the manual "Save" button with debounced auto-save: every field edit kicks
@@ -103,6 +112,9 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
       || normalizeCollege((profile as { department?: string | null }).department),
     );
     setResidence(((profile as { residence?: Residence | null }).residence ?? '') as Residence | '');
+    const p = profile as { role?: string | null; bio?: string | null };
+    setIsShop(isBusinessRole(p.role));
+    setShopName(isBusinessRole(p.role) ? (p.bio ?? '') : '');
   }, [profile, authEmail, user]);
 
   /* One-time backfill — many existing profile rows have email=null because the
@@ -231,6 +243,11 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
          * it", and those must not be the same request. A real clear still works:
          * touching the field sets the flag, and toE164('') sends null. */
         if (phoneTouched.current) update.phone = storedPhone;
+        /* A shop with no name yet is not written: it would be a shop nobody
+           can see the name of. It saves as soon as there is one. */
+        if (shopTouched.current && (!isShop || cleanShopName(shopName))) {
+          Object.assign(update, shopFields(isShop ? 'business' : 'member', shopName));
+        }
         const trimmedEmail = currentEmail.trim();
         if (emailTouched.current && trimmedEmail) update.email = trimmedEmail;
         const { error: err } = await supabase
@@ -264,7 +281,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
       setError((e as Error).message ?? 'Could not save');
       setSaveStatus('error');
     }
-  }, [canSave, phone, isDemo, name, collegeId, currentEmail, graduatingYear, course, college, residence, user, refreshProfile]);
+  }, [canSave, phone, isDemo, name, collegeId, currentEmail, graduatingYear, course, college, residence, isShop, shopName, user, refreshProfile]);
 
   /* Always points at the newest persist closure, so the flush below can call it
      without re-subscribing its listeners on every keystroke. */
@@ -625,6 +642,57 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
               })}
             </div>
           </div>
+        </Section>
+
+        <Section
+          title="Your shop"
+          hint={ownBrand
+            ? `${ownBrand.name} has a brand page on Wecycle — your products open there.`
+            : 'Run a student business? Your storefront goes up under its name, with an Orders counter in Inventory.'}
+        >
+          <div role="radiogroup" aria-label="Account type" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {([['member', 'Just me'], ['business', 'Student business']] as const).map(([k, label]) => {
+              const active = (k === 'business') === isShop;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => {
+                    const next = k === 'business';
+                    if (next === isShop) return;
+                    setIsShop(next);
+                    shopTouched.current = true;
+                    markInteracted();
+                    track(EVT.shop_mode_set, { on: next, where: 'account' });
+                  }}
+                  className="residence-chip"
+                  data-active={active || undefined}
+                >
+                  <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {isShop && (
+            <div>
+              <label htmlFor="acct-shop" className="field-label" style={{ display: 'block', marginBottom: 6 }}>
+                Business or brand name
+              </label>
+              <input
+                id="acct-shop"
+                className="form-input"
+                value={shopName}
+                placeholder="e.g. Sanvi’s Crochet"
+                maxLength={SHOP_NAME_MAX}
+                autoComplete="organization"
+                onChange={e => { setShopName(e.target.value); shopTouched.current = true; markInteracted(); }}
+              />
+            </div>
+          )}
         </Section>
 
         {error && (

@@ -19,6 +19,7 @@
  * mix each calendar day without jarring mid-session reshuffles.
  */
 
+import { brandForUser } from '../lib/brands';
 import { useEffect, useState } from 'react';
 import RelatedRail, { type RailCard } from './RelatedRail';
 import {
@@ -135,13 +136,14 @@ export default function RelatedShelf({ item, onOpenItem, onOpenLF, onOpenSeller 
   let sellerSubtitle: string | undefined;
   let sellerCta: { label: string; onClick: () => void } | undefined;
 
-  const sellerFirstName = item.user.name.split(' ')[0] || item.user.name;
+  /* A featured brand is "More from Foku", not "More from aagam". */
+  const sellerFirstName = brandForUser(item.user.id)?.name ?? item.user.shop ?? (item.user.name.split(' ')[0] || item.user.name);
 
   if (data.fromSeller.length > 0) {
     sellerRailItems = consume(data.fromSeller);
     sellerTitle = `More from ${sellerFirstName}`;
     sellerSubtitle = `${sellerRailItems.length} other active listing${sellerRailItems.length === 1 ? '' : 's'}`;
-    sellerCta = onOpenSeller ? { label: 'See storefront', onClick: onOpenSeller } : undefined;
+    sellerCta = onOpenSeller ? { label: brandForUser(item.user.id) ? 'Visit the store' : 'See storefront', onClick: onOpenSeller } : undefined;
   } else {
     /* Fallback: other sellers from the pool, day-shuffled */
     sellerRailItems = consume(shuffled(poolOtherSellers, 8));

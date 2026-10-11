@@ -44,6 +44,7 @@
 import { NextResponse } from 'next/server';
 import { createHash, randomInt } from 'node:crypto';
 import { emailGateProblem } from '../../../../lib/emailDomain';
+import { shopFields } from '../../../../lib/shops';
 import {
   DB, aw, q, json, cors, callerId, serverConfigured, type Args, type Row,
 } from '../../_lib/appwrite';
@@ -169,6 +170,11 @@ async function ensureProfile(uid: string, args: Args) {
   if (!room) return json({ message: 'Choose your NMIMS campus to finish signing up.', code: 'campus_required' }, 409);
 
   const fullName = String(args.full_name ?? accountName ?? '').trim();
+  /* A student business (lib/shops.ts): from the sign-up form, or from the
+     account's prefs when this is the self-heal running without the form. */
+  const prefs = (me.json.prefs ?? {}) as Record<string, unknown>;
+  const kind = args.account_kind === 'business' || prefs.account_kind === 'business' ? 'business' : 'member';
+  const shop = shopFields(kind, args.shop_name ?? prefs.shop_name);
   /* College codes are Manipal's schools; NMIMS members are identified by room. */
   const college = room.university === 'MAHE' && typeof args.college === 'string' && COLLEGES.has(args.college)
     ? args.college : undefined;
@@ -194,6 +200,7 @@ async function ensureProfile(uid: string, args: Args) {
         avatar_color: '#6C63FF',
         community_id: room.id,
         ...(college ? { college } : {}),
+        ...(shop.role ? { role: shop.role, bio: shop.bio } : {}),
         notification_prefs: DEFAULT_NOTIFICATION_PREFS,
         joined_at: now,
         updated_at: now,

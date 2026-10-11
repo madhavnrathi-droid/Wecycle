@@ -184,12 +184,19 @@ async function finishSignUp(
   /* The campus, for a university with more than one (NMIMS). Saved on the
      account first so that if the profile call below fails, the self-heal that
      creates it later still puts the member in the right room. */
-  if (meta.campus) {
-    try { await account().updatePrefs({ prefs: { campus: meta.campus } }); } catch { /* sent below too */ }
+  /* Same for a student business: the choice and the shop's name go on the
+     account too, so the self-heal can still make the profile a shop. */
+  const business = meta.account_kind === 'business';
+  if (meta.campus || business) {
+    const prefs: Record<string, unknown> = {};
+    if (meta.campus) prefs.campus = meta.campus;
+    if (business) { prefs.account_kind = 'business'; prefs.shop_name = meta.shop_name ?? null; }
+    try { await account().updatePrefs({ prefs }); } catch { /* sent below too */ }
   }
   try {
     await rpc('ensure_profile', {
       full_name: meta.full_name, college: meta.college, phone: meta.phone, campus: meta.campus,
+      ...(business ? { account_kind: 'business', shop_name: meta.shop_name } : {}),
     });
   } catch { /* AuthContext heals it */ }
 

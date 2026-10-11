@@ -49,6 +49,7 @@ import { shareLink } from '../lib/share';
 import { shareUrl } from '../lib/shareUrl';
 import type { SellerSummary, PlacedModule, ModuleId, CardVariant } from '../lib/feed/modules';
 import SellerCard from './SellerCard';
+import { BrandSpotlightSlot } from './brand/BrandPromo';
 import CompactRow from './CompactRow';
 import CardMenu, { useLongPress } from './CardMenu';
 import { useGlide } from '../lib/useGlide';
@@ -1203,6 +1204,18 @@ export default function FeedScreen({
          search or picked a category they have told us what they want, and a
          sampler of everything else pushing their answer down the page is
          noise. See the note on `shopWindow`. */}
+      {/* ── BRAND SPOTLIGHT ──
+         A student brand the team features (lib/brands.ts), above the shop
+         window: promoting a brand is the point, and its card is itself stock —
+         three of its things and a way into the rest. */}
+      {showStorefront && (
+        <BrandSpotlightSlot onOpen={(b) => {
+          engine.noteSignal('storefront_view');
+          track(EVT.user_card_opened, { user_id: b.ownerId, source: 'feed_brand_spotlight' });
+          onOpenUser?.(b.ownerId);
+        }} />
+      )}
+
       {showStorefront && shopWindow.length >= 2 && (
         <Rail
           title="Have a look at what&rsquo;s here"

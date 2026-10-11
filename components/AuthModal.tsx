@@ -42,9 +42,10 @@ import { OUTAGE_MODE } from '../lib/outage';
 import {
   Mail, User, ArrowLeft, KeyRound, Loader2, Phone, Lock, Eye, EyeOff,
   GraduationCap, LifeBuoy, MailWarning, WandSparkles,
-  AlertTriangle, MapPin,
+  AlertTriangle, MapPin, Store,
 } from 'lucide-react';
 import Modal from './Modal';
+import { cleanShopName, SHOP_NAME_MAX, type AccountKind } from '../lib/shops';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
 import { setDemoMode } from '../lib/demoMode';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
@@ -183,6 +184,11 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
   const [pending, setPending] = useState<Pending>(null);
 
   const [name, setName] = useState('');
+  /* Joining as a person, or as a student business. A business adds one field
+     — its name — and the account gets a shop (lib/shops.ts). Defaults to a
+     person, so the choice costs nobody who doesn't need it a tap. */
+  const [accountKind, setAccountKind] = useState<AccountKind>('member');
+  const [shopName, setShopName] = useState('');
   /* Which university, and — for NMIMS — which campus. The campus is the room
      the member joins (lib/rooms.ts), so it is asked, never guessed: NMIMS uses
      the same addresses on every campus. */
@@ -413,6 +419,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     resetting ? emailOk && domainOk
     : mode === 'signup'
       ? name.trim().length > 0 && emailOk && domainOk && termsAgreed && phoneOk
+        && (accountKind !== 'business' || !!cleanShopName(shopName))
         && (university === 'NMIMS'
           ? !!campus
           : !!college && (emailDomain === FACULTY_DOMAIN || !!joiningYear))
@@ -441,6 +448,9 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
     college: university === 'MAHE' ? college || undefined : undefined,
     campus: university === 'NMIMS' ? campus || undefined : undefined,
     ...(toE164(phone) ? { phone: toE164(phone) as string } : {}),
+    ...(accountKind === 'business'
+      ? { account_kind: 'business', shop_name: cleanShopName(shopName) ?? undefined }
+      : {}),
 
   });
 
@@ -589,6 +599,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
           university,
           campus: campus || undefined,
           has_phone: !!toE164(phone),
+          account_kind: accountKind,
         });
         if (!REQUIRE_EMAIL_CONFIRMATION) {
           await createAccountWithPassword();
@@ -949,6 +960,60 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                   maxLength={60}
                   required
                 />
+              </div>
+            )}
+
+            {/* Sign-up only: a person, or a student business. Asked right after
+                the name because it changes what the name is for — a shop has a
+                name of its own, and the person is who runs it. */}
+            {mode === 'signup' && !resetting && (
+              <div className="field">
+                <span id="auth-kind-label" className="field-label">
+                  <Store size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                  Joining as
+                </span>
+                <div role="radiogroup" aria-labelledby="auth-kind-label" className="auth-choice-row">
+                  {([
+                    ['member', 'Myself', 'Buy, sell, swap, lend'],
+                    ['business', 'A student business', 'A brand, shop or service you run'],
+                  ] as const).map(([k, title, sub]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      role="radio"
+                      aria-checked={accountKind === k}
+                      className="auth-choice"
+                      data-on={accountKind === k || undefined}
+                      onClick={() => { setAccountKind(k); setError(null); }}
+                    >
+                      <span className="auth-choice-title">{title}</span>
+                      <span className="auth-choice-sub">{sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {mode === 'signup' && !resetting && accountKind === 'business' && (
+              <div className="field auth-shop-field">
+                <label htmlFor="auth-shop" className="field-label">
+                  Business or brand name <span className="required" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="auth-shop"
+                  className="form-input"
+                  placeholder="e.g. Foku, Sanvi’s Crochet"
+                  value={shopName}
+                  onChange={e => setShopName(e.target.value)}
+                  autoComplete="organization"
+                  maxLength={SHOP_NAME_MAX}
+                  aria-describedby="auth-shop-hint"
+                  required
+                />
+                <span id="auth-shop-hint" className="field-hint" style={{ lineHeight: 1.5 }}>
+                  Your storefront goes up under this name, with an Orders counter for what people order.
+                  Want a brand page with your own colours and logo? Tell us in Feedback once you’re in.
+                </span>
               </div>
             )}
 
