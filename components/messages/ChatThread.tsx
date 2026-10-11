@@ -23,6 +23,8 @@ import { track, EVT } from '../../lib/analytics';
 import { collegeName } from '../../lib/colleges';
 import ReportSheet from '../ReportSheet';
 import PeerAvatar from './PeerAvatar';
+import OrderCard from '../orders/OrderCard';
+import { useOrders, ordersInConversation, orderUpdateIds } from '../../lib/orders/store';
 
 interface ChatThreadProps {
   conversationId: string;
@@ -75,6 +77,12 @@ export default function ChatThread({ conversationId, onBack, onOpenProfile, onOp
   const preview = usePostPreview(ctx);
   const blockedByMe = s.blocked.has(peerId);
   const messages = thread?.messages ?? [];
+  /* Orders between these two people. The card replaces the post card while
+     one is open — it shows the same item and says where it has got to — and
+     the steps each order posted draw as quiet one-line updates. */
+  const os = useOrders();
+  const orders = useMemo(() => ordersInConversation(os, conversationId), [os, conversationId]);
+  const updateIds = useMemo(() => orderUpdateIds(os, conversationId), [os, conversationId]);
   const hasSent = messages.some(m => m.state === 'sent');
 
   /* This thread is on screen: arriving messages are read on arrival. */
@@ -230,7 +238,9 @@ export default function ChatThread({ conversationId, onBack, onOpenProfile, onOp
     });
   };
 
-  const starters = preview && ctx && !draft && (s.pendingContext[conversationId] || !hasSent)
+  /* Openers are for a first message about a post. Once there is an order
+     they are answering a question already asked. */
+  const starters = preview && ctx && !draft && orders.length === 0 && (s.pendingContext[conversationId] || !hasSent)
     ? starterPrompts(preview.starter) : [];
 
   /* ── Per-message actions: long-press on touch, right-click on a mouse ── */
@@ -319,7 +329,11 @@ export default function ChatThread({ conversationId, onBack, onOpenProfile, onOp
         )}
       </header>
 
-      {ctx && <ContextCard ctx={ctx} preview={preview} onOpen={onOpenPost} />}
+      {orders.length > 0 ? (
+        <div className="ord-stack">
+          {orders.map(o => <OrderCard key={o.id} order={o} me={me} peerFirst={first} onOpenPost={onOpenPost} />)}
+        </div>
+      ) : ctx && <ContextCard ctx={ctx} preview={preview} onOpen={onOpenPost} />}
 
       <div
         ref={scrollRef}
@@ -368,6 +382,7 @@ export default function ChatThread({ conversationId, onBack, onOpenProfile, onOp
               peerId={peerId}
               peer={peer}
               name={first}
+              update={item.kind === 'msg' && updateIds.has(item.msg.id)}
               animate={item.kind === 'msg' && landed.current && !seen.current.has(item.msg.id)}
               actionsOpen={item.kind === 'msg' && actionFor === item.msg.id}
               timeOpen={item.kind === 'msg' && timeFor === item.msg.id}
@@ -513,6 +528,8 @@ interface RowProps {
   peerId: string;
   peer: ReturnType<typeof useMessaging>['peers'][string] | null;
   name: string;
+  /** An order step: drawn as a one-line update, not a speech bubble. */
+  update: boolean;
   animate: boolean;
   actionsOpen: boolean;
   timeOpen: boolean;
@@ -537,6 +554,15 @@ function TimelineRow(p: RowProps) {
   const failed = receipt === 'failed';
   const permanent = failed && !!msg.error?.code && PERMANENT_FAILURES.has(msg.error.code);
   const showAvatar = !mine && (pos === 'last' || pos === 'single');
+
+  if (p.update) {
+    return (
+      <div className={`dm-update${p.animate ? ' dm-bubble-new' : ''}`} role="note">
+        <span className="dm-update-text"><b>{mine ? 'You' : p.name}</b> · {msg.body}</span>
+        <span className="dm-update-time">{clockTime(msg.createdAt)}</span>
+      </div>
+    );
+  }
 
   return (
     <div className={`dm-row ${mine ? 'mine' : 'theirs'}`} data-pos={pos} data-state={msg.state}>

@@ -27,8 +27,10 @@ import PhotoCarousel from './PhotoCarousel';
 import EmptyState from './EmptyState';
 import { priceChip, fromListingType } from '../lib/dealTypes';
 import { useGlide } from '../lib/useGlide';
+import OrdersList from './orders/OrdersList';
+import { useOrders, waitingOnMe, type Order } from '../lib/orders/store';
 
-type Tab = 'all' | 'requests' | 'shared' | 'events' | 'saved';
+type Tab = 'all' | 'orders' | 'requests' | 'shared' | 'events' | 'saved';
 
 interface InventoryScreenProps {
   onOpenMenu: () => void;
@@ -43,6 +45,8 @@ interface InventoryScreenProps {
   onOpenEventInsights?: (event: CommunityEvent) => void;
   /** Opens the Lost & Found detail sheet (lifted to app/page.tsx). */
   onOpenLF?: (item: LostItem) => void;
+  /** Opens the chat an order lives in. */
+  onOpenOrder?: (order: Order, peerId: string) => void;
 }
 
 const MY_UPLOAD_IDS = ['m1', 'm5', 'm10'];
@@ -58,7 +62,7 @@ type UploadEntry =
   | { kind: 'event'; event: CommunityEvent }
   | { kind: 'lostfound'; lf: LostItem };
 
-export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessages, onPostNew, onOpenItem, onOpenEvent, onOpenEventInsights, onOpenLF }: InventoryScreenProps) {
+export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessages, onPostNew, onOpenItem, onOpenEvent, onOpenEventInsights, onOpenLF, onOpenOrder }: InventoryScreenProps) {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -113,6 +117,17 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
   useEffect(() => {
     if (activeTab === 'events' && !hasEvents) setActiveTab('all');
   }, [activeTab, hasEvents]);
+
+  /* Orders: a tab once there is something in it, like Events — a member who
+     has never bought or sold anything doesn't need an empty one. The count is
+     what is waiting on them: new requests to answer, ready ones to collect. */
+  const os = useOrders();
+  const orderCount = Object.keys(os.orders).length;
+  const hasOrders = !!onOpenOrder && orderCount > 0;
+  const waiting = waitingOnMe(os);
+  useEffect(() => {
+    if (activeTab === 'orders' && !hasOrders) setActiveTab('all');
+  }, [activeTab, hasOrders]);
 
   /* Items + events as a unified list for the active tab.
        - demo mode → seeded MY_*_IDS lists
@@ -243,6 +258,16 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
           >
             All
           </button>
+          {hasOrders && (
+            <button
+              onClick={() => setActiveTab('orders')}
+              aria-pressed={activeTab === 'orders'}
+              data-active={activeTab === 'orders' || undefined}
+              aria-label={waiting ? `Orders, ${waiting} waiting on you` : 'Orders'}
+            >
+              Orders{waiting > 0 && <span className="ord-tab-count" aria-hidden="true">{waiting}</span>}
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('shared')}
             aria-pressed={activeTab === 'shared'}
@@ -284,9 +309,11 @@ export default function InventoryScreen({ onOpenMenu, onOpenAccount, onOpenMessa
         </section>
       )}
 
-      {/* ── GRID ── */}
+      {/* ── GRID ── (or the orders list) */}
       <section style={{ padding: '0 12px' }}>
-        {entries.length === 0 ? (
+        {activeTab === 'orders' && onOpenOrder ? (
+          <OrdersList onOpen={onOpenOrder} />
+        ) : entries.length === 0 ? (
           <InventoryEmpty tab={activeTab} onPostNew={onPostNew} signedIn={!!user} />
         ) : (
           <div className="pgrid" style={{ padding: 0 }}>

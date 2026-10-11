@@ -51,6 +51,7 @@ import { sendMessage, markConversationRead, canMessage } from '../../_lib/messag
 import { roomForNewMember, syncRoomLabels, roomReadPerm } from '../../_lib/rooms';
 import { deletePost, deleteComment } from '../../_lib/deletion';
 import { updatePost } from '../../_lib/editing';
+import { createOrder, updateOrder, orderCode } from '../../_lib/orders';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -444,6 +445,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
 
       case 'dm_can_message':
         return await canMessage(uid, args);
+
+      /* Orders — written here for the same reason as messages: each row is
+         readable by exactly its buyer and its seller. See _lib/orders.ts. */
+      case 'order_create':
+        return await createOrder(uid, args);
+
+      case 'order_update':
+        return await updateOrder(uid, args);
+
+      case 'order_code':
+        return await orderCode(uid, args);
 
       default:
         return json({ message: `Unknown function ${fn}`, code: '42883' }, 404);

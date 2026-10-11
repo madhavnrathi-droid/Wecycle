@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle, ShoppingBag } from 'lucide-react';
 import { messagingAvailable } from '../lib/messaging/store';
+import { useOrders, ordersAvailable, openOrderFor } from '../lib/orders/store';
+import { isOrderable } from '../lib/orders/model';
 import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
@@ -246,6 +248,9 @@ interface ItemDetailScreenProps {
    *  (and messaging is available), it is the primary action and email /
    *  WhatsApp become the secondary ones. */
   onMessage?: (item: MarketplaceItem) => void;
+  /** Order this item. Offered on items for sale, ahead of messaging — the
+   *  order opens the same chat, with the order pinned to it. */
+  onOrder?: (item: MarketplaceItem) => void;
   /** When the viewer owns this post, inline editing turns on (fields become
    *  inputs in place, dirty-state CTAs replace Delete). No standalone Edit
    *  button — the post detail IS the editor. */
@@ -459,7 +464,7 @@ function firstPhotoSrc(media: ReadonlyArray<string | { kind?: string; src: strin
   return null;
 }
 
-export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onMessage, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onMessage, onOrder, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
   /* The post-live moment: the form that just published this marked it, and
      this is where the member is looking now. The hero lands and rings once,
      the chime plays, and a toast names where it went live. The success haptic
@@ -980,6 +985,20 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   const canMessage = !!onMessage && dmAvailable && !isOwner && !item.isClosed;
   const startMessage = () => { haptics.medium(); onMessage?.(item); };
 
+  /* Ordering: for things for sale, it leads, and messaging steps to the side
+     — ordering opens that same chat anyway. Someone with an order already
+     open for this item gets a way back to it instead of a second order. */
+  const [ordersOn] = useState(() => ordersAvailable());
+  const os = useOrders();
+  /* Only once this member's orders have loaded: that is the proof the
+     orders table exists. Until then — or signed out — Message stays the
+     primary action, so nobody is offered a button that can only fail. */
+  const canOrder = !!onOrder && ordersOn && os.status === 'ready' && canMessage && !item.isRequest
+    && isOrderable({ kind: item.kind ?? 'item', listing_type: item.listingType, status: 'active' });
+  const myOpenOrder = canOrder ? openOrderFor(os, item.id) : null;
+  const orderLabel = myOpenOrder ? 'View order' : 'Order';
+  const startOrder = () => { haptics.medium(); onOrder?.(item); };
+
   const handleContactClick = (link: ContactLink) => {
     if (!user) {
       onRequireAuth();
@@ -1116,6 +1135,9 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
         hasBoth={hasBoth}
         canMessage={canMessage}
         onMessage={startMessage}
+        canOrder={canOrder}
+        orderLabel={orderLabel}
+        onOrder={startOrder}
         canManage={canManage}
         onDelete={onDelete}
         isAdmin={isAdmin}
@@ -1901,7 +1923,57 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             </>
           ) : (
           <>
-          {canMessage ? (
+          {canOrder ? (
+            /* ── Order first, for things for sale. Message stays one tap away
+               as a round button, with email and WhatsApp beside it. */
+            <>
+              <button
+                onClick={startOrder}
+                aria-label={myOpenOrder ? `View your order for ${item.title}` : `Order ${item.title} from ${item.user.name}`}
+                style={{
+                  flex: 1, minWidth: 0, height: 52, borderRadius: 999,
+                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <ShoppingBag size={16} strokeWidth={2} />
+                {orderLabel}
+              </button>
+              <button
+                onClick={startMessage}
+                aria-label={`Message ${item.user.name}`}
+                style={{
+                  width: 52, height: 52, borderRadius: 999, flexShrink: 0,
+                  background: 'var(--bg-inset)', color: 'var(--text-primary)',
+                  border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <MessageCircle size={18} strokeWidth={1.9} />
+              </button>
+              {contactLinks.map(link => (
+                <button
+                  key={link.channel}
+                  onClick={() => {
+                    if (!user) { onRequireAuth(); return; }
+                    handleContactClick(link);
+                  }}
+                  aria-label={link.ariaLabel}
+                  style={{
+                    width: 52, height: 52, borderRadius: 999, flexShrink: 0,
+                    background: link.channel === 'whatsapp' ? WA_FILL : 'var(--bg-inset)',
+                    color: link.channel === 'whatsapp' ? WA_INK : 'var(--text-primary)',
+                    border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  {link.channel === 'whatsapp' ? <WhatsAppGlyph size={18} /> : <Mail size={18} strokeWidth={1.9} />}
+                </button>
+              ))}
+            </>
+          ) : canMessage ? (
             /* ── Message on Wecycle, first. Email and WhatsApp stay beside it
                as round secondary buttons for people who would rather use them —
                nothing is taken away, the order just changes. */
@@ -2100,6 +2172,9 @@ interface DesktopLayoutProps {
    *  component. */
   canMessage: boolean;
   onMessage: () => void;
+  canOrder: boolean;
+  orderLabel: string;
+  onOrder: () => void;
   canManage: boolean;
   onDelete?: () => void | Promise<void>;
   isAdmin?: boolean;
@@ -2117,7 +2192,7 @@ function DesktopLayout({
   shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
   onOpenItem, onOpenLF,
   contactLinks, gate, primaryActionLabel, handleContactClick, hasBoth,
-  canMessage, onMessage,
+  canMessage, onMessage, canOrder, orderLabel, onOrder,
   canManage, onDelete, isAdmin, isOwner, heroSentinelRef, heroVisible, editState,
   adminEdit,
 }: DesktopLayoutProps) {
@@ -2724,6 +2799,37 @@ function DesktopLayout({
               </button>
             ) : canMessage ? (
               <>
+                {canOrder ? (
+                  <>
+                    <button
+                      onClick={onOrder}
+                      aria-label={orderLabel === 'Order' ? `Order ${item.title} from ${item.user.name}` : `View your order for ${item.title}`}
+                      style={{
+                        flex: '1 1 150px', minWidth: 0, height: 52, borderRadius: 14,
+                        background: 'var(--text-primary)', color: 'var(--bg-base)',
+                        border: 'none', cursor: 'pointer',
+                        fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      }}
+                    >
+                      <ShoppingBag size={17} strokeWidth={2} />
+                      {orderLabel}
+                    </button>
+                    <button
+                      onClick={onMessage}
+                      aria-label={`Message ${item.user.name}`}
+                      title={`Message ${item.user.name}`}
+                      style={{
+                        width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+                        background: 'var(--bg-inset)', color: 'var(--text-primary)',
+                        border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <MessageCircle size={18} strokeWidth={1.9} />
+                    </button>
+                  </>
+                ) : (
                 <button
                   onClick={onMessage}
                   aria-label={`${primaryActionLabel} — message ${item.user.name}`}
@@ -2741,6 +2847,7 @@ function DesktopLayout({
                   <MessageCircle size={17} strokeWidth={2} />
                   {primaryActionLabel}
                 </button>
+                )}
                 {contactLinks.map(link => (
                   <button
                     key={link.channel}

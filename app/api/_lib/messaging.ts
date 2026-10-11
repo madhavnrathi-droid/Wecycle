@@ -55,10 +55,10 @@ export function conversationIdFor(x: string, y: string): string {
 const firstName = (p: Row | null): string =>
   String(p?.full_name ?? '').trim().split(/\s+/)[0] || 'This member';
 
-type Refusal = { ok: false; status: number; code: string; message: string };
+export type Refusal = { ok: false; status: number; code: string; message: string };
 type Allowed = { ok: true; peer: Row };
 
-async function getRow(table: string, id: string): Promise<Row | null> {
+export async function getRow(table: string, id: string): Promise<Row | null> {
   if (!isValidRowId(id)) return null;
   const r = await aw('GET', `${T(table)}/${encodeURIComponent(id)}`);
   return r.ok ? r.json : null;
@@ -68,7 +68,7 @@ async function getRow(table: string, id: string): Promise<Row | null> {
  *  members. A client can only grant itself, so it cannot make one of these —
  *  which is what stops someone padding another member's rate limit, or faking
  *  a reply to get past "DMs off", with rows they created themselves. */
-const serverWritten = (row: Row): boolean => {
+export const serverWritten = (row: Row): boolean => {
   const p = row.$permissions;
   return Array.isArray(p) && p.length === 2 && p[0] !== p[1]
     && p.every(x => /^read\("user:[^"]+"\)$/.test(String(x)));
@@ -83,7 +83,7 @@ async function countSince(table: string, since: string, ...filters: unknown[]): 
 }
 
 /** Everything that decides whether `uid` may message `peerId` right now. */
-async function policy(uid: string, peerId: string): Promise<Allowed | Refusal> {
+export async function policy(uid: string, peerId: string): Promise<Allowed | Refusal> {
   if (!peerId || peerId === uid) {
     return { ok: false, status: 400, code: 'self', message: 'You can’t message yourself.' };
   }
@@ -174,17 +174,6 @@ export async function canMessage(uid: string, args: Args) {
  * continent that was five seconds of "Sending…". Now it is the caller check,
  * one parallel wave, then the writes. */
 export async function sendMessage(uid: string, args: Args) {
-  const body = normalizeBody(String(args.body ?? ''));
-  if (!body) return json({ message: 'Write a message first.', code: 'invalid' }, 400);
-  if (Array.from(body).length > MESSAGE_MAX) {
-    return json({ message: `Messages can be up to ${MESSAGE_MAX.toLocaleString('en-IN')} characters.`, code: 'too_long' }, 400);
-  }
-  const messageId = args.message_id;
-  if (!isValidRowId(messageId)) return json({ message: 'Invalid message id', code: 'invalid' }, 400);
-
-  const hit = findObjectionable(body);
-  if (hit) return json({ message: objectionableMessage(hit), code: 'objectionable' }, 422);
-
   /* Who it is for. A conversation id is checked against its members; a bare
      `to` is a person. Either way, from here on the pair is what matters. */
   let peerId = String(args.to ?? '');
@@ -200,6 +189,32 @@ export async function sendMessage(uid: string, args: Args) {
     return json({ message: 'Conversation not found', code: 'not_found' }, 404);
   }
 
+  const r = await postMessage(uid, peerId, String(args.body ?? ''), args.message_id, args.context);
+  if (!r.ok) return json({ message: r.message, code: r.code }, r.status);
+  return json({ data: { conversation: r.conversation, message: r.message } }, r.created ? 201 : 200);
+}
+
+export type Posted =
+  | { ok: true; conversation: Row | null; message: Row; created: boolean }
+  | Refusal;
+
+/* ── postMessage ────────────────────────────────────────────────────────────
+ *
+ * The whole of sending, for anything that sends: a member typing in a chat,
+ * and an order step posting its one-line update (_lib/orders.ts). Every check
+ * above applies to both, so an order can never become a way round a block,
+ * a room, a suspension or the rate limits. */
+export async function postMessage(uid: string, peerId: string, rawBody: string, messageId: unknown, context?: unknown): Promise<Posted> {
+  const body = normalizeBody(rawBody);
+  if (!body) return { ok: false, status: 400, code: 'invalid', message: 'Write a message first.' };
+  if (Array.from(body).length > MESSAGE_MAX) {
+    return { ok: false, status: 400, code: 'too_long', message: `Messages can be up to ${MESSAGE_MAX.toLocaleString('en-IN')} characters.` };
+  }
+  if (!isValidRowId(messageId)) return { ok: false, status: 400, code: 'invalid', message: 'Invalid message id' };
+
+  const hit = findObjectionable(body);
+  if (hit) return { ok: false, status: 422, code: 'objectionable', message: objectionableMessage(hit) };
+
   const convId = conversationIdFor(uid, peerId);
   const [a, b] = orderedPair(uid, peerId);
   const perms = [readPerm(a), readPerm(b)];
@@ -209,7 +224,7 @@ export async function sendMessage(uid: string, args: Args) {
 
   const [allowed, ctx, already, sentLastMinute, existingConv, chatsLastHour] = await Promise.all([
     policy(uid, peerId),
-    resolveContext(args.context, uid, peerId),
+    resolveContext(context, uid, peerId),
     getRow('messages', messageId),
     countSince('messages', minuteAgo, { method: 'equal', attribute: 'sender_id', values: [uid] }),
     getRow('conversations', convId),
@@ -224,15 +239,15 @@ export async function sendMessage(uid: string, args: Args) {
      — and is not refused by a limit the first attempt already counted in. */
   if (already) {
     if (already.sender_id === uid && already.conversation_id === convId && isGenuine(already.$permissions, a, b)) {
-      return json({ data: { conversation: existingConv, message: already } });
+      return { ok: true, conversation: existingConv, message: already, created: false };
     }
-    return json({ message: 'Invalid message id', code: 'invalid' }, 409);
+    return { ok: false, status: 409, code: 'invalid', message: 'Invalid message id' };
   }
 
-  if (!allowed.ok) return json({ message: allowed.message, code: allowed.code }, allowed.status);
-  if (ctx === 'invalid') return json({ message: 'That post isn’t available.', code: 'bad_context' }, 400);
+  if (!allowed.ok) return allowed;
+  if (ctx === 'invalid') return { ok: false, status: 400, code: 'bad_context', message: 'That post isn’t available.' };
   if (sentLastMinute >= RATE_PER_MINUTE) {
-    return json({ message: 'You’re sending messages very fast. Wait a moment and try again.', code: 'rate_limited' }, 429);
+    return { ok: false, status: 429, code: 'rate_limited', message: 'You’re sending messages very fast. Wait a moment and try again.' };
   }
 
   const summary = {
@@ -247,7 +262,7 @@ export async function sendMessage(uid: string, args: Args) {
   let created = false;
   if (!conv) {
     if (chatsLastHour >= NEW_CHATS_PER_HOUR) {
-      return json({ message: 'You’ve started a lot of new chats in the last hour. Try again a little later.', code: 'rate_limited' }, 429);
+      return { ok: false, status: 429, code: 'rate_limited', message: 'You’ve started a lot of new chats in the last hour. Try again a little later.' };
     }
     const r = await aw('POST', T('conversations'), {
       rowId: convId,
@@ -256,9 +271,9 @@ export async function sendMessage(uid: string, args: Args) {
     });
     if (r.ok) { conv = r.json; created = true; }
     else if (r.status === 409) conv = await getRow('conversations', convId); // a racing first message won
-    else return json({ message: 'Couldn’t start this conversation. Try again.', code: 'server' }, 502);
+    else return { ok: false, status: 502, code: 'server', message: 'Couldn’t start this conversation. Try again.' };
   }
-  if (!conv) return json({ message: 'Couldn’t start this conversation. Try again.', code: 'server' }, 502);
+  if (!conv) return { ok: false, status: 502, code: 'server', message: 'Couldn’t start this conversation. Try again.' };
 
   /* A row at the pair's id that the server did not write — someone created it
      from a client to squat the id. Take it over: the server's data, the
@@ -269,7 +284,7 @@ export async function sendMessage(uid: string, args: Args) {
       data: { user_a: a, user_b: b, created_at: now, ...summary },
       permissions: perms,
     });
-    if (!r.ok) return json({ message: 'Couldn’t start this conversation. Try again.', code: 'server' }, 502);
+    if (!r.ok) return { ok: false, status: 502, code: 'server', message: 'Couldn’t start this conversation. Try again.' };
     conv = r.json;
     created = true;
   }
@@ -282,7 +297,7 @@ export async function sendMessage(uid: string, args: Args) {
   if (!m.ok) {
     /* Never leave an empty conversation in someone's inbox. */
     if (created) await aw('DELETE', `${T('conversations')}/${convId}`);
-    return json({ message: 'Message not sent. Try again.', code: 'server' }, 502);
+    return { ok: false, status: 502, code: 'server', message: 'Message not sent. Try again.' };
   }
 
   if (!created) {
@@ -290,7 +305,7 @@ export async function sendMessage(uid: string, args: Args) {
     if (u.ok) conv = u.json;
   }
 
-  return json({ data: { conversation: conv, message: m.json } }, 201);
+  return { ok: true, conversation: conv, message: m.json as Row, created: true };
 }
 
 /* ── dm_mark_read { conversation_id } ───────────────────────────────────────

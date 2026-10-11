@@ -46,6 +46,7 @@ const FeedbackScreen          = dynamic(() => import('../components/FeedbackScre
 const ChangePasswordScreen    = dynamic(() => import('../components/ChangePasswordScreen'), { ssr: false });
 const StorefrontScreen        = dynamic(() => import('../components/StorefrontScreen'), { ssr: false });
 const MessagesScreen          = dynamic(() => import('../components/messages/MessagesScreen'), { ssr: false });
+const OrderSheet              = dynamic(() => import('../components/orders/OrderSheet'), { ssr: false });
 
 /* Overlays — none of these exist until something is opened. */
 const Drawer                = dynamic(() => import('../components/Drawer'), { ssr: false });
@@ -77,6 +78,7 @@ import type { WecycleAlert } from '../lib/alerts';
 import {
   startMessaging, openConversationWith, rememberPeer, peerFromUser, type MessageTarget,
 } from '../lib/messaging/store';
+import { startOrders, getOrdersState, openOrderFor, type Order } from '../lib/orders/store';
 import { primePostPreview } from '../lib/messaging/useMessaging';
 import { conversationIdFor } from '../lib/messaging/conversationId';
 import type { DeepLinkPost } from '../lib/liveData';
@@ -161,7 +163,7 @@ export default function WecycleApp() {
      member is known. Deferred a moment on sign-in so its queries do not
      compete with the feed's first paint. */
   useEffect(() => {
-    const t = window.setTimeout(() => startMessaging(user?.id ?? null), user ? 1200 : 0);
+    const t = window.setTimeout(() => { startMessaging(user?.id ?? null); startOrders(user?.id ?? null); }, user ? 1200 : 0);
     return () => window.clearTimeout(t);
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -196,6 +198,30 @@ export default function WecycleApp() {
     { kind: 'lostfound', data: lf },
   );
   const messageUser = (u: User) => openMessages({ peer: peerFromUser(u) });
+
+  /* ── Orders ──
+     "Order" on a post opens the order sheet — or, if this member already has
+     an open order for it, goes straight to that order's chat. Placing one
+     lands in the chat too: ordering and talking are one thread. */
+  const [orderItem, setOrderItem] = useState<MarketplaceItem | null>(null);
+  const openOrderChat = (conversationPeerId: string) => {
+    if (!user) { setModal('auth'); return; }
+    startMessaging(user.id);
+    const conversationId = openConversationWith(conversationPeerId, null);
+    if (!conversationId) return;
+    setDrawerOpen(false);
+    setMessagesReturn(null);
+    setMessagesOpen({ conversationId, entry: 'thread' });
+  };
+  const orderItemFlow = (it: MarketplaceItem) => {
+    if (!user) { setModal('auth'); return; }
+    startOrders(user.id);
+    const existing = openOrderFor(getOrdersState(), it.id);
+    if (existing) { rememberPeer(peerFromUser(it.user)); openOrderChat(it.user.id); return; }
+    track(EVT.order_sheet_opened, { priced: typeof it.price === 'number' });
+    setOrderItem(it);
+  };
+  const openOrderFromList = (order: Order, peerId: string) => { void order; openOrderChat(peerId); };
 
   /* Back from a profile or post that was opened from a chat → the chat. */
   useEffect(() => {
@@ -710,6 +736,7 @@ export default function WecycleApp() {
                 onOpenItem={setOpenItem}
                 onOpenLF={setOpenLF}
                 onMessage={messageAboutItem}
+                onOrder={orderItemFlow}
                 /* Owner edits inline (no Edit button — fields are editable
                    in place). Admin gets Delete on any post for moderation. */
                 isOwner={ownsItem(openItem)}
@@ -985,6 +1012,7 @@ export default function WecycleApp() {
                 onOpenEvent={setOpenEvent}
                 onOpenEventInsights={setInsightsEvent}
                 onOpenLF={(lf) => setOpenLF(lf)}
+                onOpenOrder={openOrderFromList}
               />
             )}
             {activeScreen === 'account' && (
@@ -1090,6 +1118,7 @@ export default function WecycleApp() {
                 onOpenItem={setOpenItem}
                 onOpenLF={(lf) => { setOpenItem(null); setOpenLF(lf); }}
                 onMessage={messageAboutItem}
+                onOrder={orderItemFlow}
                 isOwner={ownsItem(openItem)}
                 isAdmin={isAdmin}
                 onDelete={(ownsItem(openItem) || isAdmin) ? async () => {
@@ -1163,6 +1192,17 @@ export default function WecycleApp() {
     <>
       {view}
       {messagesOverlay}
+      {orderItem && (
+        <OrderSheet
+          item={orderItem}
+          onClose={() => setOrderItem(null)}
+          onPlaced={(_conversationId, it) => {
+            setOrderItem(null);
+            primePostPreview({ kind: 'item', data: it });
+            openMessages({ peer: peerFromUser(it.user), context: { type: 'listing', id: it.id, title: it.title } }, { kind: 'item', data: it });
+          }}
+        />
+      )}
     </>
   );
 }

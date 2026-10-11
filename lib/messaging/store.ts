@@ -413,6 +413,12 @@ async function ensurePeers(ids: string[]): Promise<void> {
   for (const id of missing) peerFetches.delete(id);
 }
 
+/** Names for people shown outside a chat — the Orders list. */
+export function ensurePeersFor(ids: string[]): void {
+  if (isDemoMode() || !ids.length) return;
+  void ensurePeers(ids);
+}
+
 /** Register someone the member is about to message, from a post or a
  *  profile, so the thread can draw their name before any fetch returns. */
 export function rememberPeer(peer: Peer): void {
@@ -786,6 +792,43 @@ async function onConversationRow(row: Row): Promise<void> {
     const keepLocal = prev && Date.parse(prev.lastMessageAt) > Date.parse(c.lastMessageAt);
     return { conversations: { ...s.conversations, [c.id]: keepLocal ? { ...c, lastMessage: prev.lastMessage, lastMessageAt: prev.lastMessageAt, lastSenderId: prev.lastSenderId } : c } };
   });
+}
+
+/* ── Rows from elsewhere ─────────────────────────────────────────────────
+ *
+ * An order step posts a chat message on the server (lib/orders/store.ts).
+ * The rows it gets back are merged in here at once, rather than waiting for
+ * realtime — so the chat shows the step the moment the button settles, and a
+ * first order to a new seller has a conversation to land in. Realtime then
+ * delivers the same rows again, which merge by id to nothing. */
+export async function ingestServerRows(
+  conversation: Record<string, unknown> | null | undefined,
+  message: Record<string, unknown> | null | undefined,
+): Promise<void> {
+  if (!state.me) return;
+  if (conversation?.$id) await onConversationRow(conversation as Row);
+  if (message?.$id) onMessageRow(message as Row, true);
+}
+
+/** Demo mode: a message into a thread as if it had arrived — the orders demo
+ *  uses it to play the other side. */
+export function demoPostMessage(conversationId: string, peerId: string, senderId: string, body: string): string {
+  const id = `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const at = new Date().toISOString();
+  const msg: ChatMessage = { id, conversationId, senderId, body, createdAt: at, readAt: null, state: 'sent' };
+  set(s => {
+    const t = s.threads[conversationId] ?? { peerId, status: 'ready' as const, hasMore: false, loadingOlder: false, messages: [] };
+    const conv = s.conversations[conversationId]
+      ?? { id: conversationId, peerId, lastMessage: '', lastMessageAt: at, lastSenderId: null, context: null, persisted: true };
+    const fromPeer = senderId !== s.me;
+    const watching = s.active === conversationId;
+    return {
+      threads: { ...s.threads, [conversationId]: { ...t, messages: mergeMessages(t.messages, [msg]) } },
+      conversations: { ...s.conversations, [conversationId]: { ...conv, lastMessage: previewOf(body), lastMessageAt: at, lastSenderId: senderId, persisted: true } },
+      unread: fromPeer && !watching ? { ...s.unread, [conversationId]: (s.unread[conversationId] ?? 0) + 1 } : s.unread,
+    };
+  });
+  return id;
 }
 
 /* ── Derived views ───────────────────────────────────────────────────────── */

@@ -3498,6 +3498,180 @@
         }
       ],
       "indexes": []
+    },
+    {
+      "$id": "orders",
+      "databaseId": "wecycle",
+      "name": "orders",
+      "enabled": true,
+      "$permissions": [],
+      "documentSecurity": true,
+      "columns": [
+        {
+          "key": "listing_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "seller_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "buyer_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "community_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "conversation_id",
+          "type": "varchar",
+          "size": 36,
+          "required": true
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "size": 200,
+          "required": true
+        },
+        {
+          "key": "photo_url",
+          "type": "text",
+          "size": 2000,
+          "required": false
+        },
+        {
+          "key": "price",
+          "type": "double",
+          "required": false
+        },
+        {
+          "key": "quantity",
+          "type": "integer",
+          "required": false,
+          "default": 1
+        },
+        {
+          "key": "note",
+          "type": "text",
+          "size": 1000,
+          "required": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "format": "enum",
+          "elements": [
+            "requested",
+            "confirmed",
+            "making",
+            "ready",
+            "done",
+            "cancelled"
+          ],
+          "required": true
+        },
+        {
+          "key": "ready_by",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "key": "pickup",
+          "type": "varchar",
+          "size": 200,
+          "required": false
+        },
+        {
+          "key": "verified",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "key": "cancelled_by",
+          "type": "varchar",
+          "size": 36,
+          "required": false
+        },
+        {
+          "key": "history",
+          "type": "longtext",
+          "required": false
+        },
+        {
+          "key": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "updated_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "key": "closed_at",
+          "type": "datetime",
+          "required": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_orders_buyer",
+          "type": "key",
+          "columns": [
+            "buyer_id",
+            "updated_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_orders_seller",
+          "type": "key",
+          "columns": [
+            "seller_id",
+            "updated_at"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "ix_orders_listing_buyer",
+          "type": "key",
+          "columns": [
+            "listing_id",
+            "buyer_id"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "ix_orders_conversation",
+          "type": "key",
+          "columns": [
+            "conversation_id"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
     }
   ]
 }

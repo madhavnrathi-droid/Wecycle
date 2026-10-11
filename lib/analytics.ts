@@ -119,6 +119,16 @@ export const EVT = {
   message_failed:           'message_failed',
   message_starter_used:     'message_starter_used',
 
+  /* ── Orders ───
+     order_step carries the action and who took it; `done` and `received`
+     are handovers — the north-star event the UX plan could not measure until
+     orders existed. */
+  order_sheet_opened:       'order_sheet_opened',
+  order_placed:             'order_placed',
+  order_failed:             'order_failed',
+  order_step:               'order_step',
+  order_step_failed:        'order_step_failed',
+
   /* ── Event registration forms + organizer insights ─── */
   event_form_saved:         'event_form_saved',
   event_form_removed:       'event_form_removed',

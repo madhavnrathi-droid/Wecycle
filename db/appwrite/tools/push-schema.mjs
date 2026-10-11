@@ -6,6 +6,7 @@
  *   set -a && . db/appwrite/appwrite.env && set +a
  *   node db/appwrite/tools/push-schema.mjs --dry-run
  *   node db/appwrite/tools/push-schema.mjs
+ *   node db/appwrite/tools/push-schema.mjs --only orders   # one new table
  *
  * Written rather than using `appwrite push` so that the thing creating the
  * schema and the thing that generated appwrite.json agree exactly, and so a
@@ -36,6 +37,11 @@ const PROJECT = process.env.APPWRITE_PROJECT;
 const KEY = process.env.APPWRITE_KEY;
 const DB = process.env.APPWRITE_DB || CONFIG.tablesDB[0].$id;
 const DRY = process.argv.includes('--dry-run');
+/* --only <table>: create just that table. Adding a table to a live project
+   otherwise means a few hundred 409s for the ones already there. */
+const ONLY = (() => { const i = process.argv.indexOf('--only'); return i > 0 ? process.argv[i + 1] : null; })();
+const TABLES = ONLY ? CONFIG.tables.filter((t) => t.$id === ONLY) : CONFIG.tables;
+if (ONLY && !TABLES.length) { console.error(`No table "${ONLY}" in appwrite.json.`); process.exit(2); }
 
 if (!DRY && (!ENDPOINT || !PROJECT || !KEY)) {
   console.error('Set APPWRITE_ENDPOINT, APPWRITE_PROJECT and APPWRITE_KEY.');
@@ -106,16 +112,20 @@ async function waitForColumns(tableId, expected) {
 
 async function main() {
   console.log(`\n${DRY ? '[dry run] ' : ''}pushing schema to ${DRY ? '(nowhere)' : ENDPOINT}`);
-  console.log(`database: ${DB}   tables: ${CONFIG.tables.length}\n`);
+  console.log(`database: ${DB}   tables: ${TABLES.length}\n`);
 
-  const dbRes = await api('POST', '/tablesdb', { databaseId: DB, name: 'Wecycle' });
-  console.log(dbRes.ok ? 'database created' : dbRes.status === 409 ? 'database already there' : `database FAILED: ${dbRes.status} ${dbRes.json?.message ?? ''}`);
-  if (!dbRes.ok && dbRes.status !== 409) process.exit(1);
+  /* Adding one table to a live project: the database is already there, and
+     creating it needs a broader scope than adding a table does. */
+  if (!ONLY) {
+    const dbRes = await api('POST', '/tablesdb', { databaseId: DB, name: 'Wecycle' });
+    console.log(dbRes.ok ? 'database created' : dbRes.status === 409 ? 'database already there' : `database FAILED: ${dbRes.status} ${dbRes.json?.message ?? ''}`);
+    if (!dbRes.ok && dbRes.status !== 409) process.exit(1);
+  }
 
   let madeTables = 0, madeCols = 0, madeIdx = 0;
   const problems = [];
 
-  for (const t of CONFIG.tables) {
+  for (const t of TABLES) {
     const tRes = await api('POST', `/tablesdb/${DB}/tables`, {
       tableId: t.$id,
       name: t.name,
