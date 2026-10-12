@@ -25,6 +25,7 @@
 
 import type { Brand } from './brands';
 import { renderLushGradient } from './lushGradient';
+import { corsFresh } from './corsImage';
 
 export const BRAND_CARD_SIZE = 1080;
 
@@ -51,17 +52,6 @@ export interface RenderedBrandCard {
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-
-/* A product photo has usually just been shown on the page as a plain <img>,
-   and the browser will answer a crossOrigin request for the same URL from that
-   cached, non-CORS copy — the load fails and the card comes out with no
-   products. A query parameter makes it a different URL and a fresh CORS
-   request. (Not Appwrite's /preview resizer: that counts against the image
-   transformation quota.) */
-export function corsFresh(src: string): string {
-  if (!/^https?:/i.test(src)) return src;
-  return `${src}${src.includes('?') ? '&' : '?'}cors=1`;
-}
 
 function loadImage(src: string, cors: boolean, timeoutMs = 8000): Promise<HTMLImageElement | null> {
   return new Promise(resolve => {

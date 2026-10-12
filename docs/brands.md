@@ -58,8 +58,9 @@ device (`lib/brandCard.ts`) and a message written from what the store has now
   shared (most desktops) the card downloads and the message is copied.
   **WhatsApp** sends the message alone via wa.me; the link unfurls from
   /b/<handle>'s Open Graph tags.
-- Product photos load with `?cors=1`: the page has usually just shown them as
-  plain images, and the cached non-CORS copy would otherwise fail the canvas.
+- Product photos load with `?cors=<host>` (`corsFresh`): the page has usually
+  just shown them as plain images, and that cached non-CORS copy would fail
+  the canvas; the host is in the key because storage sends no `Vary: Origin`.
 
 ## Adding a brand
 

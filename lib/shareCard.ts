@@ -25,6 +25,7 @@
  * link copy. Never throws — a tainted canvas re-renders without remote photos.
  */
 
+import { corsFresh } from './corsImage';
 import { getActiveRoom } from './rooms';
 import { haptics } from './haptics';
 
@@ -432,8 +433,8 @@ function loadImage(src: string, cors = true, timeoutMs = 8000): Promise<HTMLImag
     /* A photo already shown on the page sits in the cache as a non-CORS
        response, and a crossOrigin request for the same URL is answered from
        it and fails — the card came out without its photo. A distinct URL is a
-       fresh CORS request. */
-    img.src = cors && /^https?:/i.test(src) ? `${src}${src.includes('?') ? '&' : '?'}cors=1` : src;
+       fresh CORS request (lib/corsImage.ts). */
+    img.src = cors ? corsFresh(src) : src;
   });
 }
 
