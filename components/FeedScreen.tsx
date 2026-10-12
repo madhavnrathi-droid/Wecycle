@@ -1209,11 +1209,18 @@ export default function FeedScreen({
          window: promoting a brand is the point, and its card is itself stock —
          three of its things and a way into the rest. */}
       {showStorefront && (
-        <BrandSpotlightSlot onOpen={(b) => {
-          engine.noteSignal('storefront_view');
-          track(EVT.user_card_opened, { user_id: b.ownerId, source: 'feed_brand_spotlight' });
-          onOpenUser?.(b.ownerId);
-        }} />
+        <BrandSpotlightSlot
+          onOpen={(b) => {
+            engine.noteSignal('storefront_view');
+            track(EVT.user_card_opened, { user_id: b.ownerId, source: 'feed_brand_spotlight' });
+            onOpenUser?.(b.ownerId);
+          }}
+          onOpenItem={(it, b) => {
+            trackPostOpened('item', it.id, { source: 'feed_brand_spotlight' });
+            track(EVT.brand_item_opened, { brand: b.handle, item_id: it.id, section: 'home_spotlight' });
+            withViewTransition(() => onOpenItem(it));
+          }}
+        />
       )}
 
       {showStorefront && shopWindow.length >= 2 && (

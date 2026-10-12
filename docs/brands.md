@@ -37,6 +37,30 @@ bounces. It pauses off screen and in hidden tabs, and is a still gradient under
 reduced motion. Promos outside the page hold still — the feed is not the place
 for a colour cycle.
 
+## Sharing a brand
+
+Share on the brand page opens `BrandShareSheet`: a 1080×1080 PNG made on the
+device (`lib/brandCard.ts`) and a message written from what the store has now
+(`brandShareMessage` in `lib/brands.ts`), editable before it goes.
+
+- **The card**: the brand's wordmark and mascot, three Picks as stickers with
+  price tags, "N products · from ₹X", the /b/ link and "Order now". Every
+  element is measured to stay inside the square.
+- **The background** is the *Foku lush gradient* shader — authored in the
+  team's Figma library ("W" team, shader fill `4b06460e-…`) with the
+  figma-shaders skill and ported to WebGL in `lib/lushGradient.ts`: domain-
+  warped Perlin noise, colours blended round the hue wheel (OKLCH), a chroma
+  lift, fold depth and grain. **Remix** is a new seed. A brand's look lives in
+  `palette.lush`; neighbouring colours must be under half the hue wheel apart
+  (hence periwinkle between Foku's teal and pink) or the blend turns grey.
+- **Share card** sends image + message through the phone's share sheet (into
+  WhatsApp: the picture with the message as its caption). Where files can't be
+  shared (most desktops) the card downloads and the message is copied.
+  **WhatsApp** sends the message alone via wa.me; the link unfurls from
+  /b/<handle>'s Open Graph tags.
+- Product photos load with `?cors=1`: the page has usually just shown them as
+  plain images, and the cached non-CORS copy would otherwise fail the canvas.
+
 ## Adding a brand
 
 1. Assets in `public/brands/<handle>/`: `wordmark.svg` with letters as
@@ -44,8 +68,8 @@ for a colour cycle.
    `mascot.svg` (white, face cut out), optional `art.webp`, `poster.webp`,
    `og.jpg` (1200×630).
 2. An entry in `BRANDS` (`lib/brands.ts`): handle, name, `ownerId` (the
-   member's profile id), palette (`ink` must reach 7:1 on every field),
-   collections, picks.
+   member's profile id), palette (`ink` must reach 7:1 on every field;
+   `lush` for the share card), collections, picks.
 3. Set the owner's profile to a shop (`role`, `bio`) so their name reads
    right everywhere the registry does not reach.
 4. `npm test` — `lib/brands.test.ts` checks handles and owners are unique.

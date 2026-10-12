@@ -46,6 +46,15 @@ export interface Brand {
     /** The colours the hero cycles through, in order. Each field glows with
      *  the next one, so the gradient is always made of the brand's colours. */
     fields: string[];
+    /** The share card's background — the "Foku lush gradient" shader
+     *  (lib/lushGradient.ts). Colours are ordered so each neighbour is a
+     *  short step round the hue wheel; the rest are the shader's controls. */
+    lush: {
+      colors: string[];
+      stops: number[];
+      scale?: number; flow?: number; spread?: number;
+      chroma?: number; depth?: number; glow?: number; grain?: number;
+    };
   };
   assets: {
     wordmark: string;
@@ -78,6 +87,14 @@ export const BRANDS: readonly Brand[] = [
          mascot (green). Black is the fifth colour there; it is left out here
          because the ink is black. */
       fields: ['#20AEA9', '#EB8291', '#E5A922', '#6DBE45'],
+      /* Teal, then the periwinkle from Foku's doodle art as the bridge to its
+         pink, then mustard. Teal straight into pink crosses the hue wheel and
+         goes grey; through periwinkle it stays a colour all the way. */
+      lush: {
+        colors: ['#20AEA9', '#9697CB', '#EB8291', '#E5A922'],
+        stops: [0, 0.55, 0.78, 1],
+        scale: 0.8, flow: 0.55, spread: 3, chroma: 1.3, depth: 0.2, glow: 0.25, grain: 0.08,
+      },
     },
     assets: {
       wordmark: '/brands/foku/wordmark.svg',
@@ -197,4 +214,37 @@ export function rangeLine(sections: BrandSection[]): string {
   if (!names.length) return '';
   if (names.length === 1) return names[0];
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** "₹499" — the cheapest open, priced listing, for "from ₹499". */
+export function fromPrice(items: MarketplaceItem[]): string | null {
+  const prices = items
+    .filter(i => !i.isClosed && !i.isRequest && i.listingType === 'sell' && typeof i.price === 'number' && i.price > 0)
+    .map(i => i.price as number);
+  return prices.length ? `₹${Math.min(...prices).toLocaleString('en-IN')}` : null;
+}
+
+/** The words that go out with a brand's share card — into WhatsApp as the
+ *  image's caption, or wherever else it is posted. Built from what the store
+ *  has right now, so it can never promise a range or a price that is gone.
+ *  Kept short: WhatsApp folds anything long behind "Read more", and the link
+ *  goes last, on its own line, where it is easiest to tap. */
+export function brandShareMessage(brand: Brand, items: MarketplaceItem[], ownerName?: string | null): string {
+  const sections = sectionsFor(brand, items);
+  const range = rangeLine(sections);
+  const from = fromPrice(items);
+  const first = (ownerName ?? '').trim().split(/\s+/)[0];
+  const what = [
+    range ? range.charAt(0).toLowerCase() + range.slice(1) : null,
+    first ? `by ${first}` : null,
+  ].filter(Boolean).join(' ');
+  const line = [
+    brand.tagline.replace(/[.!]+$/, ''),
+    what || null,
+  ].filter(Boolean).join(' — ');
+  return [
+    `${brand.name} is on Wecycle 👕`,
+    `${line}${from ? `, from ${from}` : ''}. Order straight from the store:`,
+    brandUrl(brand),
+  ].join('\n');
 }

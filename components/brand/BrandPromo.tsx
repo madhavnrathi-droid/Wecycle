@@ -70,41 +70,70 @@ export function BrandStrip({ brand, count, onOpen }: { brand: Brand; count: numb
   );
 }
 
-export function BrandSpotlight({ brand, items, onOpen }: { brand: Brand; items: MarketplaceItem[]; onOpen: () => void }) {
-  const [ref, inView] = useArrived<HTMLButtonElement>();
-  const thumbs = items
-    .map(it => { const m = resolveItemMedia(it)[0]; return typeof m === 'string' ? m : m?.poster ?? null; })
-    .filter((s): s is string => !!s)
-    .slice(0, 3);
+/* The home spotlight: a slim strip, not a hero. The brand on the left (or
+   on top, on a phone), and a carousel of its products you can open straight
+   from the feed — each a small sticker with its price, the way the brand
+   shows its things on its own poster. The last card goes to the store.
+   Fixed card sizes, so the strip is the same height on a phone and on a wide
+   desktop, where it used to grow with the screen. */
+export function BrandSpotlight({ brand, items, onOpen, onOpenItem }: {
+  brand: Brand;
+  items: MarketplaceItem[];
+  onOpen: () => void;
+  onOpenItem?: (item: MarketplaceItem) => void;
+}) {
+  const [ref, inView] = useArrived<HTMLElement>();
+  const cards = items
+    .map(it => {
+      const m = resolveItemMedia(it)[0];
+      return { it, photo: typeof m === 'string' ? m : m?.poster ?? null };
+    })
+    .filter((c): c is { it: MarketplaceItem; photo: string } => !!c.photo)
+    .slice(0, 8);
   return (
     <div className="bp-wrap">
-      <p className="bs-eyebrow bp-eyebrow">Student brand on Wecycle</p>
-      <button
+      <section
         ref={ref}
-        type="button"
         className="bp bp--spot"
         data-in={inView || undefined}
         style={vars(brand)}
-        onClick={() => { haptics.light(); onOpen(); }}
-        aria-label={`${brand.name} — ${brand.tagline} Visit the store, ${items.length} products`}
+        aria-label={`${brand.name}, a student brand on Wecycle`}
       >
-        <span className="bp-spot-top">
+        <button type="button" className="bp-spot-head" onClick={() => { haptics.light(); onOpen(); }}
+          aria-label={`Visit the ${brand.name} store — ${brand.tagline} ${items.length} products`}>
           <img src={brand.assets.mascot} alt="" className="bp-mascot" draggable={false} />
           <span className="bp-text">
+            <span className="bp-kicker">Student brand</span>
             <BrandWordmark src={brand.assets.wordmark} name={brand.name} className="bp-mark" decorative />
             <span className="bp-line">{brand.tagline}</span>
           </span>
-        </span>
-        {thumbs.length === 3 && (
-          <span className="bp-thumbs" aria-hidden="true">
-            {thumbs.map(src => <span key={src} className="bp-thumb"><img src={src} alt="" loading="lazy" draggable={false} /></span>)}
-          </span>
-        )}
-        <span className="bp-spot-foot">
-          <span className="bp-line">{items.length} products</span>
-          <span className="bp-cta" aria-hidden="true">Visit the store <ArrowRight size={15} strokeWidth={2.4} /></span>
-        </span>
-      </button>
+          <span className="bp-cta" aria-hidden="true">Visit <ArrowRight size={14} strokeWidth={2.4} /></span>
+        </button>
+        <ul className="bp-rail" role="list">
+          {cards.map(({ it, photo }, i) => (
+            <li key={it.id} className="bp-card" style={{ ['--i' as string]: i }}>
+              <button
+                type="button"
+                className="bp-card-hit"
+                onClick={() => { haptics.light(); (onOpenItem ?? (() => onOpen()))(it); }}
+                aria-label={`${it.title}${it.listingType === 'sell' && typeof it.price === 'number' ? `, ₹${it.price}` : ''} — from ${brand.name}`}
+              >
+                <span className="bp-card-photo"><img src={photo} alt="" loading="lazy" draggable={false} /></span>
+                {it.listingType === 'sell' && typeof it.price === 'number' && (
+                  <span className="bp-card-price">₹{it.price.toLocaleString('en-IN')}</span>
+                )}
+              </button>
+            </li>
+          ))}
+          <li className="bp-card bp-card--more">
+            <button type="button" className="bp-card-hit bp-more" onClick={() => { haptics.light(); onOpen(); }}>
+              <span className="bp-more-n">{items.length}</span>
+              <span className="bp-more-l">products</span>
+              <span className="bp-more-go">See all <ArrowRight size={13} strokeWidth={2.4} /></span>
+            </button>
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }
@@ -131,7 +160,10 @@ export function BrandStoreLink({ brand, onOpen }: { brand: Brand; onOpen: () => 
 const SPOT_TTL = 5 * 60_000;
 const spotCache = new Map<string, { at: number; items: MarketplaceItem[] }>();
 
-export function BrandSpotlightSlot({ onOpen }: { onOpen: (brand: Brand) => void }) {
+export function BrandSpotlightSlot({ onOpen, onOpenItem }: {
+  onOpen: (brand: Brand) => void;
+  onOpenItem?: (item: MarketplaceItem, brand: Brand) => void;
+}) {
   const [spot, setSpot] = useState<{ brand: Brand; items: MarketplaceItem[] } | null>(null);
   useEffect(() => {
     let live = true;
@@ -155,5 +187,12 @@ export function BrandSpotlightSlot({ onOpen }: { onOpen: (brand: Brand) => void 
     return () => { live = false; };
   }, []);
   if (!spot) return null;
-  return <BrandSpotlight brand={spot.brand} items={spot.items} onOpen={() => onOpen(spot.brand)} />;
+  return (
+    <BrandSpotlight
+      brand={spot.brand}
+      items={spot.items}
+      onOpen={() => onOpen(spot.brand)}
+      onOpenItem={onOpenItem ? (it) => onOpenItem(it, spot.brand) : undefined}
+    />
+  );
 }

@@ -45,6 +45,7 @@ import PostStamp from '../PostStamp';
 import ReportSheet from '../ReportSheet';
 import BrandCanvas from './BrandCanvas';
 import BrandWordmark from './BrandWordmark';
+import BrandShareSheet from './BrandShareSheet';
 
 interface BrandScreenProps {
   brand: Brand;
@@ -206,9 +207,14 @@ export default function BrandScreen({ brand, owner, onBack, onOpenItem, onMessag
     return () => io.disconnect();
   }, [items, navSections]);
 
+  /* Share opens the brand's own card and message (BrandShareSheet). Until
+     the range has loaded there is nothing to put on the card, so the link
+     goes out on its own. */
+  const [shareOpen, setShareOpen] = useState(false);
   const share = async () => {
     haptics.selection();
-    track(EVT.brand_shared, { brand: brand.handle });
+    if (items && items.length) { setShareOpen(true); return; }
+    track(EVT.brand_shared, { brand: brand.handle, via: 'link' });
     const res = await shareLink({ title: `${brand.name} on Wecycle`, text: `${brand.name} — ${brand.tagline}`, url: brandUrl(brand) });
     if (res === 'copied') toast('Link copied');
   };
@@ -458,6 +464,16 @@ export default function BrandScreen({ brand, owner, onBack, onOpenItem, onMessag
             </button>
           </div>
         </section>
+      )}
+
+      {items && items.length > 0 && (
+        <BrandShareSheet
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          brand={brand}
+          items={items}
+          ownerName={owner.name}
+        />
       )}
 
       <ReportSheet

@@ -429,7 +429,11 @@ function loadImage(src: string, cors = true, timeoutMs = 8000): Promise<HTMLImag
     if (cors) img.crossOrigin = 'anonymous';
     img.onload = () => done(img);
     img.onerror = () => done(null);
-    img.src = src;
+    /* A photo already shown on the page sits in the cache as a non-CORS
+       response, and a crossOrigin request for the same URL is answered from
+       it and fails — the card came out without its photo. A distinct URL is a
+       fresh CORS request. */
+    img.src = cors && /^https?:/i.test(src) ? `${src}${src.includes('?') ? '&' : '?'}cors=1` : src;
   });
 }
 

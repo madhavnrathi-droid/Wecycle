@@ -9158,32 +9158,162 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
 .bp--strip { padding: 12px 12px 12px 14px; border-radius: 18px; min-height: 72px; }
 .bp--strip .bp-mascot { width: 50px; }
 
-/* On the home feed: the brand, and a few of its things. */
-.bp--spot { flex-direction: column; align-items: stretch; gap: 14px; padding: 16px; border-radius: 24px; }
-.bp-spot-top { display: flex; align-items: center; gap: 12px; }
-.bp--spot .bp-mark { height: 30px; }
-.bp-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.bp-thumb {
-  aspect-ratio: 1; border-radius: 14px; overflow: hidden;
-  border: 3px solid #fff; background: rgba(255, 255, 255, 0.6);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+/* On the home feed: a slim strip — the brand, then a carousel of its
+   products. Fixed card sizes, so it is the same height on every screen. */
+.bp-wrap { padding: 4px 16px 18px; container-type: inline-size; }
+.bp--spot {
+  flex-direction: column; align-items: stretch; gap: 10px;
+  padding: 12px 0 14px; border-radius: 22px; cursor: default;
 }
-.bp-thumb:nth-child(1) { transform: rotate(-2.5deg); }
-.bp-thumb:nth-child(3) { transform: rotate(2.5deg); }
-.bp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.bp-spot-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bp-spot-head {
+  all: unset; box-sizing: border-box; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 12px 0 14px; min-height: 48px;
+  color: var(--bp-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.bp-spot-head:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; border-radius: 14px; }
+.bp--spot .bp-mascot { width: 44px; }
+.bp--spot .bp-text { gap: 1px; }
+.bp-kicker {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: calc(9.5px * var(--text-scale)); font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.72;
+}
+.bp--spot .bp-mark { height: 20px; }
+.bp--spot .bp-line { font-size: calc(12px * var(--text-scale)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bp-cta {
-  height: 40px; padding: 0 16px; border-radius: 999px;
-  display: inline-flex; align-items: center; gap: 6px;
+  flex-shrink: 0; height: 36px; padding: 0 14px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 5px;
   background: var(--bp-ink); color: #fff;
-  font-size: calc(13.5px * var(--text-scale)); font-weight: 700;
+  font-size: calc(13px * var(--text-scale)); font-weight: 700;
   transition: transform var(--dur-3) var(--spring-snappy);
 }
-.bp--spot:active .bp-cta { transform: scale(0.96); transition-duration: var(--dur-1); }
-.bp-wrap { padding: 4px 16px 18px; }
-.bp-eyebrow { margin: 0 0 8px 4px; }
+.bp-spot-head:active .bp-cta { transform: scale(0.95); transition-duration: var(--dur-1); }
+
+.bp-rail {
+  list-style: none; margin: 0; padding: 4px 14px 4px;
+  display: flex; gap: 10px;
+  overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 14px;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
+}
+.bp-rail::-webkit-scrollbar { display: none; }
+.bp-card { flex: 0 0 104px; scroll-snap-align: start; }
+.bp-card-hit {
+  all: unset; box-sizing: border-box; cursor: pointer; position: relative;
+  display: block; width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+.bp-card-hit:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; border-radius: 16px; }
+/* The brand's sticker grammar, small: white border, the slightest tilt. */
+.bp-card-photo {
+  display: block; aspect-ratio: 4 / 5; overflow: hidden;
+  border: 3px solid #fff; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
+  transform: rotate(-1.5deg);
+  transition: transform var(--dur-3) var(--spring-snappy);
+}
+.bp-card:nth-child(even) .bp-card-photo { transform: rotate(1.5deg); }
+.bp-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bp-card-hit:active .bp-card-photo { transform: scale(0.95); transition-duration: var(--dur-1); }
+@media (hover: hover) { .bp-card-hit:hover .bp-card-photo { transform: rotate(0deg) translateY(-2px); } }
+.bp-card-price {
+  position: absolute; left: 6px; bottom: -6px;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--bp-ink); color: #fff;
+  font-size: calc(12px * var(--text-scale)); font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.bp-more {
+  aspect-ratio: 4 / 5; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: rgba(255, 255, 255, 0.86); color: var(--bp-ink);
+}
+.bp-more-n { font-size: calc(26px * var(--text-scale)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.bp-more-l { font-size: calc(11.5px * var(--text-scale)); font-weight: 600; opacity: 0.75; }
+.bp-more-go { margin-top: 8px; display: inline-flex; align-items: center; gap: 3px; font-size: calc(12px * var(--text-scale)); font-weight: 700; }
+/* The cards slide in once, as the strip arrives. */
+.bp--spot[data-in] .bp-card { animation: bs-card-in var(--dur-4) var(--ease-enter) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+@container (min-width: 720px) {
+  .bp--spot { flex-direction: row; align-items: center; padding: 12px 0 12px 6px; gap: 6px; }
+  .bp-spot-head { flex: 0 0 auto; flex-direction: column; align-items: flex-start; gap: 8px; padding: 6px 16px; width: 230px; }
+  .bp--spot .bp-mascot { width: 52px; }
+  .bp--spot .bp-mark { height: 26px; }
+  .bp--spot .bp-line { white-space: normal; }
+  .bp-rail { flex: 1; min-width: 0; padding-right: 18px; }
+  .bp-card { flex-basis: 116px; }
+}
+
 /* The mascot gives one wink of a bounce as the promo scrolls into view. */
 .bp[data-in] .bp-mascot { animation: bc-squash var(--dur-5) var(--spring-bouncy); }
+
+/* ── Brand share sheet (components/brand/BrandShareSheet.tsx) ── */
+.bsh { display: grid; gap: 16px; }
+.bsh-preview {
+  position: relative; width: 100%; aspect-ratio: 1;
+  border-radius: 20px; overflow: hidden; background: var(--bg-inset);
+}
+.bsh-img { display: block; width: 100%; height: 100%; animation: ord-pop var(--dur-4) var(--spring-snappy) backwards; }
+.bsh-skel { position: absolute; inset: 0; border-radius: 20px; }
+.bsh-busy {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.28); color: #0B0B0B;
+}
+.bsh-spin { animation: spin 0.9s linear infinite; }
+.bsh-remix {
+  position: absolute; top: 10px; right: 10px;
+  height: 36px; padding: 0 12px; border: none; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, 0.9); color: #0B0B0B;
+  font-size: calc(12.5px * var(--text-scale)); font-weight: 700;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+}
+.bsh-remix::before { content: ''; position: absolute; inset: -4px; }
+.bsh-remix:disabled { opacity: 0.6; }
+.bsh-note {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 8px 14px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(12, 14, 18, 0.88); color: #fff;
+  font-size: calc(12.5px * var(--text-scale)); font-weight: 600; text-align: center;
+  animation: ord-swap var(--dur-3) var(--spring-snappy) backwards;
+}
+.bsh-field { display: grid; gap: 6px; }
+.bsh-label {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: calc(12px * var(--text-scale)); font-weight: 600; color: var(--text-secondary);
+}
+.bsh-reset {
+  border: none; background: none; cursor: pointer; padding: 4px 2px;
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--text-secondary); font-size: calc(12px * var(--text-scale)); font-weight: 600;
+}
+.bsh-field textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 104px;
+  padding: 12px 14px; border: none; border-radius: 16px;
+  background: var(--bg-inset); color: var(--text-primary);
+  font: inherit; font-size: calc(14.5px * var(--text-scale)); line-height: 1.5;
+}
+.bsh-field textarea:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.bsh-hint { font-size: calc(11.5px * var(--text-scale)); color: var(--text-muted); line-height: 1.45; }
+.bsh-actions { display: flex; gap: 8px; width: 100%; }
+.bsh-primary {
+  flex: 1; height: 50px; border: none; border-radius: 14px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--text-primary); color: var(--bg-base);
+  font-size: calc(15px * var(--text-scale)); font-weight: 700;
+}
+.bsh-primary:disabled { opacity: 0.6; cursor: default; }
+.bsh-icon {
+  width: 50px; height: 50px; flex-shrink: 0; border: none; border-radius: 14px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-inset); color: var(--text-primary);
+}
+.bsh-icon:disabled { opacity: 0.5; cursor: default; }
+.bsh-primary:focus-visible, .bsh-icon:focus-visible, .bsh-remix:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .bc, .bc-glows, .bc-mascot-float, .bc-mascot-in, .bc-squash[data-on], .bc-wordmark .l, .bc-tagline,
@@ -9195,3 +9325,7 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
   .bc-wipe { animation: none; transform: translate(-50%, -50%) scale(1); }
 }
 .bc[data-still] .bc-glows, .bc[data-still] .bc-mascot-float { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .bp--spot[data-in] .bp-card, .bsh-img, .bsh-note { animation: none; }
+  .bp-card-photo, .bp-cta { transition: none; }
+}

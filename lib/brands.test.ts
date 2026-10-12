@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BRANDS, brandByHandle, brandForUser, sectionsFor, picksFor, priceLine, rangeLine, type Brand } from './brands';
+import { BRANDS, brandByHandle, brandForUser, sectionsFor, picksFor, priceLine, rangeLine, fromPrice, brandShareMessage, type Brand } from './brands';
 import { isBusinessRole, cleanShopName, shopNameOf, shopFields, BUSINESS_ROLE, SHOP_NAME_MAX } from './shops';
 import type { MarketplaceItem } from './mockData';
 
@@ -121,4 +121,26 @@ test('shop names are cleaned and capped, and turning a shop off clears it', () =
   assert.equal(cleanShopName(42), null);
   assert.deepEqual(shopFields('business', ' Foku '), { role: BUSINESS_ROLE, bio: 'Foku' });
   assert.deepEqual(shopFields('member', 'Foku'), { role: null, bio: null });
+});
+
+test('the share message says what is in the store now, and ends on the link', () => {
+  const range = [item('t1', 'Oversized T-shirt', 799), item('c1', 'Crop top', 499), item('s', 'Sold tee', 299, { isClosed: true })];
+  assert.equal(fromPrice(range), '₹499');
+  const msg = brandShareMessage(foku, range, 'Karan Seth');
+  assert.equal(msg, [
+    'Foku is on Wecycle 👕',
+    'If clothes were a canvas — oversized T-shirts and crop tops by Karan, from ₹499. Order straight from the store:',
+    'https://wecycle.page/b/foku',
+  ].join('\n'));
+  /* Short enough that WhatsApp shows it whole. */
+  assert.ok(msg.length < 220);
+  /* With nothing for sale it still reads, and still links. */
+  assert.equal(brandShareMessage(foku, []), 'Foku is on Wecycle 👕\nIf clothes were a canvas. Order straight from the store:\nhttps://wecycle.page/b/foku');
+});
+
+test('every brand has a share-card gradient with a stop per colour', () => {
+  for (const b of BRANDS) {
+    assert.equal(b.palette.lush.colors.length, b.palette.lush.stops.length);
+    assert.ok(b.palette.lush.colors.length >= 2 && b.palette.lush.colors.length <= 4);
+  }
 });
