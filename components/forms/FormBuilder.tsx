@@ -5,21 +5,21 @@
  * controlled component: renders `fields`, emits every mutation via
  * `onChange`.
  *
- * Visual language: soft white pills on the cream base — no bordered boxes,
- * ghost icon buttons, tonal inputs, hairline separation. Reordering uses
+ * Visual language: the Light system — a question is its words and its
+ * fields, separated from the next by space and one hairline, not a floating
+ * card. Fields are soft fills, icon buttons are ghosts, and each type is
+ * named by a thin glyph (FieldTypeGlyph), not an emoji. Reordering uses
  * up/down arrows (reliable on touch; matches the app's no-drag convention).
  */
 
 import { useState } from 'react';
-import { ChevronUp, ChevronDown, Trash2, Plus, X } from '@/lib/icons';
+import { ChevronUp, ChevronDown, Trash2, Plus, X, CheckSquare, RadioButton } from '@/lib/icons';
 import {
   FIELD_TYPE_META, FIELD_TYPE_ORDER, newField,
   type FormField, type FormFieldType,
 } from '../../lib/eventForms';
 import { haptics } from '../../lib/haptics';
-
-/* Soft elevation used by every floating pill in the builder. */
-const PILL_SHADOW = '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)';
+import FieldTypeGlyph from './FieldTypeGlyph';
 
 interface FormBuilderProps {
   fields: FormField[];
@@ -53,7 +53,7 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       {fields.map((f, idx) => (
         <FieldCard
           key={f.id}
@@ -67,18 +67,14 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
         />
       ))}
 
-      {/* ── Add-question palette — soft pill sheet, no dashed frame ── */}
+      {/* ── Add-question palette — a label and a wrap of soft chips ── */}
       {paletteOpen ? (
         <div style={{
-          background: 'var(--bg-card)',
-          borderRadius: 20, padding: '14px 14px 12px',
-          boxShadow: PILL_SHADOW,
+          padding: fields.length ? '18px 0 4px' : '4px 0',
+          borderTop: fields.length ? '0.5px solid var(--hairline)' : 'none',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{
-              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
-              textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
-            }}>
+            <span className="t-label">
               Add a question
             </span>
             {fields.length > 0 && (
@@ -102,15 +98,15 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
                 title={FIELD_TYPE_META[t].hint}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '9px 14px',
+                  padding: '9px 14px 9px 12px',
                   background: 'var(--bg-inset)',
                   border: 'none', borderRadius: 999,
                   cursor: 'pointer',
-                  fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
-                  fontFamily: 'inherit',
+                  fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
+                  letterSpacing: '-0.006em', fontFamily: 'inherit',
                 }}
               >
-                <span aria-hidden="true" style={{ fontSize: 'calc(13px * var(--text-scale))' }}>{FIELD_TYPE_META[t].icon}</span>
+                <FieldTypeGlyph type={t} size={16} />
                 {FIELD_TYPE_META[t].label}
               </button>
             ))}
@@ -122,24 +118,23 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
           onClick={() => setPaletteOpen(true)}
           className="press-scale"
           style={{
-            alignSelf: 'center',
+            alignSelf: 'center', marginTop: 18,
             display: 'inline-flex', alignItems: 'center', gap: 7,
             padding: '11px 20px',
-            background: 'var(--bg-card)',
+            background: 'var(--bg-inset)',
             border: 'none', borderRadius: 999,
-            boxShadow: PILL_SHADOW,
-            cursor: 'pointer', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-            color: 'var(--text-primary)', fontFamily: 'inherit',
+            cursor: 'pointer', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
+            letterSpacing: '-0.015em', color: 'var(--text-primary)', fontFamily: 'inherit',
           }}
         >
-          <Plus size={15} strokeWidth={2.2} /> Add question
+          <Plus size={16} /> Add question
         </button>
       )}
     </div>
   );
 }
 
-/* ── One editable question — a floating white pill ── */
+/* ── One editable question — words and fields, a hairline above ── */
 
 function FieldCard({
   field, index, count, onPatch, onMoveUp, onMoveDown, onRemove,
@@ -164,30 +159,23 @@ function FieldCard({
 
   return (
     <div style={{
-      background: 'var(--bg-card)',
-      borderRadius: 20,
-      padding: '14px 16px 14px',
-      boxShadow: PILL_SHADOW,
+      padding: index === 0 ? '2px 0 18px' : '16px 0 18px',
+      borderTop: index === 0 ? 'none' : '0.5px solid var(--hairline)',
     }}>
-      {/* Row 1: quiet type label + ghost controls, split by a hairline */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-          color: 'var(--text-muted)',
-        }}>
-          <span aria-hidden="true" style={{ fontSize: 'calc(12px * var(--text-scale))' }}>{meta.icon}</span> {meta.label}
+      {/* Row 1: the type in the mono voice + ghost controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+        <span className="t-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <FieldTypeGlyph type={field.type} size={14} /> {meta.label}
         </span>
         <span style={{ flex: 1 }} />
         <GhostBtn label={`Move question ${index + 1} up`} disabled={index === 0} onClick={onMoveUp}>
-          <ChevronUp size={15} strokeWidth={2} />
+          <ChevronUp size={16} />
         </GhostBtn>
         <GhostBtn label={`Move question ${index + 1} down`} disabled={index === count - 1} onClick={onMoveDown}>
-          <ChevronDown size={15} strokeWidth={2} />
+          <ChevronDown size={16} />
         </GhostBtn>
-        <span aria-hidden="true" style={{ width: 1, height: 16, background: 'var(--border-subtle)', margin: '0 4px' }} />
         <GhostBtn label={`Delete question ${index + 1}`} onClick={onRemove} danger>
-          <Trash2 size={14} strokeWidth={2} />
+          <Trash2 size={16} />
         </GhostBtn>
       </div>
 
@@ -210,8 +198,13 @@ function FieldCard({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {options.map((opt, oi) => (
             <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: 'calc(12px * var(--text-scale))', width: 18, textAlign: 'center', flexShrink: 0 }}>
-                {field.type === 'checkboxes' ? '☐' : field.type === 'dropdown' ? `${oi + 1}.` : '○'}
+              <span aria-hidden="true" style={{
+                color: 'var(--text-muted)', fontSize: 'calc(12px * var(--text-scale))', width: 18, flexShrink: 0,
+                display: 'inline-flex', justifyContent: 'center', fontVariantNumeric: 'tabular-nums',
+              }}>
+                {field.type === 'checkboxes' ? <CheckSquare size={16} />
+                  : field.type === 'dropdown' ? `${oi + 1}.`
+                  : <RadioButton size={16} />}
               </span>
               <input
                 className="form-input"
@@ -230,7 +223,7 @@ function FieldCard({
                 disabled={options.length <= 1}
                 onClick={() => onPatch({ options: options.filter((_, i) => i !== oi) })}
               >
-                <X size={13} strokeWidth={2} />
+                <X size={14} />
               </GhostBtn>
             </div>
           ))}
@@ -241,11 +234,11 @@ function FieldCard({
               alignSelf: 'flex-start',
               display: 'inline-flex', alignItems: 'center', gap: 5,
               background: 'none', border: 'none', padding: '4px 2px 0 24px',
-              cursor: 'pointer', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600,
-              color: 'var(--text-secondary)', fontFamily: 'inherit',
+              cursor: 'pointer', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
+              color: 'var(--brand-ink)', fontFamily: 'inherit',
             }}
           >
-            <Plus size={12} strokeWidth={2.2} /> Add option
+            <Plus size={13} /> Add option
           </button>
         </div>
       )}
@@ -256,7 +249,7 @@ function FieldCard({
       <label style={{
         display: 'flex', alignItems: 'center', gap: 8,
         marginTop: 12, cursor: 'pointer', userSelect: 'none',
-        fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, color: 'var(--text-secondary)',
+        fontSize: 'calc(13px * var(--text-scale))', fontWeight: 400, color: 'var(--text-secondary)',
       }}>
         <span className="pill-switch" style={{ width: 34, height: 20 }}>
           <input
@@ -267,8 +260,8 @@ function FieldCard({
           />
           <span className="pill-switch-track" aria-hidden="true" style={{
             position: 'absolute', inset: 0, borderRadius: 999,
-            background: field.required ? 'var(--text-primary)' : 'var(--bg-inset)',
-            transition: 'background 180ms',
+            background: field.required ? 'var(--ink)' : 'var(--border-default)',
+            transition: 'background-color var(--dur-2) var(--ease-standard)',
             pointerEvents: 'none',
           }} />
           <span aria-hidden="true" style={{
@@ -276,7 +269,7 @@ function FieldCard({
             width: 14, height: 14, borderRadius: '50%',
             background: '#fff',
             boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-            transition: 'left 180ms cubic-bezier(.2,.8,.2,1)',
+            transition: 'left var(--dur-2) var(--ease-standard)',
             pointerEvents: 'none',
           }} />
         </span>
@@ -307,7 +300,7 @@ function GhostBtn({
         width: 30, height: 30,
         background: 'transparent', border: 'none',
         borderRadius: 999, cursor: disabled ? 'default' : 'pointer',
-        color: disabled ? 'var(--border-strong)' : danger ? 'var(--accent-rose)' : 'var(--text-muted)',
+        color: disabled ? 'var(--border-strong)' : danger ? 'var(--accent-rose-ink)' : 'var(--text-secondary)',
         opacity: disabled ? 0.45 : 1,
       }}
     >

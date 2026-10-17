@@ -1044,3 +1044,73 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes dialog-in { from { opacity: 0; scale: 0.98; } to { opacity: 1; scale: 1; } }
+
+/* ═══ Activity: the all-time card ══════════════════════════════════════════
+   It was a black slab with a lime glow in the corner — the loudest object in
+   the app, on a screen that is only a summary. Now it is one of our posts:
+   the meadow bloom under film grain (.tex supplies the grain), ink type, and
+   the big number drawn LIGHT like a widget's figure. Meadow is soft all
+   over, so ink holds well above 5:1 across the whole card. */
+.activity-hero {
+  --tex-img: url(/textures/meadow.webp);
+  background-color: #DCE8CF;
+  color: var(--text-primary);
+  border-radius: 20px;
+  padding: 18px 18px 16px;
+}
+.activity-hero::after { opacity: 0.5; }
+.activity-hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--text-scale));
+  letter-spacing: 0.08em;
+  opacity: 1;
+  color: rgba(17, 17, 16, 0.72);
+}
+.activity-hero-value {
+  font-size: calc(48px * var(--text-scale));
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+@media (min-width: 1024px) {
+  .activity-hero { border-radius: 20px; }
+  .activity-hero-value { font-size: calc(40px * var(--text-scale)); }
+}
+
+/* ═══ Account: residence and shop choices ══════════════════════════════════
+   The same choice tile as sign-up: a soft fill, and the chosen one turns
+   white with an ink ring. The glyph above the word is a thin House or Bed,
+   not a 🏠 / 🛏️ sticker. */
+.residence-chip {
+  color: var(--text-primary);
+  border: none;
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow var(--dur-2) var(--ease-standard),
+              background-color var(--dur-2) var(--ease-standard),
+              transform var(--dur-1) var(--ease-standard);
+}
+.residence-chip:hover { background: #EEEEEB; }
+.residence-chip:active { transform: scale(0.98); }
+.residence-chip[data-active] { background: #FFFFFF; box-shadow: inset 0 0 0 1.5px var(--ink); }
+
+/* ═══ Filter chips (Marketplace categories) ════════════════════════════════
+   Same rule as .pill: a fill, never an outline, and the chosen one is ink.
+   The lime plate was a third accent on a screen that already had green. */
+.filter-chip {
+  background: var(--bg-inset);
+  border: none;
+  color: var(--text-primary);
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  padding: 8px 14px 8px 11px;
+  gap: 6px;
+  min-height: 36px;
+  transition: background-color var(--dur-2) var(--ease-standard),
+              color var(--dur-2) var(--ease-standard),
+              transform var(--dur-1) var(--ease-standard);
+}
+.filter-chip:hover { background: #ECECE9; }
+.filter-chip:active { transform: scale(var(--press-scale)); }
+.filter-chip.active { background: var(--ink); color: #FFFFFF; border-color: transparent; }
+.filter-chip-ico svg { display: block; }

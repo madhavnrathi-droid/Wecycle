@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { ChevronLeft, Trash2, Check, Loader2 } from '@/lib/icons';
+import { ChevronLeft, Trash2, Check, Loader2, AlertTriangle, AlertCircle } from '@/lib/icons';
 import FormBuilder from './FormBuilder';
 import { lockBodyScroll } from '../../lib/bodyLock';
 import type { FormField } from '../../lib/eventForms';
@@ -110,7 +110,7 @@ export default function FormBuilderScreen({
       <header style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px',
-        borderBottom: '1px solid var(--border-subtle)',
+        borderBottom: '0.5px solid var(--hairline)',
         background: 'var(--bg-base)',
         flexShrink: 0,
       }}>
@@ -135,20 +135,26 @@ export default function FormBuilderScreen({
       {/* ── Scrollable canvas ── */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ maxWidth: 620, margin: '0 auto', padding: '20px 20px 140px' }}>
-          <p style={{ margin: '0 0 18px', fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+          <p style={{ margin: '0 0 20px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.45, letterSpacing: '-0.006em' }}>
             People answer these questions when they RSVP — their responses land
             in your event&rsquo;s Insights.
           </p>
 
           {responseCount > 0 && !loading && (
             <div style={{
-              padding: '10px 14px', marginBottom: 16,
-              background: 'rgba(245,132,0,0.10)',
+              display: 'flex', gap: 10, alignItems: 'flex-start',
+              padding: '12px 14px', marginBottom: 20,
+              background: 'var(--bg-inset)',
               borderRadius: 14,
-              fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.5, color: 'var(--text-primary)',
+              fontSize: 'calc(13px * var(--text-scale))', lineHeight: 1.4, color: 'var(--text-secondary)',
             }}>
-              ⚠️ {responseCount} response{responseCount === 1 ? '' : 's'} already collected.
-              Existing answers keep their values — edits apply to future submissions.
+              <AlertTriangle size={18} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--accent-amber-ink)', marginTop: -1 }} />
+              <span>
+                <strong style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {responseCount} response{responseCount === 1 ? '' : 's'} already collected.
+                </strong>{' '}
+                Existing answers keep their values — edits apply to future submissions.
+              </span>
             </div>
           )}
 
@@ -165,12 +171,14 @@ export default function FormBuilderScreen({
 
           {error && (
             <div role="alert" style={{
-              marginTop: 16, padding: '10px 14px',
-              background: 'rgba(237,46,80,0.10)',
+              display: 'flex', gap: 10, alignItems: 'flex-start',
+              marginTop: 16, padding: '12px 14px',
+              background: 'var(--bg-inset)',
               borderRadius: 14,
-              color: 'var(--accent-rose)', fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500,
+              color: 'var(--accent-rose-ink)', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, lineHeight: 1.4,
             }}>
-              {error}
+              <AlertCircle size={18} aria-hidden="true" style={{ flexShrink: 0, marginTop: -1 }} />
+              <span>{error}</span>
             </div>
           )}
         </div>
@@ -188,9 +196,11 @@ export default function FormBuilderScreen({
           display: 'flex', alignItems: 'center', gap: 8,
           width: '100%', maxWidth: 480,
           padding: 8,
-          background: 'var(--bg-card)',
+          background: 'var(--glass-bg-strong)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          backdropFilter: 'saturate(180%) blur(20px)',
           borderRadius: 999,
-          boxShadow: '0 2px 6px rgba(28,28,26,0.06), 0 12px 36px rgba(28,28,26,0.14)',
+          boxShadow: 'var(--shadow-lg)',
           pointerEvents: 'auto',
         }}>
           {onRemove && (
@@ -203,16 +213,16 @@ export default function FormBuilderScreen({
               style={{
                 width: 44, height: 44, borderRadius: 999, flexShrink: 0,
                 background: 'transparent', border: 'none', cursor: 'pointer',
-                color: 'var(--accent-rose)',
+                color: 'var(--accent-rose-ink)',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Trash2 size={17} strokeWidth={1.9} />
+              <Trash2 size={20} />
             </button>
           )}
           <span style={{
             flex: 1, paddingLeft: onRemove ? 2 : 14,
-            fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 500,
+            fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', fontWeight: 400,
           }}>
             {fields.length} question{fields.length === 1 ? '' : 's'}
           </span>
@@ -222,16 +232,16 @@ export default function FormBuilderScreen({
             disabled={saving || loading}
             style={{
               height: 44, padding: '0 22px', borderRadius: 999,
-              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              background: 'var(--ink)', color: '#FFFFFF',
               border: 'none', cursor: saving ? 'wait' : 'pointer',
-              fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+              fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em',
               display: 'inline-flex', alignItems: 'center', gap: 7,
               fontFamily: 'inherit',
             }}
           >
             {saving
-              ? <><Loader2 size={15} strokeWidth={2.2} className="spin" /> Saving…</>
-              : <><Check size={15} strokeWidth={2.4} /> {saveLabel}</>}
+              ? <><Loader2 size={16} className="spin" /> Saving…</>
+              : <><Check size={16} /> {saveLabel}</>}
           </button>
         </div>
       </div>

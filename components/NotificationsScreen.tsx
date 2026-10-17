@@ -117,10 +117,10 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
             padding: '16px 16px 14px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <Bell size={15} strokeWidth={1.9} aria-hidden="true" />
+              <Bell size={20} aria-hidden="true" />
               <h2 style={{
-                margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-                letterSpacing: '-0.01em', color: 'var(--text-primary)',
+                margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600,
+                letterSpacing: '-0.025em', color: 'var(--text-primary)',
               }}>
                 Want to hear from Wecycle?
               </h2>
@@ -143,9 +143,10 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
                 }}
                 style={{
                   flex: 1, minHeight: 44, cursor: 'pointer',
-                  border: '1px solid var(--border-default)', borderRadius: 12,
-                  background: 'var(--bg-inset)', color: 'var(--text-primary)',
-                  font: 'inherit', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
+                  border: 'none', borderRadius: 12,
+                  background: '#FFFFFF', color: 'var(--text-primary)',
+                  font: 'inherit', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
+                  letterSpacing: '-0.015em',
                 }}
               >
                 Yes, email me
@@ -155,9 +156,10 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
                 onClick={() => { recordNotifAsk('dismissed'); setAsk('dismissed'); }}
                 style={{
                   flex: 1, minHeight: 44, cursor: 'pointer',
-                  border: '1px solid var(--border-default)', borderRadius: 12,
-                  background: 'var(--bg-inset)', color: 'var(--text-primary)',
-                  font: 'inherit', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
+                  border: 'none', borderRadius: 12,
+                  background: '#FFFFFF', color: 'var(--text-primary)',
+                  font: 'inherit', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
+                  letterSpacing: '-0.015em',
                 }}
               >
                 No thanks
@@ -171,7 +173,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
       <Section title="Channels" hint="How you'd like Wecycle to reach you.">
         <Card>
           <ChannelRow
-            icon={<Bell size={15} strokeWidth={1.8} />}
+            icon={<Bell size={20} />}
             title="In-app"
             subtitle="Activity tab + banner toasts"
             on={ch.inApp}
@@ -179,7 +181,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <ChannelRow
-            icon={<Volume2 size={15} strokeWidth={1.8} />}
+            icon={<Volume2 size={20} />}
             title="Sound"
             subtitle="Play a chime with in-app alerts"
             on={ch.sound}
@@ -192,7 +194,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           {pushPerm !== 'unsupported' && (
             <>
               <ChannelRow
-                icon={<Bell size={15} strokeWidth={1.8} />}
+                icon={<Bell size={20} />}
                 title="Push"
                 subtitle={
                   pushPerm === 'granted' ? 'Device alerts even when the app is closed' :
@@ -210,7 +212,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
             </>
           )}
           <ChannelRow
-            icon={<Mail size={15} strokeWidth={1.8} />}
+            icon={<Mail size={20} />}
             title="Email"
             subtitle={hasEmail ? 'Sent to your account email' : 'Add an email to enable'}
             on={ch.email}
@@ -221,7 +223,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <ChannelRow
-            icon={<Phone size={15} strokeWidth={1.8} />}
+            icon={<Phone size={20} />}
             title="SMS"
             subtitle={hasPhone ? 'Text messages to your phone' : 'Add a phone number to enable'}
             on={ch.sms}
@@ -253,21 +255,21 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
                     all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%',
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 12px', borderRadius: 10,
-                    background: settings.notifications.emailFrequency === o.v ? 'var(--bg-inset)' : 'transparent',
+                    background: 'transparent',
                   }}
                 >
                   <span style={{
-                    width: 16, height: 16, borderRadius: '50%',
-                    border: '2px solid ' + (settings.notifications.emailFrequency === o.v ? 'var(--text-primary)' : 'var(--border-default)'),
+                    width: 18, height: 18, borderRadius: '50%',
+                    border: '1.5px solid ' + (settings.notifications.emailFrequency === o.v ? 'var(--ink)' : 'var(--border-strong)'),
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
                   }}>
                     {settings.notifications.emailFrequency === o.v && (
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--text-primary)' }} />
+                      <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--ink)' }} />
                     )}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>{o.label}</div>
+                    <div style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>{o.label}</div>
                     <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>{o.hint}</div>
                   </div>
                 </button>
@@ -281,7 +283,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
       <Section title="What to notify me about" hint="Pick the topics you actually care about.">
         <Card>
           <CategoryRow
-            icon={<MessageSquare size={15} strokeWidth={1.8} />}
+            icon={<MessageSquare size={20} />}
             title="Comments on my posts"
             subtitle="Someone comments on or likes your listing"
             on={cat.comments}
@@ -289,7 +291,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<Reply size={15} strokeWidth={1.8} />}
+            icon={<Reply size={20} />}
             title="Responses to my requests"
             subtitle="A reply comes in on a request you posted"
             on={cat.requestReplies}
@@ -297,7 +299,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<MessageCircle size={15} strokeWidth={1.8} />}
+            icon={<MessageCircle size={20} />}
             title="Direct messages"
             subtitle="Someone wants to swap, request, or chat"
             on={cat.messages}
@@ -305,7 +307,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<Sparkles size={15} strokeWidth={1.8} />}
+            icon={<Sparkles size={20} />}
             title="Saved-search alerts"
             subtitle="A new post matches your saved search keywords"
             on={cat.matches}
@@ -313,7 +315,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<MapPin size={15} strokeWidth={1.8} />}
+            icon={<MapPin size={20} />}
             title="Lost & found nearby"
             subtitle="A new report near you matches your keywords"
             on={cat.lostFound}
@@ -321,7 +323,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<CalendarDays size={15} strokeWidth={1.8} />}
+            icon={<CalendarDays size={20} />}
             title="Events near me"
             subtitle="Day-of nudges for events you RSVP'd to"
             on={cat.events}
@@ -329,7 +331,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<Store size={15} strokeWidth={1.8} />}
+            icon={<Store size={20} />}
             title="Marketplace activity"
             subtitle="Price drops + reposts on items you saved"
             on={cat.marketplace}
@@ -337,7 +339,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<Megaphone size={15} strokeWidth={1.8} />}
+            icon={<Megaphone size={20} />}
             title="Community announcements"
             subtitle="From your community admins"
             on={cat.community}
@@ -345,7 +347,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<ShieldCheck size={15} strokeWidth={1.8} />}
+            icon={<ShieldCheck size={20} />}
             title="Account & security"
             subtitle="Sign-ins, password changes, suspicious activity"
             on={cat.accountSecurity}
@@ -353,7 +355,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
           />
           <Divider />
           <CategoryRow
-            icon={<Newspaper size={15} strokeWidth={1.8} />}
+            icon={<Newspaper size={20} />}
             title="Weekly digest"
             subtitle="A recap of what's circulating each week"
             on={cat.digest}
@@ -373,7 +375,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
               <Divider />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>From</div>
+                  <div style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>From</div>
                   <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>Start of quiet window</div>
                 </div>
                 <input
@@ -387,7 +389,7 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
               <Divider />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)' }}>To</div>
+                  <div style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>To</div>
                   <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>End of quiet window</div>
                 </div>
                 <input
@@ -405,22 +407,17 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
 
       {(!hasEmail || !hasPhone) && (
         <div style={{ padding: '0 20px 24px' }}>
-          <div style={{
-            display: 'flex', gap: 10,
-            padding: 12, borderRadius: 12,
-            background: 'var(--bg-inset)',
-            border: '1px dashed var(--border-default)',
-          }}>
-            <Info size={14} strokeWidth={1.8} color="var(--text-secondary)" style={{ flexShrink: 0, marginTop: 2 }} />
-            <div style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+          {/* A footnote, not a box: the glyph and the words are enough. */}
+          <div style={{ display: 'flex', gap: 10, padding: '0 4px' }}>
+            <Info size={18} color="var(--text-secondary)" style={{ flexShrink: 0, marginTop: 0 }} />
+            <div style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
               Add {[!hasEmail && 'an email', !hasPhone && 'a phone number'].filter(Boolean).join(' and ')}
               {' '}in your Account to unlock {!hasEmail && !hasPhone ? 'email and SMS' : !hasEmail ? 'email' : 'SMS'} notifications.
               <button
                 onClick={onOpenAccount}
                 style={{
                   all: 'unset', boxSizing: 'border-box', cursor: 'pointer', marginLeft: 6,
-                  color: 'var(--text-primary)', fontWeight: 600,
-                  textDecoration: 'underline',
+                  color: 'var(--brand-ink)', fontWeight: 500,
                 }}
               >
                 Open account
@@ -432,10 +429,11 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
 
       <style jsx>{`
         .notif-btn-primary {
-          background: var(--text-primary);
-          color: var(--bg-base);
+          background: var(--ink);
+          color: #FFFFFF;
           border: none; border-radius: 999px;
-          padding: 6px 12px; font-size: 12px; font-weight: 600;
+          padding: 7px 14px; font-size: calc(13px * var(--text-scale)); font-weight: 600;
+          letter-spacing: -0.006em;
           cursor: pointer;
         }
       `}</style>
@@ -485,14 +483,15 @@ function Card({ children }: { children: React.ReactNode }) {
 }
 
 function Divider() {
-  return <div style={{ height: 1, background: 'var(--border-default)', opacity: 0.6, marginLeft: 56 }} />;
+  /* Inset to the text, past the glyph — the iOS grouped-list rule. */
+  return <div style={{ height: 0.5, background: 'var(--hairline)', marginLeft: 56 }} />;
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: 52 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
           {label}
         </div>
         {hint && (
@@ -524,15 +523,14 @@ function ChannelRow({ icon, title, subtitle, on, onChange, disabled, disabledHin
       padding: '12px 16px', opacity: disabled ? 0.7 : 1,
     }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 10,
-        background: 'var(--bg-inset)',
+        width: 28, height: 28,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: 'var(--text-primary)', flexShrink: 0,
       }}>
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
           {title}
         </div>
         {subtitle && (
@@ -550,10 +548,11 @@ function ChannelRow({ icon, title, subtitle, on, onChange, disabled, disabledHin
       )}
       <style jsx>{`
         .notif-btn-primary {
-          background: var(--text-primary);
-          color: var(--bg-base);
+          background: var(--ink);
+          color: #FFFFFF;
           border: none; border-radius: 999px;
-          padding: 6px 12px; font-size: 12px; font-weight: 600;
+          padding: 7px 14px; font-size: calc(13px * var(--text-scale)); font-weight: 600;
+          letter-spacing: -0.006em;
           cursor: pointer;
         }
       `}</style>
@@ -571,15 +570,14 @@ function CategoryRow({ icon, title, subtitle, on, onChange }: {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 10,
-        background: 'var(--bg-inset)',
+        width: 28, height: 28,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'var(--text-secondary)', flexShrink: 0,
+        color: 'var(--text-primary)', flexShrink: 0,
       }}>
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
           {title}
         </div>
         {subtitle && (

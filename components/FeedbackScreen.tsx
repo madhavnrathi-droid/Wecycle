@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Send, Heart, EyeOff, Eye, Sparkles } from '@/lib/icons';
+import {
+  ChevronLeft, Send, Heart, EyeOff, Eye, Sparkles,
+  Bug, Lightbulb, Palette, SmileyMeh, Mail, type LucideIcon,
+} from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { Toggle } from './SettingsScreen';
 
@@ -13,15 +16,16 @@ const FEEDBACK_EMAIL = 'wecycle.page@gmail.com';
 const FEEDBACK_SUBJECT = 'Feedback For Wecycle';
 
 /* Optional tag chips — they help users start typing. Tag selection is
-   prepended to the body so we can route feedback even from anonymous senders. */
-const TAGS = [
-  { id: 'bug',       label: 'Bug', emoji: '🐛' },
-  { id: 'idea',      label: 'Feature idea', emoji: '💡' },
-  { id: 'design',    label: 'Design', emoji: '🎨' },
-  { id: 'love',      label: 'Praise', emoji: '💚' },
-  { id: 'confused',  label: 'Confused', emoji: '🤔' },
-  { id: 'other',     label: 'Other', emoji: '✉️' },
-] as const;
+   prepended to the body so we can route feedback even from anonymous senders.
+   Each is named by a thin glyph rather than an emoji. */
+const TAGS: ReadonlyArray<{ id: string; label: string; icon: LucideIcon }> = [
+  { id: 'bug',       label: 'Bug', icon: Bug },
+  { id: 'idea',      label: 'Feature idea', icon: Lightbulb },
+  { id: 'design',    label: 'Design', icon: Palette },
+  { id: 'love',      label: 'Praise', icon: Heart },
+  { id: 'confused',  label: 'Confused', icon: SmileyMeh },
+  { id: 'other',     label: 'Other', icon: Mail },
+];
 
 export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
   const { user, profile } = useAuth();
@@ -105,26 +109,15 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
 
       {/* ── Intro ── */}
       <section style={{ padding: '18px 20px 4px' }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '4px 10px',
-          background: 'var(--bg-inset)',
-          borderRadius: 999,
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
-          color: 'var(--text-secondary)',
-          letterSpacing: '0.02em',
-        }}>
-          <Sparkles size={11} strokeWidth={1.8} /> We read every note
+        <div className="t-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Sparkles size={13} /> We read every note
         </div>
-        <h2 style={{
-          margin: '10px 0 4px',
-          fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
-          letterSpacing: '-0.025em', color: 'var(--text-primary)',
-        }}>
+        <h2 className="t-title1" style={{ margin: '8px 0 6px', color: 'var(--text-primary)' }}>
           Help shape Wecycle
         </h2>
         <p style={{
-          margin: 0, fontSize: 'calc(14px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5,
+          margin: 0, fontSize: 'calc(15px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.4,
+          letterSpacing: '-0.015em',
         }}>
           Bugs, half-baked ideas, things that confused you — drop them below.
           Your default mail app opens with everything pre-filled; just hit send.
@@ -132,35 +125,23 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
       </section>
 
       {/* ── Tags ── */}
-      <section style={{ padding: '14px 20px 4px' }}>
-        <div style={{
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
-          letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-          color: 'var(--text-secondary)',
-          marginBottom: 8,
-        }}>
+      <section style={{ padding: '24px 20px 4px' }}>
+        <div className="t-label" style={{ marginBottom: 10 }}>
           What's this about?
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {TAGS.map(t => {
             const active = tag === t.id;
+            const Icon = t.icon;
             return (
               <button
                 key={t.id}
                 onClick={() => setTag(active ? '' : t.id)}
-                style={{
-                  all: 'unset', boxSizing: 'border-box', cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '5px 11px',
-                  fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
-                  borderRadius: 999,
-                  border: '1px solid ' + (active ? 'var(--text-primary)' : 'var(--border-default)'),
-                  background: active ? 'var(--text-primary)' : 'transparent',
-                  color: active ? 'var(--bg-base)' : 'var(--text-primary)',
-                  transition: 'all 0.15s',
-                }}
+                aria-pressed={active}
+                className={`pill ${active ? 'pill-active' : ''}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingLeft: 12 }}
               >
-                <span aria-hidden="true">{t.emoji}</span> {t.label}
+                <Icon size={16} aria-hidden="true" weight={active ? 'regular' : undefined} /> {t.label}
               </button>
             );
           })}
@@ -168,7 +149,7 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
       </section>
 
       {/* ── Textarea ── */}
-      <section style={{ padding: '14px 20px 4px' }}>
+      <section style={{ padding: '20px 20px 4px' }}>
         <div style={{
           background: 'var(--bg-inset)',
           border: 'none',
@@ -195,17 +176,17 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginTop: 10, paddingTop: 10,
-            borderTop: '1px solid var(--border-default)',
+            borderTop: '0.5px solid var(--hairline)',
           }}>
-            <div style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
+            <div className="t-label" style={{ fontSize: 'calc(10.5px * var(--text-scale))', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
               {charCount} / {MAX_CHARS}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)', fontWeight: 500,
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', fontWeight: 400,
               }}>
-                {anonymous ? <EyeOff size={12} /> : <Eye size={12} />}
+                {anonymous ? <EyeOff size={16} /> : <Eye size={16} />}
                 Send anonymously
               </span>
               <Toggle on={anonymous} onChange={setAnonymous} />
@@ -238,15 +219,15 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
             all: 'unset', cursor: canSend ? 'pointer' : 'not-allowed',
             width: '100%', boxSizing: 'border-box',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '14px 20px', borderRadius: 14,
-            background: canSend ? 'var(--text-primary)' : 'var(--bg-inset)',
-            color: canSend ? 'var(--bg-base)' : 'var(--text-muted)',
-            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-            letterSpacing: '-0.01em',
-            transition: 'background 0.18s',
+            padding: '14px 20px', borderRadius: 999,
+            background: canSend ? 'var(--ink)' : 'var(--bg-inset)',
+            color: canSend ? '#FFFFFF' : 'var(--text-muted)',
+            fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600,
+            letterSpacing: '-0.025em',
+            transition: 'background-color var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard)',
           }}
         >
-          <Send size={15} strokeWidth={2} />
+          <Send size={18} />
           {justSent ? 'Mail app opened — hit send to deliver' : 'Open mail to send'}
         </button>
         <p style={{
@@ -258,32 +239,20 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
         </p>
       </section>
 
-      {/* ── Thank-you note ── */}
-      <section style={{ padding: '24px 20px 0' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, color-mix(in oklab, var(--accent-rose) 12%, var(--bg-card)) 0%, var(--bg-card) 100%)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 16,
-          padding: 18,
-          display: 'flex', gap: 12,
-        }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: 12,
-            background: 'color-mix(in oklab, var(--accent-rose) 18%, var(--bg-card))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--accent-rose-ink)', flexShrink: 0,
-          }}>
-            <Heart size={18} strokeWidth={2} />
-          </div>
+      {/* ── Thank-you note — a glyph and a paragraph, set apart by space ── */}
+      <section style={{ padding: '36px 20px 0' }}>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Heart size={22} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--accent-rose-ink)', marginTop: -1 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={{
-              margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-              letterSpacing: '-0.015em', color: 'var(--text-primary)',
+              margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600,
+              letterSpacing: '-0.025em', color: 'var(--text-primary)',
             }}>
               Thanks for taking the time
             </h3>
             <p style={{
-              margin: '6px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5,
+              margin: '4px 0 0', fontSize: 'calc(15px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.4,
+              letterSpacing: '-0.015em',
             }}>
               Wecycle gets better because people like you tell us when things feel off.
               Every note lands in our inbox and we reply to most within 48 hours.

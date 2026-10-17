@@ -3,7 +3,7 @@
 import { isBusinessRole, cleanShopName, shopFields, SHOP_NAME_MAX } from '../lib/shops';
 import { brandForUser } from '../lib/brands';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home, Loader2 } from '@/lib/icons';
+import { ChevronLeft, Check, LogOut, Home, Bed, Loader2 } from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { updateDemoSession, type Residence } from '../lib/demoAuth';
 import { COLLEGES, normalizeCollege } from '../lib/colleges';
@@ -385,12 +385,12 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
             whiteSpace: 'nowrap',
             fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
             color:
-              saveStatus === 'saved'   ? 'var(--accent-mint, #22C55E)' :
+              saveStatus === 'saved'   ? 'var(--brand-ink)'            :
               saveStatus === 'error'   ? 'var(--accent-rose)'          :
               saveStatus === 'saving'  ? 'var(--text-muted)'           :
                                          'var(--text-muted)',
             opacity: saveStatus === 'idle' ? 0 : 1,
-            transition: 'opacity 200ms ease',
+            transition: 'opacity var(--dur-3) var(--ease-standard)',
             letterSpacing: '-0.01em',
             paddingRight: 8,
           }}
@@ -420,7 +420,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
               width: 64, height: 64, borderRadius: '50%',
-              background: (profile?.avatar_color ?? '#6C63FF'),
+              background: (profile?.avatar_color ?? 'var(--text-secondary)'),
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em',
               flexShrink: 0,
@@ -465,7 +465,6 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div className="field">
               <label htmlFor="acc-email" className="field-label">
-                <Mail size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 Email <span className="required" aria-hidden="true">*</span>
               </label>
               <input
@@ -486,7 +485,6 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
             </div>
             <div className="field">
               <label htmlFor="acc-collegeid" className="field-label">
-                <IdCard size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 College ID <span className="required" aria-hidden="true">*</span>
               </label>
               <input
@@ -506,15 +504,15 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
 
           <div className="field">
             <label htmlFor="acc-phone" className="field-label">
-              <Phone size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
               Phone <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
             </label>
             <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center',
-                padding: '0 12px', borderRadius: 'var(--radius-md)',
-                background: 'var(--bg-inset)', border: '1px solid var(--border-default)',
-                fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
+                padding: '0 14px', borderRadius: 12,
+                background: 'var(--bg-inset)', border: 'none',
+                fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500, color: 'var(--text-secondary)',
+                fontVariantNumeric: 'tabular-nums',
                 whiteSpace: 'nowrap',
               }}>
                 +91
@@ -545,7 +543,6 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10 }}>
             <div className="field">
               <label htmlFor="acc-year" className="field-label">
-                <GraduationCap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 Grad. year
               </label>
               <input
@@ -581,7 +578,6 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           {nmims ? (
             <div className="field">
               <span className="field-label">
-                <Building2 size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 Campus
               </span>
               <div className="form-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }} aria-readonly="true">
@@ -594,7 +590,6 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           ) : (
           <div className="field">
             <label htmlFor="acc-college" className="field-label">
-              <Building2 size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
               College
             </label>
             <select
@@ -616,7 +611,6 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
           {/* Residence as visual chips */}
           <div>
             <label className="field-label" style={{ display: 'block', marginBottom: 6 }}>
-              <Home size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
               Residence
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -631,10 +625,10 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                     className="residence-chip"
                     data-active={active || undefined}
                   >
-                    <span style={{ fontSize: 'calc(18px * var(--text-scale))', marginBottom: 4 }} aria-hidden="true">
-                      {opt === 'day_scholar' ? '🏠' : '🛏️'}
-                    </span>
-                    <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {opt === 'day_scholar'
+                      ? <Home size={24} aria-hidden="true" weight={active ? 'regular' : undefined} style={{ marginBottom: 4 }} />
+                      : <Bed size={24} aria-hidden="true" weight={active ? 'regular' : undefined} style={{ marginBottom: 4 }} />}
+                    <span style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
                       {opt === 'day_scholar' ? 'Day scholar' : 'Hosteler'}
                     </span>
                   </button>
@@ -670,7 +664,7 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
                   className="residence-chip"
                   data-active={active || undefined}
                 >
-                  <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <span style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
                     {label}
                   </span>
                 </button>
@@ -698,12 +692,12 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         {error && (
           <div role="alert" style={{
             margin: '0 20px 16px',
-            padding: '10px 12px',
-            background: 'rgba(237,46,80,0.10)',
-            border: '1px solid rgba(237,46,80,0.25)',
-            borderRadius: 'var(--radius-md)',
+            padding: '12px 14px',
+            background: 'var(--bg-inset)',
+            border: 'none',
+            borderRadius: 14,
             color: 'var(--accent-rose-ink)',
-            fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
+            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, lineHeight: 1.4,
           }}>
             {error}
           </div>
@@ -717,15 +711,15 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
             onClick={handleSignOut}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'transparent', border: '1px solid var(--border-default)',
+              background: 'var(--bg-inset)', border: 'none',
               borderRadius: 999,
-              padding: '10px 16px',
-              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500,
+              padding: '11px 18px',
+              fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500, letterSpacing: '-0.015em',
               color: 'var(--accent-rose-ink)',
               cursor: 'pointer',
             }}
           >
-            <LogOut size={14} strokeWidth={1.8} />
+            <LogOut size={18} />
             Sign out
           </button>
         </section>
@@ -744,26 +738,17 @@ function Section({ title, hint, required, children }: {
     <section style={{ padding: '4px 20px 24px' }}>
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <h3 style={{
-            margin: 0,
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
-            letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-            color: 'var(--text-secondary)',
-          }}>
+          <h3 className="t-label" style={{ margin: 0 }}>
             {title}
           </h3>
           {required && (
-            <span style={{
-              fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
-              color: 'var(--accent-rose-ink)',
-              letterSpacing: '0.02em',
-            }}>
+            <span className="t-label" style={{ fontSize: 'calc(10px * var(--text-scale))', color: 'var(--accent-rose-ink)' }}>
               required
             </span>
           )}
         </div>
         {hint && (
-          <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
             {hint}
           </p>
         )}

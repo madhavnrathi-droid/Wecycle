@@ -4,6 +4,7 @@ import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, Bookmark, Share2, MessageCircle, Plus, Bell,
   Clock, IndianRupee, MapPin, MoreHorizontal, Users, CalendarDays,
+  Package, Tray, type LucideIcon,
 } from '@/lib/icons';
 import {
   MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS,
@@ -151,29 +152,28 @@ function StatsTab({
     <div>
       {/* Hero stat block */}
       <section style={{ padding: '0 16px 18px' }}>
-        <div className="activity-hero">
-          <div className="activity-hero-bg" />
+        <div className="activity-hero tex">
           <div className="activity-hero-headline">
             <p className="activity-hero-eyebrow">All time</p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
               <span className="activity-hero-value">
                 {summary.totalViews.toLocaleString()}
               </span>
-              <span style={{ fontSize: 'calc(14px * var(--text-scale))', opacity: 0.7 }}>views</span>
+              <span style={{ fontSize: 'calc(15px * var(--text-scale))', color: 'rgba(17, 17, 16, 0.72)' }}>views</span>
             </div>
           </div>
 
           <div className="activity-hero-metrics">
-            <MiniMetric icon={<Bookmark size={13} strokeWidth={1.8} />} label="Saves" value={summary.totalSaves} />
-            <MiniMetric icon={<Share2 size={13} strokeWidth={1.8} />} label="Shares" value={summary.totalShares} />
-            <MiniMetric icon={<MessageCircle size={13} strokeWidth={1.8} />} label="Inquiries" value={summary.totalInquiries} />
+            <MiniMetric icon={<Bookmark size={14} />} label="Saves" value={summary.totalSaves} />
+            <MiniMetric icon={<Share2 size={14} />} label="Shares" value={summary.totalShares} />
+            <MiniMetric icon={<MessageCircle size={14} />} label="Inquiries" value={summary.totalInquiries} />
           </div>
         </div>
       </section>
 
       {/* Summary line */}
       <section style={{ padding: '0 20px 14px' }}>
-        <p style={{ margin: 0, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.4 }}>
           Across <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
             {summary.itemCount} {summary.itemCount === 1 ? 'item' : 'items'}
           </strong> and <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -192,11 +192,7 @@ function StatsTab({
       {myItems.length > 0 && (
         <>
           <section style={{ padding: '6px 20px 12px' }}>
-            <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
-              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-              color: 'var(--text-secondary)',
-            }}>
+            <h3 className="t-label" style={{ margin: 0 }}>
               Your posts
             </h3>
           </section>
@@ -213,11 +209,7 @@ function StatsTab({
       {myEvents.length > 0 && (
         <>
           <section style={{ padding: '16px 20px 12px' }}>
-            <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
-              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-              color: 'var(--text-secondary)',
-            }}>
+            <h3 className="t-label" style={{ margin: 0 }}>
               Your events
             </h3>
           </section>
@@ -232,11 +224,11 @@ function StatsTab({
 
       {myItems.length === 0 && myEvents.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-          <div style={{ fontSize: 'calc(32px * var(--text-scale))', marginBottom: 8 }}>📦</div>
-          <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <Package size={36} aria-hidden="true" style={{ display: 'block', margin: '0 auto 10px', color: 'var(--text-secondary)' }} />
+          <p style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.025em', color: 'var(--text-primary)' }}>
             Nothing posted yet
           </p>
-          <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'calc(15px * var(--text-scale))', color: 'var(--text-muted)', letterSpacing: '-0.015em' }}>
             Share an item or host an event to see metrics here.
           </p>
         </div>
@@ -250,13 +242,12 @@ function MiniMetric({
 }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: 0.7, fontSize: 'calc(11px * var(--text-scale))' }}>
+      <div className="t-label" style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(17, 17, 16, 0.72)' }}>
         {icon}
         <span>{label}</span>
       </div>
-      <p style={{
-        margin: '2px 0 0', fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
-        letterSpacing: '-0.025em', fontVariantNumeric: 'tabular-nums',
+      <p className="t-figure" style={{
+        margin: '2px 0 0', fontSize: 'calc(24px * var(--text-scale))', lineHeight: 1.15,
       }}>
         {value.toLocaleString()}
       </p>
@@ -276,7 +267,7 @@ function PostMetricsRow({ item }: { item: MarketplaceItem }) {
     <div style={{
       display: 'flex', gap: 12,
       padding: '14px 20px',
-      borderTop: '1px solid var(--border-subtle)',
+      borderTop: '0.5px solid var(--hairline)',
     }}>
       <div style={{
         width: 56, height: 56, borderRadius: 12,
@@ -290,29 +281,29 @@ function PostMetricsRow({ item }: { item: MarketplaceItem }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
-          margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
+          margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500,
           color: 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          letterSpacing: '-0.01em',
+          letterSpacing: '-0.015em',
         }}>
           {item.title}
         </p>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
           marginTop: 6,
-          fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
+          fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums',
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Eye size={11} strokeWidth={1.8} /> {m.views}
+            <Eye size={14} /> {m.views}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Bookmark size={11} strokeWidth={1.8} /> {m.saves}
+            <Bookmark size={14} /> {m.saves}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Share2 size={11} strokeWidth={1.8} /> {m.shares}
+            <Share2 size={14} /> {m.shares}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <MessageCircle size={11} strokeWidth={1.8} /> {m.inquiries}
+            <MessageCircle size={14} /> {m.inquiries}
           </span>
         </div>
       </div>
@@ -327,7 +318,7 @@ function EventMetricsRow({ event }: { event: CommunityEvent }) {
     <div style={{
       display: 'flex', gap: 12,
       padding: '14px 20px',
-      borderTop: '1px solid var(--border-subtle)',
+      borderTop: '0.5px solid var(--hairline)',
     }}>
       <div style={{
         width: 56, height: 56, borderRadius: 12,
@@ -346,39 +337,39 @@ function EventMetricsRow({ event }: { event: CommunityEvent }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           backdropFilter: 'blur(4px)',
         }}>
-          <CalendarDays size={10} strokeWidth={2} />
+          <CalendarDays size={12} />
         </span>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
-          margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
+          margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500,
           color: 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          letterSpacing: '-0.01em',
+          letterSpacing: '-0.015em',
         }}>
           {event.title}
         </p>
         <p style={{
-          margin: '2px 0 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
+          margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
         }}>
           {event.date}
         </p>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
           marginTop: 6,
-          fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
+          fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums',
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Eye size={11} strokeWidth={1.8} /> {m.views}
+            <Eye size={14} /> {m.views}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Users size={11} strokeWidth={1.8} /> {m.rsvps}
+            <Users size={14} /> {m.rsvps}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <Share2 size={11} strokeWidth={1.8} /> {m.shares}
+            <Share2 size={14} /> {m.shares}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <MessageCircle size={11} strokeWidth={1.8} /> {m.questions}
+            <MessageCircle size={14} /> {m.questions}
           </span>
         </div>
       </div>
@@ -411,19 +402,12 @@ function AlertsTab({
           padding: 14,
           display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: 'rgba(168,221,0,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--accent-lime-ink)', flexShrink: 0,
-          }}>
-            <Bell size={18} strokeWidth={1.8} />
-          </div>
+          <Bell size={24} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--brand)', marginLeft: 2 }} />
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <p style={{ margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
               Catch the next match
             </p>
-            <p style={{ margin: '2px 0 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
               We'll ping you when someone posts what you need.
             </p>
           </div>
@@ -431,15 +415,15 @@ function AlertsTab({
             onClick={onCreate}
             aria-label="Create alert"
             style={{
-              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              background: 'var(--ink)', color: '#FFFFFF',
               border: 'none', borderRadius: 999,
               padding: '8px 14px',
-              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
+              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              letterSpacing: '-0.01em', flexShrink: 0,
+              letterSpacing: '-0.006em', flexShrink: 0,
             }}
           >
-            <Plus size={13} strokeWidth={2.5} /> New
+            <Plus size={14} weight="regular" /> New
           </button>
         </div>
       </section>
@@ -448,11 +432,7 @@ function AlertsTab({
       {active.length > 0 ? (
         <>
           <section style={{ padding: '4px 20px 10px' }}>
-            <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
-              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-              color: 'var(--text-secondary)',
-            }}>
+            <h3 className="t-label" style={{ margin: 0 }}>
               Active
             </h3>
           </section>
@@ -462,11 +442,11 @@ function AlertsTab({
         </>
       ) : (
         <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-          <div style={{ fontSize: 'calc(32px * var(--text-scale))', marginBottom: 8 }}>🔔</div>
-          <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <Bell size={36} aria-hidden="true" style={{ display: 'block', margin: '0 auto 10px', color: 'var(--text-secondary)' }} />
+          <p style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.025em', color: 'var(--text-primary)' }}>
             No active alerts
           </p>
-          <p style={{ margin: '4px 0 16px', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 18px', fontSize: 'calc(15px * var(--text-scale))', color: 'var(--text-muted)', letterSpacing: '-0.015em', lineHeight: 1.35 }}>
             Create one to be the first to know when someone uploads it.
           </p>
           <button
@@ -474,7 +454,7 @@ function AlertsTab({
             className="btn btn-primary btn-sm"
             style={{ gap: 6 }}
           >
-            <Plus size={13} strokeWidth={2.5} /> Create alert
+            <Plus size={14} weight="regular" /> Create alert
           </button>
         </div>
       )}
@@ -483,11 +463,7 @@ function AlertsTab({
       {recent.length > 0 && (
         <>
           <section style={{ padding: '24px 20px 10px' }}>
-            <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
-              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-              color: 'var(--text-muted)',
-            }}>
+            <h3 className="t-label" style={{ margin: 0, color: 'var(--text-muted)' }}>
               Recently expired
             </h3>
           </section>
@@ -518,20 +494,15 @@ function AlertCard({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <span style={{
+            <span className="t-label" style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '3px 8px',
-              background: isExpired ? 'var(--bg-inset)' : 'rgba(168,221,0,0.15)',
-              color: isExpired ? 'var(--text-muted)' : 'var(--accent-lime-ink)',
-              borderRadius: 999,
-              fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+              fontSize: 'calc(10px * var(--text-scale))',
+              color: isExpired ? 'var(--text-muted)' : 'var(--brand-ink)',
             }}>
-              <Clock size={10} strokeWidth={2} />
+              <Clock size={12} />
               {isExpired ? 'Expired' : remaining}
             </span>
-            <span style={{
-              fontSize: 'calc(10px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 500,
-            }}>
+            <span className="t-label" style={{ fontSize: 'calc(10px * var(--text-scale))', color: 'var(--text-muted)' }}>
               · {alert.category}
             </span>
           </div>
@@ -543,7 +514,7 @@ function AlertCard({
             {alert.title}
           </h4>
           <p style={{
-            margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)',
+            margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)',
             lineHeight: 1.4,
             display: '-webkit-box', WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -552,20 +523,20 @@ function AlertCard({
           </p>
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: 10,
-            marginTop: 8, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
+            marginTop: 8, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
           }}>
             {alert.maxPrice && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                <IndianRupee size={10} strokeWidth={2} /> up to {alert.maxPrice}
+                <IndianRupee size={13} /> up to {alert.maxPrice}
               </span>
             )}
             {alert.locationPref && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                <MapPin size={10} strokeWidth={2} /> {alert.locationPref}
+                <MapPin size={13} /> {alert.locationPref}
               </span>
             )}
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <Bell size={10} strokeWidth={2} /> notify via {alert.notify}
+              <Bell size={13} /> notify via {alert.notify}
             </span>
           </div>
         </div>
@@ -578,7 +549,7 @@ function AlertCard({
             borderRadius: 8,
           }}
         >
-          <MoreHorizontal size={16} strokeWidth={1.8} />
+          <MoreHorizontal size={20} />
         </button>
       </div>
     </article>
@@ -597,8 +568,15 @@ interface InboxItem {
   timeAgo: string;
   ref?: { type: 'alert' | 'listing'; id: string };
   unread?: boolean;
-  emoji: string;
 }
+
+/* What each notification is, as a thin glyph. */
+const INBOX_GLYPH: Record<InboxItem['kind'], LucideIcon> = {
+  alert_match: Bell,
+  alert_expired: Clock,
+  item_saved: Bookmark,
+  item_messaged: MessageCircle,
+};
 
 function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: MarketplaceItem[] }) {
   /* Build a deterministic mock feed: real expired-alert entries +
@@ -618,7 +596,6 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
         timeAgo: timeRemaining(a.expiresAt).replace('Expired', 'Just now'),
         ref: { type: 'alert', id: a.id },
         unread: true,
-        emoji: '⏰',
       });
     });
 
@@ -632,7 +609,6 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
         timeAgo: i === 0 ? '12m ago' : '1h ago',
         ref: { type: 'listing', id: item.id },
         unread: i === 0,
-        emoji: '🔖',
       });
     });
     if (myItems[0]) {
@@ -643,7 +619,6 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
         body: `Someone asked about "${myItems[0].title}".`,
         timeAgo: '3h ago',
         ref: { type: 'listing', id: myItems[0].id },
-        emoji: '💬',
       });
     }
 
@@ -653,11 +628,11 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
   if (inbox.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-        <div style={{ fontSize: 'calc(32px * var(--text-scale))', marginBottom: 8 }}>📭</div>
-        <p style={{ margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <Tray size={36} aria-hidden="true" style={{ display: 'block', margin: '0 auto 10px', color: 'var(--text-secondary)' }} />
+        <p style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.025em', color: 'var(--text-primary)' }}>
           Inbox is quiet
         </p>
-        <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+        <p style={{ margin: '4px 0 0', fontSize: 'calc(15px * var(--text-scale))', color: 'var(--text-muted)', letterSpacing: '-0.015em', lineHeight: 1.35 }}>
           Notifications about matches, saves and messages show up here.
         </p>
       </div>
@@ -666,7 +641,9 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
 
   return (
     <div>
-      {inbox.map((n, i) => (
+      {inbox.map((n, i) => {
+        const Glyph = INBOX_GLYPH[n.kind];
+        return (
         <button
           key={n.id}
           type="button"
@@ -674,43 +651,37 @@ function InboxTab({ alerts, myItems }: { alerts: WecycleAlert[]; myItems: Market
             width: '100%',
             display: 'flex', gap: 12, alignItems: 'flex-start',
             padding: '14px 20px',
-            background: n.unread ? 'rgba(168,221,0,0.05)' : 'transparent',
+            background: 'transparent',
             border: 'none',
-            borderTop: i === 0 ? '1px solid var(--border-subtle)' : undefined,
-            borderBottom: '1px solid var(--border-subtle)',
+            borderTop: i === 0 ? '0.5px solid var(--hairline)' : undefined,
+            borderBottom: '0.5px solid var(--hairline)',
             cursor: 'pointer', textAlign: 'left',
             fontFamily: 'inherit',
           }}
         >
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'var(--bg-inset)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 'calc(17px * var(--text-scale))', flexShrink: 0,
-          }}>
-            {n.emoji}
-          </div>
-          <div style={{ flex: 1, minWidth: 0, lineHeight: 1.4 }}>
-            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <Glyph size={24} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-primary)', marginTop: 1 }} />
+          <div style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>
+            <p style={{ margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: n.unread ? 600 : 500, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
               {n.title}
               {n.unread && (
                 <span style={{
                   display: 'inline-block', verticalAlign: 'middle',
                   width: 6, height: 6, borderRadius: '50%',
-                  background: 'var(--accent-lime-dim)',
+                  background: 'var(--brand)',
                   marginLeft: 6,
                 }} aria-hidden="true" />
               )}
             </p>
-            <p style={{ margin: '2px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)' }}>
               {n.body}
             </p>
-            <p style={{ margin: '4px 0 0', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
+            <p style={{ margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
               {n.timeAgo}
             </p>
           </div>
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

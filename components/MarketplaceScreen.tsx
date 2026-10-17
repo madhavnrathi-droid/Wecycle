@@ -5,26 +5,67 @@ import { matchesCategoryFilter } from '../lib/categories';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search, SlidersHorizontal, Heart, MapPin, MessageCircle,
-  X, Check, ArrowUpDown, Grid3X3, List, Clock, ArrowRight,
+  X, Check, ArrowUpDown, Grid3X3, List, Clock, ArrowRight, ShoppingBag, Package,
 } from '@/lib/icons';
 import { MARKETPLACE_ITEMS, CATEGORIES, LISTING_TYPES, type MarketplaceItem } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
+import { resolveItemMedia } from '../lib/photos';
 import EmptyState from './EmptyState';
+import NoPhoto from './NoPhoto';
 
 type ViewMode = 'grid' | 'list';
 
-const TYPE_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-  free:   { label: 'Free',   bg: 'rgba(34,197,94,0.92)',   color: '#fff' },
-  borrow: { label: 'Borrow', bg: 'rgba(139,133,255,0.92)', color: '#fff' },
-  swap:   { label: 'Swap',   bg: 'rgba(61,214,245,0.92)',  color: '#0C0C0B' },
-  sell:   { label: 'Sell',   bg: 'rgba(255,154,64,0.92)',  color: '#0C0C0B' },
+/* A listing's kind is a word with a dot of colour, on a frosted label — the
+   badge every other card wears (.pcard-badge). Four filled pills in four
+   colours made each photo compete with its own price tag. */
+const TYPE_CONFIG: Record<string, { label: string; dot: string }> = {
+  free:   { label: 'Free',   dot: 'var(--status-free)' },
+  borrow: { label: 'Borrow', dot: 'var(--status-opportunity)' },
+  swap:   { label: 'Swap',   dot: 'var(--status-event)' },
+  sell:   { label: 'Sell',   dot: 'var(--ink)' },
 };
 
 const CONDITION_LABEL: Record<string, string> = {
-  like_new: '✦ Like New',
+  like_new: 'Like new',
   good: 'Good',
   fair: 'Fair',
 };
+
+/* The listing's own first photo (a video's poster), or nothing — in which
+   case the card shows the honest "No photo" placeholder, never an emoji. */
+function photoOf(item: MarketplaceItem): string | undefined {
+  const first = resolveItemMedia(item)[0];
+  return typeof first === 'string' ? first : (first?.poster ?? first?.src);
+}
+
+function Photo({ item }: { item: MarketplaceItem }) {
+  const src = photoOf(item);
+  return src
+    ? <img src={src} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+    : <NoPhoto />;
+}
+
+/* Frosted price/kind label for a photo. */
+function KindLabel({ item, large }: { item: MarketplaceItem; large?: boolean }) {
+  const tc = TYPE_CONFIG[item.listingType];
+  const priced = item.listingType === 'sell';
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: large ? '7px 12px 7px 10px' : '4px 9px 4px 8px',
+      borderRadius: 'var(--radius-pill)',
+      background: 'rgba(255, 255, 255, 0.86)',
+      WebkitBackdropFilter: 'blur(10px)', backdropFilter: 'blur(10px)',
+      color: '#111110',
+      ...(priced
+        ? { fontSize: `calc(${large ? 17 : 13}px * var(--text-scale))`, fontWeight: 600, letterSpacing: '-0.015em', fontVariantNumeric: 'tabular-nums' as const }
+        : { fontFamily: 'var(--font-mono)', fontSize: `calc(${large ? 11 : 9.5}px * var(--text-scale))`, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' as const }),
+    }}>
+      {!priced && <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: tc.dot }} />}
+      {priced ? `₹${item.price}` : tc.label}
+    </span>
+  );
+}
 
 export default function MarketplaceScreen() {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -68,13 +109,11 @@ export default function MarketplaceScreen() {
         /* Opaque. --bg-overlay is 88% alpha, so content showed
            through the header as it scrolled past. */
         background: 'var(--bg-card)',
-        borderBottom: '1px solid var(--border-subtle)',
         padding: '14px 16px 12px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <h1 style={{
-            margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
-            letterSpacing: '-0.025em', color: 'var(--text-primary)', flex: 1,
+          <h1 className="t-large-title" style={{
+            margin: 0, color: 'var(--text-primary)', flex: 1,
           }}>
             Market
           </h1>
@@ -84,19 +123,20 @@ export default function MarketplaceScreen() {
             aria-label={viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
           >
             {viewMode === 'grid'
-              ? <List size={17} strokeWidth={2} />
-              : <Grid3X3 size={17} strokeWidth={2} />}
+              ? <List size={22} />
+              : <Grid3X3 size={22} />}
           </button>
           <button
             onClick={() => setFilterOpen(true)}
             className="theme-toggle"
             style={activeType !== 'all' ? {
-              background: 'var(--accent-lime)',
-              color: 'var(--text-on-accent)',
+              background: 'var(--ink)',
+              color: '#FFFFFF',
             } : undefined}
             aria-label="Filter"
+            aria-pressed={activeType !== 'all'}
           >
-            <SlidersHorizontal size={17} strokeWidth={2} />
+            <SlidersHorizontal size={22} />
           </button>
         </div>
 
@@ -142,43 +182,34 @@ export default function MarketplaceScreen() {
         </div>
       </header>
 
-      {/* ── TYPE FILTER TABS ── */}
-      <div style={{
-        display: 'flex', gap: 0,
-        borderBottom: '1px solid var(--border-subtle)',
-        padding: '0 16px', overflowX: 'auto', scrollbarWidth: 'none',
-        background: 'var(--bg-base)',
-      }}>
-        {LISTING_TYPES.map(type => (
-          <button
-            key={type.id}
-            onClick={() => setActiveType(type.id)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '12px 16px',
-              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600,
-              color: activeType === type.id ? 'var(--text-primary)' : 'var(--text-muted)',
-              borderBottom: `2px solid ${activeType === type.id ? 'var(--accent-lime)' : 'transparent'}`,
-              whiteSpace: 'nowrap', transition: 'all 0.15s',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {type.label}
-          </button>
-        ))}
+      {/* ── TYPE FILTER — a scrolling row of words; the chosen one is ink ── */}
+      <div style={{ padding: '4px 16px 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="segmented segmented--scroll" style={{ display: 'flex', width: 'max-content' }}>
+          {LISTING_TYPES.map(type => (
+            <button
+              key={type.id}
+              onClick={() => setActiveType(type.id)}
+              aria-pressed={activeType === type.id}
+              data-active={activeType === type.id || undefined}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {type.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── RESULTS HEADER ── */}
       <div style={{ padding: '14px 16px 4px', display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', flex: 1 }}>
+        <span style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', flex: 1 }}>
           {filtered.length} items near you
         </span>
         <button style={{
           display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, color: 'var(--text-secondary)',
+          fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, color: 'var(--brand-ink)',
         }}>
-          <ArrowUpDown size={12} strokeWidth={1.8} /> Sort
+          <ArrowUpDown size={16} /> Sort
         </button>
       </div>
 
@@ -186,13 +217,13 @@ export default function MarketplaceScreen() {
       {filtered.length === 0 ? (
         items.length === 0 ? (
           <EmptyState
-            icon="🛍️"
+            icon={<ShoppingBag size={40} />}
             prompt="The marketplace is wide open."
             sub="Be the one who breaks the seal — share or sell something your community could use."
           />
         ) : (
           <EmptyState
-            icon="🔍"
+            icon={<Search size={32} />}
             prompt="No items match those filters."
             sub="Try a different category or clear the search."
             compact
@@ -214,8 +245,8 @@ export default function MarketplaceScreen() {
           {/* Section header */}
           <div style={{ padding: '24px 16px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-              letterSpacing: '-0.015em', color: 'var(--text-primary)',
+              margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
+              letterSpacing: '-0.022em', color: 'var(--text-primary)',
             }}>
               All items
             </h3>
@@ -247,38 +278,38 @@ export default function MarketplaceScreen() {
         </div>
       )}
 
-      {/* ── SHARE BANNER ── */}
-      <div style={{ padding: '24px 16px 0' }}>
-        <div style={{
-          background: 'var(--accent-lime)',
-          borderRadius: 'var(--radius-2xl)',
-          padding: '18px 18px',
+      {/* ── SHARE BANNER — one of our posts: the meadow bloom under grain ── */}
+      <div style={{ padding: '32px 16px 0' }}>
+        <div className="tex tex--meadow" style={{
+          borderRadius: 20,
+          padding: '16px 16px 16px 18px',
           display: 'flex', alignItems: 'center', gap: 14,
-          position: 'relative', overflow: 'hidden',
+          overflow: 'hidden',
         }}>
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'radial-gradient(circle at 90% 50%, rgba(255,255,255,0.18), transparent 50%)',
-            pointerEvents: 'none',
-          }} />
-          <div style={{ fontSize: 'calc(36px * var(--text-scale))', position: 'relative' }}>📦</div>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <p style={{ margin: '0 0 2px', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: '#0C0C0B', letterSpacing: '-0.02em' }}>
+          <span style={{
+            width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255, 255, 255, 0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-primary)',
+          }}>
+            <Package size={24} aria-hidden="true" />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: '0 0 2px', fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.025em' }}>
               Got something to give?
             </p>
-            <p style={{ margin: 0, fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(0,0,0,0.6)', fontWeight: 600 }}>
+            <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))', color: 'rgba(17, 17, 16, 0.72)' }}>
               Share with your community in 30 seconds
             </p>
           </div>
           <button style={{
-            background: '#0C0C0B', color: 'var(--accent-lime)',
+            background: 'var(--ink)', color: '#FFFFFF',
             border: 'none', padding: '9px 14px', borderRadius: 'var(--radius-pill)',
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, cursor: 'pointer',
+            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.006em', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 4,
-            position: 'relative', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             flexShrink: 0,
           }}>
-            Share <ArrowRight size={12} strokeWidth={2.5} />
+            Share <ArrowRight size={14} />
           </button>
         </div>
       </div>
@@ -299,13 +330,13 @@ export default function MarketplaceScreen() {
                 </h2>
                 <button
                   onClick={() => { setActiveType('all'); setFilterOpen(false); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brand-ink)', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, letterSpacing: '-0.015em' }}
                 >
                   Reset
                 </button>
               </div>
-              <p style={{ margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
-                Listing Type
+              <p className="t-label" style={{ margin: '0 0 10px' }}>
+                Listing type
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
                 {LISTING_TYPES.filter(t => t.id !== 'all').map(type => (
@@ -315,15 +346,16 @@ export default function MarketplaceScreen() {
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '14px 16px',
-                      background: activeType === type.id ? 'rgba(168,221,0,0.08)' : 'var(--bg-inset)',
-                      border: `1.5px solid ${activeType === type.id ? 'rgba(168,221,0,0.5)' : 'transparent'}`,
-                      borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-                      color: 'var(--text-primary)',
+                      background: activeType === type.id ? '#FFFFFF' : 'var(--bg-inset)',
+                      border: 'none',
+                      boxShadow: `inset 0 0 0 1.5px ${activeType === type.id ? 'var(--ink)' : 'transparent'}`,
+                      borderRadius: 14,
+                      cursor: 'pointer', fontSize: 'calc(15px * var(--text-scale))', fontWeight: activeType === type.id ? 600 : 500,
+                      letterSpacing: '-0.015em', color: 'var(--text-primary)',
                     }}
                   >
                     {type.label}
-                    {activeType === type.id && <Check size={16} strokeWidth={2.5} color="var(--accent-lime)" />}
+                    {activeType === type.id && <Check size={18} weight="regular" />}
                   </button>
                 ))}
               </div>
@@ -343,120 +375,99 @@ export default function MarketplaceScreen() {
 ══════════════════════════════════════════════════ */
 
 function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSaved: boolean; onSave: () => void }) {
-  const tc = TYPE_CONFIG[item.listingType];
-  const priceLabel = item.listingType === 'sell' ? `₹${item.price}` : tc.label;
-
+  const hasPhoto = !!photoOf(item);
   return (
-    <div style={{ position: 'relative', cursor: 'pointer' }}>
-      {/* Full-bleed photo */}
+    <div style={{ position: 'relative', cursor: 'pointer', padding: '0 16px' }}>
       <div style={{
         height: 360,
-        background: item.photoColor,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'calc(110px * var(--text-scale))',
-        position: 'relative',
+        background: 'var(--bg-inset)',
+        position: 'relative', overflow: 'hidden',
+        borderRadius: 20,
       }}>
-        {item.photoIcon}
+        <Photo item={item} />
 
-        {/* Bottom gradient */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.78) 100%)',
-        }} />
+        {/* Bottom scrim — only over a photo, where white type needs it. */}
+        {hasPhoto && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to bottom, transparent 45%, rgba(0,0,0,0.62) 100%)',
+          }} />
+        )}
 
-        {/* Featured label — quiet */}
-        <div style={{
-          position: 'absolute', top: 16, left: 16,
-          background: 'rgba(0,0,0,0.5)', color: '#fff',
-          backdropFilter: 'blur(8px)',
+        <span className="t-label" style={{
+          position: 'absolute', top: 14, left: 14,
+          background: 'rgba(255, 255, 255, 0.86)', color: '#111110',
+          WebkitBackdropFilter: 'blur(10px)', backdropFilter: 'blur(10px)',
           borderRadius: 'var(--radius-pill)',
-          padding: '4px 10px',
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '-0.01em',
+          padding: '5px 10px',
+          fontSize: 'calc(10px * var(--text-scale))',
         }}>
           Featured
-        </div>
+        </span>
 
-        {/* Save */}
+        {/* Save — a frosted disc */}
         <button
           onClick={e => { e.stopPropagation(); onSave(); }}
+          aria-label={isSaved ? 'Unsave' : 'Save'}
+          aria-pressed={isSaved}
           style={{
-            position: 'absolute', top: 14, right: 14,
-            width: 38, height: 38, borderRadius: '50%',
-            background: 'rgba(0,0,0,0.4)', border: 'none',
+            position: 'absolute', top: 12, right: 12,
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(255, 255, 255, 0.82)', border: 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', backdropFilter: 'blur(8px)',
-            color: isSaved ? 'var(--accent-rose)' : '#fff',
+            cursor: 'pointer',
+            WebkitBackdropFilter: 'blur(10px)', backdropFilter: 'blur(10px)',
+            color: isSaved ? 'var(--accent-rose)' : '#111110',
           }}
         >
-          <Heart size={18} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+          <Heart size={20} fill={isSaved ? 'currentColor' : 'none'} />
         </button>
 
-        {/* Bottom info */}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
-          padding: '20px 18px',
+          padding: '18px 16px',
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, color: hasPhoto ? '#fff' : 'var(--text-primary)' }}>
               <h3 style={{
-                margin: '0 0 6px', fontSize: 'calc(24px * var(--text-scale))', fontWeight: 600,
-                color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1,
+                margin: '0 0 4px', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
+                letterSpacing: '-0.022em', lineHeight: 1.15,
               }}>
                 {item.title}
               </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%',
-                  background: item.user.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, color: '#fff',
-                }}>
-                  {item.user.initials[0]}
-                </div>
-                <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
-                  {item.user.name.split(' ')[0]}
-                </span>
-                <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(255,255,255,0.4)' }}>·</span>
-                <MapPin size={11} color="rgba(255,255,255,0.6)" strokeWidth={2} />
-                <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
-                  {item.location}
-                </span>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 'calc(13px * var(--text-scale))',
+                opacity: hasPhoto ? 0.85 : 1, color: hasPhoto ? undefined : 'var(--text-secondary)',
+              }}>
+                <span>{item.user.name.split(' ')[0]}</span>
+                <span aria-hidden="true">·</span>
+                <MapPin size={14} />
+                <span>{item.location}</span>
               </div>
             </div>
-            <div style={{
-              background: tc.bg, color: tc.color,
-              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-              padding: '8px 14px', borderRadius: 'var(--radius-pill)',
-              letterSpacing: '-0.01em', flexShrink: 0,
-              backdropFilter: 'blur(8px)',
-            }}>
-              {priceLabel}
-            </div>
+            <KindLabel item={item} large />
           </div>
         </div>
       </div>
 
       {/* Footer strip */}
       <div style={{
-        padding: '12px 16px',
+        padding: '10px 2px 0',
         display: 'flex', alignItems: 'center', gap: 10,
-        background: 'var(--bg-base)',
-        borderBottom: '1px solid var(--border-subtle)',
+        fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)',
       }}>
-        <span style={{
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
-          color: item.condition === 'like_new' ? 'var(--accent-lime-ink)' : 'var(--text-muted)',
-        }}>
+        <span style={{ color: item.condition === 'like_new' ? 'var(--brand-ink)' : undefined }}>
           {CONDITION_LABEL[item.condition]}
         </span>
-        <span className="ticker-dot" style={{ color: 'var(--text-muted)' }} />
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 600 }}>
-          <Clock size={11} strokeWidth={2} /> {item.postedDaysAgo === 0 ? 'today' : `${item.postedDaysAgo}d ago`}
+        <span aria-hidden="true">·</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Clock size={14} /> {item.postedDaysAgo === 0 ? 'today' : `${item.postedDaysAgo}d ago`}
         </span>
         <div style={{ flex: 1 }} />
         {item.responses > 0 && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 600 }}>
-            <MessageCircle size={11} strokeWidth={2} /> {item.responses} interested
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <MessageCircle size={14} /> {item.responses} interested
           </span>
         )}
       </div>
@@ -465,59 +476,47 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
 }
 
 /* ══════════════════════════════════════════════════
-   GRID CARD — minimal border, photo-led
+   GRID CARD — the photo is the card
 ══════════════════════════════════════════════════ */
 
 function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSaved: boolean; onSave: () => void }) {
-  const tc = TYPE_CONFIG[item.listingType];
-  const priceLabel = item.listingType === 'sell' ? `₹${item.price}` : tc.label;
-
   return (
     <div style={{ cursor: 'pointer' }} className="press-scale-sm">
-      {/* Photo */}
       <div style={{
         aspectRatio: '1 / 1.15',
-        background: item.photoColor,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'calc(56px * var(--text-scale))', position: 'relative',
-        borderRadius: 'var(--radius-lg)',
+        background: 'var(--bg-inset)',
+        position: 'relative',
+        borderRadius: 'var(--radius-media)',
         overflow: 'hidden',
-        marginBottom: 8,
+        marginBottom: 9,
       }}>
-        {item.photoIcon}
+        <Photo item={item} />
 
-        {/* Save */}
         <button
           onClick={e => { e.stopPropagation(); onSave(); }}
+          aria-label={isSaved ? 'Unsave' : 'Save'}
+          aria-pressed={isSaved}
           style={{
             position: 'absolute', top: 8, right: 8,
             width: 30, height: 30, borderRadius: '50%',
-            background: 'rgba(0,0,0,0.45)', border: 'none',
+            background: 'rgba(255, 255, 255, 0.82)', border: 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', backdropFilter: 'blur(8px)',
-            color: isSaved ? 'var(--accent-rose)' : '#fff',
+            cursor: 'pointer',
+            WebkitBackdropFilter: 'blur(10px)', backdropFilter: 'blur(10px)',
+            color: isSaved ? 'var(--accent-rose)' : '#111110',
           }}
         >
-          <Heart size={14} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+          <Heart size={16} fill={isSaved ? 'currentColor' : 'none'} />
         </button>
 
-        {/* Type pill */}
-        <div style={{
-          position: 'absolute', bottom: 8, left: 8,
-          background: tc.bg, color: tc.color,
-          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
-          padding: '4px 9px', borderRadius: 'var(--radius-pill)',
-          letterSpacing: '-0.01em',
-          backdropFilter: 'blur(6px)',
-        }}>
-          {priceLabel}
+        <div style={{ position: 'absolute', bottom: 8, left: 8 }}>
+          <KindLabel item={item} />
         </div>
       </div>
 
-      {/* Caption */}
       <h3 style={{
-        margin: '0 0 4px', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-        color: 'var(--text-primary)', letterSpacing: '-0.01em',
+        margin: '0 0 2px', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 400,
+        color: 'var(--text-primary)', letterSpacing: '-0.012em',
         display: '-webkit-box', WebkitLineClamp: 1,
         WebkitBoxOrient: 'vertical', overflow: 'hidden',
         lineHeight: 1.3,
@@ -525,16 +524,11 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         {item.title}
       </h3>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, color: 'var(--text-muted)' }}>
-          {item.user.name.split(' ')[0]}
-        </span>
-        <span className="ticker-dot" style={{ color: 'var(--text-muted)' }} />
-        <span style={{
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
-          color: item.condition === 'like_new' ? 'var(--accent-lime-ink)' : 'var(--text-muted)',
-        }}>
-          {item.condition === 'like_new' ? '✦ New' : item.condition === 'good' ? 'Good' : 'Fair'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+        <span>{item.user.name.split(' ')[0]}</span>
+        <span aria-hidden="true">·</span>
+        <span style={{ color: item.condition === 'like_new' ? 'var(--brand-ink)' : undefined }}>
+          {CONDITION_LABEL[item.condition]}
         </span>
       </div>
     </div>
@@ -551,41 +545,42 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
 
   return (
     <div style={{
-      display: 'flex', gap: 14, padding: '14px 16px',
-      borderBottom: '1px solid var(--border-subtle)',
+      display: 'flex', gap: 14, padding: '12px 16px',
+      borderBottom: '0.5px solid var(--hairline)',
       cursor: 'pointer',
     }} className="press-scale-sm">
-      {/* Photo */}
       <div style={{
-        width: 96, height: 96, borderRadius: 'var(--radius-md)',
-        background: item.photoColor,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'calc(38px * var(--text-scale))', flexShrink: 0, position: 'relative', overflow: 'hidden',
+        width: 96, height: 96, borderRadius: 12,
+        background: 'var(--bg-inset)',
+        flexShrink: 0, position: 'relative', overflow: 'hidden',
       }}>
-        {item.photoIcon}
+        <Photo item={item} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
           <h3 style={{
-            margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-            color: 'var(--text-primary)', letterSpacing: '-0.01em', flex: 1,
+            margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500,
+            color: 'var(--text-primary)', letterSpacing: '-0.015em', flex: 1,
             display: '-webkit-box', WebkitLineClamp: 1,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>
             {item.title}
           </h3>
           <span style={{
-            background: tc.bg, color: tc.color,
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
-            padding: '3px 9px', borderRadius: 'var(--radius-pill)', flexShrink: 0,
+            flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5,
+            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em',
+            color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums',
           }}>
+            {item.listingType !== 'sell' && (
+              <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: tc.dot }} />
+            )}
             {priceLabel}
           </span>
         </div>
 
         <p style={{
-          margin: '0 0 6px', fontSize: 'calc(12px * var(--text-scale))',
+          margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))',
           color: 'var(--text-secondary)', lineHeight: 1.4,
           display: '-webkit-box', WebkitLineClamp: 1,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -593,28 +588,25 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
           {item.description}
         </p>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }}>
-          <div style={{
-            width: 16, height: 16, borderRadius: '50%',
-            background: item.user.color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, color: '#fff',
-          }}>
-            {item.user.initials[0]}
-          </div>
-          <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-secondary)', fontWeight: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>
             {item.user.name.split(' ')[0]}
           </span>
-          <span className="ticker-dot" style={{ color: 'var(--text-muted)' }} />
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>
-            <MapPin size={10} strokeWidth={2} /> {item.location}
+          <span aria-hidden="true">·</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <MapPin size={13} /> {item.location}
           </span>
           <div style={{ flex: 1 }} />
-          <button onClick={e => { e.stopPropagation(); onSave(); }} style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-            color: isSaved ? 'var(--accent-rose)' : 'var(--text-muted)',
-          }}>
-            <Heart size={15} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+          <button
+            onClick={e => { e.stopPropagation(); onSave(); }}
+            aria-label={isSaved ? 'Unsave' : 'Save'}
+            aria-pressed={isSaved}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              color: isSaved ? 'var(--accent-rose)' : 'var(--text-muted)',
+            }}
+          >
+            <Heart size={18} fill={isSaved ? 'currentColor' : 'none'} />
           </button>
         </div>
       </div>

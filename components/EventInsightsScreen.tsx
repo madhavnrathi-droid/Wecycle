@@ -30,6 +30,7 @@ import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 import { useGlide } from '../lib/useGlide';
+import FieldTypeGlyph from './forms/FieldTypeGlyph';
 
 interface EventInsightsScreenProps {
   event: CommunityEvent;
@@ -123,7 +124,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
         display: 'flex', alignItems: 'center', gap: 10,
         padding: '14px 16px',
         background: 'var(--bg-base)',
-        borderBottom: '1px solid var(--border-subtle)',
+        borderBottom: '0.5px solid var(--hairline)',
       }}>
         <button onClick={onBack} aria-label="Back" className="theme-toggle">
           <ChevronLeft size={20} strokeWidth={1.8} />
@@ -149,10 +150,10 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
               background: 'var(--bg-inset)',
               border: 'none',
               borderRadius: 999, cursor: 'pointer',
-              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
+              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'inherit',
             }}
           >
-            <Download size={13} strokeWidth={2} /> CSV
+            <Download size={15} /> CSV
           </button>
         )}
       </header>
@@ -162,13 +163,13 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
         <div style={{
           display: 'grid',
           gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)',
-          gap: 10, marginBottom: 18,
+          columnGap: 16, rowGap: 20, padding: '4px 4px 0', marginBottom: 28,
         }}>
-          <StatTile icon={<Eye size={15} strokeWidth={2} />} value={views} label="Views" />
-          <StatTile icon={<Heart size={15} strokeWidth={2} />} value={saves} label="Saves" />
-          <StatTile icon={<MessageCircle size={15} strokeWidth={2} />} value={commentCount} label="Comments" />
+          <StatTile icon={<Eye size={14} />} value={views} label="Views" />
+          <StatTile icon={<Heart size={14} />} value={saves} label="Saves" />
+          <StatTile icon={<MessageCircle size={14} />} value={commentCount} label="Comments" />
           <StatTile
-            icon={<Users size={15} strokeWidth={2} />}
+            icon={<Users size={14} />}
             value={going}
             label={event.maxAttendees ? `Going · of ${event.maxAttendees}` : 'Going'}
           />
@@ -247,20 +248,18 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
   );
 }
 
-/* ── Stat tile ────────────────────────────────────── */
+/* ── Stat ─────────────────────────────────────────────
+   A mono label over a light figure — the widget register. No tile: the
+   grid's spacing already groups the four numbers. */
 
 function StatTile({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      borderRadius: 18, padding: '14px 16px 12px',
-      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', marginBottom: 6 }}>
+    <div>
+      <div className="t-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         {icon}
-        <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>{label}</span>
+        <span>{label}</span>
       </div>
-      <div style={{ fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+      <div className="t-figure" style={{ fontSize: 'calc(34px * var(--text-scale))', lineHeight: 1.1, color: 'var(--text-primary)' }}>
         {value.toLocaleString('en-IN')}
       </div>
     </div>
@@ -277,13 +276,10 @@ function AttendeeList({ attendees, onOpenUser }: { attendees: EventAttendee[]; o
       </div>
     );
   }
-  /* Flat list, hairline-separated — not a stack of boxed cards. */
+  /* Flat list, hairline-separated — not a stack of boxed cards, and not
+     one card around the lot either. */
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      borderRadius: 20, padding: '4px 16px',
-      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
-    }}>
+    <div style={{ padding: '0 4px' }}>
       {attendees.map((a, i) => (
         <button
           key={`${a.user.id}-${i}`}
@@ -293,7 +289,7 @@ function AttendeeList({ attendees, onOpenUser }: { attendees: EventAttendee[]; o
             display: 'flex', alignItems: 'center', gap: 12,
             padding: '12px 0', width: '100%', textAlign: 'left',
             background: 'transparent', border: 'none',
-            borderBottom: i < attendees.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+            borderBottom: i < attendees.length - 1 ? '0.5px solid var(--hairline)' : 'none',
             cursor: onOpenUser ? 'pointer' : 'default',
             fontFamily: 'inherit',
           }}
@@ -305,18 +301,18 @@ function AttendeeList({ attendees, onOpenUser }: { attendees: EventAttendee[]; o
             <img src={getAvatar(a.user.id)} alt="" width={36} height={36} draggable={false} />
           </span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <span style={{ display: 'block', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
               {a.user.name}
             </span>
-            <span style={{ display: 'block', fontSize: 'calc(11.5px * var(--text-scale))', color: 'var(--text-muted)' }}>
+            <span style={{ display: 'block', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)' }}>
               {a.user.role ? `${a.user.role} · ` : ''}RSVP&rsquo;d {formatWhen(a.rsvpedAt)}
             </span>
           </span>
-          <span style={{
-            fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-            color: '#16A34A', background: 'rgba(34,197,94,0.12)',
-            padding: '3px 8px', borderRadius: 999, flexShrink: 0,
+          <span className="t-label" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+            color: 'var(--brand-ink)',
           }}>
+            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)' }} />
             Going
           </span>
         </button>
@@ -338,7 +334,7 @@ function formatWhen(v: string): string {
 function ResponseSummary({ form, responses, isDesktop }: { form: EventFormRecord; responses: FormResponse[]; isDesktop: boolean }) {
   return (
     <div style={{
-      display: 'grid', gap: 12,
+      display: 'grid', columnGap: 24, rowGap: 28, padding: '4px 4px 0',
       gridTemplateColumns: isDesktop ? 'repeat(2, minmax(0, 1fr))' : '1fr',
       alignItems: 'start',
     }}>
@@ -375,17 +371,13 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
   const maxCount = counts ? Math.max(1, ...counts.map(([, n]) => n)) : 1;
 
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      borderRadius: 20, padding: 16,
-      boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-        <span aria-hidden="true" style={{ fontSize: 'calc(13px * var(--text-scale))' }}>{meta.icon}</span>
-        <span style={{ flex: 1, fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <FieldTypeGlyph type={field.type} size={18} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+        <span style={{ flex: 1, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
           {field.label || meta.label}
         </span>
-        <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
+        <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
           {answered.length} answer{answered.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -396,15 +388,15 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
             const pct = answered.length ? Math.round((n / answered.length) * 100) : 0;
             return (
               <div key={opt}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'calc(12px * var(--text-scale))', marginBottom: 3 }}>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{opt}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'calc(13px * var(--text-scale))', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 400 }}>{opt}</span>
                   <span style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{n} · {pct}%</span>
                 </div>
-                <div style={{ height: 8, borderRadius: 999, background: 'var(--bg-inset)', overflow: 'hidden' }} aria-hidden="true">
+                <div style={{ height: 6, borderRadius: 999, background: 'var(--bg-inset)', overflow: 'hidden' }} aria-hidden="true">
                   <div style={{
                     width: `${(n / maxCount) * 100}%`, height: '100%', borderRadius: 999,
-                    background: 'linear-gradient(90deg, #8B5CF6, #A855F7)',
-                    transition: 'width 300ms var(--ease-smooth, ease)',
+                    background: 'var(--brand)',
+                    transition: 'width var(--dur-4) var(--ease-standard)',
                   }} />
                 </div>
               </div>
@@ -418,8 +410,8 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {(expanded ? answered : answered.slice(0, 5)).map(r => (
               <div key={r.id} style={{
-                padding: '8px 10px', borderRadius: 10,
-                background: 'var(--bg-inset)', fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.45,
+                padding: '10px 12px', borderRadius: 12,
+                background: 'var(--bg-inset)', fontSize: 'calc(13px * var(--text-scale))', lineHeight: 1.4,
               }}>
                 <span style={{ color: 'var(--text-primary)' }}>{String(r.answers[field.id])}</span>
                 <span style={{ color: 'var(--text-muted)' }}> — {r.user.name}</span>
@@ -436,10 +428,10 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
               style={{
                 marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
                 background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'inherit',
+                fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, color: 'var(--brand-ink)', fontFamily: 'inherit',
               }}
             >
-              <ChevronDown size={13} strokeWidth={2} style={{ transform: expanded ? 'rotate(180deg)' : undefined }} />
+              <ChevronDown size={14} style={{ transform: expanded ? 'rotate(180deg)' : undefined }} />
               {expanded ? 'Show fewer' : `Show all ${answered.length}`}
             </button>
           )}
@@ -478,9 +470,9 @@ function FileAnswerList({ field, responses }: { field: FormField; responses: For
               borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
             }}
           >
-            <Paperclip size={13} strokeWidth={2} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            <Paperclip size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             <span style={{
-              flex: 1, minWidth: 0, fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
+              flex: 1, minWidth: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {opening === path ? 'Opening…' : fileAnswerName(path)}
@@ -500,12 +492,11 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
   onDelete?: (r: FormResponse) => void | Promise<void>;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {responses.map(r => (
+    <div style={{ display: 'flex', flexDirection: 'column', padding: '0 4px' }}>
+      {responses.map((r, i) => (
         <div key={r.id} style={{
-          background: 'var(--bg-card)',
-          borderRadius: 20, padding: 16,
-          boxShadow: '0 1px 2px rgba(28,28,26,0.04), 0 6px 20px rgba(28,28,26,0.06)',
+          padding: i === 0 ? '4px 0 20px' : '18px 0 20px',
+          borderTop: i === 0 ? 'none' : '0.5px solid var(--hairline)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <button
@@ -524,8 +515,8 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
                 <img src={getAvatar(r.user.id)} alt="" width={30} height={30} draggable={false} />
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{r.user.name}</span>
-                <span style={{ display: 'block', fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>{r.submittedAt}</span>
+                <span style={{ display: 'block', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>{r.user.name}</span>
+                <span style={{ display: 'block', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>{r.submittedAt}</span>
               </span>
             </button>
             {onDelete && (
@@ -541,7 +532,7 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
                   borderRadius: 999, cursor: 'pointer', color: 'var(--accent-rose-ink)',
                 }}
               >
-                <Trash2 size={13} strokeWidth={2} />
+                <Trash2 size={16} />
               </button>
             )}
           </div>
@@ -550,8 +541,8 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
               const a = r.answers[f.id];
               const empty = a == null || (Array.isArray(a) ? a.length === 0 : a === '');
               return (
-                <div key={f.id} style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.45 }}>
-                  <span style={{ display: 'block', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 2 }}>
+                <div key={f.id} style={{ fontSize: 'calc(15px * var(--text-scale))', lineHeight: 1.35, letterSpacing: '-0.015em' }}>
+                  <span className="t-label" style={{ display: 'block', marginBottom: 3 }}>
                     {f.label || FIELD_TYPE_META[f.type].label}
                   </span>
                   {empty ? (

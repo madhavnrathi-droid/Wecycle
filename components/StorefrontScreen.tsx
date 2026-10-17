@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { availableFirst } from '../lib/feed/rank';
 import PostStamp from './PostStamp';
 import { matchesCategoryFilter } from '../lib/categories';
-import { ChevronLeft, MapPin, Calendar, Users, IndianRupee, Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal, MessageCircle } from '@/lib/icons';
+import { ChevronLeft, MapPin, Calendar, Users, IndianRupee, Search, MoreHorizontal, MessageCircle, Archive, ClipboardList } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import ReportSheet from './ReportSheet';
 import BrandScreen from './brand/BrandScreen';
@@ -389,12 +389,10 @@ function PersonStorefront({
                 display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8,
               }}>
                 {user.badges.slice(0, 4).map(b => (
-                  <span key={b} style={{
-                    fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
-                    padding: '3px 8px', borderRadius: 999,
+                  <span key={b} className="t-label" style={{
+                    fontSize: 'calc(10px * var(--text-scale))',
+                    padding: '4px 8px', borderRadius: 999,
                     background: 'var(--bg-inset)',
-                    color: 'var(--text-secondary)',
-                    letterSpacing: '0.01em',
                   }}>
                     {b}
                   </span>
@@ -404,10 +402,11 @@ function PersonStorefront({
           </div>
         </div>
 
-        {/* Stat tiles — live counts (refetched on every post change). */}
+        {/* Stats — live counts (refetched on every post change). Three
+            figures in a row; their spacing groups them, so no tiles. */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
-          marginTop: 16,
+          marginTop: 20,
         }}>
           <StatTile value={sharedDisplay}   label="Shared"  />
           <StatTile value={receivedDisplay} label="Received" />
@@ -420,14 +419,14 @@ function PersonStorefront({
             onClick={() => { haptics.light(); onMessage?.(user); }}
             aria-label={`Message ${user.name}`}
             style={{
-              marginTop: 14, width: '100%', height: 46, borderRadius: 999,
-              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              marginTop: 18, width: '100%', height: 46, borderRadius: 999,
+              background: 'var(--ink)', color: '#FFFFFF',
               border: 'none', cursor: 'pointer',
-              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
+              fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            <MessageCircle size={16} strokeWidth={2} />
+            <MessageCircle size={18} />
             Message {user.name.split(' ')[0]}
           </button>
         )}
@@ -534,7 +533,7 @@ function PersonStorefront({
             : (
               <ul className="events-list-grid" style={{
                 listStyle: 'none', margin: 0, padding: '4px 8px',
-                display: 'grid', gap: 10,
+                display: 'grid', gap: 20,
               }}>
                 {events.map(ev => (
                   <EventTile key={ev.id} event={ev} onClick={() => onOpenEvent(ev)} />
@@ -622,17 +621,17 @@ function PublicInfoSection({
 }: { profile: PublicProfile | null; user: User }) {
   /* Build the rows in display order. Each entry is null when the field
      isn't worth showing, then filtered out before render. */
-  type Row = { icon: React.ReactNode; label: string; value: string };
+  type Row = { label: string; value: string };
   const rows: Row[] = [];
   /* Email — always show if present (auth fallback already covered upstream). */
   const email = profile?.email || user.email;
-  if (email) rows.push({ icon: <Mail size={13} strokeWidth={1.8} />, label: 'Email', value: email });
+  if (email) rows.push({ label: 'Email', value: email });
   /* Phone — only when the user opted in via the storefront pref. */
   if (profile?.showPhone && profile.phone) {
-    rows.push({ icon: <Phone size={13} strokeWidth={1.8} />, label: 'Phone', value: profile.phone });
+    rows.push({ label: 'Phone', value: profile.phone });
   }
   if (profile?.collegeId) {
-    rows.push({ icon: <IdCard size={13} strokeWidth={1.8} />, label: 'College ID', value: profile.collegeId });
+    rows.push({ label: 'College ID', value: profile.collegeId });
   }
   /* College, not Department: `college` is the canonical school field now. Fall
      back to a legacy `department` value so members who only ever set the old
@@ -640,20 +639,18 @@ function PublicInfoSection({
   const collegeCode = normalizeCollege(profile?.college) || normalizeCollege(profile?.department);
   if (collegeCode) {
     rows.push({
-      icon: <Building2 size={13} strokeWidth={1.8} />,
       label: 'College',
       value: collegeName(collegeCode) ? `${collegeCode} — ${collegeName(collegeCode)}` : collegeCode,
     });
   }
   if (profile?.course) {
-    rows.push({ icon: <GraduationCap size={13} strokeWidth={1.8} />, label: 'Course', value: profile.course });
+    rows.push({ label: 'Course', value: profile.course });
   }
   if (profile?.graduatingYear) {
-    rows.push({ icon: <Calendar size={13} strokeWidth={1.8} />, label: 'Graduating', value: String(profile.graduatingYear) });
+    rows.push({ label: 'Graduating', value: String(profile.graduatingYear) });
   }
   if (profile?.residence) {
     rows.push({
-      icon: <Home size={13} strokeWidth={1.8} />,
       label: 'Residence',
       value: profile.residence === 'day_scholar' ? 'Day scholar' : 'Hosteler',
     });
@@ -663,23 +660,18 @@ function PublicInfoSection({
 
   return (
     <section style={{ padding: '4px 20px 18px' }}>
-      <h3 style={{
-        margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
-        letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-        color: 'var(--text-muted)',
-      }}>
+      <h3 className="t-label" style={{ margin: '0 0 10px' }}>
         About
       </h3>
+      {/* Label and value in two columns, aligned on their baselines. The
+          words are the structure; no box around them. */}
       <dl style={{
-        margin: 0, padding: '12px 14px',
-        background: 'var(--bg-inset)',
-        border: 'none',
-        borderRadius: 14,
-        display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 16, rowGap: 8,
+        margin: 0,
+        display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 20, rowGap: 8,
         alignItems: 'baseline',
       }}>
         {rows.map(r => (
-          <PublicInfoRow key={r.label} icon={r.icon} label={r.label} value={r.value} />
+          <PublicInfoRow key={r.label} label={r.label} value={r.value} />
         ))}
       </dl>
     </section>
@@ -687,20 +679,19 @@ function PublicInfoSection({
 }
 
 function PublicInfoRow({
-  icon, label, value,
-}: { icon: React.ReactNode; label: string; value: string }) {
+  label, value,
+}: { label: string; value: string }) {
   return (
     <>
       <dt style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500, color: 'var(--text-muted)',
+        fontSize: 'calc(13px * var(--text-scale))', fontWeight: 400, color: 'var(--text-muted)',
         whiteSpace: 'nowrap',
       }}>
-        {icon}
         {label}
       </dt>
       <dd style={{
-        margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 500, color: 'var(--text-primary)',
+        margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 400, letterSpacing: '-0.015em',
+        color: 'var(--text-primary)',
         overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {value}
@@ -724,14 +715,11 @@ function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
       {lfPhoto
         ? <img src={lfPhoto} alt="" className="feed-card-img" loading="lazy" />
         : <NoPhoto />}
-      <span style={{
-        position: 'absolute', top: 10, left: 10,
-        background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
-        color: '#fff', borderRadius: 999,
-        padding: '4px 10px',
-        fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
-        textTransform: 'uppercase', fontFamily: 'var(--font-mono)', zIndex: 3,
-      }}>{lf.status}</span>
+      {/* The frosted label with a dot of status colour — the same badge the
+          listing cards wear (.pcard-badge in app/light.css). */}
+      <span className="pcard-badge" data-kind={isLost ? 'lost' : 'found'}>
+        {lf.status}
+      </span>
       <div className="feed-card-overlay" data-light={!lfPhoto || undefined}>
         <p className="feed-card-title">{lf.title}</p>
         <div className="feed-card-meta">
@@ -747,23 +735,16 @@ function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
 
 /* ── Pieces ─────────────────────────────────────── */
 
+/* A light figure over a quiet word — Apple's widget register. */
 function StatTile({ value, label }: { value: number; label: string }) {
   return (
-    <div style={{
-      background: 'var(--bg-inset)',
-      border: 'none',
-      borderRadius: 14,
-      padding: '12px 14px',
-      textAlign: 'center',
-    }}>
-      <div style={{
-        fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
-        letterSpacing: '-0.025em',
+    <div>
+      <div className="t-figure" style={{
+        fontSize: 'calc(28px * var(--text-scale))',
         color: 'var(--text-primary)',
-        fontVariantNumeric: 'tabular-nums',
-        lineHeight: 1.15,
+        lineHeight: 1.1,
       }}>{value}</div>
-      <div style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -771,8 +752,8 @@ function StatTile({ value, label }: { value: number; label: string }) {
 function EmptyState({ label }: { label: string }) {
   return (
     <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)' }}>
-      <div style={{ fontSize: 'calc(28px * var(--text-scale))', marginBottom: 6 }}>🗂️</div>
-      <p style={{ margin: 0, fontSize: 'calc(13px * var(--text-scale))' }}>{label}</p>
+      <Archive size={32} aria-hidden="true" style={{ display: 'block', margin: '0 auto 10px', color: 'var(--text-secondary)' }} />
+      <p style={{ margin: 0, fontSize: 'calc(15px * var(--text-scale))', letterSpacing: '-0.015em' }}>{label}</p>
     </div>
   );
 }
@@ -848,30 +829,26 @@ function RequestRow({ feed }: { feed: FeedItem }) {
       border: 'none',
       borderRadius: 14,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <span style={{
-          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500,
-          padding: '3px 8px', borderRadius: 999,
-          background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber-ink)',
-          textTransform: 'uppercase', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
-        }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span className="t-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 'calc(10px * var(--text-scale))' }}>
+          <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--status-request)' }} />
           Request
         </span>
-        <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)' }}>{feed.timeAgo}</span>
+        <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>{feed.timeAgo}</span>
       </div>
       <h3 style={{
-        margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-        color: 'var(--text-primary)', letterSpacing: '-0.01em',
+        margin: 0, fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
+        color: 'var(--text-primary)', letterSpacing: '-0.015em',
       }}>{r.title}</h3>
       <p style={{
-        margin: '4px 0 0', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.45,
+        margin: '4px 0 0', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.4,
         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
       }}>{r.description}</p>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, marginTop: 8,
-        fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
+        fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
       }}>
-        <MapPin size={11} strokeWidth={1.8} />
+        <MapPin size={13} />
         {r.location}
       </div>
     </li>
@@ -885,18 +862,16 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
       <button
         type="button"
         onClick={onClick}
+        /* A poster and its words, like the Events tab's rows — no card. */
         style={{
           all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%',
-          background: 'var(--bg-inset)',
-          border: 'none',
-          borderRadius: 14,
-          overflow: 'hidden',
           display: 'block',
         }}
         aria-label={`Open ${event.title}`}
       >
         <div style={{
           aspectRatio: '4 / 3', background: 'var(--bg-inset)',
+          borderRadius: 'var(--radius-media)', overflow: 'hidden',
           position: 'relative',
           ...(photo ? {
             backgroundImage: `url(${photo})`,
@@ -905,29 +880,28 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
         }}>
           {!photo && <NoPhoto />}
         </div>
-        <div style={{ padding: '12px 14px' }}>
+        <div style={{ padding: '10px 2px 6px' }}>
           <h3 style={{
-            margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-            color: 'var(--text-primary)', letterSpacing: '-0.01em',
+            margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600,
+            color: 'var(--text-primary)', letterSpacing: '-0.025em',
             display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>{event.title}</h3>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 12, marginTop: 6,
-            fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', gap: 12, marginTop: 4,
+            fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)',
           }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <Calendar size={11} strokeWidth={1.8} /> {event.date}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Calendar size={14} /> {event.date}
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <Users size={11} strokeWidth={1.8} /> {event.attendees}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Users size={14} /> {event.attendees}
             </span>
             {event.hasForm && (
-              <span style={{
-                color: '#8B5CF6', background: 'rgba(139,92,246,0.12)',
-                padding: '1px 7px', borderRadius: 999,
-                fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
+              <span className="t-label" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 'calc(10px * var(--text-scale))', color: 'var(--brand-ink)',
               }}>
-                📋 Register
+                <ClipboardList size={13} aria-hidden="true" /> Register
               </span>
             )}
           </div>

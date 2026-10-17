@@ -38,7 +38,9 @@ of this page.
 5. **Thin icons.** Phosphor, LIGHT weight, through `lib/icons.tsx`, which keeps
    the old Lucide names working. A selected state switches to the FILL weight
    (the tab bar does this). New code can pass `weight` directly. Emoji in option
-   data render as glyphs through `<EmojiGlyph>`.
+   data render as glyphs through `<EmojiGlyph>`; registration-form question
+   types (whose `FIELD_TYPE_META` still carries emoji) render through
+   `components/forms/FieldTypeGlyph.tsx`.
 
    **The exception is the category strip on Home**, which keeps its voxel renders
    (`public/icons/categories/*.webp`, owner's call, 18 Oct 2026). The tiles have

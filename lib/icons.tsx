@@ -56,6 +56,12 @@ import {
   Swap as PhSwap, HandCoins as PhHandCoins, Question as PhQuestion, Cube as PhCube, Barcode as PhBarcode,
   Handshake as PhHandshake, PawPrint as PhPawPrint, SquaresFour as PhSquaresFour, Flower as PhFlower,
   Lightning as PhLightning, ArrowsLeftRight as PhArrowsLeftRight, Coffee as PhCoffee,
+  Rocket as PhRocket, Leaf as PhLeaf, Trophy as PhTrophy, Flask as PhFlask, HandWaving as PhHandWaving,
+  Recycle as PhRecycle, PiggyBank as PhPiggyBank, Hash as PhHash, TextT as PhTextT,
+  TextAlignLeft as PhTextAlignLeft, RadioButton as PhRadioButton, CheckSquare as PhCheckSquare,
+  CaretCircleDown as PhCaretCircleDown, TrashSimple as PhTrashSimple, Tray as PhTray, Bug as PhBug,
+  Lightbulb as PhLightbulb, Palette as PhPalette, SmileyMeh as PhSmileyMeh, Bed as PhBed,
+  Hammer as PhHammer, Plug as PhPlug, ProjectorScreen as PhProjectorScreen,
 } from '@phosphor-icons/react';
 
 type PhosphorIcon = ComponentType<PhIconProps>;
@@ -235,6 +241,29 @@ export const Flower = make(PhFlower, 'Flower');
 export const Lightning = make(PhLightning, 'Lightning');
 export const ArrowsLeftRight = make(PhArrowsLeftRight, 'ArrowsLeftRight');
 export const Coffee = make(PhCoffee, 'Coffee');
+export const Rocket = make(PhRocket, 'Rocket');
+export const Leaf = make(PhLeaf, 'Leaf');
+export const Trophy = make(PhTrophy, 'Trophy');
+export const Flask = make(PhFlask, 'Flask');
+export const HandWaving = make(PhHandWaving, 'HandWaving');
+export const Recycle = make(PhRecycle, 'Recycle');
+export const PiggyBank = make(PhPiggyBank, 'PiggyBank');
+export const Hash = make(PhHash, 'Hash');
+export const TextT = make(PhTextT, 'TextT');
+export const TextAlignLeft = make(PhTextAlignLeft, 'TextAlignLeft');
+export const RadioButton = make(PhRadioButton, 'RadioButton');
+export const CheckSquare = make(PhCheckSquare, 'CheckSquare');
+export const CaretCircleDown = make(PhCaretCircleDown, 'CaretCircleDown');
+export const TrashSimple = make(PhTrashSimple, 'TrashSimple');
+export const Tray = make(PhTray, 'Tray');
+export const Bug = make(PhBug, 'Bug');
+export const Lightbulb = make(PhLightbulb, 'Lightbulb');
+export const Palette = make(PhPalette, 'Palette');
+export const SmileyMeh = make(PhSmileyMeh, 'SmileyMeh');
+export const Bed = make(PhBed, 'Bed');
+export const Hammer = make(PhHammer, 'Hammer');
+export const Plug = make(PhPlug, 'Plug');
+export const ProjectorScreen = make(PhProjectorScreen, 'ProjectorScreen');
 
 /* ── Emoji, drawn as glyphs ──
    A lot of option data (lib/dealTypes, lib/opportunity, …) still carries the
