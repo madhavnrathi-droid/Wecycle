@@ -3,7 +3,7 @@
 import { getActiveRoom, isPrivateRoom } from '../lib/rooms';
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
-import { Search, CalendarDays, MapPin, X, Check, Plus } from 'lucide-react';
+import { Search, CalendarDays, MapPin, X, Check, Plus } from '@/lib/icons';
 import { EVENTS, type CommunityEvent } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
@@ -244,8 +244,8 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onOpenMessages
       {upcomingRsvps.length > 0 && (
         <section style={{ padding: '8px 20px 8px' }}>
           <h3 style={{
-            margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-            letterSpacing: '0.04em', textTransform: 'uppercase',
+            margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+            letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             color: 'var(--text-muted)',
           }}>
             Your upcoming
@@ -274,8 +274,8 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onOpenMessages
         <>
           <section style={{ padding: '18px 20px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-              letterSpacing: '0.04em', textTransform: 'uppercase',
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
               color: 'var(--text-muted)',
             }}>
               Browse events
@@ -383,8 +383,8 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
     <article style={{
       borderRadius: 22,
       overflow: 'hidden',
-      background: 'var(--bg-surface)',
-      border: '1px solid var(--border-subtle)',
+      background: 'var(--bg-inset)',
+      border: 'none',
     }}>
       {/* Photo */}
       <div style={{

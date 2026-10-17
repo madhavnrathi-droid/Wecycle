@@ -14,9 +14,9 @@
 import { getActiveRoom, isPrivateRoom } from '../lib/rooms';
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, MapPin, AlertCircle, CheckCircle,
+import { Search, Plus, MapPin, CheckCircle,
   Mail, X, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, Share2, MessageCircle,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
@@ -171,32 +171,34 @@ export default function LostFoundScreen({
           onClick={() => { if (!user) { onRequireAuth(); return; } onReport('lost'); }}
           style={{
             flex: 1, height: 44, borderRadius: 999,
-            background: 'rgba(237,46,80,0.10)',
-            color: 'var(--status-lost-ink)',
-            border: '1px solid rgba(237,46,80,0.22)',
+            background: 'var(--bg-inset)',
+            color: 'var(--text-primary)',
+            border: 'none',
             cursor: 'pointer',
-            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-            letterSpacing: '-0.01em',
+            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500,
+            letterSpacing: '-0.015em',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
         >
-          <AlertCircle size={14} strokeWidth={2} />
+          {/* A dot of the status colour, not a tinted button: the colour marks
+              the kind and the words say it. */}
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--status-lost)' }} />
           Report lost
         </button>
         <button
           onClick={() => { if (!user) { onRequireAuth(); return; } onReport('found'); }}
           style={{
             flex: 1, height: 44, borderRadius: 999,
-            background: 'rgba(34,197,94,0.10)',
-            color: 'var(--status-free-ink)',
-            border: '1px solid rgba(34,197,94,0.22)',
+            background: 'var(--bg-inset)',
+            color: 'var(--text-primary)',
+            border: 'none',
             cursor: 'pointer',
-            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-            letterSpacing: '-0.01em',
+            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 500,
+            letterSpacing: '-0.015em',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
         >
-          <CheckCircle size={14} strokeWidth={2} />
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--status-free)' }} />
           Report found
         </button>
       </section>
@@ -280,8 +282,6 @@ function LostFoundCard({
   item, variant, onClick,
 }: { item: LostItem; variant: Variant; onClick: () => void }) {
   const isLost = item.status === 'lost';
-  const accent = isLost ? 'var(--status-lost-ink)' : 'var(--status-free-ink)';
-  const bg = isLost ? 'rgba(237,46,80,0.10)' : 'rgba(34,197,94,0.10)';
   const photo = resolveLostFoundPhoto(item.id, item.photoUrls);
   return (
     <button
@@ -308,17 +308,21 @@ function LostFoundCard({
           }}
         />
       ) : <NoPhoto />}
+      {/* Same frosted label as every other card badge: a dot of the status
+          colour and the word in the mono voice. */}
       <span style={{
         position: 'absolute', top: 8, left: 8,
-        background: bg,
-        color: accent,
-        fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        padding: '4px 10px',
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        background: 'rgba(255,255,255,0.86)',
+        color: '#111110',
+        fontSize: 'calc(9.5px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+        textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
+        padding: '4px 8px 4px 7px',
         borderRadius: 999,
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
       }}>
+        <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: isLost ? 'var(--status-lost)' : 'var(--status-free)' }} />
         {item.status}
       </span>
       {item.verified && (
@@ -649,8 +653,8 @@ export function LostFoundDetailSheet({
           <span style={{
             background: isLost ? 'rgba(237,46,80,0.12)' : 'rgba(34,197,94,0.12)',
             color: accent,
-            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
-            textTransform: 'uppercase',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+            textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             padding: '4px 10px', borderRadius: 999,
           }}>{isOwner ? eStatus : item.status}</span>
           {!isOwner && (
@@ -894,8 +898,8 @@ export function LostFoundDetailSheet({
                   aria-label="Discard changes"
                   style={{
                     width: 48, height: 48, borderRadius: 14,
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-default)',
+                    background: 'var(--bg-inset)',
+                    border: 'none',
                     color: 'var(--text-secondary)',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     cursor: saving ? 'not-allowed' : 'pointer', flexShrink: 0,
@@ -909,8 +913,8 @@ export function LostFoundDetailSheet({
                   disabled={!!saving}
                   style={{
                     flex: '1 1 140px', minWidth: 0, height: 48, borderRadius: 14,
-                    background: 'var(--bg-surface)', color: 'var(--text-primary)',
-                    border: '1px solid var(--border-default)',
+                    background: 'var(--bg-inset)', color: 'var(--text-primary)',
+                    border: 'none',
                     cursor: saving ? 'wait' : 'pointer',
                     fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -1079,8 +1083,8 @@ function LFEditField({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <span style={{
         display: 'inline-flex', alignItems: 'center',
-        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-        letterSpacing: '0.08em', textTransform: 'uppercase',
+        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+        letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
         color: 'var(--text-secondary)',
       }}>{label}</span>
       {children}

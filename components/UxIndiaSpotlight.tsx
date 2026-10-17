@@ -32,7 +32,7 @@
  * two is the most common way a promo card gets ignored.
  */
 
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight } from '@/lib/icons';
 import { Logomark } from './Brand';
 import { MEMBER_TIER, UX_INDIA_EVENT } from '../lib/eventOffer';
 import { track, EVT } from '../lib/analytics';

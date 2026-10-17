@@ -49,7 +49,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play } from '@/lib/icons';
 import FitImage from './FitImage';
 import NoPhoto from './NoPhoto';
 import type { MediaEntry } from '../lib/photos';

@@ -21,7 +21,7 @@
  * a 2-up grid at desktop widths so multiple matches read at a glance.
  */
 
-import { ChevronRight, Users } from 'lucide-react';
+import { ChevronRight, Users } from '@/lib/icons';
 import { getAvatar } from '../lib/photos';
 import OnlineBadge from './OnlineBadge';
 import type { UserSearchHit } from '../lib/liveData';

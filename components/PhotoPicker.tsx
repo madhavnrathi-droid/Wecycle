@@ -23,7 +23,7 @@
 import {
   useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef,
 } from 'react';
-import { Plus, X, Camera, ImagePlus, Play, Scissors, Loader2, Star } from 'lucide-react';
+import { Plus, X, Camera, ImagePlus, Play, Scissors, Loader2, Star } from '@/lib/icons';
 import {
   compressMediaBatch, MAX_VIDEO_BYTES, MediaTooLargeError,
   type CompressedMedia,

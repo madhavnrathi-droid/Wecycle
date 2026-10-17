@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, MapPin, IndianRupee, Mail, Phone, Trash2, AlertTriangle } from 'lucide-react';
+import { Bell, MapPin, IndianRupee, Mail, Phone, Trash2, AlertTriangle } from '@/lib/icons';
 import Modal from '../Modal';
 import {
   createAlert, updateAlert, deleteAlert,

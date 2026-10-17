@@ -7,7 +7,7 @@
  * Opened from a row in the store's Orders list, or from "Order details" on
  * the card in a chat. */
 
-import { Package, ExternalLink } from 'lucide-react';
+import { Package, ExternalLink } from '@/lib/icons';
 import Modal from '../Modal';
 import PeerAvatar from '../messages/PeerAvatar';
 import { useMessaging } from '../../lib/messaging/useMessaging';

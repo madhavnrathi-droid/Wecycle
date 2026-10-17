@@ -8,7 +8,7 @@
  * the card is a shortcut for the steps people would otherwise type out. */
 
 import { useState } from 'react';
-import { Package } from 'lucide-react';
+import { Package } from '@/lib/icons';
 import type { DeepLinkPost } from '../../lib/liveData';
 import { usePostPreview } from '../../lib/messaging/useMessaging';
 import { roleIn, type Order } from '../../lib/orders/store';

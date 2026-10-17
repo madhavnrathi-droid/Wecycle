@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, Plus, Share2 } from 'lucide-react';
+import { Lock, Plus, Share2 } from '@/lib/icons';
 import type { Room } from '../lib/rooms';
 import { haptics } from '../lib/haptics';
 import { track, EVT } from '../lib/analytics';

@@ -6,7 +6,7 @@
    into than in a form, so the form doesn't try. */
 
 import { useEffect, useRef, useState } from 'react';
-import { Minus, Plus, Package, Check } from 'lucide-react';
+import { Minus, Plus, Package, Check } from '@/lib/icons';
 import Modal from '../Modal';
 import type { MarketplaceItem } from '../../lib/mockData';
 import { resolveItemMedia } from '../../lib/photos';

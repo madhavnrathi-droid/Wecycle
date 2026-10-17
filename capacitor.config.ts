@@ -16,10 +16,10 @@ const config: CapacitorConfig = {
        more — MainActivity reports the insets to CSS instead of padding the
        WebView, so the web layer paints edge to edge and this shows only during
        the first frame before it does. */
-    backgroundColor: '#FAFAF6',
+    backgroundColor: '#FFFFFF',
   },
   ios: {
-    backgroundColor: '#FAFAF6',
+    backgroundColor: '#FFFFFF',
     /* The web layer already paints its own strip behind the status bar
        (.app-container::before, sized by env(safe-area-inset-top)) and pads for
        the home indicator itself. Letting Capacitor inset the WebView as well
@@ -35,7 +35,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 600,
       launchAutoHide: true,
-      backgroundColor: '#FAFAF6',
+      backgroundColor: '#FFFFFF',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
     },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Menu } from 'lucide-react';
+import { Menu } from '@/lib/icons';
 import { Wordmark } from './Brand';
 import { useAuth } from '../lib/AuthContext';
 import { getAvatar } from '../lib/photos';
@@ -57,49 +57,56 @@ export default function TopBar({ onOpenMenu, onOpenAccount, onOpenMessages, titl
       data-scrolled={scrolled || undefined}
       style={{
         position: 'sticky', top: 0, zIndex: 30,
-        background: 'var(--bg-card)',
-        padding: '14px 16px 10px',
+        padding: '10px 16px 8px',
       }}
     >
       <div className="app-topbar">
         <div>
           <button onClick={onOpenMenu} aria-label="Open menu" className="theme-toggle" style={{ marginLeft: -8 }}>
-            <Menu size={20} strokeWidth={1.8} />
+            <Menu size={24} />
           </button>
         </div>
         {title ? (
           <h1 style={{
             margin: 0, textAlign: 'center',
-            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600,
-            letterSpacing: '-0.01em', color: 'var(--text-primary)',
+            fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600,
+            letterSpacing: '-0.025em', color: 'var(--text-primary)',
           }}>
             {title}
           </h1>
-        ) : <Wordmark height={30} />}
+        ) : <Wordmark height={24} />}
         <div className="app-topbar-end">
           <MessagesButton onClick={onOpenMessages} />
           <button
             aria-label="Your profile"
             onClick={onOpenAccount}
+            /* A 44px target around a 32px disc: the avatar is a way in, not a
+               headline, so it is drawn at the size of the icons beside it. */
             style={{
               width: 44, height: 44, borderRadius: '50%',
-              background: 'var(--bg-inset)',
+              background: 'transparent',
               border: 'none', cursor: 'pointer',
-              padding: 0, overflow: 'hidden',
+              padding: 0, marginRight: -6,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
             }}
             suppressHydrationWarning
           >
-            {mounted && (
-              <img
-                src={getAvatar(user?.id ?? 'guest')}
-                alt=""
-                width={44}
-                height={44}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            )}
+            <span style={{
+              width: 32, height: 32, borderRadius: '50%', overflow: 'hidden',
+              background: 'var(--bg-inset)', display: 'block',
+              boxShadow: 'inset 0 0 0 0.5px rgba(17, 17, 16, 0.10)',
+            }}>
+              {mounted && (
+                <img
+                  src={getAvatar(user?.id ?? 'guest')}
+                  alt=""
+                  width={32}
+                  height={32}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              )}
+            </span>
           </button>
         </div>
       </div>

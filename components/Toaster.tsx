@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, AlertCircle } from 'lucide-react';
+import { Check, AlertCircle } from '@/lib/icons';
 import { onToast, toast, type ToastMsg } from '../lib/toast';
 import { DUR, EASE, SPRING, reducedMotion } from '../lib/motion';
 

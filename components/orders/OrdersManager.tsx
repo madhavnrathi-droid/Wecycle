@@ -12,7 +12,7 @@
  * ready ones waiting to be collected, then work in hand by due date. */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Package, ShoppingBag } from 'lucide-react';
+import { ChevronRight, Package, ShoppingBag } from '@/lib/icons';
 import {
   useOrders, ordersAs, sortForStore, bucketCounts, bucketOf, BUCKET_LABEL,
   type Bucket, type Order,

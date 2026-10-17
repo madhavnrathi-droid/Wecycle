@@ -6,7 +6,7 @@ import PostStamp from './PostStamp';
 import { moments, markJustSold, clearJustSold } from '../lib/moments';
 import { toast } from '../lib/toast';
 import { SOLD_VISIBLE_DAYS } from '../lib/feed/rank';
-import { Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check } from 'lucide-react';
+import { Search, MapPin, X, Heart, CalendarDays, Eye, Users, Check, EmojiGlyph } from '@/lib/icons';
 import { MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS, type MarketplaceItem, type CommunityEvent, type LostItem, closedLabelFor } from '../lib/mockData';
 import { opportunityCompLabel } from '../lib/opportunity';
 import { resolveItemMedia, getEventPhoto, resolveLostFoundPhoto } from '../lib/photos';
@@ -488,7 +488,7 @@ function SummaryPill({ icon, label }: { icon: string; label: string }) {
       fontSize: 'calc(12px * var(--text-scale))', fontWeight: 500,
       color: 'var(--text-secondary)',
     }}>
-      <span aria-hidden="true">{icon}</span> {label}
+      <EmojiGlyph emoji={icon} size={15} /> {label}
     </span>
   );
 }
@@ -546,7 +546,7 @@ function InventoryCard({
               borderRadius: 999,
               fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
             }}>
-              {item.isRequest ? '🙋 Request' : item.category}
+              {item.isRequest ? 'Request' : item.category}
             </span>
             <p style={{
               margin: 0,
@@ -627,7 +627,7 @@ function InventoryCard({
                 <div className="feed-card-meta">
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                     {item.isRequest
-                      ? <>🙋 {item.category}</>
+                      ? <>Wanted · {item.category}</>
                       : <><MapPin size={10} strokeWidth={2} />{item.location}</>}
                   </span>
                   <span
@@ -663,8 +663,8 @@ function InventoryCard({
 }
 
 /* Per-card action pill rendered BELOW the photo/card area. Owner-only.
-   Default (available): white bg, black text, 1px border.
-   Active/closed (already sold/completed): black bg, white text, no border.
+   Default (available): a soft fill, ink text.
+   Active/closed (already sold/completed): ink bg, white text.
    Hover: slight elevation on the available state. */
 function CompleteButton({
   label, onClick, isClosed, onReopen,
@@ -695,9 +695,9 @@ function CompleteButton({
         width: '100%',
         padding: '7px 10px',
         marginTop: 6,
-        background: isClosed ? '#0E0E0E' : 'var(--bg-surface, #fff)',
+        background: isClosed ? 'var(--ink)' : 'var(--bg-inset)',
         color: isClosed ? '#fff' : 'var(--text-primary)',
-        border: isClosed ? 'none' : '1px solid var(--border-default)',
+        border: 'none',
         borderRadius: 999,
         fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em',
         cursor: busy ? 'wait' : (isClosed && !canUndo) ? 'default' : 'pointer',
@@ -870,7 +870,7 @@ function InventoryLostFoundCard({
             color: '#fff',
             backdropFilter: 'blur(8px)', borderRadius: 999,
             padding: '4px 10px',
-            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             zIndex: 3,
           }}>
             {lf.status}

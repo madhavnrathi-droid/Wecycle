@@ -43,7 +43,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
-import { ArrowUpRight, BadgeCheck, Loader2, Lock, Ticket } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, Loader2, Lock, Ticket } from '@/lib/icons';
 import ScratchCode from './ScratchCode';
 import PlainCode from './PlainCode';
 import { OUTAGE_MODE } from '../lib/outage';

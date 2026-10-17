@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight,
   Bell, BellRing, Shield, Tag, Info, LifeBuoy,
   MessageSquare, Globe, EyeOff, Trash2, Loader2, UserX, Lock,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push';
 import { getBlockedUsers, unblockUser, onBlocksChange, type BlockedUser } from '../lib/moderation';
 import {
@@ -500,8 +500,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     <section style={{ padding: '4px 20px 18px' }}>
       <div style={{ marginBottom: 10 }}>
         <h3 style={{
-          margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase',
+          margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+          letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           color: 'var(--text-secondary)',
         }}>
           {title}
@@ -522,8 +522,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-default)',
+      background: 'var(--bg-inset)',
+      border: 'none',
       borderRadius: 16,
       overflow: 'hidden',
     }}>
@@ -572,8 +572,8 @@ function LinkCard({ icon, title, subtitle, onClick }: {
       onClick={onClick}
       style={{
         all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%',
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-default)',
+        background: 'var(--bg-inset)',
+        border: 'none',
         borderRadius: 16, padding: '14px 16px',
         display: 'flex', alignItems: 'center', gap: 12,
       }}

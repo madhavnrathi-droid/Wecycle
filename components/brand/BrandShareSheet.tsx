@@ -20,7 +20,7 @@
  * Remix draws the gradient again with a new seed. */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Share2, Download, Copy, Loader2, Shuffle, Check, RotateCcw } from 'lucide-react';
+import { Share2, Download, Copy, Loader2, Shuffle, Check, RotateCcw } from '@/lib/icons';
 import Modal from '../Modal';
 import { WhatsAppMark } from '../ContactChannels';
 import { openExternal } from '../PostLink';

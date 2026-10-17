@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle } from '@/lib/icons';
 import { useBreakpoint } from '../../lib/useBreakpoint';
 import { track, EVT } from '../../lib/analytics';
 import { haptics } from '../../lib/haptics';

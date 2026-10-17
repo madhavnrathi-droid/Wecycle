@@ -14,7 +14,7 @@
  */
 
 import { useRef, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy } from '@/lib/icons';
 import { haptics } from '../lib/haptics';
 
 export interface PlainCodeProps {

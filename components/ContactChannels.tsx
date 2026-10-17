@@ -12,7 +12,7 @@
  * seller's details are only fetched for members. */
 
 import type { ReactNode } from 'react';
-import { MessageCircle, Mail, ShoppingBag } from 'lucide-react';
+import { MessageCircle, Mail, ShoppingBag } from '@/lib/icons';
 import type { ContactLink } from '../lib/contactUser';
 import { toast } from '../lib/toast';
 import { haptics } from '../lib/haptics';

@@ -5,7 +5,7 @@
  * dynamically and only when running inside the native app, so the web bundle is
  * unaffected.
  *
- *  - Status bar: dark icons on the light (#FAFAF6) surface; Android bar bg set
+ *  - Status bar: dark icons on the light (#FFFFFF) surface; Android bar bg set
  *    to match so it blends with the app header.
  *  - Keyboard: resize the web view so focused inputs aren't covered.
  *  - Splash: hide once the web app has mounted (snappier than a fixed timer).
@@ -27,7 +27,7 @@ export default function NativeInit() {
         /* Style.Dark = dark icons/text, for our light background. */
         await StatusBar.setStyle({ style: Style.Dark });
         if (Capacitor.getPlatform() === 'android') {
-          await StatusBar.setBackgroundColor({ color: '#FAFAF6' });
+          await StatusBar.setBackgroundColor({ color: '#FFFFFF' });
         }
       } catch { /* plugin unavailable — ignore */ }
 

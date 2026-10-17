@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import type { MarketplaceItem } from '../../lib/mockData';
 import { normalizeLink, linkHost } from '../../lib/postLink';
 import { findObjectionable, objectionableMessage } from '../../lib/contentFilter';
-import { MapPin, Bell, Link2, ChevronRight } from 'lucide-react';
+import { MapPin, Bell, Link2, ChevronRight, EmojiGlyph } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
@@ -335,7 +335,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
                   aria-pressed={form.oppRole === r}
                   onClick={() => update('oppRole', r)}
                 >
-                  <span style={{ fontSize: 'calc(20px * var(--text-scale))' }} aria-hidden="true">{OPP_ROLE_META[r].emoji}</span>
+                  <EmojiGlyph emoji={OPP_ROLE_META[r].emoji} size={24} />
                   <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>{OPP_ROLE_META[r].label}</span>
                   <span style={{ fontSize: 'calc(10.5px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
                     {OPP_ROLE_META[r].blurb}
@@ -358,7 +358,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
                   aria-pressed={form.comp === c}
                   onClick={() => update('comp', c)}
                 >
-                  <span style={{ fontSize: 'calc(20px * var(--text-scale))' }} aria-hidden="true">{COMP_META[c].emoji}</span>
+                  <EmojiGlyph emoji={COMP_META[c].emoji} size={24} />
                   <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>{COMP_META[c].label}</span>
                   <span style={{ fontSize: 'calc(10.5px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>{COMP_META[c].blurb}</span>
                 </button>
@@ -422,7 +422,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
                   {form.ratePeriod === 'project' ? 'Budget' : 'How much'}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span aria-hidden="true" style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0 }}>₹</span>
+                  <span aria-hidden="true" style={{ fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)', flexShrink: 0 }}>₹</span>
                   <input
                     id="si-price"
                     type="number" inputMode="numeric" min="0"
@@ -459,7 +459,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
                   fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)',
                 }}>
                   Shows on your post as{' '}
-                  <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+                  <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                     {opportunityCompLabel({
                       comp: 'paid',
                       price: form.price ?? null,
@@ -493,7 +493,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
                   aria-pressed={form.deal === d.id}
                   onClick={() => { haptics.selection(); update('deal', d.id); }}
                 >
-                  <span style={{ fontSize: 'calc(20px * var(--text-scale))' }} aria-hidden="true">{d.emoji}</span>
+                  <EmojiGlyph emoji={d.emoji} size={24} />
                   <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>{d.label}</span>
                   <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}>
                     {d.blurb}
@@ -822,7 +822,7 @@ function NotifyToggle({
           <span style={{
             position: 'absolute', inset: 0,
             borderRadius: 999,
-            background: checked ? 'var(--accent-green, #A8DD00)' : 'var(--border-subtle, rgba(255,255,255,0.15))',
+            background: checked ? 'var(--brand)' : 'var(--border-subtle, rgba(255,255,255,0.15))',
             transition: 'background 200ms',
             cursor: 'pointer',
           }} onClick={() => onChange(!checked)} />
@@ -848,7 +848,7 @@ function NotifyToggle({
           onClick={onClose}
           style={{
             background: 'none', border: 'none', padding: 0,
-            color: 'var(--accent-primary, #A8DD00)',
+            color: 'var(--brand-ink)',
             fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
             textDecoration: 'underline', textDecorationStyle: 'dotted',
           }}
@@ -890,10 +890,9 @@ function ConditionSlider({
             pointerEvents: 'none',
           }}
         >
-          <span>{stop.emoji}</span>
           <span style={{
-            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, marginTop: 2,
-            color: stop.color, letterSpacing: '-0.01em',
+            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, marginTop: 24,
+            color: 'var(--text-primary)', letterSpacing: '-0.015em', whiteSpace: 'nowrap',
           }}>{stop.label}</span>
         </div>
       </div>
@@ -915,9 +914,12 @@ function ConditionSlider({
           width: '100%',
           appearance: 'none',
           WebkitAppearance: 'none',
-          height: 10,
+          height: 4,
           borderRadius: 999,
-          background: 'linear-gradient(to right, #F87171 0%, #FB923C 25%, #FACC15 50%, #86EFAC 75%, #22C55E 100%)',
+          /* The reference widget's gradient bar: thin, and in our sunset
+             palette rather than a traffic light. Worn → like new reads left to
+             right from the label above the thumb, not from the colour. */
+          background: 'linear-gradient(to right, #CDB9DC 0%, #F2B9A3 35%, #FF9A52 70%, #1F9D5F 100%)',
           outline: 'none',
           cursor: 'pointer',
         }}
@@ -926,21 +928,21 @@ function ConditionSlider({
         input[type='range']::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 22px; height: 22px;
+          width: 26px; height: 26px;
           border-radius: 50%;
           background: #fff;
-          border: 2px solid ${stop.color};
-          box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+          border: none;
+          box-shadow: 0 0.5px 1px rgba(17,17,16,0.12), 0 3px 8px rgba(17,17,16,0.16);
           cursor: pointer;
           transition: transform 0.15s;
         }
         input[type='range']::-webkit-slider-thumb:hover { transform: scale(1.08); }
         input[type='range']::-moz-range-thumb {
-          width: 22px; height: 22px;
+          width: 26px; height: 26px;
           border-radius: 50%;
           background: #fff;
-          border: 2px solid ${stop.color};
-          box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+          border: none;
+          box-shadow: 0 0.5px 1px rgba(17,17,16,0.12), 0 3px 8px rgba(17,17,16,0.16);
           cursor: pointer;
         }
       `}</style>

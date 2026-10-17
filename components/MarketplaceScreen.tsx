@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Search, SlidersHorizontal, Heart, MapPin, MessageCircle,
   X, Check, ArrowUpDown, Grid3X3, List, Clock, ArrowRight,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { MARKETPLACE_ITEMS, CATEGORIES, LISTING_TYPES, type MarketplaceItem } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import EmptyState from './EmptyState';
@@ -73,7 +73,7 @@ export default function MarketplaceScreen() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <h1 style={{
-            margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 700,
+            margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.025em', color: 'var(--text-primary)', flex: 1,
           }}>
             Market
@@ -156,7 +156,7 @@ export default function MarketplaceScreen() {
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               padding: '12px 16px',
-              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 800,
+              fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600,
               color: activeType === type.id ? 'var(--text-primary)' : 'var(--text-muted)',
               borderBottom: `2px solid ${activeType === type.id ? 'var(--accent-lime)' : 'transparent'}`,
               whiteSpace: 'nowrap', transition: 'all 0.15s',
@@ -263,7 +263,7 @@ export default function MarketplaceScreen() {
           }} />
           <div style={{ fontSize: 'calc(36px * var(--text-scale))', position: 'relative' }}>📦</div>
           <div style={{ flex: 1, position: 'relative' }}>
-            <p style={{ margin: '0 0 2px', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 900, color: '#0C0C0B', letterSpacing: '-0.02em' }}>
+            <p style={{ margin: '0 0 2px', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: '#0C0C0B', letterSpacing: '-0.02em' }}>
               Got something to give?
             </p>
             <p style={{ margin: 0, fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(0,0,0,0.6)', fontWeight: 600 }}>
@@ -273,9 +273,9 @@ export default function MarketplaceScreen() {
           <button style={{
             background: '#0C0C0B', color: 'var(--accent-lime)',
             border: 'none', padding: '9px 14px', borderRadius: 'var(--radius-pill)',
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 900, cursor: 'pointer',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 4,
-            position: 'relative', letterSpacing: '0.04em', textTransform: 'uppercase',
+            position: 'relative', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             flexShrink: 0,
           }}>
             Share <ArrowRight size={12} strokeWidth={2.5} />
@@ -292,19 +292,19 @@ export default function MarketplaceScreen() {
             <div style={{ padding: '16px 20px 24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{
-                  margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 900,
+                  margin: 0, fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
                   letterSpacing: '-0.02em', color: 'var(--text-primary)', flex: 1,
                 }}>
                   Filter
                 </h2>
                 <button
                   onClick={() => { setActiveType('all'); setFilterOpen(false); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
                 >
                   Reset
                 </button>
               </div>
-              <p style={{ margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <p style={{ margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
                 Listing Type
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
@@ -318,7 +318,7 @@ export default function MarketplaceScreen() {
                       background: activeType === type.id ? 'rgba(168,221,0,0.08)' : 'var(--bg-inset)',
                       border: `1.5px solid ${activeType === type.id ? 'rgba(168,221,0,0.5)' : 'transparent'}`,
                       borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 700,
+                      cursor: 'pointer', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
                       color: 'var(--text-primary)',
                     }}
                   >
@@ -399,7 +399,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h3 style={{
-                margin: '0 0 6px', fontSize: 'calc(24px * var(--text-scale))', fontWeight: 900,
+                margin: '0 0 6px', fontSize: 'calc(24px * var(--text-scale))', fontWeight: 600,
                 color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1,
               }}>
                 {item.title}
@@ -409,11 +409,11 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
                   width: 22, height: 22, borderRadius: '50%',
                   background: item.user.color,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 'calc(10px * var(--text-scale))', fontWeight: 800, color: '#fff',
+                  fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, color: '#fff',
                 }}>
                   {item.user.initials[0]}
                 </div>
-                <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
+                <span style={{ fontSize: 'calc(12px * var(--text-scale))', color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
                   {item.user.name.split(' ')[0]}
                 </span>
                 <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'rgba(255,255,255,0.4)' }}>·</span>
@@ -425,7 +425,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
             </div>
             <div style={{
               background: tc.bg, color: tc.color,
-              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 900,
+              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
               padding: '8px 14px', borderRadius: 'var(--radius-pill)',
               letterSpacing: '-0.01em', flexShrink: 0,
               backdropFilter: 'blur(8px)',
@@ -444,7 +444,7 @@ function FeaturedCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         borderBottom: '1px solid var(--border-subtle)',
       }}>
         <span style={{
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800,
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
           color: item.condition === 'like_new' ? 'var(--accent-lime-ink)' : 'var(--text-muted)',
         }}>
           {CONDITION_LABEL[item.condition]}
@@ -505,7 +505,7 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
         <div style={{
           position: 'absolute', bottom: 8, left: 8,
           background: tc.bg, color: tc.color,
-          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 900,
+          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
           padding: '4px 9px', borderRadius: 'var(--radius-pill)',
           letterSpacing: '-0.01em',
           backdropFilter: 'blur(6px)',
@@ -516,7 +516,7 @@ function GridItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
 
       {/* Caption */}
       <h3 style={{
-        margin: '0 0 4px', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 800,
+        margin: '0 0 4px', fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
         color: 'var(--text-primary)', letterSpacing: '-0.01em',
         display: '-webkit-box', WebkitLineClamp: 1,
         WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -568,7 +568,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
           <h3 style={{
-            margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 800,
+            margin: 0, fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
             color: 'var(--text-primary)', letterSpacing: '-0.01em', flex: 1,
             display: '-webkit-box', WebkitLineClamp: 1,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -577,7 +577,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
           </h3>
           <span style={{
             background: tc.bg, color: tc.color,
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 900,
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600,
             padding: '3px 9px', borderRadius: 'var(--radius-pill)', flexShrink: 0,
           }}>
             {priceLabel}
@@ -598,7 +598,7 @@ function ListItemCard({ item, isSaved, onSave }: { item: MarketplaceItem; isSave
             width: 16, height: 16, borderRadius: '50%',
             background: item.user.color,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 800, color: '#fff',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, color: '#fff',
           }}>
             {item.user.initials[0]}
           </div>

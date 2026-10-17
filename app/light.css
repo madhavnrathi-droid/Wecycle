@@ -1,0 +1,1040 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT — Wecycle's design system, second edition
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Loaded after globals.css (app/layout.tsx), so every rule here wins by order
+   alone. globals.css still holds the layout, the behaviour and the long
+   arguments behind each component; this sheet changes how the product LOOKS.
+
+   What changed, and why
+   ─────────────────────
+   The app read as loud and machine-made: heavy bold type at every size, a
+   2px icon stroke heavier than the words beside it, a border around nearly
+   everything, a lime button, a purple button, a green-to-blue gradient
+   button, a mint pill in the tab bar, and 3D voxel art standing in for
+   icons. Every element asked for attention, so nothing could get it.
+
+   The rules this edition follows:
+
+   1. Space and type make the hierarchy. Not boxes. A group is a group
+      because its parts sit close together and far from the next group. A
+      surface gets a fill only when it is a control (a field, a track); a
+      line appears only where two scrolling regions meet.
+
+   2. Apple's type system. Text styles from the iOS Human Interface
+      Guidelines: Large Title 34, Title 1 28, Title 2 22, Title 3 20,
+      Headline 17 semibold, Body 17, Callout 16, Subhead 15, Footnote 13,
+      Caption 12/11. The font is the platform's own: SF Pro on Apple
+      devices, Roboto on Android, Segoe on Windows, Geist after that. Bold
+      (700) is kept for large titles; everything at reading size is
+      semibold (600) at most. Prices and figures go LIGHT (300) at large
+      sizes, the way Apple's widgets show a time or a temperature.
+
+   3. A mono voice for labels. Eyebrows, badges, counters and timestamps are
+      set small, uppercase and monospaced (SF Mono, then Geist Mono): the
+      "TODAY'S SUNSET" register from the reference widget and the
+      "FOR STUDENTS / BY STUDENTS" lines on our own posts. It separates
+      metadata from content without another weight or another box.
+
+   4. One ink, one green. Primary actions are near-black with white text.
+      Wecycle green is the accent: a selected state, a link, a success. Lime
+      survives in the textures and the grain, where it belongs.
+
+   5. Thin icons. Phosphor, LIGHT weight, through lib/icons.tsx. The FILL
+      weight marks a selected state: a change of shape, not of colour.
+
+   6. Lighter motion. Shorter travel, no bounce on ordinary presses, and the
+      gentle overshoot kept for the one or two moments that earn it (the
+      heart, the SOLD stamp).
+
+   Contrast is measured, not guessed. Every text colour below clears WCAG AA
+   (4.5:1) against --bg-inset, the darkest light surface, so it clears every
+   lighter one too. Numbers are next to each value.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Type ─────────────────────────────────────────────────────────────── */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  /* The token scale globals.css already exposes, re-pointed at Apple's sizes.
+     --text-lg moves 19 → 20 (Title 3) and --text-3xl 36 → 34 (Large Title). */
+  --text-xs: 0.6875rem;   /* 11  Caption 2  */
+  --text-sm: 0.8125rem;   /* 13  Footnote   */
+  --text-base: 0.9375rem; /* 15  Subhead    */
+  --text-md: 1.0625rem;   /* 17  Body       */
+  --text-lg: 1.25rem;     /* 20  Title 3    */
+  --text-xl: 1.375rem;    /* 22  Title 2    */
+  --text-2xl: 1.75rem;    /* 28  Title 1    */
+  --text-3xl: 2.125rem;   /* 34  Large Title */
+
+  /* ── Surfaces ─────────────────────────────────────────────────────────
+     White page, one quiet fill for controls. The cream base is gone: with
+     cards on cream every card is a box; with both white, a card is just its
+     photo and its words. */
+  --bg-base: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F7F7F5;
+  --bg-inset: #F4F4F2;
+  --bg-overlay: rgba(255, 255, 255, 0.86);
+
+  /* Lines are the exception, so they are faint. */
+  --border-default: #E9E9E6;
+  --border-subtle: #F0F0EE;
+  --border-strong: #D4D4D0;
+  --hairline: rgba(17, 17, 16, 0.08);
+
+  /* ── Text ───────────────────────────────────────────── vs inset · white */
+  --text-primary: #111110;     /* 17.2 · 18.9 */
+  --text-secondary: #5C5C58;   /*  6.1 ·  6.7 */
+  --text-muted: #6A6A65;       /*  4.9 ·  5.4 */
+  /* Decoration only — dividers, disabled glyphs. Never text. */
+  --text-quaternary: #B4B4AF;
+  --text-on-accent: #FFFFFF;
+
+  /* ── Ink and green ────────────────────────────────────────────────────── */
+  --ink: #111110;
+  --ink-hover: #2A2A28;
+  --brand: #00965E;            /* the logomark; fills and icons (3.6 on white) */
+  --brand-ink: #0F7A45;        /* the green as TEXT — 4.9 · 5.4 */
+  --brand-tint: #E8F5EE;
+  /* The keyboard ring: a non-text indicator, so 3:1 is the bar. 3.2 on inset. */
+  --focus-ring: #1F9D5F;
+
+  /* ── Elevation ─────────────────────────────────────────────────────────
+     Shadows describe a thing floating (a sheet, a menu, the tab bar), not a
+     thing being important. So they are wide and faint, and cards have none. */
+  --shadow-sm: 0 1px 2px rgba(17, 17, 16, 0.04);
+  --shadow-md: 0 8px 24px -12px rgba(17, 17, 16, 0.14);
+  --shadow-lg: 0 18px 44px -18px rgba(17, 17, 16, 0.20);
+  --shadow-xl: 0 28px 64px -24px rgba(17, 17, 16, 0.26);
+  --shadow-accent: none;
+
+  /* Glass, thinner and whiter. */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-strong: rgba(255, 255, 255, 0.90);
+  --glass-bg-faint: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(17, 17, 16, 0.06);
+  --glass-inset: none;
+  --glass-shadow: var(--shadow-lg);
+
+  /* Editable fields: a fill, and a line only when focused. */
+  --edit-border: transparent;
+  --edit-border-hover: transparent;
+  --edit-bg: var(--bg-inset);
+  --edit-bg-focus: #EEEEEB;
+  --edit-ring: rgba(17, 17, 16, 0.10);
+
+  /* ── Motion ────────────────────────────────────────────────────────────
+     Same five durations (lib/motion.test.ts holds every component to them).
+     What changes is the feel: the snappy curve no longer overshoots — it is
+     Apple's own deceleration — and the bouncy one overshoots ~4% instead of
+     ~15%, so the heart lands rather than springs. */
+  --spring-snappy: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring-bouncy: cubic-bezier(0.34, 1.18, 0.64, 1);
+  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --press-scale: 0.97;
+
+  /* Radii: continuous-looking, one step softer for media. */
+  --radius-media: 14px;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring-snappy: cubic-bezier(0.32, 0.72, 0, 1);
+    /* ζ 0.72, ω 24 — 3.8% overshoot, settles in ~360ms */
+    --spring-bouncy: linear(0, 0.0266 2.8%, 0.1430 7.2%, 0.3383 12.5%, 0.5621 18.4%,
+      0.7633 24.9%, 0.9106 31.9%, 0.9969 39.2%, 1.0331 47%, 1.0375 55.1%,
+      1.0276 63.5%, 1.0150 72.2%, 1.0056 81.2%, 1.0005 90.5%, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --spring-snappy: var(--ease-standard);
+    --spring-bouncy: var(--ease-standard);
+  }
+}
+
+/* ═══ Base ═════════════════════════════════════════════════════════════════ */
+
+/* Restated on body because Geist's family names arrive as custom properties
+   on <body> (the `geist` package's className). Referenced from :root they are
+   undefined there, and an undefined var() voids the whole stack — the page
+   falls back to the browser's serif. */
+body {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    system-ui, "Segoe UI", Roboto, var(--font-geist-sans, "Helvetica Neue"), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, var(--font-geist-mono, Menlo), Menlo, monospace;
+  font-family: var(--font-sans);
+  font-size: calc(15px * var(--text-scale));
+  letter-spacing: -0.01em;
+  /* Apple's text is drawn with optical sizes; ask for them. */
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: rgba(0, 150, 94, 0.18); }
+
+code, kbd, samp, pre { font-family: var(--font-mono); }
+
+/* ═══ Type styles ══════════════════════════════════════════════════════════
+   Named after the iOS text styles so a design note and the code use the same
+   words. Size · line height · tracking are Apple's (tracking converted to em
+   and held at zero on the two display sizes, which only SF can carry loose). */
+
+.t-large-title { font-size: calc(34px * var(--text-scale)); line-height: 1.2;  font-weight: 700; letter-spacing: -0.012em; }
+.t-title1      { font-size: calc(28px * var(--text-scale)); line-height: 1.21; font-weight: 700; letter-spacing: -0.01em; }
+.t-title2      { font-size: calc(22px * var(--text-scale)); line-height: 1.27; font-weight: 600; letter-spacing: -0.012em; }
+.t-title3      { font-size: calc(20px * var(--text-scale)); line-height: 1.25; font-weight: 600; letter-spacing: -0.022em; }
+.t-headline    { font-size: calc(17px * var(--text-scale)); line-height: 1.29; font-weight: 600; letter-spacing: -0.025em; }
+.t-body        { font-size: calc(17px * var(--text-scale)); line-height: 1.29; font-weight: 400; letter-spacing: -0.025em; }
+.t-callout     { font-size: calc(16px * var(--text-scale)); line-height: 1.31; font-weight: 400; letter-spacing: -0.02em; }
+.t-subhead     { font-size: calc(15px * var(--text-scale)); line-height: 1.33; font-weight: 400; letter-spacing: -0.015em; }
+.t-footnote    { font-size: calc(13px * var(--text-scale)); line-height: 1.38; font-weight: 400; letter-spacing: -0.006em; }
+.t-caption     { font-size: calc(12px * var(--text-scale)); line-height: 1.33; font-weight: 400; letter-spacing: 0; }
+.t-caption2    { font-size: calc(11px * var(--text-scale)); line-height: 1.18; font-weight: 400; letter-spacing: 0.005em; }
+
+/* The mono label — eyebrows, badges, counters, timestamps. */
+.t-label {
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--text-scale));
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+/* Large figures drawn light — a price, a count, a time. */
+.t-figure {
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The older names, re-pointed. */
+.text-display { font-size: var(--text-3xl); font-weight: 700; letter-spacing: -0.012em; line-height: 1.12; }
+.text-h1      { font-size: var(--text-2xl); font-weight: 700; letter-spacing: -0.01em;  line-height: 1.2; }
+.text-h2      { font-size: var(--text-xl);  font-weight: 600; letter-spacing: -0.012em; line-height: 1.27; }
+.text-h3      { font-size: var(--text-md);  font-weight: 600; letter-spacing: -0.025em; line-height: 1.29; }
+.text-label {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.text-metric, .text-metric-sm { font-weight: 300; letter-spacing: -0.02em; }
+
+/* ═══ Buttons ══════════════════════════════════════════════════════════════ */
+
+.btn {
+  font-size: calc(15px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  transition: transform var(--dur-2) var(--ease-standard),
+              background-color var(--dur-2) var(--ease-standard),
+              color var(--dur-2) var(--ease-standard),
+              opacity var(--dur-2) var(--ease-standard);
+}
+.btn:active { transform: scale(var(--press-scale)); }
+
+/* One primary look: ink. The lime fill, and the green-to-blue gradient that
+   sat beside it, were two answers to one question. */
+.btn-primary,
+.btn-gradient {
+  background: var(--ink);
+  color: #FFFFFF;
+  padding: 13px 22px;
+  box-shadow: none;
+  filter: none;
+}
+.btn-primary:hover,
+.btn-gradient:hover { background: var(--ink-hover); filter: none; }
+.btn-primary:disabled,
+.btn-gradient:disabled { opacity: 0.35; }
+
+.btn-secondary {
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: none;
+  padding: 12px 20px;
+}
+.btn-secondary:hover { background: #ECECE9; }
+
+.btn-ghost { color: var(--text-primary); font-weight: 500; }
+.btn-ghost:hover { background: var(--bg-inset); }
+
+.btn-icon,
+.theme-toggle {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--text-primary);
+}
+.btn-icon:hover,
+.theme-toggle:hover { background: var(--bg-inset); color: var(--text-primary); }
+.theme-toggle:active { transform: scale(0.92); }
+
+.btn-sm { padding: 8px 14px; font-size: calc(13px * var(--text-scale)); }
+.btn-lg { padding: 16px 26px; font-size: calc(17px * var(--text-scale)); }
+
+/* ═══ Badges & chips ═══════════════════════════════════════════════════════ */
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+}
+
+/* ═══ Forms ════════════════════════════════════════════════════════════════
+   A field is a soft fill. No outline at rest; on focus it whitens and takes a
+   hairline of ink, which is the one place a line earns its keep. */
+
+.field { gap: 8px; }
+.field-label {
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  color: var(--text-secondary);
+}
+.field-hint { font-size: calc(12px * var(--text-scale)); line-height: 1.4; }
+.field-error { font-size: calc(12px * var(--text-scale)); color: var(--accent-rose-ink); }
+
+.form-input,
+.form-select,
+.form-textarea {
+  background: var(--bg-inset);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 14px;
+  letter-spacing: -0.015em;
+}
+.form-input:hover,
+.form-select:hover,
+.form-textarea:hover { border-color: transparent; background: #F0F0EE; }
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  background: #FFFFFF;
+  border-color: rgba(17, 17, 16, 0.85);
+  box-shadow: none;
+}
+.form-input::placeholder,
+.form-textarea::placeholder { color: #8C8C87; }
+
+/* Choice tiles (Sign up: "Manipal / NMIMS", "Myself / A student business").
+   Fill, no outline; the chosen one turns ink. */
+.option-card {
+  background: var(--bg-inset);
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  transition: background var(--dur-2) var(--ease-standard),
+              color var(--dur-2) var(--ease-standard),
+              transform var(--dur-1) var(--ease-standard);
+}
+.option-card:hover { border-color: transparent; background: #EEEEEB; }
+.option-card:active { transform: scale(0.98); }
+.option-card[aria-pressed="true"],
+.option-card.selected {
+  background: #FFFFFF;
+  border-color: var(--ink);
+  color: var(--text-primary);
+}
+
+.inline-edit--input,
+.inline-edit--body { letter-spacing: -0.015em; }
+
+/* ═══ Search ═══════════════════════════════════════════════════════════════ */
+
+.search-pill {
+  background: var(--bg-inset);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 11px 14px 11px 40px;
+  letter-spacing: -0.015em;
+}
+.search-pill::placeholder { color: #8C8C87; }
+.search-pill:focus,
+.search-pill:focus-visible {
+  background: #EFEFEC;
+  border-color: transparent;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.search-pill:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* ═══ Segmented controls & tabs ════════════════════════════════════════════
+   iOS's segmented control: a grey track, a white thumb with a soft lift. The
+   old thumb was solid ink — the loudest thing on any screen that had one. */
+
+.segmented {
+  background: var(--bg-inset);
+  border: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  padding: 3px;
+  border-radius: 12px;
+}
+.segmented button {
+  min-height: 38px;
+  border-radius: 9px;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  color: var(--text-secondary);
+}
+.segmented button[data-active] {
+  background: #FFFFFF;
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(17, 17, 16, 0.06), 0 3px 8px rgba(17, 17, 16, 0.06);
+}
+.segmented[data-glide]::before {
+  top: 3px;
+  bottom: 3px;
+  border-radius: 9px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(17, 17, 16, 0.06), 0 3px 8px rgba(17, 17, 16, 0.06);
+}
+.segmented[data-glide] button[data-active] { background: transparent; box-shadow: none; }
+
+/* A scrolling row of filters reads as words, not as a control: no track. */
+.segmented.segmented--scroll { background: transparent; padding: 0; gap: 6px; }
+.segmented.segmented--scroll button {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+}
+.segmented.segmented--scroll button[data-active] {
+  background: var(--ink);
+  color: #FFFFFF;
+  box-shadow: none;
+}
+.segmented.segmented--scroll[data-glide]::before { background: var(--ink); box-shadow: none; border-radius: 999px; top: 0; bottom: 0; }
+.segmented.segmented--scroll[data-glide] button { background: transparent; }
+.segmented.segmented--scroll[data-glide] button[data-active] { color: #FFFFFF; }
+
+.tabs { border-radius: 12px; padding: 3px; }
+.tabs button { border-radius: 9px; font-weight: 500; }
+.tabs button[aria-selected="true"] {
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(17, 17, 16, 0.06), 0 3px 8px rgba(17, 17, 16, 0.06);
+}
+
+.listing-type-chip { font-weight: 500; }
+.listing-type-chip[data-active] { background: var(--ink); color: #FFFFFF; font-weight: 600; }
+
+/* ═══ Cards ════════════════════════════════════════════════════════════════ */
+
+.card,
+.card-elevated {
+  border: none;
+  box-shadow: none;
+  background: var(--bg-card);
+}
+.card-glass {
+  background: var(--bg-card);
+  border: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* ═══ Sheets & dialogs ═════════════════════════════════════════════════════
+   A sheet is paper, not frosted glass: white, a wide faint shadow, no
+   outline, and its header and footer separated by space rather than rules. */
+
+.modal-backdrop {
+  background: rgba(17, 17, 16, 0.30);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.modal {
+  background: #FFFFFF;
+  border: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 -12px 48px -12px rgba(17, 17, 16, 0.18);
+  border-radius: 22px 22px 0 0;
+}
+@media (min-width: 768px) {
+  .modal { border-radius: 22px; box-shadow: var(--shadow-xl); }
+}
+.modal-header { border-bottom: none; padding: 16px 20px 6px; }
+.modal-title {
+  font-size: calc(17px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.modal-close { color: var(--text-secondary); background: var(--bg-inset); width: 32px; height: 32px; }
+.modal-close:hover { background: #ECECE9; color: var(--text-primary); }
+.modal-body { padding: 12px 20px 20px; gap: 18px; }
+.modal-footer { border-top: none; background: #FFFFFF; padding: 12px 20px 16px; }
+/* The sheet arrives whole. Staggering its rows made a form feel like it was
+   being assembled while you watched. */
+.modal-body > * { animation: none; }
+
+/* ═══ Top bar ══════════════════════════════════════════════════════════════ */
+
+/* Flat white at the top of the page; once something scrolls under it, the
+   bar becomes a material — translucent, blurred, with a half-pixel line. No
+   drop shadow: the line is enough to say "this floats". */
+.app-topbar-host {
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  transition: box-shadow var(--dur-3) var(--ease-standard),
+              background-color var(--dur-3) var(--ease-standard);
+}
+.app-topbar-host[data-scrolled] {
+  background: rgba(255, 255, 255, 0.80);
+  box-shadow: 0 0.5px 0 var(--hairline);
+}
+.app-topbar-host[data-scrolled] .app-topbar > :nth-child(2) { scale: 0.94; }
+.dm-badge {
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  top: 6px;
+  right: 4px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px #FFFFFF;
+}
+
+/* ═══ Bottom navigation ════════════════════════════════════════════════════
+   Instagram's bar, in Apple's material: icons alone, light at rest, FILLED
+   when selected — the selection is a change of shape, and the bar carries no
+   coloured pill. The create button is a soft tile rather than a green disc. */
+
+.bottom-nav { --nav-rest: #6A6A65; --nav-ink: #111110; }
+.bottom-nav-inner {
+  background: rgba(255, 255, 255, 0.88);
+  background-color: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border-top: 0.5px solid var(--hairline);
+  border-radius: 0;
+  padding-top: 6px;
+}
+.bottom-nav-slider { display: none; }
+.bottom-nav-btn { height: 48px; color: var(--nav-rest); }
+.bottom-nav-btn[data-active] { color: var(--nav-ink); }
+.bottom-nav-btn:active { transform: scale(0.9); }
+.bottom-nav-btn svg { display: block; transition: transform var(--dur-3) var(--spring-bouncy); }
+.bottom-nav-btn[data-active] svg { transform: none; }
+.bottom-nav-btn:not([data-active]):hover { color: var(--nav-ink); }
+
+.bottom-nav-post {
+  width: 52px;
+  height: 38px;
+  border-radius: 13px;
+  background: var(--bg-inset);
+  color: var(--nav-ink);
+  box-shadow: none;
+}
+.bottom-nav-post::after { display: none; }
+.bottom-nav-post:hover { transform: none; background: #ECECE9; }
+.bottom-nav-post:active { transform: scale(0.92); }
+.bottom-nav-post svg { display: block; transition: rotate var(--dur-4) var(--spring-bouncy); }
+.bottom-nav-post[data-open] svg { rotate: 45deg; }
+.bottom-nav-post[data-open] { background: var(--ink); color: #FFFFFF; }
+
+@media (min-width: 768px) {
+  .bottom-nav-inner {
+    border: 0.5px solid var(--hairline);
+    border-radius: 999px;
+    box-shadow: var(--shadow-lg);
+  }
+  .bottom-nav-post { width: 46px; height: 34px; border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-btn svg, .bottom-nav-post svg { transition: none; }
+}
+
+/* ═══ Rails (the home screen's rows) ═══════════════════════════════════════ */
+
+.rail { margin: 0 0 32px; }
+.rail-head { padding: 0 16px 12px; align-items: baseline; }
+.rail-title {
+  font-size: calc(20px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.25;
+}
+.rail-sub {
+  margin-top: 2px;
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 400;
+  letter-spacing: -0.006em;
+  color: var(--text-muted);
+}
+.rail-seeall {
+  font-size: calc(15px * var(--text-scale));
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--brand-ink);
+}
+.rail-seeall:hover { color: var(--text-primary); }
+.rail-seeall svg { display: none; }
+
+/* ═══ Category tiles ═══════════════════════════════════════════════════════ */
+
+.cat-tile { gap: 7px; width: 68px; }
+.cat-tile-ico {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  transition: background var(--dur-2) var(--ease-standard),
+              color var(--dur-2) var(--ease-standard),
+              transform var(--dur-2) var(--ease-standard);
+}
+.cat-tile-ico svg { color: inherit; }
+.cat-tile:hover .cat-tile-ico { transform: none; background: #ECECE9; }
+.cat-tile:active .cat-tile-ico { transform: scale(0.94); }
+.cat-tile[data-active] .cat-tile-ico { background: var(--ink); color: #FFFFFF; box-shadow: none; }
+.cat-tile[data-active] .cat-tile-ico svg { color: #FFFFFF; }
+.cat-tile-label {
+  font-size: calc(12px * var(--text-scale));
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+.cat-tile[data-active] .cat-tile-label { color: var(--text-primary); font-weight: 500; }
+
+/* ═══ Listing cards ════════════════════════════════════════════════════════
+   The photo is the card. No container, no outline: a rounded image and two
+   lines of type beneath it, like a shop window rather than a stack of
+   panels. */
+
+.pcard {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+}
+.pcard:hover { transform: none; box-shadow: none; }
+.pcard[data-pressed] { transform: scale(0.98); }
+.pcard-media { border-radius: var(--radius-media); background: var(--bg-inset); }
+.pcard:hover .pcard-media .fit-img-fg { transform: scale(1.03); }
+.pcard-body { padding: 9px 2px 4px; gap: 3px; min-height: 0; }
+.rail--micro .pcard-body,
+.rail--wide .pcard-body { min-height: 0; padding: 8px 2px 4px; }
+.pcard-title,
+.rail--micro .pcard-title {
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+}
+.pcard-price {
+  order: -1;
+  font-size: calc(15px * var(--text-scale));
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+}
+.pcard-price--soft { font-size: calc(13px * var(--text-scale)); font-weight: 500; }
+.pcard-meta { font-size: calc(12px * var(--text-scale)); margin-top: 2px; }
+.pcard-meta svg { opacity: 0.8; }
+
+/* Save: a frosted disc, no drop shadow. */
+.pcard-save { color: #111110; }
+.pcard-save::before {
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+.pcard-save[data-saved] { color: var(--accent-rose); }
+
+/* Badges on a photo: a frosted label with a dot of colour, in the mono
+   voice. The colour still marks the kind; the word says it. */
+.pcard-badge,
+.pcard-badge[data-kind] {
+  top: 8px;
+  left: 8px;
+  gap: 5px;
+  padding: 4px 8px 4px 7px;
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #111110;
+  font-family: var(--font-mono);
+  font-size: calc(9.5px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.pcard-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot, #111110);
+  flex: 0 0 auto;
+}
+.pcard-badge--second { top: 34px; }
+.pcard-badge[data-kind="lost"]        { --dot: var(--status-lost); }
+.pcard-badge[data-kind="found"]       { --dot: var(--status-found); }
+.pcard-badge[data-kind="event"]       { --dot: var(--status-event); }
+.pcard-badge[data-kind="request"]     { --dot: var(--status-request); }
+.pcard-badge[data-kind="opportunity"] { --dot: var(--status-opportunity); }
+.pcard-badge[data-kind="hiring"]      { --dot: var(--status-hiring); }
+.pcard-badge[data-kind="free"]        { --dot: var(--status-free); }
+.pcard-badge[data-kind="mine"]        { --dot: var(--brand); }
+
+/* ═══ Feed cards (overlay style) ═══════════════════════════════════════════ */
+
+.feed-card { border-radius: 16px; }
+.feed-card--text { border: none; background: var(--bg-inset); }
+.feed-card-text-title { font-weight: 600; letter-spacing: -0.022em; }
+.feed-card-title { font-weight: 500; }
+.feed-card-price { font-weight: 600; letter-spacing: -0.015em; }
+.feed-card-type-chip {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.feed-card-save { box-shadow: none; }
+
+/* Inventory: the coloured outlines are gone; the badge and the status
+   underneath already say what each card is. */
+.inventory-card::after { border-color: transparent !important; box-shadow: none !important; }
+
+/* ═══ The "pass something on" strip ═══════════════════════════════════════ */
+
+.sell-nudge {
+  background: var(--bg-inset);
+  border-radius: 16px;
+  padding: 14px 14px 14px 16px;
+  box-shadow: none;
+}
+.sell-nudge-ico { background: #FFFFFF; box-shadow: none; border-radius: 12px; color: var(--text-primary); }
+.sell-nudge-title { font-weight: 600; font-size: calc(15px * var(--text-scale)); letter-spacing: -0.015em; }
+.sell-nudge-sub { font-size: calc(13px * var(--text-scale)); color: var(--text-muted); }
+.sell-nudge-go {
+  border: none;
+  background: var(--ink);
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: calc(13px * var(--text-scale));
+  padding: 8px 14px;
+}
+.sell-nudge:hover .sell-nudge-go { background: var(--ink-hover); color: #FFFFFF; }
+
+/* ═══ Texture & grain ══════════════════════════════════════════════════════
+   The gradients from our posts: liquid marble with film grain. Generated by
+   scripts/make-textures.py (domain-warped noise mapped to palette bands, the
+   technique behind fffuel's ffflux and gggrain) and served as small WebPs, so
+   a banner costs one ~45KB image instead of an illustration.
+
+     <div class="tex tex--moss">…</div>
+
+   .tex carries the grain on ::after; content sits above it. */
+
+.tex {
+  position: relative;
+  isolation: isolate;
+  background-color: #CFE6B8;
+  background-image: var(--tex-img);
+  background-size: cover;
+  background-position: center;
+}
+.tex::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background-image: url(/textures/grain.png);
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.tex > * { position: relative; z-index: 1; }
+.tex--moss   { --tex-img: url(/textures/moss.webp);   background-color: #5C7A2E; }
+.tex--ember  { --tex-img: url(/textures/ember.webp);  background-color: #C2401F; }
+.tex--prism  { --tex-img: url(/textures/prism.webp);  background-color: #B2343A; }
+.tex--violet { --tex-img: url(/textures/violet.webp); background-color: #5B3FA8; }
+.tex--sunset { --tex-img: url(/textures/sunset.webp); background-color: #E9C2B4; }
+.tex--mist   { --tex-img: url(/textures/mist.webp);   background-color: #DCE3EA; }
+.tex--meadow { --tex-img: url(/textures/meadow.webp); background-color: #DCE8CF; }
+
+/* ═══ Focus ════════════════════════════════════════════════════════════════ */
+
+:focus-visible { outline-color: var(--focus-ring); }
+
+/* ═══ Action lists (the Create sheet) ══════════════════════════════════════
+   A row is a glyph and two lines of type. No container: the press state is
+   the only fill a row ever gets. */
+.post-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 12px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-2) var(--ease-standard),
+              transform var(--dur-1) var(--ease-standard);
+}
+.post-option > svg:first-child { flex-shrink: 0; color: var(--text-primary); }
+.post-option:hover { background: var(--bg-inset); }
+.post-option:active { background: var(--bg-inset); transform: scale(0.985); }
+.post-option:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* The grabber on every sheet. */
+.sheet-grab > div { background: #DCDCD8 !important; width: 36px; height: 5px !important; }
+
+/* ═══ No photo ═════════════════════════════════════════════════════════════ */
+.nophoto { color: var(--text-muted); }
+.nophoto-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.75;
+}
+.nophoto-label {
+  font-family: var(--font-mono);
+  font-size: calc(9.5px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ═══ Banner, textured ═════════════════════════════════════════════════════
+   The home banner as one of our posts: liquid marble under film grain, a mono
+   eyebrow, a title in Title 2. Type sits on the veiled (left) side of each
+   texture, where every pixel is at least 5:1 against ink — measured in
+   scripts/make-textures.py's output, not eyeballed. */
+.marketing-banner-wide { border-radius: 20px; }
+.marketing-banner-slide.mb-tex {
+  color: var(--text-primary);
+  align-items: stretch;
+  padding: 16px 18px !important;
+  border-radius: 20px;
+  box-shadow: none;
+}
+.mb-tex::after { opacity: 0.5; }
+.mb-tex-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 68%;
+  margin-top: auto;
+  margin-bottom: 14px;
+}
+.mb-tex-eyebrow {
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(17, 17, 16, 0.72);
+}
+.mb-tex-title {
+  font-size: calc(22px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+  color: var(--text-primary);
+}
+.mb-tex-sub {
+  font-size: calc(13px * var(--text-scale));
+  line-height: 1.3;
+  letter-spacing: -0.006em;
+  color: rgba(17, 17, 16, 0.74);
+}
+.mb-tex-go {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  transition: transform var(--dur-3) var(--ease-standard);
+}
+.mb-tex:hover .mb-tex-go { transform: translate(2px, -2px); }
+.marketing-banner-wide .marketing-banner-dots { bottom: 12px; left: 18px; right: auto; justify-content: flex-start; }
+.marketing-banner-dot { background: rgba(17, 17, 16, 0.22); }
+.marketing-banner-dot[data-active] { background: var(--text-primary); }
+@media (min-width: 768px) {
+  .marketing-banner-wide .marketing-banner-slide.mb-tex { box-shadow: none; border-radius: 20px; }
+  .mb-tex-title { font-size: calc(26px * var(--text-scale)); }
+}
+
+/* ═══ Jobs promo (mid-storefront) ══════════════════════════════════════════
+   The purple-and-cyan radial wash goes; the meadow texture and grain come
+   in. It is soft everywhere, so the copy can run the full width on a phone. */
+.sf-cta {
+  isolation: isolate;
+  background: #E3EFD8 url(/textures/meadow.webp) center / cover;
+  border-radius: 20px;
+}
+.sf-cta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url(/textures/grain.png) 0 0 / 160px 160px;
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.sf-cta > * { position: relative; z-index: 1; }
+.sf-cta-emoji {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: none;
+  border-radius: 50%;
+  color: var(--text-primary);
+}
+.sf-cta-title { font-size: calc(17px * var(--text-scale)); letter-spacing: -0.025em; }
+.sf-cta-sub { font-size: calc(13px * var(--text-scale)); color: rgba(17, 17, 16, 0.72); }
+.sf-cta-btn { background: var(--ink); color: #FFFFFF; font-size: calc(15px * var(--text-scale)); }
+.sf-cta-btn:hover { transform: none; box-shadow: none; background: var(--ink-hover); }
+
+/* ═══ Pills (filter chips) ═════════════════════════════════════════════════
+   A fill, never an outline. Selected is ink. */
+.pill {
+  border: none;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: -0.006em;
+  padding: 8px 14px;
+  min-height: 34px;
+}
+.pill:hover { background: #ECECE9; }
+.pill-active,
+.pill-active:hover { background: var(--ink); color: #FFFFFF; font-weight: 500; }
+.pill-soft.pill-soft-active { background: var(--ink); color: #FFFFFF; font-weight: 500; }
+
+/* ═══ Event rows ═══════════════════════════════════════════════════════════
+   A poster and its words; no card around them. */
+.events-list { gap: 20px; }
+.ev-row { padding: 0; background: transparent; box-shadow: none; border-radius: 0; }
+.ev-row-poster { border-radius: 12px; }
+.ev-row-kicker {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: 0.07em;
+}
+.ev-row-register,
+.ev-row-going {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  letter-spacing: 0.06em;
+}
+.ev-row-going { color: var(--brand-ink); background: var(--brand-tint); }
+.ev-row-title { font-size: calc(17px * var(--text-scale)); font-weight: 600; letter-spacing: -0.025em; line-height: 1.25; }
+.ev-row-meta { font-size: calc(13px * var(--text-scale)); color: var(--text-secondary); }
+.ev-row-going-count { font-weight: 400; font-size: calc(13px * var(--text-scale)); }
+.ev-row-cta { background: var(--bg-inset); color: var(--text-primary); font-size: calc(13px * var(--text-scale)); padding: 8px 14px; }
+.ev-row-cta[data-going] { background: var(--brand-tint); color: var(--brand-ink); }
+
+/* ═══ Sign-up choices ══════════════════════════════════════════════════════
+   Mint fill → white with an ink ring. The selection is the ring; the tile
+   underneath stays the colour of every other control. */
+.auth-choice { background: var(--bg-inset); border: none; border-radius: 14px; box-shadow: inset 0 0 0 1.5px transparent; transition: box-shadow var(--dur-2) var(--ease-standard), background-color var(--dur-2) var(--ease-standard), transform var(--dur-1) var(--ease-standard); }
+.auth-choice[data-on] { background: #FFFFFF; color: var(--text-primary); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.auth-choice-title { font-size: calc(15px * var(--text-scale)); font-weight: 600; letter-spacing: -0.015em; }
+.auth-choice-sub { font-size: calc(12px * var(--text-scale)); }
+.auth-choice[data-on] .auth-choice-sub { color: var(--text-secondary); }
+
+/* Labels are words. The 11px glyphs that sat in front of them repeated what
+   the label already said, at a size too small to read as anything. */
+.field-label > svg:first-child { display: none; }
+
+/* ═══ Sliders ══════════════════════════════════════════════════════════════
+   iOS's slider: a 4px rail, the filled part in ink, a white thumb that floats
+   on a soft shadow. No neon, no outlined thumb. */
+.duration-slider { --neon: var(--ink); --neon-glow: rgba(17, 17, 16, 0.10); height: 28px; }
+.duration-slider::-webkit-slider-runnable-track { height: 4px; border: none; }
+.duration-slider::-moz-range-track { height: 4px; border: none; }
+.duration-slider::-moz-range-progress { height: 4px; }
+.duration-slider::-webkit-slider-thumb {
+  width: 26px; height: 26px; margin-top: -11px;
+  border: none;
+  box-shadow: 0 0.5px 1px rgba(17, 17, 16, 0.12), 0 3px 8px rgba(17, 17, 16, 0.16);
+}
+.duration-slider::-moz-range-thumb {
+  width: 26px; height: 26px; border: none;
+  box-shadow: 0 0.5px 1px rgba(17, 17, 16, 0.12), 0 3px 8px rgba(17, 17, 16, 0.16);
+}
+.duration-slider:active::-webkit-slider-thumb,
+.duration-slider:focus-visible::-webkit-slider-thumb { transform: scale(1.06); }
+
+/* ═══ Rails: the first card lines up with the heading ═════════════════════ */
+.rail-track { scroll-padding-inline: 16px; }
+
+/* ═══ Compact rows (lists inside the feed) ═════════════════════════════════ */
+.crow-title { font-size: calc(15px * var(--text-scale)); font-weight: 500; letter-spacing: -0.015em; }
+.crow-lead { font-size: calc(15px * var(--text-scale)); font-weight: 600; letter-spacing: -0.015em; }
+.crow-lead[data-tone="free"] { color: var(--status-free-ink); }
+.crow-lead[data-tone="wanted"] { color: var(--status-request-ink); }
+.crow-lead[data-tone="lost"],
+.crow-lead[data-tone="found"] { font-size: calc(13px * var(--text-scale)); font-weight: 400; color: var(--text-secondary); }
+.crow-meta { font-size: calc(13px * var(--text-scale)); }
+.crow-badge,
+.crow-badge[data-kind] {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 7px 3px 6px;
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #111110;
+  font-family: var(--font-mono);
+  font-size: calc(9px * var(--text-scale));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.crow-badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--dot, #111110); }
+.crow-badge[data-kind="lost"]  { --dot: var(--status-lost); }
+.crow-badge[data-kind="found"] { --dot: var(--status-free); }
+
+/* ═══ Motion, lighter ══════════════════════════════════════════════════════
+   Same moments, less distance. A press gives 3%, not 4–6%; the heart pops to
+   118%, not 132%; things that rise travel 6px, not 10. Redefining a keyframe
+   here replaces globals.css's copy — the later @keyframes of a name wins. */
+.press-scale:active { transform: scale(var(--press-scale)); }
+.press-scale-lg:active { transform: scale(0.96); }
+@keyframes heart-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes glass-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes dialog-in { from { opacity: 0; scale: 0.98; } to { opacity: 1; scale: 1; } }

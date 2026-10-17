@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Info, X } from 'lucide-react';
+import { AlertTriangle, Info, X } from '@/lib/icons';
 import { useSystemMessage, dismissMessage } from '../lib/appStatus';
 
 export default function SystemMessage() {

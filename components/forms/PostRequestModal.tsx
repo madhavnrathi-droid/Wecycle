@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, EmojiGlyph } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createRequest } from '../../lib/liveData';
@@ -221,7 +221,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
               aria-pressed={form.urgency === 'normal'}
               onClick={() => update('urgency', 'normal')}
             >
-              <span style={{ fontSize: 'calc(22px * var(--text-scale))' }}>🙂</span>
+              <EmojiGlyph emoji="🙂" size={24} />
               <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>No rush</span>
             </button>
             <button
@@ -230,7 +230,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
               aria-pressed={form.urgency === 'urgent'}
               onClick={() => update('urgency', 'urgent')}
             >
-              <span style={{ fontSize: 'calc(22px * var(--text-scale))' }}>⚡</span>
+              <EmojiGlyph emoji="⚡" size={24} />
               <span style={{ fontWeight: 600, fontSize: 'calc(13px * var(--text-scale))' }}>Urgent</span>
             </button>
           </div>
@@ -249,8 +249,8 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
           }}>
             <legend className="field-label">Auto-delete after</legend>
             <span style={{
-              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 700,
-              color: '#A8DD00',
+              fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
+              color: 'var(--brand-ink)',
               letterSpacing: '-0.01em',
               fontVariantNumeric: 'tabular-nums',
             }}>
@@ -286,7 +286,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
             marginTop: 6,
             fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500,
             color: 'var(--text-muted)',
-            letterSpacing: '0.04em', textTransform: 'uppercase',
+            letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           }}>
             <span>24h</span>
             <span>3d</span>
@@ -372,7 +372,7 @@ function NotifyToggle({
           <span style={{
             position: 'absolute', inset: 0,
             borderRadius: 999,
-            background: checked ? 'var(--accent-green, #A8DD00)' : 'var(--border-subtle, rgba(255,255,255,0.15))',
+            background: checked ? 'var(--brand)' : 'var(--border-subtle, rgba(255,255,255,0.15))',
             transition: 'background 200ms',
             cursor: 'pointer',
           }} onClick={() => onChange(!checked)} />
@@ -396,7 +396,7 @@ function NotifyToggle({
           onClick={onClose}
           style={{
             background: 'none', border: 'none', padding: 0,
-            color: 'var(--accent-primary, #A8DD00)',
+            color: 'var(--brand-ink)',
             fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
             textDecoration: 'underline', textDecorationStyle: 'dotted',
           }}

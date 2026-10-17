@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MapPin, Bell } from 'lucide-react';
+import { MapPin, Bell } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createLostFound } from '../../lib/liveData';
@@ -361,7 +361,7 @@ function NotifyToggle({
           <span style={{
             position: 'absolute', inset: 0,
             borderRadius: 999,
-            background: checked ? 'var(--accent-green, #A8DD00)' : 'var(--border-subtle, rgba(255,255,255,0.15))',
+            background: checked ? 'var(--brand)' : 'var(--border-subtle, rgba(255,255,255,0.15))',
             transition: 'background 200ms',
             cursor: 'pointer',
           }} onClick={() => onChange(!checked)} />
@@ -385,7 +385,7 @@ function NotifyToggle({
           onClick={onClose}
           style={{
             background: 'none', border: 'none', padding: 0,
-            color: 'var(--accent-primary, #A8DD00)',
+            color: 'var(--brand-ink)',
             fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, cursor: 'pointer',
             textDecoration: 'underline', textDecorationStyle: 'dotted',
           }}

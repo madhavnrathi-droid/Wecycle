@@ -18,7 +18,7 @@
  * scene. */
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { ArrowRight, ChevronRight } from '@/lib/icons';
 import { BRANDS, picksFor, type Brand } from '../../lib/brands';
 import type { MarketplaceItem } from '../../lib/mockData';
 import { resolveItemMedia } from '../../lib/photos';

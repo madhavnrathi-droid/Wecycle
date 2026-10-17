@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { MapPin, ClipboardList, ChevronRight } from 'lucide-react';
+import { MapPin, ClipboardList, ChevronRight } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import FormBuilderScreen from './FormBuilderScreen';
@@ -11,7 +11,7 @@ import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
 import { track, EVT } from '../../lib/analytics';
 import { haptics } from '../../lib/haptics';
-import { eventTypeGroups, DEFAULT_EVENT_TYPE } from '../../lib/eventTypes';
+import { eventTypeGroups, eventTypeText, DEFAULT_EVENT_TYPE } from '../../lib/eventTypes';
 import {
   defaultSchedule, applyChange, durationLabel,
   type Schedule, type ScheduleField,
@@ -355,7 +355,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           >
             {eventTypeGroups().map(g => (
               <optgroup key={g.group} label={g.group}>
-                {g.options.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                {g.options.map(t => <option key={t.id} value={t.id}>{eventTypeText(t.id)}</option>)}
               </optgroup>
             ))}
           </select>

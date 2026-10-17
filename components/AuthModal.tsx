@@ -43,7 +43,7 @@ import {
   Mail, User, ArrowLeft, KeyRound, Loader2, Phone, Lock, Eye, EyeOff,
   GraduationCap, LifeBuoy, MailWarning, WandSparkles,
   AlertTriangle, MapPin, Store,
-} from 'lucide-react';
+} from '@/lib/icons';
 import Modal from './Modal';
 import { cleanShopName, SHOP_NAME_MAX, type AccountKind } from '../lib/shops';
 import { createDemoSession, initialsOf } from '../lib/demoAuth';
@@ -859,7 +859,7 @@ export default function AuthModal({ open, onClose, startInReset, initialEmail }:
                       onClick={handleClose}
                       style={{
                         background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                        font: 'inherit', fontWeight: 700, color: 'inherit',
+                        font: 'inherit', fontWeight: 600, color: 'inherit',
                         textDecoration: 'underline', textUnderlineOffset: 2,
                         minHeight: 24,
                       }}

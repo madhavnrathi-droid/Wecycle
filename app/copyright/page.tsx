@@ -137,7 +137,7 @@ export default function Copyright() {
 }
 
 const page: React.CSSProperties = {
-  background: '#FAFAF6', color: '#1A1A17', minHeight: '100dvh',
+  background: '#FFFFFF', color: '#1A1A17', minHeight: '100dvh',
   fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   /* Safe-area insets, not a flat 32px. The root layout ships
      viewport-fit=cover with a black-translucent status bar, so this page really
@@ -154,7 +154,7 @@ const page: React.CSSProperties = {
 const wrap: React.CSSProperties = { maxWidth: 720, margin: '0 auto' };
 const h1: React.CSSProperties = { fontSize: 'calc(32px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', margin: '20px 0 4px' };
 const meta: React.CSSProperties = { color: '#6B6B63', fontSize: 'calc(13px * var(--text-scale))', margin: '0 0 24px' };
-const h2: React.CSSProperties = { fontSize: 'calc(19px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.01em', margin: '30px 0 8px' };
+const h2: React.CSSProperties = { fontSize: 'calc(19px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em', margin: '30px 0 8px' };
 const p: React.CSSProperties = { fontSize: 'calc(15px * var(--text-scale))', margin: '0 0 12px', color: '#2A2A24' };
 const ul: React.CSSProperties = { margin: '0 0 12px', paddingLeft: 22 };
 const li: React.CSSProperties = { fontSize: 'calc(15px * var(--text-scale))', margin: '0 0 6px', color: '#2A2A24' };
@@ -165,8 +165,8 @@ const card: React.CSSProperties = {
   background: '#F2F5E6', borderRadius: 16, padding: '18px 20px', margin: '0 0 8px',
 };
 const cardLabel: React.CSSProperties = {
-  margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.08em',
+  margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.08em',
   textTransform: 'uppercase', color: '#5C7A00',
 };
-const cardValue: React.CSSProperties = { margin: '6px 0 0', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 700 };
+const cardValue: React.CSSProperties = { margin: '6px 0 0', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600 };
 const cardNote: React.CSSProperties = { margin: '8px 0 0', fontSize: 'calc(14px * var(--text-scale))', color: '#4A4A42' };

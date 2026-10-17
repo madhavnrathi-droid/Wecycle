@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, ChevronDown } from 'lucide-react';
+import { Lock, ChevronDown } from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { isPrivateRoom } from '../lib/rooms';
 import { haptics } from '../lib/haptics';

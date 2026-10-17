@@ -6,7 +6,7 @@ import {
   MessageCircle, Sparkles, CalendarDays, Store, Search,
   Megaphone, Newspaper, Info, MessageSquare, Reply,
   ShieldCheck, MapPin,
-} from 'lucide-react';
+} from '@/lib/icons';
 import {
   getSettings, saveSettings, onSettingsChange,
   notifAskState, recordNotifAsk,
@@ -111,8 +111,8 @@ export default function NotificationsScreen({ onBack, onOpenAccount }: Notificat
       {ask === 'unasked' && (
         <section style={{ padding: '4px 20px 18px' }}>
           <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-default)',
+            background: 'var(--bg-inset)',
+            border: 'none',
             borderRadius: 16,
             padding: '16px 16px 14px',
           }}>
@@ -452,8 +452,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     <section style={{ padding: '4px 20px 18px' }}>
       <div style={{ marginBottom: 10 }}>
         <h3 style={{
-          margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase',
+          margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+          letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           color: 'var(--text-secondary)',
         }}>
           {title}
@@ -474,8 +474,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-default)',
+      background: 'var(--bg-inset)',
+      border: 'none',
       borderRadius: 16,
       overflow: 'hidden',
     }}>

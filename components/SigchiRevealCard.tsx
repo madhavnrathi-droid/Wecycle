@@ -33,7 +33,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import gsap from 'gsap';
-import { ArrowUpRight, BadgeCheck, X } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, X } from '@/lib/icons';
 import EmberShader from './EmberShader';
 import ScratchCode from './ScratchCode';
 import { SIGCHI_TIER, UX_INDIA_EVENT, UX_INDIA_TICKETS_URL } from '../lib/eventOffer';

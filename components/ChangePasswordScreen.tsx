@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronLeft, Lock, Eye, EyeOff, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, Lock, Eye, EyeOff, Check, Loader2 } from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { supabase, hasSupabaseEnv } from '../lib/supabase';
 import { validatePassword, passwordStrength, humanAuthError, MIN_PASSWORD_LENGTH } from '../lib/password';
@@ -93,7 +93,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
             Password
           </h1>
           {email && (
@@ -117,7 +117,7 @@ export default function ChangePasswordScreen({ onBack, onForgot }: ChangePasswor
             }}>
               <Check size={24} strokeWidth={2.4} />
             </div>
-            <p style={{ margin: '0 0 6px', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
               Password updated
             </p>
             <p style={{ margin: '0 0 20px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', lineHeight: 1.5 }}>

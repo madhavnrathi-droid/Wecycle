@@ -154,7 +154,7 @@ export const MODULES: ModuleSpec[] = [
   },
   {
     id: 'fresh', kind: 'products', zone: 1, priority: 90, min: 3, mobility: 1, variant: 'featured',
-    title: 'Just dropped ✨', sub: 'Fresh off your batch, before anyone else',
+    title: 'Just dropped', sub: 'Fresh off your batch, before anyone else',
     affinity: { browsing: 10, shopping: 8 },
     build: (p, c) => take(byNewest(p.items, c.now)),
   },
@@ -166,14 +166,14 @@ export const MODULES: ModuleSpec[] = [
   },
   {
     id: 'trending', kind: 'products', zone: 2, priority: 80, min: 3, mobility: 1, variant: 'micro',
-    title: 'Most looked at 👀', sub: "What everyone's been opening this week",
+    title: 'Most looked at', sub: "What everyone's been opening this week",
     affinity: { browsing: 12, shopping: 6 },
     build: p => take([...p.items].filter(i => (i.viewCount ?? 0) > 0)
       .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))),
   },
   {
     id: 'around_campus', kind: 'products', zone: 2, priority: 85, min: 2, mobility: 1, variant: 'standard',
-    title: 'From your college 🎓', sub: 'Same campus, shorter walk',
+    title: 'From your college', sub: 'Same campus, shorter walk',
     affinity: { shopping: 10 },
     needsSignIn: true,
     build: (p, c) => c.viewerCollege
@@ -182,14 +182,14 @@ export const MODULES: ModuleSpec[] = [
   },
   {
     id: 'under_500', kind: 'products', zone: 4, priority: 60, min: 2, mobility: 1, variant: 'micro',
-    title: 'Under ₹500 💸', sub: 'Cheaper than a night out',
+    title: 'Under ₹500', sub: 'Cheaper than a night out',
     affinity: { browsing: 8, shopping: 6 },
     build: p => take(p.items.filter(i =>
       i.listingType === 'free' || (typeof i.price === 'number' && i.price > 0 && i.price <= 500))),
   },
   {
     id: 'free_stuff', kind: 'products', zone: 4, priority: 58, min: 2, mobility: 1, variant: 'standard',
-    title: 'Free & up for grabs 🎁', sub: '₹0. Yes, really.',
+    title: 'Free & up for grabs', sub: '₹0. Yes, really.',
     affinity: { browsing: 8 },
     /* "Up for grabs" is a promise about availability, and a TAKEN stamp inside
        the row that makes it would contradict its own heading. */
@@ -208,7 +208,7 @@ export const MODULES: ModuleSpec[] = [
   },
   {
     id: 'requests', kind: 'products', zone: 3, priority: 55, min: 1, mobility: 1, variant: 'micro',
-    title: 'Wanted on campus 🙋', sub: "Got one gathering dust? Make someone's week.",
+    title: 'Wanted on campus', sub: "Got one gathering dust? Make someone's week.",
     affinity: { selling: 20, browsing: 4 },
     build: p => take(p.requests),
   },
@@ -220,13 +220,13 @@ export const MODULES: ModuleSpec[] = [
   },
   {
     id: 'events', kind: 'events', zone: 3, priority: 50, min: 1, mobility: 0, variant: 'wide',
-    title: 'Happening soon 📅', sub: 'Around campus this week',
+    title: 'Happening soon', sub: 'Around campus this week',
     affinity: { browsing: 8 },
     build: p => take(p.events),
   },
   {
     id: 'lost_found', kind: 'lostfound', zone: 3, priority: 45, min: 1, mobility: 0, layout: 'list',
-    title: 'Help return these 🙌', sub: 'Items your campus is trying to recover',
+    title: 'Help return these', sub: 'Items your campus is trying to recover',
     build: p => take(p.lostFound),
   },
   {

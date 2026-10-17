@@ -50,7 +50,7 @@
  * on the day the offer improved.
  */
 
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from '@/lib/icons';
 import EmberShader from './EmberShader';
 import { Logomark } from './Brand';
 import { MEMBER_TIER, UX_INDIA_EVENT } from '../lib/eventOffer';

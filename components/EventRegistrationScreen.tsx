@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, CalendarDays, MapPin, Paperclip, X, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, CalendarDays, MapPin, Paperclip, X, Check, Loader2 } from '@/lib/icons';
 import type { CommunityEvent } from '../lib/mockData';
 import {
   fetchEventForm, fetchMyFormResponse, submitFormResponse,
@@ -103,7 +103,7 @@ export default function EventRegistrationScreen({
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
             {editMode ? 'Your registration' : 'Register'}
           </h1>
           <p style={{

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import { useOrders, ordersAvailable, openOrderFor, probeOrdersAvailable } from '../lib/orders/store';
 import ContactChannels from './ContactChannels';
@@ -294,24 +294,26 @@ function EngagementActions({
   adminEdit?: { on: boolean; onToggle: () => void };
   size?: number;
 }) {
+  /* Bare glyphs, Instagram's way: the icons are the buttons. Each keeps a
+     full-size hit area; only the outline around it is gone. */
   const base: React.CSSProperties = {
     width: size, height: size, borderRadius: 999,
-    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+    background: 'transparent', border: 'none',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', flexShrink: 0,
   };
-  const icon = Math.round(size * 0.44);
+  const icon = Math.round(size * 0.58);
   return (
     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
       <button onClick={onToggleSave} aria-label={saved ? 'Saved' : 'Save'} aria-pressed={saved}
-        style={{ ...base, color: saved ? '#ED2E50' : 'var(--text-secondary)' }}>
+        style={{ ...base, color: saved ? '#ED2E50' : 'var(--text-primary)' }}>
         <Heart size={icon} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
       </button>
-      <button onClick={onShare} aria-label="Share" style={{ ...base, color: 'var(--text-secondary)' }}>
+      <button onClick={onShare} aria-label="Share" style={{ ...base, color: 'var(--text-primary)' }}>
         <Share2 size={icon} strokeWidth={1.8} />
       </button>
       {showReport && (
-        <button onClick={onReport} aria-label="Report this post" style={{ ...base, color: 'var(--text-muted)' }}>
+        <button onClick={onReport} aria-label="Report this post" style={{ ...base, color: 'var(--text-secondary)' }}>
           <Flag size={icon} strokeWidth={1.8} />
         </button>
       )}
@@ -452,7 +454,7 @@ function linkBtn(color: string): React.CSSProperties {
     minHeight: 24, padding: '3px 6px', margin: '-3px 0',
     background: 'none', border: 'none', cursor: 'pointer',
     font: 'inherit',
-    fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 700,
+    fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 600,
     letterSpacing: '-0.005em', color,
     textDecoration: 'underline', textUnderlineOffset: 2,
   };
@@ -1315,8 +1317,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
         {item.isClosed ? (
           <span style={{
             flexShrink: 0,
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.06em',
-            textTransform: 'uppercase',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+            textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             color: '#fff', background: 'var(--text-primary)',
             padding: '4px 10px', borderRadius: 999,
           }}>
@@ -1326,11 +1328,10 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           <span style={{
             flexShrink: 0,
             display: 'inline-flex', alignItems: 'center', gap: 1,
-            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
+            fontSize: 'calc(15px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em',
             color: 'var(--text-primary)',
           }}>
-            {isPriced && <IndianRupee size={12} strokeWidth={2.3} />}
-            <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
+            <span>{isPriced ? `₹${item.price!.toLocaleString('en-IN')}` : priceLabel}</span>
           </span>
         )}
         {/* Mini contact CTA. Also shown when signed out, where it prompts
@@ -1459,12 +1460,12 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           {isOpportunity && (
             <div style={{
               display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
-              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: '#fff', background: '#8B5CF6',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+              textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
+              color: 'var(--text-primary)', background: 'var(--bg-inset)',
               padding: '4px 10px', borderRadius: 999,
             }}>
-              🛠️ Opportunity
+              Opportunity
             </div>
           )}
           <EditFieldRow label="Title">
@@ -1542,12 +1543,12 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               marginBottom: 10,
-              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: '#fff', background: '#8B5CF6',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+              textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
+              color: 'var(--text-primary)', background: 'var(--bg-inset)',
               padding: '4px 10px', borderRadius: 999,
             }}>
-              🛠️ Opportunity
+              Opportunity
             </div>
           )}
           {/* Title + engagement actions (save · share · report · admin-delete)
@@ -1595,22 +1596,24 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             {item.isClosed ? (
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                fontSize: 'calc(13px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.06em',
-                textTransform: 'uppercase',
+                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+                textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
                 color: '#fff', background: 'var(--text-primary)',
                 padding: '6px 14px', borderRadius: 999,
               }}>
                 {closedLabelFor(item)}
               </div>
             ) : (
-              /* Price — bold black, no bounding box (reads like a real price). */
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 1,
-                fontSize: 'calc(19px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
-                color: 'var(--text-primary)',
+              /* Price — drawn LIGHT and large, the way a widget shows a time or
+                 a temperature: the figure is the most important number on the
+                 page, and at this size a thin weight is what makes it read as
+                 a number rather than as a heading. No bounding box. */
+              <div className="t-figure" style={{
+                display: 'inline-flex', alignItems: 'baseline', gap: 1,
+                fontSize: 'calc(28px * var(--text-scale))', fontWeight: 300, letterSpacing: '-0.02em',
+                color: 'var(--text-primary)', lineHeight: 1.1,
               }}>
-                {isPriced && <IndianRupee size={16} strokeWidth={2.4} />}
-                <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
+                <span>{isPriced ? `₹${item.price!.toLocaleString('en-IN')}` : priceLabel}</span>
               </div>
             )}
           </div>
@@ -1704,8 +1707,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
               padding: '14px 14px',
               width: '100%',
               boxSizing: 'border-box',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg-inset)',
+              border: 'none',
               borderRadius: 16,
             }}
           >
@@ -1925,8 +1928,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
                 onClick={handleShare}
                 style={{
                   width: 52, height: 52, borderRadius: 999,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-inset)',
+                  border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0,
                 }}
@@ -2239,8 +2242,8 @@ function DesktopLayout({
             {item.isClosed ? (
               <span style={{
                 flexShrink: 0,
-                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.06em',
-                textTransform: 'uppercase',
+                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+                textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
                 color: '#fff', background: 'var(--text-primary)',
                 padding: '4px 10px', borderRadius: 999,
               }}>
@@ -2250,11 +2253,10 @@ function DesktopLayout({
               <span style={{
                 flexShrink: 0,
                 display: 'inline-flex', alignItems: 'center', gap: 1,
-                fontSize: 'calc(16px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
+                fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em',
                 color: 'var(--text-primary)',
               }}>
-                {isPriced && <IndianRupee size={13} strokeWidth={2.3} />}
-                <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
+                <span>{isPriced ? `₹${item.price!.toLocaleString('en-IN')}` : priceLabel}</span>
               </span>
             )}
             {canMessage ? (
@@ -2439,12 +2441,12 @@ function DesktopLayout({
           {isOpportunity && (
             <div style={{
               display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
-              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: '#fff', background: '#8B5CF6',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+              textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
+              color: 'var(--text-primary)', background: 'var(--bg-inset)',
               padding: '4px 10px', borderRadius: 999,
             }}>
-              🛠️ Opportunity
+              Opportunity
             </div>
           )}
 
@@ -2530,11 +2532,10 @@ function DesktopLayout({
               /* Price — bold black, no bounding box. */
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 2,
-                fontSize: 'calc(22px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em',
+                fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em',
                 color: 'var(--text-primary)',
               }}>
-                {isPriced && <IndianRupee size={18} strokeWidth={2.4} />}
-                <span>{isPriced ? item.price!.toLocaleString('en-IN') : priceLabel}</span>
+                <span>{isPriced ? `₹${item.price!.toLocaleString('en-IN')}` : priceLabel}</span>
               </div>
             )}
             {canManage && isRequestPost && (
@@ -2549,8 +2550,8 @@ function DesktopLayout({
             <div>
               <h2 style={{
                 margin: '0 0 8px',
-                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-                letterSpacing: '0.08em', textTransform: 'uppercase',
+                fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+                letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
                 color: 'var(--text-secondary)',
               }}>{isOpportunity ? 'About this opportunity' : 'About this item'}</h2>
               {canManage ? (
@@ -2611,8 +2612,8 @@ function DesktopLayout({
                 all: 'unset', boxSizing: 'border-box', cursor: onOpenStorefront ? 'pointer' : 'default',
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: '14px 16px',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-inset)',
+                border: 'none',
                 borderRadius: 14,
               }}
             >
@@ -2821,8 +2822,8 @@ function DesktopLayout({
               aria-pressed={saved}
               style={{
                 width: 52, height: 52, borderRadius: 14,
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-inset)',
+                border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: saved ? '#ED2E50' : 'var(--text-secondary)',
                 cursor: 'pointer',
@@ -2839,8 +2840,8 @@ function DesktopLayout({
               }}
               style={{
                 width: 52, height: 52, borderRadius: 14,
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-inset)',
+                border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--text-secondary)',
                 cursor: 'pointer',
@@ -2855,8 +2856,8 @@ function DesktopLayout({
                 onClick={() => setReportOpen(true)}
                 style={{
                   width: 52, height: 52, borderRadius: 14,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-inset)',
+                  border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'var(--text-muted)',
                   cursor: 'pointer',
@@ -2959,8 +2960,8 @@ function EditFieldRow({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-        letterSpacing: '0.08em', textTransform: 'uppercase',
+        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+        letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
         color: 'var(--text-secondary)',
       }}>
         {icon}

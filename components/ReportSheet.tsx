@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { X, Check, Loader2 } from 'lucide-react';
+import { X, Check, Loader2 } from '@/lib/icons';
 import { REPORT_REASONS, reportContent, blockUser, reportMailto } from '../lib/moderation';
 import type { ReportTargetType } from '../lib/moderation';
 import { Z_LAYER, zPanel } from '../lib/zLayers';
@@ -306,7 +306,7 @@ export default function ReportSheet({
                       }}
                     >
                       <span>{reason}</span>
-                      {checked && <Check size={16} strokeWidth={2.5} color="var(--accent-green)" />}
+                      {checked && <Check size={16} strokeWidth={2.5} color="var(--brand)" />}
                     </button>
                   );
                 })}

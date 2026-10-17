@@ -1,7 +1,9 @@
 'use client';
 
+import type { ComponentType } from 'react';
 import { track, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
+import { Home, Calendar, Search, Archive, Plus, type IconComponentProps } from '@/lib/icons';
 
 /* Activity dropped from the bottom nav — its post-level metrics now live
    inline on each Inventory card (and on the item-detail page for the owner).
@@ -59,23 +61,20 @@ const SLOT_FOR: Partial<Record<Screen, SectionKey>> = {
    button is the middle slot so the row stays symmetrical — five equal grid
    columns, not space-around, which is what left the old bar looking off-centre.
 
-   `icon` names a file in /icons/nav. Those are alpha masks, not pictures: the
-   artwork arrived as five black glyphs baked into one 2173×725 sprite sheet,
-   wrapped in an SVG that cropped a window onto it — 340KB per "icon", and flat
-   raster, so the black was not a colour that could be changed. Cut out and kept
-   as masks, each glyph is ~4KB, takes its colour from `currentColor`, and
-   therefore animates between resting and active ink for free. The white
-   negatives in the same folder were not needed at all — a mask has no colour to
-   invert.
+   `icon` is a Phosphor glyph, drawn LIGHT at rest and FILLED when its tab is
+   selected — Instagram's convention, and the reason the bar needs no coloured
+   pill: the selection is a change of shape, legible without colour (WCAG
+   1.4.1). The bar used to draw raster masks cut from a sprite sheet; they could
+   not change weight, only colour.
 
    `col` is the grid column, and doubles as the pill's slide target. */
 const SLOTS: {
-  key: SectionKey; screen: Screen; label: string; icon: string; col: number;
+  key: SectionKey; screen: Screen; label: string; icon: ComponentType<IconComponentProps>; col: number;
 }[] = [
-  { key: 'feed',       screen: 'feed',       label: 'Home',         icon: 'home',      col: 1 },
-  { key: 'events',     screen: 'events',     label: 'Events',       icon: 'events',    col: 2 },
-  { key: 'lost_found', screen: 'lost_found', label: 'Lost & Found', icon: 'lostfound', col: 4 },
-  { key: 'inventory',  screen: 'inventory',  label: 'Inventory',    icon: 'inventory', col: 5 },
+  { key: 'feed',       screen: 'feed',       label: 'Home',         icon: Home,                col: 1 },
+  { key: 'events',     screen: 'events',     label: 'Events',       icon: Calendar,  col: 2 },
+  { key: 'lost_found', screen: 'lost_found', label: 'Lost & Found', icon: Search, col: 4 },
+  { key: 'inventory',  screen: 'inventory',  label: 'Inventory',    icon: Archive,             col: 5 },
 ];
 
 export default function BottomNav({ active, onChange, onPost, postOpen }: BottomNavProps) {
@@ -123,9 +122,8 @@ export default function BottomNav({ active, onChange, onPost, postOpen }: Bottom
           className="bottom-nav-post"
           data-open={postOpen || undefined}
         >
-          {/* The same plus the icon set draws inside a ring — the ring cropped
-              off, because this button already is one. */}
-          <i className="nav-ico nav-ico--plus" aria-hidden="true" />
+          {/* Turns 45° into a close mark while the picker is open. */}
+          <Plus size={22} weight="regular" aria-hidden="true" />
         </button>
 
         {SLOTS.slice(2).map(s => (
@@ -140,10 +138,11 @@ export default function BottomNav({ active, onChange, onPost, postOpen }: Bottom
 function NavButton({
   slot, isActive, onClick,
 }: {
-  slot: { label: string; icon: string; col: number };
+  slot: { label: string; icon: ComponentType<IconComponentProps>; col: number };
   isActive: boolean;
   onClick: () => void;
 }) {
+  const Icon = slot.icon;
   return (
     <button
       onClick={onClick}
@@ -156,11 +155,7 @@ function NavButton({
       data-active={isActive || undefined}
       style={{ gridColumn: slot.col }}
     >
-      <i
-        className="nav-ico"
-        aria-hidden="true"
-        style={{ ['--ico' as string]: `url(/icons/nav/${slot.icon}.png)` }}
-      />
+      <Icon size={26} weight={isActive ? 'fill' : 'light'} aria-hidden="true" />
     </button>
   );
 }

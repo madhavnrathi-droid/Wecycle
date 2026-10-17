@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from '@/lib/icons';
 
 /* Each slide is either a photo URL (string) or a video descriptor. We keep the
  * legacy "string[]" entry point so existing callers (detail screens, picker

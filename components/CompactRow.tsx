@@ -26,7 +26,7 @@
  * drag gets mistaken for a tap.
  */
 
-import { MapPin } from 'lucide-react';
+import { MapPin } from '@/lib/icons';
 import { useTap } from '../lib/useTap';
 import NoPhoto from './NoPhoto';
 

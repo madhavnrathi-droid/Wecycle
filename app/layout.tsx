@@ -8,6 +8,9 @@ import { SITE_URL } from "../lib/siteUrl";
 import NativeInit from "../components/NativeInit";
 import Toaster from "../components/Toaster";
 import "./globals.css";
+/* The design system's second edition, layered over the first — see the header
+   of light.css for what it changes and why. Order matters: it must load last. */
+import "./light.css";
 
 /* Microsoft Clarity project ID. Hard-coded because Clarity's snippet is
  * public-by-design — the ID is embedded in the script URL on every page that
@@ -63,10 +66,10 @@ export const metadata: Metadata = {
   other: {
     "msapplication-tap-highlight": "no",
   },
-  /* Wecycle is light-only — pin the browser/PWA chrome to the cream surface so
+  /* Wecycle is light-only — pin the browser/PWA chrome to the white surface so
      a phone in OS dark mode never tints the status bar dark over a light app.
      (Single non-media value; no dark variant.) */
-  themeColor: "#FAFAF6",
+  themeColor: "#FFFFFF",
   viewport: {
     width: "device-width",
     initialScale: 1,

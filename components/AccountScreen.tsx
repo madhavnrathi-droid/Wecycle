@@ -3,7 +3,7 @@
 import { isBusinessRole, cleanShopName, shopFields, SHOP_NAME_MAX } from '../lib/shops';
 import { brandForUser } from '../lib/brands';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home, Loader2 } from 'lucide-react';
+import { ChevronLeft, Mail, Phone, IdCard, Check, LogOut, GraduationCap, Building2, Home, Loader2 } from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { updateDemoSession, type Residence } from '../lib/demoAuth';
 import { COLLEGES, normalizeCollege } from '../lib/colleges';
@@ -419,10 +419,10 @@ export default function AccountScreen({ onBack, onSignedOut }: AccountScreenProp
         <section style={{ padding: '20px 20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
-              width: 64, height: 64, borderRadius: 20,
+              width: 64, height: 64, borderRadius: '50%',
               background: (profile?.avatar_color ?? '#6C63FF'),
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em',
+              color: '#fff', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em',
               flexShrink: 0,
             }}>
               {profile?.initials ?? 'W'}
@@ -746,8 +746,8 @@ function Section({ title, hint, required, children }: {
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <h3 style={{
             margin: 0,
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-            letterSpacing: '0.08em', textTransform: 'uppercase',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+            letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             color: 'var(--text-secondary)',
           }}>
             {title}

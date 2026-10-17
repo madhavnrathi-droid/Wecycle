@@ -4,7 +4,7 @@ import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, Bookmark, Share2, MessageCircle, Plus, Bell,
   Clock, IndianRupee, MapPin, MoreHorizontal, Users, CalendarDays,
-} from 'lucide-react';
+} from '@/lib/icons';
 import {
   MARKETPLACE_ITEMS, EVENTS, MY_EVENT_IDS,
   type MarketplaceItem, type CommunityEvent,
@@ -193,8 +193,8 @@ function StatsTab({
         <>
           <section style={{ padding: '6px 20px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
               color: 'var(--text-secondary)',
             }}>
               Your posts
@@ -214,8 +214,8 @@ function StatsTab({
         <>
           <section style={{ padding: '16px 20px 12px' }}>
             <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
               color: 'var(--text-secondary)',
             }}>
               Your events
@@ -405,8 +405,8 @@ function AlertsTab({
       {/* Hero banner + CTA */}
       <section style={{ padding: '0 16px 16px' }}>
         <div style={{
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-subtle)',
+          background: 'var(--bg-inset)',
+          border: 'none',
           borderRadius: 18,
           padding: 14,
           display: 'flex', alignItems: 'center', gap: 12,
@@ -449,8 +449,8 @@ function AlertsTab({
         <>
           <section style={{ padding: '4px 20px 10px' }}>
             <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
               color: 'var(--text-secondary)',
             }}>
               Active
@@ -484,8 +484,8 @@ function AlertsTab({
         <>
           <section style={{ padding: '24px 20px 10px' }}>
             <h3 style={{
-              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
+              margin: 0, fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
               color: 'var(--text-muted)',
             }}>
               Recently expired
@@ -508,8 +508,8 @@ function AlertCard({
   return (
     <article
       style={{
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border-subtle)',
+        background: 'var(--bg-inset)',
+        border: 'none',
         borderRadius: 16,
         padding: 14,
         opacity: dim ? 0.7 : 1,

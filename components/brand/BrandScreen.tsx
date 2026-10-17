@@ -22,7 +22,7 @@
  * what has gone. Sold things sit in a last section, stamped. */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Share2, MoreHorizontal, MessageCircle, Check, Plus, Package } from 'lucide-react';
+import { ChevronLeft, Share2, MoreHorizontal, MessageCircle, Check, Plus, Package } from '@/lib/icons';
 import type { MarketplaceItem, User } from '../../lib/mockData';
 import { MARKETPLACE_ITEMS, closedLabelFor } from '../../lib/mockData';
 import { sectionsFor, picksFor, priceLine, rangeLine, brandUrl, type Brand } from '../../lib/brands';

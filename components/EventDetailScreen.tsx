@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users, Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, BarChart3, ClipboardList, Pencil, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users, Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, BarChart3, ClipboardList, Pencil, MessageCircle } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import type { CommunityEvent, MarketplaceItem, User } from '../lib/mockData';
 import { resolveEventPhotos, getAvatar } from '../lib/photos';
@@ -656,8 +656,8 @@ export default function EventDetailScreen({
                   aria-label="Discard changes"
                   style={{
                     width: 52, height: 52, borderRadius: 999,
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
+                    background: 'var(--bg-inset)',
+                    border: 'none',
                     color: 'var(--text-secondary)',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     cursor: saving ? 'not-allowed' : 'pointer',
@@ -706,9 +706,9 @@ export default function EventDetailScreen({
                   title={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
                   style={{
                     width: 52, height: 52, borderRadius: 999,
-                    background: effectiveHasForm ? 'rgba(139,92,246,0.12)' : 'var(--bg-surface)',
-                    border: `1px solid ${effectiveHasForm ? 'rgba(139,92,246,0.4)' : 'var(--border-subtle)'}`,
-                    color: effectiveHasForm ? '#8B5CF6' : 'var(--text-secondary)',
+                    background: effectiveHasForm ? 'var(--ink)' : 'var(--bg-inset)',
+                    border: 'none',
+                    color: effectiveHasForm ? '#FFFFFF' : 'var(--text-primary)',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', flexShrink: 0,
                   }}
@@ -726,8 +726,8 @@ export default function EventDetailScreen({
                     title="Delete event"
                     style={{
                       width: 52, height: 52, borderRadius: 999,
-                      background: 'transparent', color: 'var(--accent-rose-ink)',
-                      border: '1px solid var(--accent-rose)', cursor: 'pointer',
+                      background: 'var(--accent-rose-surface)', color: 'var(--accent-rose-ink)',
+                      border: 'none', cursor: 'pointer',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}
                   >
@@ -742,17 +742,17 @@ export default function EventDetailScreen({
             onClick={handleRsvpClick}
             style={{
               flex: 1, minWidth: 120, height: 52, borderRadius: 999,
-              /* Purple, not black: events are purple everywhere else in the app
-                 (the EVENT badge, the calendar chip, --color-repair), so the
-                 primary action on an event should read as an event action.
-                 Going = the confirmed/quiet state, so it drops to a surface. */
-              background: isRsvpd ? 'var(--bg-surface)' : '#8B5CF6',
+              /* Ink, like every primary action. It was purple, to match the
+                 EVENT badge — but one screen of the app speaking in its own
+                 colour made the button read as a different product. Going =
+                 the confirmed, quiet state, so it drops to a soft fill. */
+              background: isRsvpd ? 'var(--bg-inset)' : 'var(--ink)',
               color: isRsvpd ? 'var(--text-primary)' : '#FFFFFF',
-              border: isRsvpd ? '1px solid var(--border-default)' : 'none',
-              boxShadow: isRsvpd ? 'none' : '0 6px 20px rgba(139, 92, 246, 0.34)',
+              border: 'none',
+              boxShadow: 'none',
               cursor: 'pointer',
-              fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
-              letterSpacing: '-0.01em',
+              fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600,
+              letterSpacing: '-0.02em',
             }}
           >
             {isRsvpd
@@ -769,8 +769,8 @@ export default function EventDetailScreen({
             onClick={handleAddToCalendar}
             style={{
               width: 52, height: 52, borderRadius: 999,
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg-inset)',
+              border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'var(--text-secondary)',
               cursor: 'pointer', flexShrink: 0,
@@ -784,8 +784,8 @@ export default function EventDetailScreen({
             onClick={handleToggleSave}
             style={{
               width: 52, height: 52, borderRadius: 999,
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg-inset)',
+              border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: saved ? '#ED2E50' : 'var(--text-secondary)',
               cursor: 'pointer', flexShrink: 0,
@@ -800,8 +800,8 @@ export default function EventDetailScreen({
               aria-label={`Message ${event.organizer?.name ?? 'the organizer'}`}
               style={{
                 width: 52, height: 52, borderRadius: 999,
-                background: 'var(--bg-surface)', color: 'var(--text-primary)',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-inset)', color: 'var(--text-primary)',
+                border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', flexShrink: 0,
               }}
@@ -852,8 +852,8 @@ export default function EventDetailScreen({
                 aria-label={`Sign in to message ${event.organizer?.name ?? 'the organizer'}`}
                 style={{
                   width: 52, height: 52, borderRadius: 999,
-                  background: 'var(--bg-surface)', color: 'var(--text-secondary)',
-                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-inset)', color: 'var(--text-secondary)',
+                  border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', flexShrink: 0,
                 }}
@@ -912,7 +912,7 @@ export default function EventDetailScreen({
               >
                 {eventTypeGroups().map(g => (
                   <optgroup key={g.group} label={g.group}>
-                    {g.options.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    {g.options.map(t => <option key={t.id} value={t.id}>{eventTypeText(t.id)}</option>)}
                   </optgroup>
                 ))}
               </select>
@@ -1098,8 +1098,8 @@ export default function EventDetailScreen({
           <>
             <h3 style={{
               margin: '0 0 10px',
-              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+              letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
               color: 'var(--text-muted)',
             }}>
               About this event
@@ -1146,8 +1146,8 @@ export default function EventDetailScreen({
         <section style={{ padding: '20px 20px 0' }}>
           <h3 style={{
             margin: '0 0 10px',
-            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-            letterSpacing: '0.08em', textTransform: 'uppercase',
+            fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+            letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             color: 'var(--text-muted)',
           }}>
             Tags
@@ -1177,8 +1177,8 @@ export default function EventDetailScreen({
       <section style={{ padding: '24px 20px 0' }}>
         <h3 style={{
           margin: '0 0 10px',
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase',
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+          letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           color: 'var(--text-muted)',
         }}>
           Organized by
@@ -1194,8 +1194,8 @@ export default function EventDetailScreen({
             cursor: onOpenStorefront ? 'pointer' : 'default',
             display: 'flex', alignItems: 'center', gap: 12,
             padding: '12px 14px', width: '100%', boxSizing: 'border-box',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
+            background: 'var(--bg-inset)',
+            border: 'none',
             borderRadius: 16,
           }}
         >
@@ -1298,8 +1298,8 @@ function EventEditField({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-        letterSpacing: '0.08em', textTransform: 'uppercase',
+        fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+        letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
         color: 'var(--text-secondary)',
       }}>
         {icon}

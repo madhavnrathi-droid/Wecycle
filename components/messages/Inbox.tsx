@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, MessageCircle, Search, X, RotateCw } from 'lucide-react';
+import { ChevronLeft, MessageCircle, Search, X, RotateCw } from '@/lib/icons';
 import { useMessaging, usePostPreview } from '../../lib/messaging/useMessaging';
 import { inboxRows, loadInbox, type InboxRow } from '../../lib/messaging/store';
 import { inboxTime } from '../../lib/messaging/format';

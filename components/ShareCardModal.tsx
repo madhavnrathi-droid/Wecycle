@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { X, Share2, Download, Link2, Loader2, Check } from 'lucide-react';
+import { X, Share2, Download, Link2, Loader2, Check } from '@/lib/icons';
 import gsap from 'gsap';
 import {
   renderShareCard, downloadCardBlob, shareCardBlob,
@@ -207,7 +207,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
             display: 'flex', flexDirection: 'column', gap: 16,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
                 Share card
               </span>
               <Dialog.Close asChild>
@@ -311,7 +311,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
                 style={{
                   flex: 1, height: 50, borderRadius: 14, border: 'none',
                   background: 'var(--accent-lime, #C4F649)', color: '#0C1B0C',
-                  fontSize: 'calc(14.5px * var(--text-scale))', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
+                  fontSize: 'calc(14.5px * var(--text-scale))', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   opacity: busy ? 0.6 : 1,
                 }}

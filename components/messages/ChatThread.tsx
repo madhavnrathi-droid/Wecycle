@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import {
   ChevronLeft, MoreHorizontal, ArrowUp, ArrowDown, ShieldCheck, ChevronRight, Package,
   User as UserIcon, Flag, Ban, Copy, RotateCw,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { useMessaging, usePostPreview, type PostPreview } from '../../lib/messaging/useMessaging';
 import {
   setActiveConversation, loadThread, loadOlder, sendMessage, retryMessage, discardMessage,

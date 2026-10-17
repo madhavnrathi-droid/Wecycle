@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X } from '@/lib/icons';
 import { lockBodyScroll } from '../lib/bodyLock';
 import { useSheet } from '../lib/useSheet';
 

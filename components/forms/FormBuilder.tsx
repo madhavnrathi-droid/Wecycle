@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronUp, ChevronDown, Trash2, Plus, X } from 'lucide-react';
+import { ChevronUp, ChevronDown, Trash2, Plus, X } from '@/lib/icons';
 import {
   FIELD_TYPE_META, FIELD_TYPE_ORDER, newField,
   type FormField, type FormFieldType,
@@ -76,8 +76,8 @@ export default function FormBuilder({ fields, onChange }: FormBuilderProps) {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{
-              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.06em',
-              textTransform: 'uppercase', color: 'var(--text-muted)',
+              fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+              textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
             }}>
               Add a question
             </span>
@@ -173,7 +173,7 @@ function FieldCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+          fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           color: 'var(--text-muted)',
         }}>
           <span aria-hidden="true" style={{ fontSize: 'calc(12px * var(--text-scale))' }}>{meta.icon}</span> {meta.label}

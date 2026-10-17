@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { EyeOff, Flag, Share2, UserX } from 'lucide-react';
+import { EyeOff, Flag, Share2, UserX } from '@/lib/icons';
 import { haptics } from '../lib/haptics';
 
 export interface CardMenuProps {

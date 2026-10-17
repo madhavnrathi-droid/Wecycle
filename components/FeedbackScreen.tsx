@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Send, Heart, EyeOff, Eye, Sparkles } from 'lucide-react';
+import { ChevronLeft, Send, Heart, EyeOff, Eye, Sparkles } from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { Toggle } from './SettingsScreen';
 
@@ -134,8 +134,8 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
       {/* ── Tags ── */}
       <section style={{ padding: '14px 20px 4px' }}>
         <div style={{
-          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-          letterSpacing: '0.08em', textTransform: 'uppercase',
+          fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+          letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           color: 'var(--text-secondary)',
           marginBottom: 8,
         }}>
@@ -170,8 +170,8 @@ export default function FeedbackScreen({ onBack }: FeedbackScreenProps) {
       {/* ── Textarea ── */}
       <section style={{ padding: '14px 20px 4px' }}>
         <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-default)',
+          background: 'var(--bg-inset)',
+          border: 'none',
           borderRadius: 16,
           padding: 14,
           display: 'flex', flexDirection: 'column',

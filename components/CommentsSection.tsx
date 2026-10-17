@@ -17,7 +17,7 @@
  * later — the Comment shape already matches what the table will look like. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, Send, CornerDownRight, Trash2, Flag } from 'lucide-react';
+import { MessageCircle, Send, CornerDownRight, Trash2, Flag } from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { fetchComments, createComment, removeComment, timeAgo, type Comment } from '../lib/comments';
 import { isServerModerationError } from '../lib/contentFilter';
@@ -285,8 +285,8 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
 
         <div style={{
           display: 'flex', alignItems: 'flex-end', gap: 10,
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-default)',
+          background: 'var(--bg-inset)',
+          border: 'none',
           borderRadius: 16,
           padding: 10,
         }}>
@@ -307,7 +307,7 @@ export default function CommentsSection({ postId, entityType, onRequireAuth, onO
               <div style={{
                 width: '100%', height: '100%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 700,
+                color: '#fff', fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600,
               }}>?</div>
             )}
           </div>

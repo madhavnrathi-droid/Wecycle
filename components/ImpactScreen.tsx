@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   Settings, Share2, TrendingUp, Award, ArrowUpRight,
   Plus,
-} from 'lucide-react';
+} from '@/lib/icons';
 import {
   IMPACT_METRICS, PERSONAL_IMPACT, LEADERBOARD, INVENTORY_ITEMS,
   CURRENT_USER, type ImpactMetric,
@@ -57,7 +57,7 @@ export default function ImpactScreen() {
                 width: 76, height: 76, borderRadius: '50%',
                 background: CURRENT_USER.color,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 'calc(26px * var(--text-scale))', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em',
+                fontSize: 'calc(26px * var(--text-scale))', fontWeight: 600, color: '#fff', letterSpacing: '-0.02em',
               }}>
                 {CURRENT_USER.initials}
               </div>
@@ -70,7 +70,7 @@ export default function ImpactScreen() {
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{
-                margin: '0 0 3px', fontSize: 'calc(26px * var(--text-scale))', fontWeight: 900,
+                margin: '0 0 3px', fontSize: 'calc(26px * var(--text-scale))', fontWeight: 600,
                 letterSpacing: '-0.04em', color: 'var(--text-primary)',
                 lineHeight: 1.05,
               }}>
@@ -100,7 +100,7 @@ export default function ImpactScreen() {
                 borderRight: i < 2 ? '1px solid var(--border-subtle)' : 'none',
               }}>
                 <p style={{
-                  margin: '0 0 2px', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 700,
+                  margin: '0 0 2px', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
                   letterSpacing: '-0.025em',
                   color: 'var(--text-primary)',
                   lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
@@ -136,7 +136,7 @@ export default function ImpactScreen() {
               style={{
                 flex: 1, background: 'none', border: 'none', cursor: 'pointer',
                 padding: '14px 8px',
-                fontSize: 'calc(12px * var(--text-scale))', fontWeight: 800, letterSpacing: '0.02em',
+                fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.02em',
                 color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
                 borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent-lime)' : 'transparent'}`,
                 transition: 'all 0.15s',
@@ -221,7 +221,7 @@ function PersonalImpactTab() {
               </p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                 <span style={{
-                  fontSize: 'calc(22px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.025em',
+                  fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.025em',
                   color: 'var(--text-primary)', lineHeight: 1.1,
                   fontVariantNumeric: 'tabular-nums',
                 }}>
@@ -257,7 +257,7 @@ function PersonalImpactTab() {
             return (
               <div key={badge} style={{
                 display: 'flex', alignItems: 'center', gap: 7,
-                background: 'var(--bg-card)', border: '1px solid var(--border-default)',
+                background: 'var(--bg-inset)', border: 'none',
                 borderRadius: 'var(--radius-pill)', padding: '5px 12px 5px 5px',
               }}>
                 <div style={{
@@ -268,7 +268,7 @@ function PersonalImpactTab() {
                 }}>
                   {cfg.emoji}
                 </div>
-                <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 800, color: 'var(--text-primary)' }}>{badge}</span>
+                <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{badge}</span>
               </div>
             );
           })}
@@ -278,7 +278,7 @@ function PersonalImpactTab() {
             borderRadius: 'var(--radius-pill)', padding: '5px 14px',
             cursor: 'pointer',
           }}>
-            <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 700 }}>
+            <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', fontWeight: 600 }}>
               +{12 - CURRENT_USER.badges.length} more
             </span>
           </div>
@@ -396,7 +396,7 @@ function CommunityImpactTab() {
                   width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
                   background: user.color,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 'calc(12px * var(--text-scale))', fontWeight: 700, color: '#fff',
+                  fontSize: 'calc(12px * var(--text-scale))', fontWeight: 600, color: '#fff',
                 }}>
                   {user.initials}
                 </div>
@@ -454,7 +454,7 @@ function CommunityMetricRow({ metric }: { metric: ImpactMetric }) {
         </p>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <span style={{
-            fontSize: 'calc(22px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.025em',
+            fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.025em',
             color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums',
           }}>
             {formatValue(metric.value, metric.label)}
@@ -511,7 +511,7 @@ function InventoryTab() {
             borderRight: i < 2 ? '1px solid var(--border-subtle)' : 'none',
           }}>
             <p style={{
-              margin: '0 0 2px', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 700,
+              margin: '0 0 2px', fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
               letterSpacing: '-0.025em', color: 'var(--text-primary)',
               lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
             }}>

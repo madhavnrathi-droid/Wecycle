@@ -11,7 +11,7 @@ import SystemMessage from './SystemMessage';
 import { availableFirst, isRecentlyClosed } from '../lib/feed/rank';
 import { CATEGORIES as CATEGORY_LIST, normalizeCategory, categoryIdOf, matchesCategoryFilter } from '../lib/categories';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, MapPin, Heart, X, CalendarDays, Users as UsersIcon, Eye, ChevronRight } from 'lucide-react';
+import { Search, MapPin, Heart, X, Users as UsersIcon, Eye, ChevronRight, Package, Handshake } from '@/lib/icons';
 import {
   MARKETPLACE_ITEMS, OPPORTUNITIES, EVENTS, LOST_FOUND_ITEMS, CATEGORIES, closedLabelFor,
   type MarketplaceItem, type CommunityEvent, type LostItem,
@@ -826,7 +826,7 @@ export default function FeedScreen({
             <section className="rail">
               <div className="rail-head">
                 <div style={{ minWidth: 0 }}>
-                  <h2 className="rail-title">Lost on campus 👀</h2>
+                  <h2 className="rail-title">Lost on campus</h2>
                   <p className="rail-sub">Anything here look like yours?</p>
                 </div>
                 <button type="button" className="rail-seeall" onClick={() => onBannerAction?.('lost-found')}>
@@ -840,7 +840,7 @@ export default function FeedScreen({
             <section className="rail">
               <div className="rail-head">
                 <div style={{ minWidth: 0 }}>
-                  <h2 className="rail-title">Found &amp; waiting 🙌</h2>
+                  <h2 className="rail-title">Found &amp; waiting</h2>
                   <p className="rail-sub">Someone’s looking for these — is one yours?</p>
                 </div>
                 {seeAll && (
@@ -967,7 +967,8 @@ export default function FeedScreen({
   const bannerSlides: BannerSlide[] = [
     {
       id: 'share',
-      image: '/banners/share.webp',
+      texture: 'moss',
+      eyebrow: 'Pre-loved',
       illustration: 'twemoji:wrapped-gift',
       title: 'Share what you don’t use',
       subtitle: 'Give it a second life nearby',
@@ -978,7 +979,8 @@ export default function FeedScreen({
     },
     {
       id: 'request',
-      image: '/banners/request.webp',
+      texture: 'ember',
+      eyebrow: 'Requests',
       illustration: 'twemoji:raising-hand',
       title: 'Ask for what you need',
       subtitle: 'Borrow before you buy',
@@ -989,7 +991,8 @@ export default function FeedScreen({
     },
     {
       id: 'events',
-      image: '/banners/events.webp',
+      texture: 'violet',
+      eyebrow: 'Events',
       illustration: 'twemoji:tear-off-calendar',
       title: 'Join local events',
       subtitle: 'Repair cafés, swaps, cleanups',
@@ -1000,7 +1003,8 @@ export default function FeedScreen({
     },
     {
       id: 'lost-found',
-      image: '/banners/lost-found.webp',
+      texture: 'sunset',
+      eyebrow: 'Lost & found',
       illustration: 'twemoji:magnifying-glass-tilted-left',
       title: 'Lost something?',
       subtitle: 'Or help return what you found',
@@ -1016,7 +1020,8 @@ export default function FeedScreen({
          form, because browsing what is already there is the lower-commitment
          first step. */
       id: 'jobs',
-      image: '/banners/jobs.webp',
+      texture: 'prism',
+      eyebrow: 'Jobs & gigs',
       illustration: 'twemoji:briefcase',
       title: 'Get paid for what you’re good at',
       subtitle: 'Design, tutoring, photography',
@@ -1031,7 +1036,8 @@ export default function FeedScreen({
     },
     {
       id: 'whatsapp',
-      image: '/banners/whatsapp.webp',
+      texture: 'meadow',
+      eyebrow: 'Why Wecycle',
       illustration: 'twemoji:graduation-cap',
       /* Not "For MAHE, by MAHE". Wecycle is independent — /copyright states
            plainly that it is not affiliated with, endorsed by, or sponsored by
@@ -1078,7 +1084,7 @@ export default function FeedScreen({
             }} suppressHydrationWarning>
               {showValueProp
                 ? 'Buy, borrow and give away on campus'
-                : <>Hi, {greetingName} <span aria-hidden="true">👋</span></>}
+                : <>Hi, {greetingName}</>}
             </h1>
             <p style={{
               margin: '4px 0 0',
@@ -1378,16 +1384,15 @@ export default function FeedScreen({
               className="cat-tile"
               data-active={activeCategory === cat.id || undefined}
               onClick={(e) => {
-                /* A small hop of the illustration and a selection tick — the
-                   Zomato/Swiggy cuisine-tile answer. Scripted from the tap, so
-                   the default "All" never hops just because the page loaded. */
+                /* A selection tick and a small settle of the disc — it dips
+                   and returns as it fills. Scripted from the tap, so the
+                   default "All" never moves just because the page loaded. */
                 if (activeCategory !== cat.id) {
                   haptics.selection();
                   play(e.currentTarget.querySelector('.cat-tile-ico'), [
+                    { transform: 'scale(0.9)' },
                     { transform: 'none' },
-                    { transform: 'translateY(-5px) scale(1.06)', offset: 0.38 },
-                    { transform: 'none' },
-                  ], { duration: DUR[4], easing: SPRING.snappy });
+                  ], { duration: DUR[3], easing: SPRING.snappy });
                 }
                 setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id });
               }}
@@ -1643,7 +1648,7 @@ function SellNudge({ onSell }: { onSell: () => void }) {
        (62px) and gives the ask a target the width of the screen, which is the
        cheaper trade under Fitts either way. */
     <button type="button" className="sell-nudge" onClick={onSell}>
-      <span className="sell-nudge-ico" aria-hidden="true">📦</span>
+      <span className="sell-nudge-ico" aria-hidden="true"><Package size={22} /></span>
       <span className="sell-nudge-copy">
         {/* Names an object, not a category. "List an item" is a database
             instruction; a thing gathering dust is something the reader can
@@ -1666,7 +1671,7 @@ function SellNudge({ onSell }: { onSell: () => void }) {
 function StorefrontCTA({ onPostJob }: { onPostJob: () => void }) {
   return (
     <section className="sf-cta">
-      <span className="sf-cta-emoji" aria-hidden="true">🤝</span>
+      <span className="sf-cta-emoji" aria-hidden="true"><Handshake size={24} /></span>
       <div className="sf-cta-copy">
         {/* One positioning, stated symmetrically, because the board holds both
             directions and the composer's first question is which one you are.
@@ -1959,9 +1964,7 @@ function EventCard({ event, onClick }: { event: CommunityEvent; onClick: () => v
           </span>
         </span>
       </button>
-      <span className="pcard-badge" data-kind="event">
-        <CalendarDays size={9} strokeWidth={2.4} style={{ marginRight: 3, verticalAlign: '-1px' }} />Event
-      </span>
+      <span className="pcard-badge" data-kind="event">Event</span>
       {event.hasForm && <span className="pcard-badge pcard-badge--second" data-kind="opportunity">Register</span>}
     </article>
   );

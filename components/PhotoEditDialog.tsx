@@ -24,7 +24,7 @@
 import { useRef, useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2 } from '@/lib/icons';
 import PhotoPicker, { type PhotoPickerHandle } from './PhotoPicker';
 import { uploadMedia } from '../lib/liveData';
 import type { CompressedMedia } from '../lib/mediaCompression';
@@ -147,7 +147,7 @@ export default function PhotoEditDialog({
 
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
               Edit photos
             </span>
             <button
@@ -191,8 +191,8 @@ export default function PhotoEditDialog({
               disabled={saving}
               style={{
                 flex: '0 0 auto', height: 48, padding: '0 18px', borderRadius: 14,
-                background: 'var(--bg-surface)', color: 'var(--text-secondary)',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-inset)', color: 'var(--text-secondary)',
+                border: 'none',
                 cursor: saving ? 'not-allowed' : 'pointer',
                 fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600,
               }}

@@ -279,7 +279,7 @@ export function resolveTheme(_mode: ThemeMode): 'light' | 'dark' {
 /* The two surface colors the browser/OS chrome should tint to. Must match
  * --bg-base in globals.css for light + dark so the status bar / PWA title
  * bar blends seamlessly into the app instead of showing a seam. */
-const THEME_COLOR = { light: '#FAFAF6', dark: '#0C0C0B' } as const;
+const THEME_COLOR = { light: '#FFFFFF', dark: '#0C0C0B' } as const;
 
 /** Apply the theme to <html> by toggling the `.dark` class. */
 export function applyTheme(mode: ThemeMode) {

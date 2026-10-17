@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, Link2 } from 'lucide-react';
+import { ExternalLink, Link2 } from '@/lib/icons';
 import { linkHost, shortLink, linkify } from '../lib/postLink';
 
 /* Presentation for outbound links on a post. Three pieces, one rule: the

@@ -18,7 +18,7 @@
  * the bundle, and the SIGCHI check goes to /api/sigchi.
  */
 
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '@/lib/icons';
 import PartnerOfferPanel from './PartnerOfferPanel';
 
 export interface OutageNoticeProps {

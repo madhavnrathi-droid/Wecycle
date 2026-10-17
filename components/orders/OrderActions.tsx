@@ -8,7 +8,7 @@
  * The rules come from lib/orders/model.ts; this only asks them. */
 
 import { useEffect, useRef, useState } from 'react';
-import { MoreHorizontal, Check, X, MessageCircle, FileText } from 'lucide-react';
+import { MoreHorizontal, Check, X, MessageCircle, FileText } from '@/lib/icons';
 import { orderStep, pickupCodeFor, roleIn, useOrders, type Order, type StepExtras } from '../../lib/orders/store';
 import {
   actionsFor, primaryAction, isOpen, STAGES, STATUS_LABEL, ACTION_LABEL, PICKUP_MAX, REASON_MAX,

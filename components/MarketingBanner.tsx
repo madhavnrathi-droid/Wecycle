@@ -34,7 +34,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from '@/lib/icons';
 
 export interface BannerSlide {
   id: string;
@@ -58,6 +58,13 @@ export interface BannerSlide {
    *  contains all of that. If it 404s or errors, we fall back to the
    *  gradient + text composition automatically (no broken-image state). */
   image?: string;
+  /** A liquid-marble texture from /public/textures (the palettes of our
+   *  social posts, softened for type). When set it wins over `image`: the card
+   *  is the texture, a mono eyebrow, the title and the subtitle — real text,
+   *  no illustration. */
+  texture?: 'moss' | 'ember' | 'prism' | 'violet' | 'sunset' | 'meadow';
+  /** A short mono label above the title, e.g. "Pre-loved". */
+  eyebrow?: string;
   /** Fired when the slide is tapped / activated via keyboard. */
   onClick: () => void;
   ariaLabel?: string;
@@ -241,6 +248,31 @@ export default function MarketingBanner({
     >
       <div className="marketing-banner-track" ref={trackRef}>
         {slides.map((slide, i) => {
+          if (slide.texture) {
+            const file = ['sunset', 'meadow'].includes(slide.texture) ? slide.texture : `${slide.texture}-soft`;
+            return (
+              <button
+                key={slide.id}
+                type="button"
+                onClick={slide.onClick}
+                className="marketing-banner-slide mb-tex tex"
+                style={{ ['--tex-img' as string]: `url(/textures/${file}.webp)` }}
+                data-active={i === active || undefined}
+                aria-label={slide.ariaLabel ?? `${slide.title} — ${slide.subtitle}`}
+                aria-roledescription="slide"
+                aria-current={i === active ? 'true' : undefined}
+              >
+                <span className="mb-tex-copy">
+                  {slide.eyebrow && <span className="mb-tex-eyebrow">{slide.eyebrow}</span>}
+                  <span className="mb-tex-title">{slide.title}</span>
+                  <span className="mb-tex-sub">{slide.subtitle}</span>
+                </span>
+                <span className="mb-tex-go" aria-hidden="true">
+                  <ArrowUpRight size={16} weight="regular" />
+                </span>
+              </button>
+            );
+          }
           const useImage = !!slide.image && !imgErrored.has(slide.id);
           return (
           <button

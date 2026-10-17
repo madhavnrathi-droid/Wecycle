@@ -13,6 +13,19 @@
 
 import type { ReactNode } from 'react';
 import LottiePlayer from './LottiePlayer';
+import {
+  Calendar, Search, Megaphone, Handshake, ShoppingBag, Archive, Package, Bell, Mail,
+  Sparkles, Bookmark, Clock, MessageCircle, CheckCircle, type LucideIcon,
+} from '@/lib/icons';
+
+/* Call sites still pass the emoji they were written with. Each one is drawn as
+   the matching thin glyph instead, so an empty screen speaks in the same line
+   weight as the rest of the app rather than in a sticker. */
+const GLYPH_FOR: Record<string, LucideIcon> = {
+  '📅': Calendar, '🔍': Search, '🙋': Megaphone, '🤝': Handshake, '🛍️': ShoppingBag,
+  '🗂️': Archive, '📦': Package, '🔔': Bell, '📭': Mail, '✨': Sparkles, '🔖': Bookmark,
+  '⏰': Clock, '💬': MessageCircle, '✅': CheckCircle,
+};
 
 interface EmptyStateProps {
   /** Required. Tightly phrased, max ~80 chars, no punctuation tyranny. */
@@ -47,8 +60,10 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
       }}
     >
       {icon ? (
-        <div style={{ fontSize: `calc(${compact ? 30 : 40}px * var(--text-scale))`, lineHeight: 1, opacity: 0.92 }} aria-hidden="true">
-          {icon}
+        <div style={{ lineHeight: 0, color: 'var(--text-muted)', marginBottom: 4 }} aria-hidden="true">
+          {typeof icon === 'string'
+            ? (() => { const G = GLYPH_FOR[icon] ?? Sparkles; return <G size={compact ? 32 : 40} />; })()
+            : icon}
         </div>
       ) : (
         <LottiePlayer
@@ -60,10 +75,10 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
       )}
       <p style={{
         margin: 0,
-        fontSize: `calc(${compact ? 14 : 15}px * var(--text-scale))`,
+        fontSize: `calc(${compact ? 15 : 17}px * var(--text-scale))`,
         fontWeight: 600,
         color: 'var(--text-primary)',
-        letterSpacing: '-0.01em',
+        letterSpacing: '-0.025em',
         maxWidth: 320,
         lineHeight: 1.35,
       }}>
@@ -72,10 +87,11 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
       {sub && (
         <p style={{
           margin: 0,
-          fontSize: 'calc(12px * var(--text-scale))',
+          fontSize: 'calc(15px * var(--text-scale))',
           color: 'var(--text-muted)',
-          maxWidth: 360,
-          lineHeight: 1.45,
+          maxWidth: 320,
+          lineHeight: 1.35,
+          letterSpacing: '-0.015em',
         }}>
           {sub}
         </p>
@@ -85,15 +101,15 @@ export default function EmptyState({ prompt, sub, icon, cta, compact }: EmptySta
           type="button"
           onClick={cta.onClick}
           style={{
-            marginTop: 6,
-            background: 'var(--text-primary)',
-            color: 'var(--bg-base)',
+            marginTop: 10,
+            background: 'var(--ink)',
+            color: '#FFFFFF',
             border: 'none',
             borderRadius: 999,
-            padding: '10px 18px',
-            fontSize: 'calc(13px * var(--text-scale))',
+            padding: '11px 20px',
+            fontSize: 'calc(15px * var(--text-scale))',
             fontWeight: 600,
-            letterSpacing: '-0.01em',
+            letterSpacing: '-0.015em',
             cursor: 'pointer',
           }}
         >

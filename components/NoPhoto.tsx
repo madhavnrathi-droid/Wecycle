@@ -1,5 +1,7 @@
 'use client';
 
+import { ImagePlus } from '@/lib/icons';
+
 /* ── The one thing shown when a post has no photo ──────────────────────────
  *
  * Every tile in the app is a fixed-ratio box, and every box has to show
@@ -14,16 +16,14 @@
  * a picture. A placeholder that can be mistaken for content is worse than an
  * empty box, because an empty box is at least honest about knowing nothing.
  *
- * So: one image, obviously an illustration, obviously not a photograph of the
- * thing. It says "no photo" in a way no photograph can, and being the same
- * everywhere means readers learn it once and never mis-read it again.
- *
- * Sized to a fraction of its box and centred rather than filling it, for the
- * same reason: a placeholder that bleeds to the edges reads as a photo. The
- * margin is what tells you it is furniture, not content.
+ * So: a thin picture glyph on a soft fill, with the words "No photo" set in
+ * the mono label voice. It cannot be mistaken for a photograph of anything,
+ * and being the same everywhere means readers learn it once. (It used to be a
+ * 3D voxel illustration — honest, but the most artificial-looking object on
+ * any screen it appeared on.)
  */
 
-/** The default image. One file, one meaning, used app-wide. */
+/** Kept for any caller that still wants the old illustration's path. */
 export const NO_PHOTO_SRC = '/brand/no-photo.webp';
 
 interface NoPhotoProps {
@@ -46,8 +46,10 @@ export default function NoPhoto({ small, tint, className }: NoPhotoProps) {
          information a screen reader needs read aloud on every tile. */
       aria-hidden="true"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={NO_PHOTO_SRC} alt="" loading="lazy" decoding="async" draggable={false} />
+      <span className="nophoto-mark">
+        <ImagePlus size={small ? 18 : 26} />
+        {!small && <span className="nophoto-label">No photo</span>}
+      </span>
     </span>
   );
 }

@@ -36,7 +36,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy } from '@/lib/icons';
 import { haptics } from '../lib/haptics';
 
 /** Fraction of foil that must be gone before it clears itself. Chosen by

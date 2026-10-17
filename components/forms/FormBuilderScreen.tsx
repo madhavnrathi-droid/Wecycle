@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { ChevronLeft, Trash2, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, Trash2, Check, Loader2 } from '@/lib/icons';
 import FormBuilder from './FormBuilder';
 import { lockBodyScroll } from '../../lib/bodyLock';
 import type { FormField } from '../../lib/eventForms';
@@ -118,7 +118,7 @@ export default function FormBuilderScreen({
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)' }}>
             Registration form
           </h1>
           {subtitle && (

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import {
   X, User, Settings, MessageSquare, Send, Bell, Heart, LogOut, ChevronRight, MessageCircle,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { useAuth } from '../lib/AuthContext';
 import { getAvatar } from '../lib/photos';
 import { track, EVT } from '../lib/analytics';
@@ -109,7 +109,7 @@ export default function Drawer({
             background: 'var(--bg-inset)',
             overflow: 'hidden', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 'calc(14px * var(--text-scale))', fontWeight: 700, color: 'var(--text-secondary)',
+            fontSize: 'calc(14px * var(--text-scale))', fontWeight: 600, color: 'var(--text-secondary)',
           }}>
             <img
               src={avatarSrc}

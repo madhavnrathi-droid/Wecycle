@@ -1,49 +1,50 @@
 'use client';
 
+import {
+  Laptop, Armchair, TShirt, BookOpen, Bicycle, CookingPot, Basketball, Handshake,
+  Ticket, Guitar, PaintBrush, PawPrint, SquaresFour, Tag, type LucideIcon,
+} from '@/lib/icons';
+
 /* One renderer for a category's icon, so the home strip and the desktop
-   marketplace cannot drift apart the way their category LISTS once did.
+ * marketplace cannot drift apart the way their category LISTS once did.
  *
- * "All" is the odd one out and always will be: it is a filter, not a category,
- * so the voxel sheet has no tile for it and inventing one would be dishonest —
- * there is no object that means "everything". It gets a 2x2 grid glyph instead,
- * the standard "show me all of it" affordance, drawn in currentColor so it
- * inverts with the plate underneath it rather than disappearing when the tile
- * turns black. Leaving the old ⚡ emoji there was the alternative, and one
- * emoji sitting among twelve voxel illustrations reads as an oversight. */
+ * Thin Phosphor glyphs, drawn in currentColor. The tiles used to carry 3D voxel
+ * renders — twelve little dioramas in a row — and next to real photos of real
+ * things they were the most artificial-looking objects on the screen. A line
+ * glyph says "this is a filter" and leaves the photographs to be the pictures.
+ *
+ * "All" is a filter, not a category, so it gets the four-square grid: the
+ * standard "show me all of it" glyph. */
+
+const GLYPH: Record<string, LucideIcon> = {
+  all: SquaresFour,
+  electronics: Laptop,
+  furniture: Armchair,
+  fashion: TShirt,
+  books: BookOpen,
+  mobility: Bicycle,
+  kitchen: CookingPot,
+  sports: Basketball,
+  services: Handshake,
+  tickets: Ticket,
+  hobbies: Guitar,
+  art: PaintBrush,
+  adopt: PawPrint,
+};
 
 export default function CategoryIcon({
-  id, src, emoji, size = 56,
+  id, size = 56,
 }: {
   id: string;
+  /** The voxel artwork's path. Kept in the signature so callers need not
+   *  change; no longer drawn. */
   src?: string;
-  /** Fallback for anything without artwork. */
   emoji?: string;
+  /** The tile's size. A large tile draws the glyph at about half of it; a
+   *  small one (an inline chip) draws it at the size given. */
   size?: number;
 }) {
-  if (id === 'all') {
-    const s = Math.round(size * 0.52);
-    return (
-      <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-        <rect x="2"  y="2"  width="8.5" height="8.5" rx="2.6" />
-        <rect x="13.5" y="2"  width="8.5" height="8.5" rx="2.6" />
-        <rect x="2"  y="13.5" width="8.5" height="8.5" rx="2.6" />
-        <rect x="13.5" y="13.5" width="8.5" height="8.5" rx="2.6" />
-      </svg>
-    );
-  }
-
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        loading="lazy"
-        decoding="async"
-      />
-    );
-  }
-
-  return <>{emoji}</>;
+  const Glyph = GLYPH[id] ?? Tag;
+  const px = size >= 40 ? Math.round(size * 0.46) : size;
+  return <Glyph size={px} aria-hidden="true" />;
 }

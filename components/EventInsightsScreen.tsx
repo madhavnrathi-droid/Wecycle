@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, Eye, Heart, MessageCircle, Users, Download, Paperclip, ChevronDown, Trash2,
-} from 'lucide-react';
+} from '@/lib/icons';
 import type { CommunityEvent, User } from '../lib/mockData';
 import { USERS } from '../lib/mockData';
 import {
@@ -129,7 +129,7 @@ export default function EventInsightsScreen({ event, onBack, onOpenUser }: Event
           <ChevronLeft size={20} strokeWidth={1.8} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
             Insights
           </h1>
           <p style={{
@@ -258,9 +258,9 @@ function StatTile({ icon, value, label }: { icon: React.ReactNode; value: number
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', marginBottom: 6 }}>
         {icon}
-        <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</span>
+        <span style={{ fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 'calc(22px * var(--text-scale))', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
         {value.toLocaleString('en-IN')}
       </div>
     </div>
@@ -313,7 +313,7 @@ function AttendeeList({ attendees, onOpenUser }: { attendees: EventAttendee[]; o
             </span>
           </span>
           <span style={{
-            fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+            fontSize: 'calc(10.5px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             color: '#16A34A', background: 'rgba(34,197,94,0.12)',
             padding: '3px 8px', borderRadius: 999, flexShrink: 0,
           }}>
@@ -382,7 +382,7 @@ function QuestionBlock({ field, responses }: { field: FormField; responses: Form
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
         <span aria-hidden="true" style={{ fontSize: 'calc(13px * var(--text-scale))' }}>{meta.icon}</span>
-        <span style={{ flex: 1, fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+        <span style={{ flex: 1, fontSize: 'calc(13.5px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
           {field.label || meta.label}
         </span>
         <span style={{ fontSize: 'calc(11px * var(--text-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -551,7 +551,7 @@ function IndividualResponses({ form, responses, onOpenUser, onDelete }: {
               const empty = a == null || (Array.isArray(a) ? a.length === 0 : a === '');
               return (
                 <div key={f.id} style={{ fontSize: 'calc(12.5px * var(--text-scale))', lineHeight: 1.45 }}>
-                  <span style={{ display: 'block', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>
+                  <span style={{ display: 'block', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 2 }}>
                     {f.label || FIELD_TYPE_META[f.type].label}
                   </span>
                   {empty ? (

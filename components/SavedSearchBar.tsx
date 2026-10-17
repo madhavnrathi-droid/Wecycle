@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { Bell, BellPlus, X, Plus, Sparkles } from 'lucide-react';
+import { Bell, BellPlus, X, Plus, Sparkles } from '@/lib/icons';
 import {
   getSavedSearches, addSavedSearch, removeSavedSearch, onSavedSearchesChange,
   matchesAnySavedSearch, syncSavedSearches, type SavedSearch,
@@ -88,7 +88,7 @@ export default function SavedSearchBar({ requests, currentQuery = '', onRunSearc
             <Dialog.Content className="ss-content" aria-describedby="ss-desc">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Bell size={16} strokeWidth={2} style={{ color: 'var(--accent-lime-ink)' }} />
-                <Dialog.Title style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+                <Dialog.Title style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
                   Notify me about…
                 </Dialog.Title>
                 <span style={{ flex: 1 }} />

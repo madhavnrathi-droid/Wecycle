@@ -19,7 +19,7 @@
  */
 
 import { useRef } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Search } from '@/lib/icons';
 import { closedLabelFor, type MarketplaceItem, type LostItem } from '../lib/mockData';
 import { opportunityCompLabel } from '../lib/opportunity';
 import { resolveItemMedia } from '../lib/photos';
@@ -72,15 +72,15 @@ export default function RelatedRail({
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={{
-            margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 700,
+            margin: 0, fontSize: 'calc(16px * var(--text-scale))', fontWeight: 600,
             letterSpacing: '-0.02em', color: 'var(--text-primary)',
             display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
           }}>
             {title}
             {sponsored && (
               <span style={{
-                fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600, letterSpacing: '0.06em',
-                textTransform: 'uppercase',
+                fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+                textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
                 color: 'var(--text-muted)',
                 border: '1px solid var(--border-default)',
                 borderRadius: 4, padding: '2px 6px',
@@ -180,8 +180,8 @@ function ScrollNub({ direction, onClick }: { direction: 'left' | 'right'; onClic
         transform: 'translateY(-50%)',
         zIndex: 2,
         width: 36, height: 36, borderRadius: '50%',
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-default)',
+        background: 'var(--bg-inset)',
+        border: 'none',
         boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
         color: 'var(--text-primary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -261,8 +261,8 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
         {(item.isRequest || item.listingType === 'free' || item.kind === 'opportunity' || closed) && (
           <span style={{
             position: 'absolute', top: 8, left: 8,
-            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
-            textTransform: 'uppercase',
+            fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+            textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
             /* The status tokens, not a second set of hexes.
                This rail carried its own palette — #3B82F6, #8B5CF6, #14B86C —
                for the same three states the feed cards render with #FF8C00,
@@ -301,7 +301,7 @@ function ListingCard({ item, onClick }: { item: MarketplaceItem; onClick: () => 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
         {priceLabel && (
           <span style={{
-            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 700, color: 'var(--text-primary)',
+            fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)',
             letterSpacing: '-0.01em',
           }}>
             {priceLabel}
@@ -355,8 +355,8 @@ function LostFoundCard({ item, onClick }: { item: LostItem & { photoUrls?: strin
         )}
         <span style={{
           position: 'absolute', top: 8, left: 8,
-          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
-          textTransform: 'uppercase',
+          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+          textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           color: lost ? '#fff' : 'var(--status-on-bright)',
           background: lost ? 'var(--status-lost)' : 'var(--status-found)',
           padding: '3px 8px',

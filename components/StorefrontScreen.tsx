@@ -20,14 +20,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { availableFirst } from '../lib/feed/rank';
 import PostStamp from './PostStamp';
 import { matchesCategoryFilter } from '../lib/categories';
-import { ChevronLeft, MapPin, Calendar, Users, IndianRupee, Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal, MessageCircle } from 'lucide-react';
+import { ChevronLeft, MapPin, Calendar, Users, IndianRupee, Mail, Phone, GraduationCap, Building2, Home, IdCard, Search, MoreHorizontal, MessageCircle } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import ReportSheet from './ReportSheet';
 import BrandScreen from './brand/BrandScreen';
 import { brandForUser } from '../lib/brands';
 import { shopNameOf } from '../lib/shops';
 import ShareCardModal from './ShareCardModal';
-import { Share2 } from 'lucide-react';
+import { Share2 } from '@/lib/icons';
 import { haptics } from '../lib/haptics';
 import { shareUrl } from '../lib/shareUrl';
 import type {
@@ -664,16 +664,16 @@ function PublicInfoSection({
   return (
     <section style={{ padding: '4px 20px 18px' }}>
       <h3 style={{
-        margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 700,
-        letterSpacing: '0.08em', textTransform: 'uppercase',
+        margin: '0 0 10px', fontSize: 'calc(11px * var(--text-scale))', fontWeight: 500,
+        letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
         color: 'var(--text-muted)',
       }}>
         About
       </h3>
       <dl style={{
         margin: 0, padding: '12px 14px',
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
+        background: 'var(--bg-inset)',
+        border: 'none',
         borderRadius: 14,
         display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 16, rowGap: 8,
         alignItems: 'baseline',
@@ -729,8 +729,8 @@ function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
         background: isLost ? 'rgba(237,46,80,0.92)' : 'rgba(34,197,94,0.92)',
         color: '#fff', borderRadius: 999,
         padding: '4px 10px',
-        fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.04em',
-        textTransform: 'uppercase', zIndex: 3,
+        fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em',
+        textTransform: 'uppercase', fontFamily: 'var(--font-mono)', zIndex: 3,
       }}>{lf.status}</span>
       <div className="feed-card-overlay" data-light={!lfPhoto || undefined}>
         <p className="feed-card-title">{lf.title}</p>
@@ -750,14 +750,14 @@ function LostFoundTile({ lf, onClick }: { lf: LostItem; onClick: () => void }) {
 function StatTile({ value, label }: { value: number; label: string }) {
   return (
     <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-subtle)',
+      background: 'var(--bg-inset)',
+      border: 'none',
       borderRadius: 14,
       padding: '12px 14px',
       textAlign: 'center',
     }}>
       <div style={{
-        fontSize: 'calc(20px * var(--text-scale))', fontWeight: 700,
+        fontSize: 'calc(20px * var(--text-scale))', fontWeight: 600,
         letterSpacing: '-0.025em',
         color: 'var(--text-primary)',
         fontVariantNumeric: 'tabular-nums',
@@ -844,16 +844,16 @@ function RequestRow({ feed }: { feed: FeedItem }) {
   return (
     <li style={{
       padding: '14px 16px',
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-subtle)',
+      background: 'var(--bg-inset)',
+      border: 'none',
       borderRadius: 14,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{
-          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 600,
+          fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500,
           padding: '3px 8px', borderRadius: 999,
           background: 'rgba(245,132,0,0.14)', color: 'var(--accent-amber-ink)',
-          textTransform: 'uppercase', letterSpacing: '0.04em',
+          textTransform: 'uppercase', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
         }}>
           Request
         </span>
@@ -887,8 +887,8 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
         onClick={onClick}
         style={{
           all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%',
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
+          background: 'var(--bg-inset)',
+          border: 'none',
           borderRadius: 14,
           overflow: 'hidden',
           display: 'block',
@@ -925,7 +925,7 @@ function EventTile({ event, onClick }: { event: CommunityEvent; onClick: () => v
               <span style={{
                 color: '#8B5CF6', background: 'rgba(139,92,246,0.12)',
                 padding: '1px 7px', borderRadius: 999,
-                fontSize: 'calc(10px * var(--text-scale))', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase',
+                fontSize: 'calc(10px * var(--text-scale))', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
               }}>
                 📋 Register
               </span>

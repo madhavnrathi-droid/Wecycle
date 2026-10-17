@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle } from '@/lib/icons';
 import { useMessaging } from '../../lib/messaging/useMessaging';
 import { messagingAvailable, unreadConversations } from '../../lib/messaging/store';
 
@@ -20,7 +20,7 @@ export default function MessagesButton({ onClick }: { onClick: () => void }) {
   const label = n > 0 ? `Messages, ${n} unread conversation${n === 1 ? '' : 's'}` : 'Messages';
   return (
     <button type="button" onClick={onClick} aria-label={label} className="theme-toggle dm-topbtn">
-      <MessageCircle size={22} strokeWidth={1.8} aria-hidden="true" />
+      <MessageCircle size={24} aria-hidden="true" />
       {n > 0 && <span className="dm-badge" aria-hidden="true">{n > 9 ? '9+' : n}</span>}
     </button>
   );
