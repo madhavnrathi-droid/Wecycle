@@ -39,6 +39,11 @@ of this page.
    the old Lucide names working. A selected state switches to the FILL weight
    (the tab bar does this). New code can pass `weight` directly. Emoji in option
    data render as glyphs through `<EmojiGlyph>`.
+
+   **The exception is the category strip on Home**, which keeps its voxel renders
+   (`public/icons/categories/*.webp`, owner's call, 18 Oct 2026). The tiles have
+   no plate at rest; only the selected one gets a soft box. "All" is drawn in
+   the same voxel style by [`scripts/make-voxel-all.py`](../scripts/make-voxel-all.py).
 6. **Lighter motion.** Same five duration tokens (`lib/motion.test.ts` still
    enforces them). The snappy curve no longer overshoots; the bouncy one
    overshoots about 4%; presses scale to 0.97.

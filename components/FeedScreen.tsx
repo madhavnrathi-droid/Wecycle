@@ -1384,15 +1384,17 @@ export default function FeedScreen({
               className="cat-tile"
               data-active={activeCategory === cat.id || undefined}
               onClick={(e) => {
-                /* A selection tick and a small settle of the disc — it dips
-                   and returns as it fills. Scripted from the tap, so the
-                   default "All" never moves just because the page loaded. */
+                /* A small hop of the voxel object and a selection tick, the
+                   Zomato/Swiggy cuisine-tile answer. Lower than it used to be
+                   and without overshoot. Scripted from the tap, so the default
+                   "All" never hops just because the page loaded. */
                 if (activeCategory !== cat.id) {
                   haptics.selection();
-                  play(e.currentTarget.querySelector('.cat-tile-ico'), [
-                    { transform: 'scale(0.9)' },
+                  play(e.currentTarget.querySelector('.cat-tile-ico img'), [
                     { transform: 'none' },
-                  ], { duration: DUR[3], easing: SPRING.snappy });
+                    { transform: 'translateY(-4px) scale(1.04)', offset: 0.4 },
+                    { transform: 'none' },
+                  ], { duration: DUR[4], easing: SPRING.snappy });
                 }
                 setActiveCategory(cat.id); track(EVT.category_filter_changed, { category: cat.id });
               }}

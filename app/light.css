@@ -585,31 +585,37 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 .rail-seeall:hover { color: var(--text-primary); }
 .rail-seeall svg { display: none; }
 
-/* ═══ Category tiles ═══════════════════════════════════════════════════════ */
+/* ═══ Category tiles ═══════════════════════════════════════════════════════
+   The voxel renders stand on the page by themselves; no plate behind them.
+   Only the selected tile gets a box, so "where am I filtering" is the one
+   thing in the strip with an edge. */
 
-.cat-tile { gap: 7px; width: 68px; }
+.cat-tile { gap: 6px; width: 68px; }
 .cat-tile-ico {
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  background: var(--bg-inset);
-  color: var(--text-primary);
-  transition: background var(--dur-2) var(--ease-standard),
-              color var(--dur-2) var(--ease-standard),
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color var(--dur-2) var(--ease-standard),
+              box-shadow var(--dur-2) var(--ease-standard),
               transform var(--dur-2) var(--ease-standard);
 }
-.cat-tile-ico svg { color: inherit; }
-.cat-tile:hover .cat-tile-ico { transform: none; background: #ECECE9; }
+.cat-tile-ico img { width: 52px; height: 52px; object-fit: contain; }
+.cat-tile:hover .cat-tile-ico { transform: translateY(-2px); background: transparent; }
 .cat-tile:active .cat-tile-ico { transform: scale(0.94); }
-.cat-tile[data-active] .cat-tile-ico { background: var(--ink); color: #FFFFFF; box-shadow: none; }
-.cat-tile[data-active] .cat-tile-ico svg { color: #FFFFFF; }
+.cat-tile[data-active] .cat-tile-ico {
+  background: var(--cat-active-bg, #F3F2EE);
+  box-shadow: var(--cat-active-ring, inset 0 0 0 1px rgba(17, 17, 16, 0.06));
+}
+.cat-tile[data-active]:hover .cat-tile-ico { background: var(--cat-active-bg, #F3F2EE); }
 .cat-tile-label {
   font-size: calc(12px * var(--text-scale));
   font-weight: 400;
   letter-spacing: 0;
   color: var(--text-secondary);
 }
-.cat-tile[data-active] .cat-tile-label { color: var(--text-primary); font-weight: 500; }
+.cat-tile[data-active] .cat-tile-label { color: var(--text-primary); font-weight: 600; }
 
 /* ═══ Listing cards ════════════════════════════════════════════════════════
    The photo is the card. No container, no outline: a rounded image and two
