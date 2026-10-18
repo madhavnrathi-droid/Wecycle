@@ -199,7 +199,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
       }
     >
       <p style={{ margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-        Events are reviewed by community admins before they go live.
+        Your event goes live as soon as you post.
       </p>
 
       <form id="event-form" onSubmit={handleSubmit} noValidate>
