@@ -14,6 +14,7 @@ import { ChevronLeft, Trash2, Check, Loader2, AlertTriangle, AlertCircle } from 
 import FormBuilder from './FormBuilder';
 import { lockBodyScroll } from '../../lib/bodyLock';
 import type { FormField } from '../../lib/eventForms';
+import { Z_LAYER } from '../../lib/zLayers';
 
 interface FormBuilderScreenProps {
   open: boolean;
@@ -101,7 +102,11 @@ export default function FormBuilderScreen({
       aria-modal="true"
       aria-label="Registration form builder"
       style={{
-        position: 'fixed', inset: 0, zIndex: 240,
+        /* Opened from the Submit-an-event DIALOG (z 300/301) as well as from
+           an event page, so it takes the nested-dialog band: at fullPage
+           (240) it rendered underneath the sheet that launched it, and nobody
+           posting an event could see the questions they were adding. */
+        position: 'fixed', inset: 0, zIndex: Z_LAYER.dialogNested,
         background: 'var(--bg-base)',
         display: 'flex', flexDirection: 'column',
       }}
