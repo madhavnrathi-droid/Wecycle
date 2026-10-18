@@ -2,8 +2,9 @@
 
 The second edition of Wecycle's visual language (October 2026). Tokens and
 component overrides live in [`app/light.css`](../app/light.css), loaded after
-`globals.css` in `app/layout.tsx`. The header of that file is the long version
-of this page.
+`globals.css` through the single entry sheet [`app/styles.css`](../app/styles.css)
+(two separate imports in `app/layout.tsx` came out in the wrong order in the
+production bundle). The header of that file is the long version of this page.
 
 ## Principles
 

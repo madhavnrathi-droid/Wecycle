@@ -1,0 +1,11 @@
+/* The app's one stylesheet entry.
+
+   The design system is two files: globals.css (the first edition, still the
+   layout and behaviour) and light.css (the second edition, which must win every
+   tie by coming LAST). Imported as two modules from app/layout.tsx, the
+   production CSS chunk concatenated them the other way round — light.css first
+   — so on wecycle.page the old look won while `next dev` looked right. Within a
+   single sheet, @import order is the cascade order by definition, so both are
+   pulled in here and layout.tsx imports only this file. */
+@import "./globals.css";
+@import "./light.css";

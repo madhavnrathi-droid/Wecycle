@@ -2,7 +2,7 @@
    LIGHT — Wecycle's design system, second edition
    ═══════════════════════════════════════════════════════════════════════════
 
-   Loaded after globals.css (app/layout.tsx), so every rule here wins by order
+   Loaded after globals.css (both through app/styles.css), so every rule here wins by order
    alone. globals.css still holds the layout, the behaviour and the long
    arguments behind each component; this sheet changes how the product LOOKS.
 

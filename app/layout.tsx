@@ -7,10 +7,10 @@ import { AuthProvider } from "../lib/AuthContext";
 import { SITE_URL } from "../lib/siteUrl";
 import NativeInit from "../components/NativeInit";
 import Toaster from "../components/Toaster";
-import "./globals.css";
-/* The design system's second edition, layered over the first — see the header
-   of light.css for what it changes and why. Order matters: it must load last. */
-import "./light.css";
+/* globals.css, then light.css (the design system's second edition, which must
+   load last) — through one entry sheet, because as two imports here the
+   production build concatenated them in the wrong order. See app/styles.css. */
+import "./styles.css";
 
 /* Microsoft Clarity project ID. Hard-coded because Clarity's snippet is
  * public-by-design — the ID is embedded in the script URL on every page that
