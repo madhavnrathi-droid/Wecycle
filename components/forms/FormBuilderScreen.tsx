@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 import { ChevronLeft, Trash2, Check, Loader2, AlertTriangle, AlertCircle } from '@/lib/icons';
 import FormBuilder from './FormBuilder';
 import { lockBodyScroll } from '../../lib/bodyLock';
+import { Z_LAYER } from '../../lib/zLayers';
 import type { FormField } from '../../lib/eventForms';
 
 interface FormBuilderScreenProps {
@@ -35,11 +36,17 @@ interface FormBuilderScreenProps {
   onRemove?: () => void | Promise<void>;
   /** Label for the primary button — "Done" while drafting, "Save form" live. */
   saveLabel?: string;
+  /** Stacking layer (lib/zLayers.ts). Full-page by default — right over a
+   *  screen. Opened FROM a dialog (the Submit-an-event sheet) it must be
+   *  Z_LAYER.dialogNested: at full-page it rendered underneath the dialog,
+   *  half-visible behind it, with the dialog still taking the clicks. */
+  layer?: number;
 }
 
 export default function FormBuilderScreen({
   open, subtitle, fields, onChange, onBack, onSave,
   saving, loading, error, responseCount = 0, onRemove, saveLabel = 'Save form',
+  layer = Z_LAYER.fullPage,
 }: FormBuilderScreenProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const onBackRef = useRef(onBack);
@@ -101,7 +108,7 @@ export default function FormBuilderScreen({
       aria-modal="true"
       aria-label="Registration form builder"
       style={{
-        position: 'fixed', inset: 0, zIndex: 240,
+        position: 'fixed', inset: 0, zIndex: layer,
         background: 'var(--bg-base)',
         display: 'flex', flexDirection: 'column',
       }}

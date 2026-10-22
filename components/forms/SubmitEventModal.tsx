@@ -5,6 +5,7 @@ import { MapPin, ClipboardList, ChevronRight } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import FormBuilderScreen from './FormBuilderScreen';
+import { Z_LAYER } from '../../lib/zLayers';
 import { createEvent } from '../../lib/liveData';
 import { upsertEventForm, validateFields, type FormField } from '../../lib/eventForms';
 import { isDemoMode } from '../../lib/demoMode';
@@ -494,9 +495,12 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
     </Modal>
 
     {/* Full-page builder — covers the modal + bottom nav; back returns here
-        with the event draft untouched. */}
+        with the event draft untouched. Opened from this dialog, so it takes
+        the nested-dialog layer: at the default full-page layer it sat BEHIND
+        the dialog (240 < 300). */}
     <FormBuilderScreen
       open={open && builderOpen}
+      layer={Z_LAYER.dialogNested}
       subtitle={form.title.trim() || 'New event'}
       fields={regFields ?? []}
       onChange={f => { setRegFields(f); setRegError(null); }}
