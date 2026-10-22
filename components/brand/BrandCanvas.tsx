@@ -1,6 +1,7 @@
 'use client';
 
-/* The brand's canvas — the top of a brand page.
+/* The brand's canvas — the top of a brand page. Each brand's in its own
+ * motion: Foku's colour cycle (below) or Kinnu's stall (StallCanvas).
  *
  * Built from the brand's own motion, not a stock hero: Foku's animation is its
  * cloud mascot on a field that changes colour every beat — teal, pink,
@@ -40,7 +41,47 @@ interface BrandCanvasProps {
   headingId?: string;
 }
 
-export default function BrandCanvas({ brand, headingId }: BrandCanvasProps) {
+export default function BrandCanvas(props: BrandCanvasProps) {
+  return props.brand.canvas.kind === 'stall' ? <StallCanvas {...props} /> : <CycleCanvas {...props} />;
+}
+
+/* ── Kinnu: the stall ────────────────────────────────────────────────────────
+ * Kinnu's intro is a navy field, a red disc in one corner and a marigold one
+ * in the other, and the wordmark's letters dropping in at a tilt and landing
+ * straight. So: the discs grow out of their corners (their centres ARE the
+ * corners, so scaling from the centre is growing from the corner), then
+ * breathe very slowly; the letters drop in one after another on a snappy
+ * settle; the tagline follows in Kinnu's serif. Tapping the wordmark drops
+ * the letters again. Under reduced motion it is all simply there. */
+function StallCanvas({ brand, headingId }: BrandCanvasProps) {
+  const discs = brand.canvas.kind === 'stall' ? brand.canvas.discs : [];
+  const [hop, setHop] = useState(0);
+  return (
+    <div
+      className="bc bc--stall"
+      style={{
+        ['--bc-ink' as string]: brand.palette.ink,
+        ['--bc-c' as string]: brand.palette.fields[0],
+      }}
+    >
+      <div className="bc-base" aria-hidden="true" />
+      {discs.map((d, i) => (
+        <span key={i} className="bc-disc" data-corner={d.corner} style={{ ['--i' as string]: i }} aria-hidden="true">
+          <i style={{ background: d.color }} />
+        </span>
+      ))}
+      <div className="bc-stage">
+        <h1 id={headingId} className="bc-title" onClick={() => { haptics.selection(); setHop(h => h + 1); }}>
+          <BrandWordmark key={hop} src={brand.assets.wordmark} name={brand.name} ratio={brand.assets.wordmarkRatio} className="bc-wordmark" />
+        </h1>
+        <p className="bc-tagline">{brand.tagline}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Foku: the colour cycle (described at the top of the file) ── */
+function CycleCanvas({ brand, headingId }: BrandCanvasProps) {
   const fields = brand.palette.fields;
   const n = fields.length;
   const [idx, setIdx] = useState(0);
@@ -142,6 +183,7 @@ export default function BrandCanvas({ brand, headingId }: BrandCanvasProps) {
       <div className="bc-stage">
         {/* Decorative: the colour change it triggers carries no information,
             so it stays out of the tab order and the accessibility tree. */}
+        {brand.assets.mascot && (
         <div className="bc-mascot-float" aria-hidden="true" ref={mascotRef}>
           <div className="bc-mascot-in">
             {/* Re-keyed on every colour so the squash plays each time it lands. */}
@@ -156,8 +198,9 @@ export default function BrandCanvas({ brand, headingId }: BrandCanvasProps) {
             </span>
           </div>
         </div>
+        )}
         <h1 id={headingId} className="bc-title">
-          <BrandWordmark src={brand.assets.wordmark} name={brand.name} className="bc-wordmark" />
+          <BrandWordmark src={brand.assets.wordmark} name={brand.name} ratio={brand.assets.wordmarkRatio} className="bc-wordmark" />
         </h1>
         <p className="bc-tagline">{brand.tagline}</p>
       </div>

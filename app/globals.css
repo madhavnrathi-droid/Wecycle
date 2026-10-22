@@ -8916,9 +8916,11 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
   animation: bc-rise var(--dur-5) var(--ease-enter) backwards;
   animation-delay: 160ms;
 }
-.bc-wordmark .l-o { animation-delay: 215ms; }
-.bc-wordmark .l-k { animation-delay: 270ms; }
-.bc-wordmark .l-u { animation-delay: 325ms; }
+.bc-wordmark .l:nth-child(2) { animation-delay: 215ms; }
+.bc-wordmark .l:nth-child(3) { animation-delay: 270ms; }
+.bc-wordmark .l:nth-child(4) { animation-delay: 325ms; }
+.bc-wordmark .l:nth-child(5) { animation-delay: 380ms; }
+.bc-wordmark .l:nth-child(6) { animation-delay: 435ms; }
 @keyframes bc-rise { from { transform: translateY(60px) scale(0.86); opacity: 0; } }
 .bc-tagline {
   margin: 4px 0 0;
@@ -8927,6 +8929,41 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
   animation-delay: 420ms;
 }
 @keyframes bc-up { from { transform: translateY(8px); opacity: 0; } }
+/* ── Kinnu's stall: discs from the corners, letters dropping in ── */
+.bc-disc {
+  position: absolute; z-index: -3;
+  width: clamp(200px, 56cqi, 470px); aspect-ratio: 1;
+  pointer-events: none;
+}
+.bc-disc[data-corner="tl"] { left: 0; top: 0; transform: translate(-50%, -50%); }
+.bc-disc[data-corner="tr"] { right: 0; top: 0; transform: translate(50%, -50%); }
+.bc-disc[data-corner="bl"] { left: 0; bottom: 0; transform: translate(-50%, 50%); }
+.bc-disc[data-corner="br"] { right: 0; bottom: 0; transform: translate(50%, 50%); }
+.bc-disc > i {
+  display: block; width: 100%; height: 100%; border-radius: 50%;
+  animation:
+    bc-disc-in var(--dur-5) var(--spring-snappy) backwards,
+    bc-breathe 7s ease-in-out 900ms infinite alternate;
+  animation-delay: calc(var(--i, 0) * 120ms), calc(900ms + var(--i, 0) * 1.4s);
+}
+@keyframes bc-disc-in { from { transform: scale(0); } }
+@keyframes bc-breathe { to { transform: scale(1.06); } }
+.bc--stall .bc-wordmark { width: min(300px, 74cqi); cursor: pointer; }
+.bc--stall .bc-wordmark .l {
+  animation-name: bc-drop-tilt;
+  animation-timing-function: var(--spring-snappy);
+}
+@keyframes bc-drop-tilt { from { transform: translateY(-70px) rotate(-16deg); opacity: 0; } }
+.bc--stall .bc-tagline {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-style: italic; font-weight: 500; letter-spacing: 0;
+  font-size: calc(17px * var(--text-scale));
+}
+@container (min-width: 640px) {
+  .bc--stall .bc-wordmark { width: 420px; }
+  .bc--stall .bc-tagline { font-size: calc(20px * var(--text-scale)); }
+}
+
 @container (min-width: 640px) {
   .bc { min-height: 400px; border-radius: 0 0 36px 36px; }
   .bc-mascot { width: 148px; }
@@ -9118,8 +9155,26 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
 }
 .bs-about-range span { display: block; margin-bottom: 2px; }
 .bs-about-poster {
-  display: block; width: min(100%, 340px); margin: 22px auto 0;
+  display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover;
   border-radius: 20px; background: var(--bg-inset);
+}
+.bs-posters {
+  list-style: none; margin: 22px -16px 0; padding: 0 16px 4px;
+  display: flex; gap: 12px; overflow-x: auto;
+  scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none;
+}
+.bs-posters::-webkit-scrollbar { display: none; }
+.bs-posters > li { flex: 0 0 min(78%, 300px); scroll-snap-align: start; }
+.bs-posters[data-count="1"] { justify-content: center; }
+.bs-posters[data-count="1"] > li { flex-basis: min(100%, 340px); }
+@container (min-width: 860px) {
+  .bs-posters { overflow: visible; }
+  .bs-posters > li { flex: 1 1 0; max-width: 340px; }
+}
+.bs-about-aka {
+  margin: 0; font-size: calc(26px * var(--text-scale)); line-height: 1.3;
+  font-family: 'Kohinoor Devanagari', 'Noto Sans Devanagari', 'Devanagari Sangam MN', sans-serif;
+  font-weight: 600; color: var(--text-primary);
 }
 .bs-about-actions { display: flex; flex-wrap: wrap; gap: 10px; padding: 20px 4px 0; }
 .bs-about-actions .bs-msg { background: var(--bg-inset); }
@@ -9185,7 +9240,7 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
 .bp-cta {
   flex-shrink: 0; height: 36px; padding: 0 14px; border-radius: 999px;
   display: inline-flex; align-items: center; gap: 5px;
-  background: var(--bp-ink); color: #fff;
+  background: var(--bp-act-bg, var(--bp-ink)); color: var(--bp-act-fg, #fff);
   font-size: calc(13px * var(--text-scale)); font-weight: 700;
   transition: transform var(--dur-3) var(--spring-snappy);
 }
@@ -9223,13 +9278,13 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
 .bp-card-price {
   position: absolute; left: 6px; bottom: -6px;
   padding: 3px 9px; border-radius: 999px;
-  background: var(--bp-ink); color: #fff;
+  background: var(--bp-act-bg, var(--bp-ink)); color: var(--bp-act-fg, #fff);
   font-size: calc(12px * var(--text-scale)); font-weight: 800; font-variant-numeric: tabular-nums;
 }
 .bp-more {
   aspect-ratio: 4 / 5; border-radius: 14px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  background: rgba(255, 255, 255, 0.86); color: var(--bp-ink);
+  background: rgba(255, 255, 255, 0.86); color: var(--bp-dark, var(--bp-ink));
 }
 .bp-more-n { font-size: calc(26px * var(--text-scale)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .bp-more-l { font-size: calc(11.5px * var(--text-scale)); font-weight: 600; opacity: 0.75; }
@@ -9316,7 +9371,7 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
 .bsh-primary:focus-visible, .bsh-icon:focus-visible, .bsh-remix:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .bc, .bc-glows, .bc-mascot-float, .bc-mascot-in, .bc-squash[data-on], .bc-wordmark .l, .bc-tagline,
+  .bc, .bc-glows, .bc-mascot-float, .bc-mascot-in, .bc-squash[data-on], .bc-wordmark .l, .bc-tagline, .bc-disc > i,
   .bs-section[data-in] .bs-card, .bs-section[data-in] .bs-pick, .bp[data-in] .bp-mascot { animation: none; }
   .bs[data-io] .bs-section:not([data-in]) .bs-card,
   .bs[data-io] .bs-section:not([data-in]) .bs-pick { opacity: 1; }
@@ -9328,4 +9383,42 @@ button.room-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-o
 @media (prefers-reduced-motion: reduce) {
   .bp--spot[data-in] .bp-card, .bsh-img, .bsh-note { animation: none; }
   .bp-card-photo, .bp-cta { transition: none; }
+}
+
+/* Text for screen readers only (a gloss beside a name in another script). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ── Brand strips in a stall brand's own shapes (Kinnu): a flat field with its
+   two discs in opposite corners, instead of the light and glow ── */
+.bp[data-style="stall"]::before {
+  background:
+    radial-gradient(circle at 0 0, var(--bp-d0) 0 64px, transparent 65px),
+    radial-gradient(circle at 100% 100%, var(--bp-d1) 0 92px, transparent 93px);
+}
+.bp--spot[data-style="stall"] .bp-mark { height: 22px; }
+
+/* ── Featured brands taking turns in one strip ── */
+.bp-rotor { position: relative; }
+.bp-swap { animation: bp-swap-in var(--dur-4) var(--ease-enter) backwards; }
+@keyframes bp-swap-in { from { opacity: 0; transform: translateY(6px); } }
+.bp-pager { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
+.bp-dot {
+  position: relative; width: 28px; height: 24px; border: none; background: none; cursor: pointer; padding: 0;
+}
+.bp-dot::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 18px; height: 6px; margin: -3px 0 0 -9px; border-radius: 3px;
+  background: var(--text-primary); opacity: 0.3;
+  transform: scaleX(0.34);
+  transition: transform var(--dur-3) var(--spring-snappy), opacity var(--dur-3) var(--ease-standard);
+}
+.bp-dot[aria-current="true"]::after { transform: none; opacity: 0.9; }
+.bp-dot:focus-visible { outline: 2px solid var(--text-primary); outline-offset: -2px; border-radius: 8px; }
+.bp-wrap:has(.bp-pager) { padding-bottom: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .bp-swap { animation: none; }
+  .bp-dot::after { transition: none; }
 }

@@ -65,7 +65,7 @@ test('sections follow the collections, first match wins, sold goes last', () => 
 
 test('Foku belongs to Karan and groups his range: tees, then crop tops', () => {
   assert.equal(brandForUser('20266094-ea7c-4023-b452-d03371722045')?.handle, 'foku');
-  assert.equal(brandForUser('6b4e2316-692c-4857-aa7e-0b1238913413'), null);
+  assert.equal(brandForUser('6b4e2316-692c-4857-aa7e-0b1238913413')?.handle, 'kinnu');
   const s = sectionsFor(foku, [
     item('t1', 'Oversized T-shirt — Deja Boo', 799),
     item('c1', 'Crop top', 499),
@@ -142,5 +142,57 @@ test('every brand has a share-card gradient with a stop per colour', () => {
   for (const b of BRANDS) {
     assert.equal(b.palette.lush.colors.length, b.palette.lush.stops.length);
     assert.ok(b.palette.lush.colors.length >= 2 && b.palette.lush.colors.length <= 4);
+  }
+});
+
+const kinnu = BRANDS.find(b => b.handle === 'kinnu') as Brand;
+
+test('Kinnu is Aagam’s and groups his real titles the way the stall does', () => {
+  assert.equal(kinnu.ownerId, '6b4e2316-692c-4857-aa7e-0b1238913413');
+  const range = [
+    item('a', 'Rainbow marbled bangle', 100),
+    item('b', 'Black marbled bangle — pink & gold swirls', 100),
+    item('c', 'Red & black swirl bangle', 100),
+    item('d', 'Floral-print bangle — silver rim', 100),
+    item('e', 'Keychain journal — olive floral fabric', 70),
+    item('f', 'Photo frame — lilac block-print fabric', 150),
+  ];
+  assert.deepEqual(sectionsFor(kinnu, range).map(x => [x.id, x.items.map(i => i.id)]), [
+    ['marbled', ['a', 'b']], ['swirl', ['c']], ['floral', ['d']], ['journals', ['e']], ['frames', ['f']],
+  ]);
+  /* Two kinds of lacquer bangle are one thing in a message, and a lower-case
+     account name still reads as a name. */
+  assert.equal(brandShareMessage(kinnu, range, 'aagam tambi'), [
+    'Kinnu is on Wecycle ✨',
+    'Handmade, one at a time — lacquer bangles, floral bangles, keychain journals and photo frames by Aagam, from ₹70. Order straight from the store:',
+    'https://wecycle.page/b/kinnu',
+  ].join('\n'));
+});
+
+/* WCAG relative luminance and contrast, to hold every brand's colour roles. */
+const lum = (hex: string) => {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+};
+const contrast = (a: string, b: string) => {
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+
+test('every brand’s colour roles are legible', () => {
+  for (const b of BRANDS) {
+    /* The wordmark and tagline on the canvas's first field. */
+    assert.ok(contrast(b.palette.ink, b.palette.fields[0]) >= 7, `${b.handle} ink on field`);
+    /* Buttons and price tags. */
+    assert.ok(contrast(b.palette.action.fg, b.palette.action.bg) >= 4.5, `${b.handle} action`);
+    /* Type on the white share-card footer and the "more" tile. */
+    assert.ok(contrast(b.palette.dark, '#FFFFFF') >= 7, `${b.handle} dark on white`);
+    /* Type straight on the share card's gradient, at every stop. */
+    const onBg = b.palette.lush.text ?? b.palette.ink;
+    for (const c of b.palette.lush.colors) assert.ok(contrast(onBg, c) >= 4.5, `${b.handle} card text on ${c}`);
   }
 });

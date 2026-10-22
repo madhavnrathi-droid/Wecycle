@@ -285,7 +285,7 @@ export default function BrandScreen({ brand, owner, onBack, onOpenItem, onMessag
           <ChevronLeft size={20} strokeWidth={2} />
         </button>
         <span className="bs-bar-mark">
-          <BrandWordmark src={brand.assets.wordmark} name={brand.name} decorative />
+          <BrandWordmark src={brand.assets.wordmark} name={brand.name} ratio={brand.assets.wordmarkRatio} decorative />
         </span>
         <span className="bs-bar-end">
           <button type="button" onClick={() => { void share(); }} aria-label={`Share ${brand.name}`} className="bs-round">
@@ -443,15 +443,27 @@ export default function BrandScreen({ brand, owner, onBack, onOpenItem, onMessag
           style={{ scrollMarginTop: BAR_H + NAV_H + 4 }} aria-labelledby="bs-h-about">
           <div className="bs-head"><h2 id="bs-h-about">About {brand.name}</h2></div>
           {brand.assets.art && (
-            <img className="bs-about-art" src={brand.assets.art} alt={`${brand.name} artwork: the wordmark in a cloud, surrounded by colourful doodles`} loading="lazy" />
+            <img className="bs-about-art" src={brand.assets.art.src} alt={brand.assets.art.alt} loading="lazy" />
           )}
           <div className="bs-about-copy">
+            {brand.aka && (
+              <p className="bs-about-aka" lang={brand.aka.lang} title={brand.aka.gloss}>
+                {brand.aka.text}
+                <span className="sr-only"> ({brand.aka.gloss})</span>
+              </p>
+            )}
             <p className="bs-about-tag">{brand.tagline}</p>
             <p>{brand.about}</p>
             {range && <p className="bs-about-range"><span>On Wecycle now</span>{range}.</p>}
           </div>
-          {brand.assets.poster && (
-            <img className="bs-about-poster" src={brand.assets.poster} alt={`${brand.name} poster: T-shirts, tote bags, stickers and more`} loading="lazy" />
+          {/* The brand's own posters — one sits centred; several make a row
+              that scrolls on a phone and lines up on a desktop. */}
+          {brand.assets.posters && brand.assets.posters.length > 0 && (
+            <ul className="bs-posters" data-count={brand.assets.posters.length} role="list">
+              {brand.assets.posters.map(p => (
+                <li key={p.src}><img className="bs-about-poster" src={p.src} alt={p.alt} loading="lazy" /></li>
+              ))}
+            </ul>
           )}
           <div className="bs-about-actions">
             {canMessage && (
