@@ -25,11 +25,21 @@ import { resolveItemMedia } from '../../lib/photos';
 import { haptics } from '../../lib/haptics';
 import BrandWordmark from './BrandWordmark';
 import { fetchListingsByUser } from '../../lib/liveData';
+import { reducedMotion } from '../../lib/motion';
 
 const vars = (b: Brand) => ({
   ['--bp-ink' as string]: b.palette.ink,
+  ['--bp-dark' as string]: b.palette.dark,
+  ['--bp-act-bg' as string]: b.palette.action.bg,
+  ['--bp-act-fg' as string]: b.palette.action.fg,
   ['--bp-c0' as string]: b.palette.fields[0],
   ['--bp-c1' as string]: b.palette.fields[1 % b.palette.fields.length],
+  ...(b.canvas.kind === 'stall'
+    ? {
+        ['--bp-d0' as string]: b.canvas.discs[0]?.color ?? b.palette.fields[1],
+        ['--bp-d1' as string]: b.canvas.discs[1]?.color ?? b.palette.fields[2 % b.palette.fields.length],
+      }
+    : {}),
 });
 
 /** Marks the element once it has been on screen, for the mascot's one bounce. */
@@ -54,13 +64,14 @@ export function BrandStrip({ brand, count, onOpen }: { brand: Brand; count: numb
       type="button"
       className="bp bp--strip"
       data-in={inView || undefined}
+      data-style={brand.canvas.kind}
       style={vars(brand)}
       onClick={() => { haptics.light(); onOpen(); }}
       aria-label={`Visit the ${brand.name} store${count ? `, ${count} products` : ''}`}
     >
-      <img src={brand.assets.mascot} alt="" className="bp-mascot" draggable={false} />
+      {brand.assets.mascot && <img src={brand.assets.mascot} alt="" className="bp-mascot" draggable={false} />}
       <span className="bp-text">
-        <BrandWordmark src={brand.assets.wordmark} name={brand.name} className="bp-mark" decorative />
+        <BrandWordmark src={brand.assets.wordmark} name={brand.name} ratio={brand.assets.wordmarkRatio} className="bp-mark" decorative />
         <span className="bp-line">
           Visit the store{count && count > 1 ? ` · ${count} products` : ''}
         </span>
@@ -76,11 +87,13 @@ export function BrandStrip({ brand, count, onOpen }: { brand: Brand; count: numb
    shows its things on its own poster. The last card goes to the store.
    Fixed card sizes, so the strip is the same height on a phone and on a wide
    desktop, where it used to grow with the screen. */
-export function BrandSpotlight({ brand, items, onOpen, onOpenItem }: {
+export function BrandSpotlight({ brand, items, onOpen, onOpenItem, pager }: {
   brand: Brand;
   items: MarketplaceItem[];
   onOpen: () => void;
   onOpenItem?: (item: MarketplaceItem) => void;
+  /** The dots that switch between brands, when there is more than one. */
+  pager?: React.ReactNode;
 }) {
   const [ref, inView] = useArrived<HTMLElement>();
   const cards = items
@@ -96,15 +109,16 @@ export function BrandSpotlight({ brand, items, onOpen, onOpenItem }: {
         ref={ref}
         className="bp bp--spot"
         data-in={inView || undefined}
+        data-style={brand.canvas.kind}
         style={vars(brand)}
         aria-label={`${brand.name}, a student brand on Wecycle`}
       >
         <button type="button" className="bp-spot-head" onClick={() => { haptics.light(); onOpen(); }}
           aria-label={`Visit the ${brand.name} store — ${brand.tagline} ${items.length} products`}>
-          <img src={brand.assets.mascot} alt="" className="bp-mascot" draggable={false} />
+          {brand.assets.mascot && <img src={brand.assets.mascot} alt="" className="bp-mascot" draggable={false} />}
           <span className="bp-text">
-            <span className="bp-kicker">Student brand</span>
-            <BrandWordmark src={brand.assets.wordmark} name={brand.name} className="bp-mark" decorative />
+            <span className="bp-kicker">{brand.kind}</span>
+            <BrandWordmark src={brand.assets.wordmark} name={brand.name} ratio={brand.assets.wordmarkRatio} className="bp-mark" decorative />
             <span className="bp-line">{brand.tagline}</span>
           </span>
           <span className="bp-cta" aria-hidden="true">Visit <ArrowRight size={14} strokeWidth={2.4} /></span>
@@ -134,6 +148,7 @@ export function BrandSpotlight({ brand, items, onOpen, onOpenItem }: {
           </li>
         </ul>
       </section>
+      {pager}
     </div>
   );
 }
@@ -160,15 +175,37 @@ export function BrandStoreLink({ brand, onOpen }: { brand: Brand; onOpen: () => 
 const SPOT_TTL = 5 * 60_000;
 const spotCache = new Map<string, { at: number; items: MarketplaceItem[] }>();
 
+/* Which brand the home strip opens on: the next one each visit, so every
+   brand gets the first impression in turn rather than whoever is listed first. */
+function nextStartIndex(n: number): number {
+  try {
+    const k = 'wecycle.spotlight.turn';
+    const v = (Number(localStorage.getItem(k)) || 0) + 1;
+    localStorage.setItem(k, String(v));
+    return v % n;
+  } catch { return Math.floor(Math.random() * n); }
+}
+
+/* Featured brands take turns in one strip. It moves on every ROTATE_MS while
+   nobody is using it — a hover, a touch or keyboard focus inside holds it, as
+   does being off screen or in a hidden tab — and never on its own under
+   reduced motion. The dots switch by hand. */
+const ROTATE_MS = 8000;
+
 export function BrandSpotlightSlot({ onOpen, onOpenItem }: {
   onOpen: (brand: Brand) => void;
   onOpenItem?: (item: MarketplaceItem, brand: Brand) => void;
 }) {
-  const [spot, setSpot] = useState<{ brand: Brand; items: MarketplaceItem[] } | null>(null);
+  const [spots, setSpots] = useState<{ brand: Brand; items: MarketplaceItem[] }[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [held, setHeld] = useState(false);
+  const [onScreen, setOnScreen] = useState(true);
+  const rootRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     let live = true;
     (async () => {
-      for (const b of BRANDS) {
+      const loaded = await Promise.all(BRANDS.map(async b => {
         const hit = spotCache.get(b.handle);
         let rows = hit && Date.now() - hit.at < SPOT_TTL ? hit.items : null;
         if (!rows) {
@@ -176,23 +213,69 @@ export function BrandSpotlightSlot({ onOpen, onOpenItem }: {
           spotCache.set(b.handle, { at: Date.now(), items: rows });
         }
         const open = rows.filter(r => !r.isClosed && !r.isRequest);
-        if (open.length >= 3) {
-          const picks = picksFor(b, open, 3);
-          if (live) setSpot({ brand: b, items: [...picks, ...open.filter(i => !picks.includes(i))] });
-          return;
-        }
-      }
-      if (live) setSpot(null);
+        if (open.length < 3) return null;
+        const picks = picksFor(b, open, 3);
+        return { brand: b, items: [...picks, ...open.filter(i => !picks.includes(i))] };
+      }));
+      if (!live) return;
+      const ok = loaded.filter((x): x is { brand: Brand; items: MarketplaceItem[] } => !!x);
+      setSpots(ok);
+      if (ok.length > 1) setIdx(nextStartIndex(ok.length));
     })();
     return () => { live = false; };
   }, []);
-  if (!spot) return null;
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.3 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [spots.length]);
+
+  useEffect(() => {
+    if (spots.length < 2 || held || !onScreen || reducedMotion()) return;
+    const t = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setIdx(i => (i + 1) % spots.length);
+    }, ROTATE_MS);
+    return () => window.clearInterval(t);
+  }, [spots.length, held, onScreen, idx]);
+
+  if (!spots.length) return null;
+  const spot = spots[idx % spots.length];
+  const pager = spots.length > 1 ? (
+    <div className="bp-pager" role="group" aria-label="Featured brands">
+      {spots.map((sp, i) => (
+        <button
+          key={sp.brand.handle}
+          type="button"
+          className="bp-dot"
+          aria-label={`Show ${sp.brand.name}`}
+          aria-current={i === idx % spots.length ? 'true' : undefined}
+          onClick={() => { haptics.selection(); setIdx(i); }}
+        />
+      ))}
+    </div>
+  ) : null;
   return (
-    <BrandSpotlight
-      brand={spot.brand}
-      items={spot.items}
-      onOpen={() => onOpen(spot.brand)}
-      onOpenItem={onOpenItem ? (it) => onOpenItem(it, spot.brand) : undefined}
-    />
+    <div
+      ref={rootRef}
+      className="bp-rotor"
+      onPointerEnter={() => setHeld(true)}
+      onPointerLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false); }}
+      onTouchStart={() => setHeld(true)}
+    >
+      <div key={spot.brand.handle} className="bp-swap">
+        <BrandSpotlight
+          brand={spot.brand}
+          items={spot.items}
+          onOpen={() => onOpen(spot.brand)}
+          onOpenItem={onOpenItem ? (it) => onOpenItem(it, spot.brand) : undefined}
+          pager={pager}
+        />
+      </div>
+    </div>
   );
 }

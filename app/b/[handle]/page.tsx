@@ -45,6 +45,7 @@ export default function BrandLinkPage({ params }: { params: { handle: string } }
       to={`/?b=${b.handle}`}
       name={b.name}
       mascot={b.assets.mascot}
+      wordmark={b.assets.wordmark}
       colour={b.palette.fields[0]}
       ink={b.palette.ink}
     />

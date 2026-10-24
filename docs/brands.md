@@ -78,4 +78,21 @@ device (`lib/brandCard.ts`) and a message written from what the store has now
 Brands ship with the web deploy; installed apps pick them up with the next
 build.
 
-Foku (`/b/foku`) is Karan Seth's brand.
+Foku (`/b/foku`) is Karan Seth's brand. Kinnu (`/b/kinnu`) is Aagam Tambi's.
+
+## Two canvases
+
+`brand.canvas` picks the hero: `cycle` (Foku — mascot on a field cycling
+through its colours) or `stall` (Kinnu — a still navy field, its red and
+marigold discs growing from opposite corners and breathing, the wordmark's
+letters dropping in at a tilt; tap the wordmark to drop them again). Colour
+roles are separate on purpose: `ink` on the brand's colours, `dark` on white,
+`action` for buttons and price tags — Kinnu's ink is cream, so one colour
+could never do all three. `lib/brands.test.ts` checks every role's contrast.
+
+## The home strip
+
+Featured brands take turns in one strip (`BrandSpotlightSlot`): every 8 s
+while nobody is using it, held on hover, touch or focus, off screen, in a
+hidden tab, and never automatic under reduced motion. Each visit starts on the
+next brand, so they share the first impression. Dots switch by hand.

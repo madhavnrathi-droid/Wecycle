@@ -13,8 +13,8 @@ import { useEffect, useRef } from 'react';
 import { ChevronLeft, Trash2, Check, Loader2, AlertTriangle, AlertCircle } from '@/lib/icons';
 import FormBuilder from './FormBuilder';
 import { lockBodyScroll } from '../../lib/bodyLock';
-import type { FormField } from '../../lib/eventForms';
 import { Z_LAYER } from '../../lib/zLayers';
+import type { FormField } from '../../lib/eventForms';
 
 interface FormBuilderScreenProps {
   open: boolean;
@@ -36,11 +36,17 @@ interface FormBuilderScreenProps {
   onRemove?: () => void | Promise<void>;
   /** Label for the primary button — "Done" while drafting, "Save form" live. */
   saveLabel?: string;
+  /** Stacking layer (lib/zLayers.ts). Full-page by default — right over a
+   *  screen. Opened FROM a dialog (the Submit-an-event sheet) it must be
+   *  Z_LAYER.dialogNested: at full-page it rendered underneath the dialog,
+   *  half-visible behind it, with the dialog still taking the clicks. */
+  layer?: number;
 }
 
 export default function FormBuilderScreen({
   open, subtitle, fields, onChange, onBack, onSave,
   saving, loading, error, responseCount = 0, onRemove, saveLabel = 'Save form',
+  layer = Z_LAYER.fullPage,
 }: FormBuilderScreenProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const onBackRef = useRef(onBack);
@@ -102,11 +108,7 @@ export default function FormBuilderScreen({
       aria-modal="true"
       aria-label="Registration form builder"
       style={{
-        /* Opened from the Submit-an-event DIALOG (z 300/301) as well as from
-           an event page, so it takes the nested-dialog band: at fullPage
-           (240) it rendered underneath the sheet that launched it, and nobody
-           posting an event could see the questions they were adding. */
-        position: 'fixed', inset: 0, zIndex: Z_LAYER.dialogNested,
+        position: 'fixed', inset: 0, zIndex: layer,
         background: 'var(--bg-base)',
         display: 'flex', flexDirection: 'column',
       }}

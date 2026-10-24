@@ -130,7 +130,12 @@ function layoutFor(n: number): { cx: number; cy: number; w: number; rot: number 
 export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBrandCard> {
   const S = BRAND_CARD_SIZE;
   const { brand } = spec;
-  const ink = brand.palette.ink;
+  /* Colour roles: type straight on the gradient, the brand's dark for type on
+     the white footer, and its action colours for price tags and the button. */
+  const onBg = brand.palette.lush.text ?? brand.palette.ink;
+  const dark = brand.palette.dark;
+  const act = brand.palette.action;
+  const serif = brand.canvas.kind === 'stall';
 
   const canvas = document.createElement('canvas');
   canvas.width = S;
@@ -142,7 +147,7 @@ export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBran
      are cross-origin and need CORS for the canvas to stay exportable. */
   const [wordmark, mascot, wecycle, ...photos] = await Promise.all([
     loadImage(brand.assets.wordmark, false),
-    loadImage(brand.assets.mascot, false),
+    brand.assets.mascot ? loadImage(brand.assets.mascot, false) : Promise.resolve(null),
     loadImage('/brand/wordmark.png', false),
     ...spec.products.slice(0, 3).map(p => loadImage(corsFresh(p.photo), true)),
   ]);
@@ -158,6 +163,18 @@ export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBran
 
   const M = 72;
 
+  /* Kinnu's discs, from the corners, as on its page — under everything. */
+  if (brand.canvas.kind === 'stall') {
+    for (const d of brand.canvas.discs) {
+      const cx = d.corner === 'tl' || d.corner === 'bl' ? 0 : S;
+      const cy = d.corner === 'tl' || d.corner === 'tr' ? 0 : S;
+      ctx.beginPath();
+      ctx.arc(cx, cy, d.corner === 'tl' ? 300 : 330, 0, Math.PI * 2);
+      ctx.fillStyle = d.color;
+      ctx.fill();
+    }
+  }
+
   /* ── The brand ── mascot, wordmark, tagline */
   let headX = M;
   if (mascot) {
@@ -171,17 +188,38 @@ export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBran
     headX = M + mw + 18;
   }
   if (wordmark) {
-    const wh = 112, ww = wh * (wordmark.width / wordmark.height || 625 / 359);
-    ctx.drawImage(wordmark, headX, M - 14, ww, wh);
+    /* The wordmark file is drawn in currentColor, which an <img> renders
+       black; tint it to the brand's ink on an offscreen canvas. */
+    const ratio = brand.assets.wordmarkRatio || wordmark.width / wordmark.height;
+    const wh = serif ? 96 : 112, ww = Math.min(wh * ratio, S - M * 2 - 260);
+    const h2 = ww / ratio;
+    const off = document.createElement('canvas');
+    off.width = Math.ceil(ww * 2); off.height = Math.ceil(h2 * 2);
+    const o = off.getContext('2d');
+    if (o) {
+      o.drawImage(wordmark, 0, 0, off.width, off.height);
+      o.globalCompositeOperation = 'source-in';
+      o.fillStyle = onBg;
+      o.fillRect(0, 0, off.width, off.height);
+      ctx.drawImage(off, headX, M - 14 + (wh - h2) / 2, ww, h2);
+    }
   } else {
-    ctx.fillStyle = ink;
+    ctx.fillStyle = onBg;
     ctx.font = `900 96px ${FONT}`;
     ctx.textBaseline = 'top';
     ctx.fillText(brand.name, headX, M - 6);
   }
-  ctx.fillStyle = ink;
+  ctx.fillStyle = onBg;
   ctx.textBaseline = 'alphabetic';
-  fit(ctx, brand.tagline, 650, 36, 24, S - M * 2);
+  if (serif) {
+    let size = 40;
+    for (; size > 24; size -= 2) {
+      ctx.font = `italic 500 ${size}px Georgia, 'Times New Roman', serif`;
+      if (ctx.measureText(brand.tagline).width <= S - M * 2) break;
+    }
+  } else {
+    fit(ctx, brand.tagline, 650, 36, 24, S - M * 2);
+  }
   ctx.fillText(brand.tagline, M, M + 146);
 
   /* "on Wecycle" pill, top right: whose platform this is, quietly. */
@@ -250,11 +288,11 @@ export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBran
     ctx.shadowColor = 'rgba(0,0,0,0.22)';
     ctx.shadowBlur = 12;
     ctx.shadowOffsetY = 4;
-    ctx.fillStyle = ink;
+    ctx.fillStyle = act.bg;
     roundRect(ctx, tx, ty, tagW, tagH, tagH / 2);
     ctx.fill();
     ctx.shadowColor = 'transparent';
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = act.fg;
     ctx.textBaseline = 'middle';
     ctx.fillText(label, tx + 18, ty + tagH / 2 + 1);
     ctx.textBaseline = 'alphabetic';
@@ -279,7 +317,7 @@ export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBran
       `${spec.count} ${spec.count === 1 ? 'product' : 'products'}`,
       spec.from ? `from ${spec.from}` : null,
     ].filter(Boolean).join(' · ');
-    ctx.fillStyle = ink;
+    ctx.fillStyle = dark;
     fit(ctx, headline, 800, 42, 28, textW);
     ctx.fillText(headline, px + 36, py + 66);
     ctx.fillStyle = '#4A4942';
@@ -288,10 +326,10 @@ export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBran
 
     /* Right: the action, as a dark pill — it is what the card asks for. */
     const bw = rightW, bh = 84, bx = px + pw - 32 - bw, by = py + (ph - bh) / 2;
-    ctx.fillStyle = ink;
+    ctx.fillStyle = act.bg;
     roundRect(ctx, bx, by, bw, bh, bh / 2);
     ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = act.fg;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     fit(ctx, 'Order now →', 800, 32, 22, bw - 40);
