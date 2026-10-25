@@ -81,6 +81,9 @@ export const EVT = {
   post_kind_selected:       'post_kind_selected',
   post_form_started:        'post_form_started',
   post_form_submitted:      'post_form_submitted',
+  /* The photo editor on a live post: what people actually change there
+     (order, cover, additions, removals) decides what it should offer first. */
+  post_photos_edited:       'post_photos_edited',
   post_form_failed:         'post_form_failed',
   post_edit_started:        'post_edit_started',
   post_edit_saved:          'post_edit_saved',

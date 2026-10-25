@@ -9,7 +9,7 @@ import OutageNotice from './OutageNotice';
 import { OUTAGE_MODE } from '../lib/outage';
 import SystemMessage from './SystemMessage';
 import { availableFirst, isRecentlyClosed } from '../lib/feed/rank';
-import { CATEGORIES as CATEGORY_LIST, normalizeCategory, categoryIdOf, matchesCategoryFilter } from '../lib/categories';
+import { CATEGORIES as CATEGORY_LIST, normalizeCategory, matchesCategoryFilter } from '../lib/categories';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, MapPin, Heart, X, Users as UsersIcon, Eye, ChevronRight, Package, Handshake } from '@/lib/icons';
 import {
@@ -535,9 +535,12 @@ export default function FeedScreen({
      the LABEL, so this compared "art" against "art & stationery" and every
      multi-word category silently produced an empty rail — which is why only
      Electronics and Fashion had one, those being the two whose label happens to
-     equal its id. normalizeCategory covers rows that predate the id. */
+     equal its id. normalizeCategory covers rows that predate the id. A post
+     filed under more than one category belongs to each of their rails, the
+     same as it belongs to each of their filters — so "See all" never shows a
+     different set from the rail it was tapped on. */
   const itemsByCat = (cat: string) =>
-    availableFirst(liveItems.filter(it => categoryIdOf(it) === cat)).slice(0, 12);
+    availableFirst(liveItems.filter(it => matchesCategoryFilter(it, cat))).slice(0, 12);
 
   /* Category rails, generated from the taxonomy rather than a hand-picked
      subset of it. A category that fills up earns a rail automatically, which is

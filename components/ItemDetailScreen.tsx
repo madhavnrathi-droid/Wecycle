@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, Camera, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle } from '@/lib/icons';
+import { ChevronLeft, ChevronRight, MapPin, Heart, Share2, Mail, IndianRupee, Trash2, RotateCcw, Loader2, Flag, ImagePlus, Pencil, Check, TriangleAlert, ArrowUp, MessageCircle } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import { useOrders, ordersAvailable, openOrderFor, probeOrdersAvailable } from '../lib/orders/store';
 import ContactChannels from './ContactChannels';
@@ -33,7 +33,7 @@ import {
   updateRequestFields, repostRequest,
   updateListingMedia, updateRequestMedia,
 } from '../lib/liveData';
-import PhotoEditDialog from './PhotoEditDialog';
+import MediaEditor, { EditPhotosButton } from './MediaEditor';
 import { isDemoMode } from '../lib/demoMode';
 import { track, trackContactClicked, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
@@ -42,7 +42,8 @@ import { toast } from '../lib/toast';
 import { getActiveRoom } from '../lib/rooms';
 import { updateDemoPost, repostDemoPost } from '../lib/demoInventory';
 import { CATEGORIES, closedLabelFor } from '../lib/mockData';
-import { normalizeCategory, categoryLabel, categoryIdOf } from '../lib/categories';
+import { normalizeCategory, categoryLabel, categoryIdOf, categoryIdsOf, tagsWithCategories } from '../lib/categories';
+import CategoryPicker from './forms/CategoryPicker';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
@@ -104,6 +105,10 @@ interface Draft {
   ratePeriod?: RatePeriod;
   priceMaxStr: string;
   category: string;
+  /** Categories after the main one (listings only — a request has no column
+   *  to keep them in). Main stays in `category` so every older code path that
+   *  reads it is untouched. */
+  extraCategories: string[];
   urgent: boolean;
 }
 
@@ -118,6 +123,7 @@ function draftOf(it: MarketplaceItem): Draft {
     ratePeriod: it.ratePeriod,
     priceMaxStr: it.priceMax != null ? String(it.priceMax) : '',
     category: categoryIdOf(it) ?? '',
+    extraCategories: it.isRequest ? [] : categoryIdsOf(it).slice(1),
     urgent: !!it.urgent,
   };
 }
@@ -131,6 +137,7 @@ function draftsMatch(a: Draft, b: Draft, kind: { isRequest: boolean; isOpportuni
   if (a.description !== b.description) return false;
   if (a.category !== b.category) return false;
   if (kind.isRequest) return a.urgent === b.urgent;
+  if (a.extraCategories.join(',') !== b.extraCategories.join(',')) return false;
   if (a.location !== b.location) return false;
   if (kind.isOpportunity) {
     if (a.comp !== b.comp) return false;
@@ -207,6 +214,7 @@ function itemWithDraft(it: MarketplaceItem, d: Draft): MarketplaceItem {
     categoryId: d.category || it.categoryId,
   };
   if (it.isRequest) return { ...base, urgent: d.urgent };
+  base.tags = tagsWithCategories([d.category, ...d.extraCategories], it.tags ?? []);
   if (it.kind === 'opportunity') {
     /* compToListing, the same helper the write goes through, so the page
        cannot show a different reading of comp than the one it saved. */
@@ -538,15 +546,19 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   /* Optimistic local override: once the owner saves new photos we swap them in
      immediately rather than waiting for a full feed refetch. Stored as plain
      URL strings so resolveItemMedia isn't needed again. */
-  const [localPhotoUrls, setLocalPhotoUrls] = useState<string[] | null>(null);
+  /* What the editor last saved, shown at once rather than after a refetch.
+     Photos and videos separately — they are stored separately, and flattening
+     them into one list of strings is how saving photos used to delete videos. */
+  const [localMedia, setLocalMedia] = useState<{ photos: string[]; videos: string[] } | null>(null);
   /* Derive the photo list the carousel actually shows. */
-  const displayPhotos = localPhotoUrls !== null
-    ? localPhotoUrls.map(u => u) // keep as strings; PhotoCarousel accepts string[]
+  const displayPhotos = localMedia !== null
+    ? resolveItemMedia({ id: itemProp.id, photoUrls: localMedia.photos, videoUrls: localMedia.videos })
     : photos;
-  /* Current raw string URLs for seeding the picker (strip video records). */
-  const currentPhotoUrlsForPicker: string[] = photos
-    .map(p => (typeof p === 'string' ? p : p.src))
-    .filter(Boolean);
+  /* What the editor opens with: exactly what is on screen, split by kind. */
+  const editorPhotos: string[] = displayPhotos.filter((p): p is string => typeof p === 'string');
+  const editorVideos: string[] = displayPhotos
+    .filter((p): p is Exclude<typeof p, string> => typeof p !== 'string')
+    .map(p => p.src);
 
   /* ── Inline edit state ──────────────────────────────────
      Hydrated from the item; tracks dirty by comparison to the snapshot. */
@@ -564,6 +576,13 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   const [eRatePeriod, setERatePeriod]   = useState<RatePeriod | undefined>(itemProp.ratePeriod);
   const [ePriceMaxStr, setEPriceMaxStr] = useState<string>(itemProp.priceMax != null ? String(itemProp.priceMax) : '');
   const [eCategory, setECategory]       = useState(categoryIdOf(itemProp) ?? '');
+  const [eExtraCats, setEExtraCats]     = useState<string[]>(itemProp.isRequest ? [] : categoryIdsOf(itemProp).slice(1));
+  /* The picker hands back one list, main first; the draft keeps the main one
+     where every other path already reads it. */
+  const setCategories = useCallback((next: string[]) => {
+    setECategory(next[0] ?? '');
+    setEExtraCats(next.slice(1));
+  }, []);
   const [eUrgent, setEUrgent]           = useState(!!itemProp.urgent);
 
   const isRequestPost = !!itemProp.isRequest;
@@ -578,9 +597,9 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     title: eTitle, description: eDescription, location: eLocation,
     priceStr: ePriceStr, listingType: eListingType,
     comp: eComp, ratePeriod: eRatePeriod, priceMaxStr: ePriceMaxStr,
-    category: eCategory, urgent: eUrgent,
+    category: eCategory, extraCategories: eExtraCats, urgent: eUrgent,
   }), [eTitle, eDescription, eLocation, ePriceStr, eListingType,
-       eComp, eRatePeriod, ePriceMaxStr, eCategory, eUrgent]);
+       eComp, eRatePeriod, ePriceMaxStr, eCategory, eExtraCats, eUrgent]);
 
   /* What is known to be in the database — see the note on Draft. */
   const [baseline, setBaseline] = useState<Draft>(() => draftOf(itemProp));
@@ -607,6 +626,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     setERatePeriod(d.ratePeriod);
     setEPriceMaxStr(d.priceMaxStr);
     setECategory(d.category);
+    setEExtraCats(d.extraCategories);
     setEUrgent(d.urgent);
   }, []);
 
@@ -626,6 +646,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     setBaseline(fresh);
     openedAt.current = fresh;
     setSaveError(null);
+    setLocalMedia(null);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [itemProp.id]);
 
@@ -671,6 +692,10 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
            post starts announcing itself as "electronics". */
         title: snapshot.title, category: categoryLabel(snapshot.category),
         description: snapshot.description,
+        ...(isRequestPost ? {} : {
+          categoryId: snapshot.category || undefined,
+          tags: tagsWithCategories([snapshot.category, ...snapshot.extraCategories], item.tags ?? []),
+        }),
         ...(isRequestPost
           ? { urgent: snapshot.urgent }
           : isOpp
@@ -706,6 +731,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
 
     const patch = {
       title: snapshot.title, category: snapshot.category, description: snapshot.description,
+      categories: [snapshot.category, ...snapshot.extraCategories].filter(Boolean),
+      tags: item.tags ?? [],
       location: snapshot.location,
       ...(isOpp
         ? { listingType: svc!.listingType, price: svc!.price, comp: snapshot.comp,
@@ -718,7 +745,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     };
     if (mode === 'repost') await repostListing(item.id, patch);
     else await updateListingFields(item.id, patch);
-  }, [item.id, item.kind, isRequestPost]);
+  }, [item.id, item.kind, item.tags, isRequestPost]);
 
   /* The guard around persist: one write at a time, and the baseline moves only
      on success. Held in a ref as well as in state because the exit flush runs
@@ -871,17 +898,20 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     if (!draftsMatch(back, baseline, postKind)) void runSave('save', back);
   }, [applyDraft, baseline, postKind, runSave]);
 
-  const handleSavePhotos = useCallback(async (photoUrls: string[]) => {
+  const handleSavePhotos = useCallback(async (photoUrls: string[], videoUrls: string[]) => {
     if (isDemoMode()) {
-      setLocalPhotoUrls(photoUrls);
+      /* The demo store holds the demo member's own posts; keep it in step so
+         the inventory card shows the new cover too. */
+      updateDemoPost(item.id, { photoUrls, videoUrls });
+      setLocalMedia({ photos: photoUrls, videos: videoUrls });
       return;
     }
     if (isRequestPost) {
-      await updateRequestMedia(item.id, photoUrls, []);
+      await updateRequestMedia(item.id, photoUrls, videoUrls);
     } else {
-      await updateListingMedia(item.id, photoUrls, []);
+      await updateListingMedia(item.id, photoUrls, videoUrls);
     }
-    setLocalPhotoUrls(photoUrls);
+    setLocalMedia({ photos: photoUrls, videos: videoUrls });
   }, [item.id, isRequestPost]);
 
   const handleDelete = async () => {
@@ -1169,6 +1199,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           eRatePeriod, setERatePeriod,
           ePriceMaxStr, setEPriceMaxStr,
           eCategory, setECategory,
+          eExtraCats, setCategories,
           eUrgent, setEUrgent,
           isRequestPost,
           isDirty,
@@ -1183,7 +1214,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           onRetrySave: () => void runSave('save', draft),
           photoEditOpen,
           setPhotoEditOpen,
-          currentPhotoUrlsForPicker,
+          editorPhotos,
+          editorVideos,
           handleSavePhotos,
         }}
       />
@@ -1403,25 +1435,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             />
             <PhotoLogoStamp />
             {canManage && (
-              <button
-                type="button"
-                onClick={() => setPhotoEditOpen(true)}
-                aria-label="Edit photos"
-                style={{
-                  position: 'absolute', top: 12, right: 58,
-                  zIndex: 10,
-                  width: 36, height: 36, borderRadius: 999,
-                  background: 'var(--bg-overlay)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  color: 'var(--text-primary)',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                <Camera size={16} strokeWidth={1.8} />
-              </button>
+              <EditPhotosButton count={displayPhotos.length} onClick={() => setPhotoEditOpen(true)} />
             )}
           </div>
         </section>
@@ -1516,13 +1530,24 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
             </EditFieldRow>
           )}
 
-          <EditFieldRow label="Category">
-            <CategorySelect
-              value={eCategory}
-              onChange={setECategory}
-              fallbackLabel={item.category}
-            />
-          </EditFieldRow>
+          {isRequestPost ? (
+            <EditFieldRow label="Category">
+              <CategorySelect
+                value={eCategory}
+                onChange={setECategory}
+                fallbackLabel={item.category}
+              />
+            </EditFieldRow>
+          ) : (
+            <EditFieldRow label="Categories">
+              <CategoryPicker
+                bare
+                label="Categories"
+                value={[eCategory, ...eExtraCats].filter(Boolean)}
+                onChange={setCategories}
+              />
+            </EditFieldRow>
+          )}
 
           {isRequestPost && (
             <EditFieldRow label="Urgency">
@@ -2037,11 +2062,13 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
         targetLabel={`"${item.title}"`}
       />
       {canManage && (
-        <PhotoEditDialog
+        <MediaEditor
           open={photoEditOpen}
-          onOpenChange={setPhotoEditOpen}
-          initialUrls={currentPhotoUrlsForPicker}
-          bucket={isRequestPost ? 'listings' : 'listings'}
+          onClose={() => setPhotoEditOpen(false)}
+          subtitle={item.title}
+          initialPhotos={editorPhotos}
+          initialVideos={editorVideos}
+          bucket="listings"
           allowVideo={!isRequestPost}
           onSave={handleSavePhotos}
         />
@@ -2066,6 +2093,7 @@ interface EditState {
   eRatePeriod?: RatePeriod; setERatePeriod: (v: RatePeriod | undefined) => void;
   ePriceMaxStr: string;     setEPriceMaxStr: (v: string) => void;
   eCategory: string;        setECategory: (v: string) => void;
+  eExtraCats: string[];     setCategories: (v: string[]) => void;
   eUrgent: boolean;         setEUrgent: (v: boolean) => void;
   isRequestPost: boolean;
   isDirty: boolean;
@@ -2083,8 +2111,9 @@ interface EditState {
   /* Photo editing */
   photoEditOpen: boolean;
   setPhotoEditOpen: (v: boolean) => void;
-  currentPhotoUrlsForPicker: string[];
-  handleSavePhotos: (urls: string[]) => Promise<void>;
+  editorPhotos: string[];
+  editorVideos: string[];
+  handleSavePhotos: (photoUrls: string[], videoUrls: string[]) => Promise<void>;
 }
 
 interface DesktopLayoutProps {
@@ -2192,11 +2221,11 @@ function DesktopLayout({
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType,
-    eComp, setEComp, eRatePeriod, setERatePeriod, ePriceMaxStr, setEPriceMaxStr, eCategory, setECategory,
+    eComp, setEComp, eRatePeriod, setERatePeriod, ePriceMaxStr, setEPriceMaxStr, eCategory, setECategory, eExtraCats, setCategories,
     eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError, blocker, savedOnce,
     canRevert, repostBlocked, onRetrySave,
     handleSaveAndRepost, handleDiscard,
-    photoEditOpen, setPhotoEditOpen, currentPhotoUrlsForPicker, handleSavePhotos,
+    photoEditOpen, setPhotoEditOpen, editorPhotos, editorVideos, handleSavePhotos,
   } = editState;
   void setSaved; /* save state is driven through onToggleSave now */
   return (
@@ -2336,25 +2365,7 @@ function DesktopLayout({
             />
             <PhotoLogoStamp />
             {canManage && (
-              <button
-                type="button"
-                onClick={() => setPhotoEditOpen(true)}
-                aria-label="Edit photos"
-                style={{
-                  position: 'absolute', top: 12, right: 58,
-                  zIndex: 10,
-                  width: 36, height: 36, borderRadius: 999,
-                  background: 'var(--bg-overlay)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  color: 'var(--text-primary)',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                <Camera size={16} strokeWidth={1.8} />
-              </button>
+              <EditPhotosButton count={photos.length} onClick={() => setPhotoEditOpen(true)} />
             )}
           </div>
 
@@ -2450,7 +2461,14 @@ function DesktopLayout({
             </div>
           )}
 
-          {canManage ? (
+          {canManage && !isRequestPost ? (
+            <CategoryPicker
+              bare
+              label="Categories"
+              value={[eCategory, ...eExtraCats].filter(Boolean)}
+              onChange={setCategories}
+            />
+          ) : canManage ? (
             <CategorySelect
               value={eCategory}
               onChange={setECategory}
@@ -2932,10 +2950,12 @@ function DesktopLayout({
         targetLabel={`"${item.title}"`}
       />
       {canManage && (
-        <PhotoEditDialog
+        <MediaEditor
           open={photoEditOpen}
-          onOpenChange={setPhotoEditOpen}
-          initialUrls={currentPhotoUrlsForPicker}
+          onClose={() => setPhotoEditOpen(false)}
+          subtitle={item.title}
+          initialPhotos={editorPhotos}
+          initialVideos={editorVideos}
           bucket="listings"
           allowVideo={!isRequestPost}
           onSave={handleSavePhotos}

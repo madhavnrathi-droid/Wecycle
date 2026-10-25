@@ -28,7 +28,7 @@ import { markJustPosted } from '../../lib/moments';
    every post form. This file used to carry its own copy, which had already
    drifted from the chips, so a member could file a post under a category the
    feed had no way to show. */
-import { CATEGORIES } from '../../lib/categories';
+import CategoryPicker from './CategoryPicker';
 
 /* Condition slider — 5 stops with an animated emoji face per stop. Stored as
    one of the three Supabase enum values, but the user picks via a colorful
@@ -63,7 +63,8 @@ interface ShareItemModalProps {
 
 export interface ShareItemForm {
   title: string;
-  category: string;
+  /* Category ids, main first — up to MAX_CATEGORIES (see CategoryPicker). */
+  categories: string[];
   condition: string;
   description: string;
   location: string;
@@ -99,7 +100,7 @@ const MAX_PHOTOS = 3;
 export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode = 'item' }: ShareItemModalProps) {
   const isService = mode === 'service';
   const [form, setForm] = useState<ShareItemForm>({
-    title: '', category: isService ? 'Services' : '', condition: '', description: '',
+    title: '', categories: isService ? ['services'] : [], condition: '', description: '',
     link: '', linkOnPhoto: false,
     location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '',
     photos: [], comp: 'free', oppRole: 'offering',
@@ -154,7 +155,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
 
   const reset = () => {
     setForm({
-      title: '', category: isService ? 'Services' : '', condition: '', description: '', link: '', linkOnPhoto: false, location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '', photos: [], comp: 'free', oppRole: 'offering',
+      title: '', categories: isService ? ['services'] : [], condition: '', description: '', link: '', linkOnPhoto: false, location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '', photos: [], comp: 'free', oppRole: 'offering',
     });
     setNotifyOnEngagement(true);
   };
@@ -174,7 +175,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
         const svc = compToListing(form.comp, form.price);
         created = await createListingWithMedia({
           title: form.title,
-          category: form.category,
+          category: form.categories[0] ?? '',
+          categories: form.categories,
           condition: (form.condition || 'good') as 'like_new' | 'good' | 'fair',
           description: form.description,
           location: form.location,
@@ -222,7 +224,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
           has_swap_ask: form.deal === 'swap' && form.swapFor.trim().length > 0,
         }),
         has_description: form.description.trim().length > 0,
-        category: form.category,
+        category: form.categories[0] ?? '',
+        category_count: form.categories.length,
       });
       onSubmit?.(form);
       pickerRef.current?.clear();
@@ -611,22 +614,13 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
             : <span className="field-hint">{form.description.length}/500 characters</span>}
         </div>
 
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label htmlFor="si-cat" className="field-label">
-            Category
-          </label>
-          <select
-            id="si-cat"
-            className="form-select"
-            value={form.category}
-            onChange={e => update('category', e.target.value)}
-            aria-invalid={!!errors.category}
-          >
-            <option value="">Pick one — helps people find it</option>
-            {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-          </select>
-          {errors.category && <span className="field-error">{errors.category}</span>}
-        </div>
+        <CategoryPicker
+          id="si-cat"
+          value={form.categories}
+          onChange={next => update('categories', next)}
+          label={isService ? 'What kind of service' : 'Category'}
+          error={errors.categories}
+        />
 
 
         {/* ── Everything else, folded away ─────────────────────────────────

@@ -22,7 +22,7 @@ import type { MarketplaceItem, User, CommunityEvent, LostItem } from './mockData
 import { listingToComp } from './opportunity';
 import type { CompressedMedia } from './mediaCompression';
 import type { Database } from './database.types';
-import { normalizeCategory } from './categories';
+import { normalizeCategory, cleanCategoryIds, tagsWithCategories, categoryFilterExpr } from './categories';
 import { assertClean, isServerModerationError } from './contentFilter';
 import { normalizeEventType } from './eventTypes';
 import { type Schedule, toTimestamps } from './eventSchedule';
@@ -294,7 +294,7 @@ export async function fetchMarketplaceItems(filter: FeedFilter = {}): Promise<Ma
     .order('posted_at', { ascending: false })
     .limit(filter.limit ?? 60);
 
-  if (filter.category && filter.category !== 'all') q = q.eq('category_id', filter.category);
+  if (filter.category && filter.category !== 'all') q = q.or(categoryFilterExpr(filter.category));
   if (filter.search?.trim()) q = q.ilike('title', `%${filter.search.trim()}%`);
 
   const { data, error } = await q;
@@ -314,7 +314,7 @@ export async function fetchOpportunities(filter: FeedFilter = {}): Promise<Marke
     .order('posted_at', { ascending: false })
     .limit(filter.limit ?? 60);
 
-  if (filter.category && filter.category !== 'all') q = q.eq('category_id', filter.category);
+  if (filter.category && filter.category !== 'all') q = q.or(categoryFilterExpr(filter.category));
   if (filter.search?.trim()) q = q.ilike('title', `%${filter.search.trim()}%`);
 
   const { data, error } = await q;
@@ -594,6 +594,9 @@ function friendlyWriteError(error: unknown): Error {
 export interface NewListingInput {
   title: string;
   category: string;       /* category id, lowercased */
+  /** Every category, main first (up to MAX_CATEGORIES). When given, it wins
+   *  over `category`; the first becomes category_id, the rest ride in tags. */
+  categories?: string[];
   condition: 'like_new' | 'good' | 'fair';
   description?: string;
   location?: string;
@@ -652,7 +655,8 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
      that has not reloaded still submits a label, and multi-word labels do not
      lowercase into valid ids — that would fail the foreign key and the post
      would simply not go up. */
-  const categoryId = normalizeCategory(input.category) ?? 'hobbies';
+  const cats = cleanCategoryIds(input.categories?.length ? input.categories : [input.category]);
+  const categoryId = cats[0] ?? 'hobbies';
   const { data, error } = await supabase
     .from('listings')
     .insert({
@@ -690,7 +694,7 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       link_on_photo: !!(input.linkUrl && input.linkOnPhoto && photoUrls.length > 0),
       photo_urls: photoUrls,
       video_urls: videoUrls,
-      tags: [],
+      tags: tagsWithCategories(cats),
       status: 'active',
       notify_on_engagement: input.notifyOnEngagement ?? true,
     } as never)
@@ -1497,6 +1501,10 @@ export async function updateLostFoundMedia(id: string, photoUrls: string[]) {
 export interface EditListingPatch {
   title?: string;
   category?: string;        /* category id, lowercased */
+  /** Every category, main first. Rewrites category_id AND the `cat:` tags;
+   *  `tags` carries the post's current tags so non-category ones survive. */
+  categories?: string[];
+  tags?: string[];
   condition?: 'like_new' | 'good' | 'fair';
   description?: string;
   location?: string;
@@ -1555,7 +1563,13 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
      lowercased to an id no category has and every save died on the foreign key,
      taking the price and every other field in the same patch down with it. That
      is why editing appeared to silently do nothing. */
-  if (patch.category !== undefined)    update.category_id = normalizeCategory(patch.category);
+  if (patch.categories !== undefined) {
+    const cats = cleanCategoryIds(patch.categories);
+    update.category_id = cats[0] ?? null;
+    update.tags = tagsWithCategories(cats, patch.tags ?? []);
+  } else if (patch.category !== undefined) {
+    update.category_id = normalizeCategory(patch.category);
+  }
   if (patch.condition !== undefined)   update.condition = patch.condition;
   if (patch.description !== undefined) update.description = patch.description.trim() || null;
   if (patch.location !== undefined)    update.location = patch.location.trim() || null;

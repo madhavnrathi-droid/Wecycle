@@ -179,11 +179,70 @@ export function categoryIdOf(
   return normalizeCategory(post.categoryId) ?? normalizeCategory(post.category);
 }
 
-/** Does this post belong to the chosen filter? `'all'` matches everything. */
+/* ── More than one category ──────────────────────────────────────────────────
+ *
+ * A camera is Electronics AND Hobbies; a cycle is Mobility AND Sports; running
+ * shoes are Fashion AND Sports. With one category the poster had to guess which
+ * filter their buyer would open, and half of those buyers never saw the post.
+ *
+ * The first category is the MAIN one: where the post is listed, what its header
+ * says, what the feed's taste model learns from. Up to two more make it show up
+ * under those filters as well. Three, not unlimited: a post filed everywhere is
+ * noise in every filter (eBay charges for a second category for exactly this
+ * reason; Etsy allows one category and puts the rest in tags).
+ *
+ * The extras ride in the listing's existing `tags` array as `cat:<id>` — the
+ * table already has the column, so no migration, and a build that predates
+ * this reads the main category exactly as before and ignores the tags. */
+export const MAX_CATEGORIES = 3;
+const CAT_TAG = 'cat:';
+
+/** Every category a post is filed under, main first, normalised and deduped. */
+export function categoryIdsOf(
+  post: { categoryId?: string | null; category?: string | null; tags?: readonly string[] | null } | null | undefined,
+): string[] {
+  if (!post) return [];
+  const out: string[] = [];
+  const main = categoryIdOf(post);
+  if (main) out.push(main);
+  for (const t of post.tags ?? []) {
+    if (typeof t !== 'string' || !t.startsWith(CAT_TAG)) continue;
+    const id = normalizeCategory(t.slice(CAT_TAG.length));
+    if (id && !out.includes(id)) out.push(id);
+  }
+  return out.slice(0, MAX_CATEGORIES);
+}
+
+/** The `tags` array for a list of categories: whatever non-category tags the
+ *  post already had, then one `cat:` tag per category after the main one. */
+export function tagsWithCategories(ids: readonly string[], existing: readonly string[] = []): string[] {
+  const keep = existing.filter(t => typeof t === 'string' && !t.startsWith(CAT_TAG));
+  const clean = cleanCategoryIds(ids);
+  return [...keep, ...clean.slice(1).map(id => CAT_TAG + id)];
+}
+
+/** Normalised, deduped, capped — the only shape a category list is stored in. */
+export function cleanCategoryIds(ids: readonly (string | null | undefined)[]): string[] {
+  const out: string[] = [];
+  for (const raw of ids) {
+    const id = normalizeCategory(raw ?? null);
+    if (id && !out.includes(id)) out.push(id);
+  }
+  return out.slice(0, MAX_CATEGORIES);
+}
+
+/** Does this post belong to the chosen filter? `'all'` matches everything.
+ *  Any of the post's categories counts, not just the main one. */
 export function matchesCategoryFilter(
-  post: { categoryId?: string | null; category?: string | null } | null | undefined,
+  post: { categoryId?: string | null; category?: string | null; tags?: readonly string[] | null } | null | undefined,
   filterId: string,
 ): boolean {
   if (filterId === 'all') return true;
-  return categoryIdOf(post) === filterId;
+  return categoryIdsOf(post).includes(filterId);
+}
+
+/** PostgREST-style `or` for a server-side category filter: the main column, or
+ *  the category riding in the tags. */
+export function categoryFilterExpr(filterId: string): string {
+  return `category_id.eq.${filterId},tags.cs.{${CAT_TAG}${filterId}}`;
 }

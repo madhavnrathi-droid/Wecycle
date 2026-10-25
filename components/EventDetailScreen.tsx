@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users, Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, BarChart3, ClipboardList, Pencil, MessageCircle } from '@/lib/icons';
+import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users, Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, ImagePlus, BarChart3, ClipboardList, Pencil, MessageCircle } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import type { CommunityEvent, MarketplaceItem, User } from '../lib/mockData';
 import { resolveEventPhotos, getAvatar } from '../lib/photos';
@@ -29,7 +29,7 @@ import {
   validateFields, type FormField,
 } from '../lib/eventForms';
 import FormBuilderScreen from './forms/FormBuilderScreen';
-import PhotoEditDialog from './PhotoEditDialog';
+import MediaEditor, { EditPhotosButton } from './MediaEditor';
 import { isDemoMode } from '../lib/demoMode';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
@@ -113,12 +113,16 @@ export default function EventDetailScreen({
     : (Array.isArray(uploadedPhotos) ? [] : resolveEventPhotos(event));
   /* Photo editing — owner can add/replace photos. */
   const [photoEditOpen, setPhotoEditOpen] = useState(false);
-  const [localPhotoUrls, setLocalPhotoUrls] = useState<string[] | null>(null);
-  const displayPhotos: string[] = localPhotoUrls !== null ? localPhotoUrls : photos;
-  const handleSaveEventPhotos = useCallback(async (photoUrls: string[]) => {
-    if (isDemoMode()) { setLocalPhotoUrls(photoUrls); return; }
-    await updateEventMedia(event.id, photoUrls, []);
-    setLocalPhotoUrls(photoUrls);
+  /* Videos are kept apart from photos and handed back untouched unless the
+     organiser removes one — saving photos used to write [] over them. */
+  const eventVideos = (event as { videoUrls?: string[] }).videoUrls ?? [];
+  const [localMedia, setLocalMedia] = useState<{ photos: string[]; videos: string[] } | null>(null);
+  const displayPhotos: string[] = localMedia !== null ? localMedia.photos : photos;
+  const displayVideos: string[] = localMedia !== null ? localMedia.videos : eventVideos;
+  const handleSaveEventPhotos = useCallback(async (photoUrls: string[], videoUrls: string[]) => {
+    if (isDemoMode()) { setLocalMedia({ photos: photoUrls, videos: videoUrls }); return; }
+    await updateEventMedia(event.id, photoUrls, videoUrls);
+    setLocalMedia({ photos: photoUrls, videos: videoUrls });
   }, [event.id]);
   const [expanded, setExpanded] = useState(false);
   const desc = event.description ?? '';
@@ -580,25 +584,7 @@ export default function EventDetailScreen({
                       </div>
                     )}
                     {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => setPhotoEditOpen(true)}
-                        aria-label="Edit photos"
-                        style={{
-                          position: 'absolute', bottom: 14, right: 14,
-                          zIndex: 10,
-                          width: 36, height: 36, borderRadius: 999,
-                          background: 'var(--bg-overlay)',
-                          backdropFilter: 'blur(10px)',
-                          WebkitBackdropFilter: 'blur(10px)',
-                          border: '1px solid rgba(255,255,255,0.18)',
-                          color: 'var(--text-primary)',
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Camera size={16} strokeWidth={1.8} />
-                      </button>
+                      <EditPhotosButton place="bottom-right" count={displayPhotos.length} onClick={() => setPhotoEditOpen(true)} />
                     )}
                   </>
                 }
@@ -1257,12 +1243,13 @@ export default function EventDetailScreen({
       </div>{/* /desktop grid wrapper */}
 
       {canEdit && (
-        <PhotoEditDialog
+        <MediaEditor
           open={photoEditOpen}
-          onOpenChange={setPhotoEditOpen}
-          initialUrls={photos}
+          onClose={() => setPhotoEditOpen(false)}
+          subtitle={event.title}
+          initialPhotos={displayPhotos}
+          initialVideos={displayVideos}
           bucket="events"
-          allowVideo={false}
           onSave={handleSaveEventPhotos}
         />
       )}

@@ -15,14 +15,14 @@ import { getActiveRoom, isPrivateRoom } from '../lib/rooms';
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, MapPin, CheckCircle,
-  Mail, X, Trash2, Save, RotateCcw, Loader2, Camera, ImagePlus, Share2, MessageCircle,
+  Mail, X, Trash2, Save, RotateCcw, Loader2, ImagePlus, Share2, MessageCircle,
 } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
 import { isDemoMode } from '../lib/demoMode';
 import { hasSupabaseEnv } from '../lib/supabase';
 import { fetchLostFound, onPostsChanged, updateLostFoundMedia } from '../lib/liveData';
-import PhotoEditDialog from './PhotoEditDialog';
+import MediaEditor, { EditPhotosButton } from './MediaEditor';
 import EmptyState from './EmptyState';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
@@ -408,10 +408,12 @@ export function LostFoundDetailSheet({
   const displayPhotoUrl: string | undefined =
     (localPhotoUrls !== null ? localPhotoUrls[0] : undefined) ??
     resolveLostFoundPhoto(item.id, item.photoUrls) ?? undefined;
+  /* Lost & found reports carry photos only. */
   const handleSaveLFPhotos = async (photoUrls: string[]) => {
     await updateLostFoundMedia(item.id, photoUrls);
     setLocalPhotoUrls(photoUrls);
   };
+  const editorPhotos = localPhotoUrls ?? currentPhotoUrls;
 
   const shareCardSpec: ShareCardSpec = {
     kind: item.status === 'found' ? 'found' : 'lost',
@@ -612,25 +614,7 @@ export function LostFoundDetailSheet({
               </span>
             )}
             {isOwner && displayPhotoUrl && (
-              <button
-                type="button"
-                onClick={() => setPhotoEditOpen(true)}
-                aria-label="Edit photo"
-                style={{
-                  position: 'absolute', bottom: 12, right: 12,
-                  zIndex: 10,
-                  width: 36, height: 36, borderRadius: 999,
-                  background: 'var(--bg-overlay)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  color: 'var(--text-primary)',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                <Camera size={16} strokeWidth={1.8} />
-              </button>
+              <EditPhotosButton place="bottom-right" count={editorPhotos.length} onClick={() => setPhotoEditOpen(true)} />
             )}
           </div>
         )}
@@ -728,25 +712,7 @@ export function LostFoundDetailSheet({
               </span>
             )}
             {isOwner && displayPhotoUrl && (
-              <button
-                type="button"
-                onClick={() => setPhotoEditOpen(true)}
-                aria-label="Edit photo"
-                style={{
-                  position: 'absolute', bottom: 8, right: 8,
-                  zIndex: 5,
-                  width: 32, height: 32, borderRadius: 999,
-                  background: 'var(--bg-overlay)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  color: 'var(--text-primary)',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                <Camera size={14} strokeWidth={1.8} />
-              </button>
+              <EditPhotosButton place="bottom-right" count={editorPhotos.length} onClick={() => setPhotoEditOpen(true)} />
             )}
           </div>
         )}
@@ -1057,13 +1023,13 @@ export function LostFoundDetailSheet({
         </div>{/* /right column */}
       </div>
       {isOwner && (
-        <PhotoEditDialog
+        <MediaEditor
           open={photoEditOpen}
-          onOpenChange={setPhotoEditOpen}
-          initialUrls={currentPhotoUrls}
+          onClose={() => setPhotoEditOpen(false)}
+          subtitle={item.title}
+          initialPhotos={editorPhotos}
           bucket="lost-found"
-          allowVideo={false}
-          onSave={handleSaveLFPhotos}
+          onSave={photoUrls => handleSaveLFPhotos(photoUrls)}
         />
       )}
       <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />

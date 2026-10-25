@@ -172,6 +172,9 @@ export class AppwriteQuery<T = AnyRow> implements PromiseLike<Result<T[]>> {
       else if (op === 'is' && v === null) qs.push(Query.isNull(col(c)));
       else if (op === 'gt') qs.push(Query.greaterThan(col(c), v as never));
       else if (op === 'lt') qs.push(Query.lessThan(col(c), v as never));
+      /* `tags.cs.{cat:books}` — array contains. PostgREST wraps the value in
+         braces; Appwrite wants the bare element. */
+      else if (op === 'cs') qs.push(Query.contains(col(c), [String(raw).replace(/^\{|\}$/g, '') as never]));
     }
     if (qs.length) { this.filters.push(Query.or(qs)); this.otherFilters++; }
     return this;

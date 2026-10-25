@@ -37,7 +37,8 @@ const COMMON = ['title', 'description', 'status', 'posted_at', 'updated_at', 'ph
 const EDITABLE: Record<string, { owner: string; columns: ReadonlySet<string> }> = {
   listings: {
     owner: 'user_id',
-    columns: new Set([...COMMON, 'category_id', 'condition', 'location', 'listing_type', 'price',
+    /* tags: a listing's extra categories ride there as `cat:<id>`. */
+    columns: new Set([...COMMON, 'category_id', 'tags', 'condition', 'location', 'listing_type', 'price',
       'comp', 'opp_role', 'price_band', 'rate_period', 'price_max']),
   },
   requests: {
