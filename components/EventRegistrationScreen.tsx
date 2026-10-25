@@ -20,6 +20,13 @@ import { useBreakpoint } from '../lib/useBreakpoint';
 import { track, EVT } from '../lib/analytics';
 import { haptics } from '../lib/haptics';
 
+/* Unsent answers, per event, for this session. Back is one press away now (the
+   browser's button, Android's gesture, a mouse's thumb button), and a form that
+   forgets half a page of answers on one stray press is worse than one that never
+   let you leave. Kept in memory only — answers can be personal, and a draft
+   that outlives the tab would be a surprise. */
+const drafts = new Map<string, { answers: FormAnswers; files: Record<string, File | null> }>();
+
 interface EventRegistrationScreenProps {
   event: CommunityEvent;
   /** True when the user is already going and is editing their submission. */
@@ -47,13 +54,22 @@ export default function EventRegistrationScreen({
     Promise.all([fetchEventForm(event.id), fetchMyFormResponse(event.id)]).then(([f, mine]) => {
       if (cancelled) return;
       setForm(f);
-      if (mine) setAnswers(mine.answers);
+      const draft = drafts.get(event.id);
+      if (draft) { setAnswers(draft.answers); setFiles(draft.files); }
+      else if (mine) setAnswers(mine.answers);
       setLoaded(true);
     });
     return () => { cancelled = true; };
   }, [event.id, editMode]);
 
+  /* Only what the person typed becomes a draft — not the form as it loaded. */
+  const touched = useRef(false);
+  useEffect(() => {
+    if (loaded && touched.current) drafts.set(event.id, { answers, files });
+  }, [loaded, answers, files, event.id]);
+
   const setAnswer = (id: string, v: string | string[]) => {
+    touched.current = true;
     setAnswers(a => ({ ...a, [id]: v }));
     setErrors(e => ({ ...e, [id]: '' }));
   };
@@ -73,6 +89,8 @@ export default function EventRegistrationScreen({
     setSubmitError(null);
     try {
       await submitFormResponse(event.id, form.id, form.fields, answers, files);
+      drafts.delete(event.id);
+      touched.current = false;
       haptics.success();
       track(EVT.registration_submitted, {
         event_id: event.id,
@@ -174,6 +192,7 @@ export default function EventRegistrationScreen({
                 error={errors[f.id]}
                 onChange={v => setAnswer(f.id, v)}
                 onFile={file => {
+                  touched.current = true;
                   setFiles(prev => ({ ...prev, [f.id]: file }));
                   setErrors(e => ({ ...e, [f.id]: '' }));
                 }}

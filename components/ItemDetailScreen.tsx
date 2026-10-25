@@ -262,6 +262,9 @@ interface ItemDetailScreenProps {
   /** Order this item. Offered on items for sale, ahead of messaging — the
    *  order opens the same chat, with the order pinned to it. */
   onOrder?: (item: MarketplaceItem) => void;
+  /** Where Back goes — "Rahul's storefront", "Messages", "Home". The desktop
+   *  breadcrumb starts with it, so it never claims a path that wasn't taken. */
+  backLabel?: string;
   /** When the viewer owns this post, inline editing turns on (fields become
    *  inputs in place, dirty-state CTAs replace Delete). No standalone Edit
    *  button — the post detail IS the editor. */
@@ -477,7 +480,7 @@ function firstPhotoSrc(media: ReadonlyArray<string | { kind?: string; src: strin
   return null;
 }
 
-export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onMessage, onOrder, onDelete, isOwner, isAdmin }: ItemDetailScreenProps) {
+export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth, onOpenStorefront, onOpenItem, onOpenLF, onMessage, onOrder, onDelete, isOwner, isAdmin, backLabel }: ItemDetailScreenProps) {
   /* The post-live moment: the form that just published this marked it, and
      this is where the member is looking now. The hero lands and rings once,
      the chime plays, and a toast names where it went live. The success haptic
@@ -1163,6 +1166,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
         isPriced={isPriced}
         priceLabel={priceLabel}
         onBack={onBack}
+        backLabel={backLabel}
         onRequireAuth={onRequireAuth}
         onOpenStorefront={onOpenStorefront}
         onOpenItem={onOpenItem}
@@ -2132,6 +2136,7 @@ interface DesktopLayoutProps {
   isPriced: boolean;
   priceLabel: string;
   onBack: () => void;
+  backLabel?: string;
   onRequireAuth: () => void;
   onOpenStorefront?: (user: User) => void;
   onOpenItem?: (item: MarketplaceItem) => void;
@@ -2163,7 +2168,7 @@ interface DesktopLayoutProps {
 function DesktopLayout({
   heroAspect,
   item, photos, saved, setSaved, onToggleSave, expanded, setExpanded,
-  shouldClamp, desc, isPriced, priceLabel, onBack, onRequireAuth, onOpenStorefront,
+  shouldClamp, desc, isPriced, priceLabel, onBack, backLabel, onRequireAuth, onOpenStorefront,
   onOpenItem, onOpenLF,
   contactLinks, gate, primaryActionLabel, handleContactClick, hasBoth,
   canMessage, onMessage, canOrder, orderLabel, onOrder,
@@ -2246,7 +2251,7 @@ function DesktopLayout({
         </button>
         {/* Breadcrumb — always visible */}
         <span style={{ fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
-          Marketplace
+          <button type="button" className="crumb-back" onClick={onBack}>{backLabel ?? 'Marketplace'}</button>
           <span style={{ margin: '0 6px', opacity: 0.5 }}>›</span>
           <span style={{ color: 'var(--text-secondary)' }}>{item.category}</span>
         </span>

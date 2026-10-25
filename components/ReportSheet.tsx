@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useBackLayer } from '../lib/backStack';
 import { useAuth } from '../lib/AuthContext';
 import { X, Check, Loader2 } from '@/lib/icons';
 import { REPORT_REASONS, reportContent, blockUser, reportMailto } from '../lib/moderation';
@@ -36,6 +37,7 @@ export default function ReportSheet({
 }: ReportSheetProps) {
   const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
+  useBackLayer(open, onClose);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [blockConfirm, setBlockConfirm] = useState(false);

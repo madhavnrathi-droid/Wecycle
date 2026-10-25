@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { useBackLayer } from '../lib/backStack';
 import * as Dialog from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Bell, BellPlus, X, Plus, Sparkles } from '@/lib/icons';
@@ -37,6 +38,7 @@ interface Props {
 export default function SavedSearchBar({ requests, currentQuery = '', onRunSearch }: Props) {
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [open, setOpen] = useState(false);
+  useBackLayer(open, () => setOpen(false));
   const [input, setInput] = useState('');
 
   useEffect(() => {

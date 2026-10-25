@@ -28,6 +28,9 @@ const MY_UPLOAD_IDS = ['m1', 'm5', 'm10'];
 
 interface ActivityScreenProps {
   onOpenMenu: () => void;
+  /** Activity is not a tab — it is reached from inside the app — so it has a
+   *  way back. */
+  onBack?: () => void;
   onOpenAccount: () => void;
   /** The Messages button in the top bar. */
   onOpenMessages: () => void;
@@ -36,7 +39,7 @@ interface ActivityScreenProps {
 }
 
 export default function ActivityScreen({
-  onOpenMenu, onOpenAccount, onOpenMessages, onCreateAlert, onEditAlert,
+  onOpenMenu, onBack, onOpenAccount, onOpenMessages, onCreateAlert, onEditAlert,
 }: ActivityScreenProps) {
   const { user, isDemo } = useAuth();
   const mode = isDemo ? 'demo' : 'supabase';
@@ -83,7 +86,7 @@ export default function ActivityScreen({
     <div className="screen-transition" style={{ paddingBottom: 120, background: 'var(--bg-base)', minHeight: '100%' }}>
 
       {/* ── TOP BAR ── */}
-      <TopBar onOpenMenu={onOpenMenu} onOpenAccount={onOpenAccount} onOpenMessages={onOpenMessages} />
+      <TopBar onOpenMenu={onOpenMenu} onBack={onBack} onOpenAccount={onOpenAccount} onOpenMessages={onOpenMessages} />
 
       {/* ── PAGE TITLE ── */}
       <section style={{ padding: '14px 20px 14px' }}>

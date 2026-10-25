@@ -14,6 +14,7 @@ import { ChevronLeft, Trash2, Check, Loader2, AlertTriangle, AlertCircle } from 
 import FormBuilder from './FormBuilder';
 import { lockBodyScroll } from '../../lib/bodyLock';
 import { Z_LAYER } from '../../lib/zLayers';
+import { useBackLayer } from '../../lib/backStack';
 import type { FormField } from '../../lib/eventForms';
 
 interface FormBuilderScreenProps {
@@ -51,6 +52,7 @@ export default function FormBuilderScreen({
   const rootRef = useRef<HTMLDivElement>(null);
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
+  useBackLayer(open, () => onBackRef.current());
 
   /* Own the viewport: ref-counted body lock (a Modal underneath holds its own
      lock — counting prevents the restore-order wedge), move focus IN, trap

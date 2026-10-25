@@ -32,6 +32,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import { useBackLayer } from '../lib/backStack';
 import gsap from 'gsap';
 import { ArrowUpRight, BadgeCheck, X } from '@/lib/icons';
 import EmberShader from './EmberShader';
@@ -71,6 +72,7 @@ export default function SigchiRevealCard({ code, name, onClose }: SigchiRevealCa
   const returnTo = useRef<Element | null>(null);
 
   const close = useCallback(() => { onClose(); }, [onClose]);
+  useBackLayer(true, close);
 
   useEffect(() => {
     returnTo.current = document.activeElement;

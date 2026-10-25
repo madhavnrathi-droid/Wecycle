@@ -37,6 +37,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Star, ArrowLeft, ArrowRight, Scissors, Trash2, Loader2, Play, RotateCcw, Camera, ImagePlus,
 } from '@/lib/icons';
@@ -52,6 +53,7 @@ import { toast, dismissToast } from '../lib/toast';
 import { DUR, EASE, reducedMotion } from '../lib/motion';
 import { useDragReorder } from '../lib/useDragReorder';
 import { useBreakpoint } from '../lib/useBreakpoint';
+import { useBackLayer } from '../lib/backStack';
 import { track, EVT } from '../lib/analytics';
 
 export interface MediaEditorProps {
@@ -389,6 +391,8 @@ export default function MediaEditor({
   };
   const cancelRef = useRef(cancel);
   cancelRef.current = cancel;
+  /* System back = Cancel: closes a sheet first, asks before discarding. */
+  useBackLayer(open, () => cancelRef.current());
 
   /* ── Own the viewport while open: body lock, focus in, Escape, Tab trap ── */
   useEffect(() => {
@@ -485,7 +489,10 @@ export default function MediaEditor({
   const groupOfSheet = sheetTile ? tiles.filter(t => t.kind === sheetTile.kind) : [];
   const idxInGroup = sheetTile ? groupOfSheet.findIndex(t => t.key === sheetTile.key) : -1;
 
-  return (
+  /* Rendered at the page root: inside a desktop post window (which centres
+     itself with a transform) a fixed-position editor would be trapped in, and
+     clipped to, that window. */
+  return createPortal(
     <div
       ref={rootRef}
       className="me-root"
@@ -641,7 +648,8 @@ export default function MediaEditor({
         onChange={e => { void addFiles(e.target.files); e.target.value = ''; }} />
 
       <p className="sr-only" aria-live="polite">{said}</p>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

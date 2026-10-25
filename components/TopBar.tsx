@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Menu } from '@/lib/icons';
+import { Menu, ChevronLeft } from '@/lib/icons';
 import { Wordmark } from './Brand';
 import { useAuth } from '../lib/AuthContext';
 import { getAvatar } from '../lib/photos';
@@ -14,6 +14,9 @@ interface TopBarProps {
   /** A screen name in place of the wordmark (Lost & Found). It is that
    *  screen's h1, so it stays a heading, not a label. */
   title?: string;
+  /** A screen reached from inside the app rather than from the tab bar gets a
+   *  back arrow where the menu would be — every nested screen has a way back. */
+  onBack?: () => void;
 }
 
 /* ── The bar at the top of every tab ─────────────────────────────────────────
@@ -26,7 +29,7 @@ interface TopBarProps {
  * A three-column grid rather than flex: the wordmark stays at the true centre
  * with one control on the left and two on the right. With flex it was centred
  * between them, i.e. pushed 22px left of centre by the extra button. */
-export default function TopBar({ onOpenMenu, onOpenAccount, onOpenMessages, title }: TopBarProps) {
+export default function TopBar({ onOpenMenu, onOpenAccount, onOpenMessages, title, onBack }: TopBarProps) {
   const { user } = useAuth();
   /* The avatar seed depends on the signed-in user, which the server render
      does not know. */
@@ -62,9 +65,15 @@ export default function TopBar({ onOpenMenu, onOpenAccount, onOpenMessages, titl
     >
       <div className="app-topbar">
         <div>
-          <button onClick={onOpenMenu} aria-label="Open menu" className="theme-toggle" style={{ marginLeft: -8 }}>
-            <Menu size={24} />
-          </button>
+          {onBack ? (
+            <button onClick={onBack} aria-label="Back" className="theme-toggle" style={{ marginLeft: -8 }}>
+              <ChevronLeft size={24} strokeWidth={1.9} />
+            </button>
+          ) : (
+            <button onClick={onOpenMenu} aria-label="Open menu" className="theme-toggle" style={{ marginLeft: -8 }}>
+              <Menu size={24} />
+            </button>
+          )}
         </div>
         {title ? (
           <h1 style={{

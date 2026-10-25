@@ -1283,3 +1283,27 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 .me-entry:active { transform: scale(0.96); }
 .me-entry:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .me-entry[data-place="bottom-right"] { top: auto; left: auto; bottom: 14px; right: 14px; }
+
+/* ═══ Navigation stack (components/nav/NavLayer.tsx) ═══════════════════════
+   A pushed screen is an opaque page over the tabs, with its own scroller.
+   What it fully covers stops painting — visibility, not display, so every
+   scroll position underneath survives. */
+.nav-layer {
+  position: fixed; inset: 0;
+  background: var(--bg-base);
+  overflow: hidden;
+  outline: none;
+  /* The edge a screen slides in on, visible only while it moves. */
+  box-shadow: -12px 0 32px rgba(17, 17, 16, 0.10);
+}
+.nav-layer[data-covered], .nav-base[data-covered] { visibility: hidden; }
+/* Overlays (a sheet, a desktop window, Messages) bring their own surface; the
+   wrapper only orders them in the stack and blocks nothing. */
+.nav-overlay { position: fixed; top: 0; left: 0; width: 0; height: 0; }
+/* Kept-alive screens (tabs, the inbox under a chat) are hidden with the
+   `hidden` attribute; a class that sets display must not bring them back. */
+.motion-rise[hidden], .dm-pane[hidden] { display: none; }
+/* The first breadcrumb segment is where Back goes, and goes there. */
+.crumb-back { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.crumb-back:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+.crumb-back:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }

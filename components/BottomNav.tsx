@@ -80,7 +80,8 @@ const SLOTS: {
 export default function BottomNav({ active, onChange, onPost, postOpen }: BottomNavProps) {
   /* Wraps the parent's onChange so we get a single source of nav events. */
   const navigate = (next: Screen) => {
-    if (next === active) return;
+    /* The tab you are on: the parent scrolls it back to the top. */
+    if (next === active) { onChange(next); return; }
     haptics.selection();   /* iOS-style light tick on tab change */
     track(EVT.nav_switched, { from: active, to: next });
     onChange(next);

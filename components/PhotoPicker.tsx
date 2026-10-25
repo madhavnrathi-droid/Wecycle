@@ -29,6 +29,7 @@ import {
   type CompressedMedia,
 } from '../lib/mediaCompression';
 import { apiBase } from '../lib/platform';
+import { useBackLayer } from '../lib/backStack';
 
 interface PhotoPickerProps {
   /** Object/remote URLs currently held (photos and videos share this list). */
@@ -56,6 +57,7 @@ const PhotoPicker = forwardRef<PhotoPickerHandle, PhotoPickerProps>(function Pho
   /* Map of objectURL → CompressedMedia. */
   const mediaRef = useRef<Map<string, CompressedMedia>>(new Map());
   const [sheetOpen, setSheetOpen] = useState(false);
+  useBackLayer(sheetOpen, () => setSheetOpen(false));
   const [busy, setBusy] = useState(0);            /* files compressing */
   /* Desktop drag-and-drop. Dropping goes through the SAME addFiles() path as the
      file dialog, so compression, HEIC handling, the max-count cap and the video

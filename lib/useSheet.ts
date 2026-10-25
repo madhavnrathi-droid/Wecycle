@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { haptics } from './haptics';
 import { DUR, EASE, SPRING, reducedMotion } from './motion';
+import { useBackLayer } from './backStack';
 
 const DISMISS_FRACTION = 0.25;
 const FLICK_PX_PER_MS = 0.5;
@@ -69,7 +70,12 @@ function animateOut(sheet: HTMLElement | null, backdrop: HTMLElement | null, opt
       if (backdrop) anims.push(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: DUR[2], easing: EASE.standard, fill: 'forwards' }));
     }
   } catch { return Promise.resolve(); }
-  return Promise.all(anims.map(a => a.finished.catch(() => {}))).then(() => {});
+  /* A backgrounded page runs no animations, so `finished` can wait forever —
+     and a sheet that never finishes leaving never calls onClose. The timer is
+     the longest exit plus a margin; whichever comes first closes it. */
+  const done = Promise.all(anims.map(a => a.finished.catch(() => {}))).then(() => {});
+  const timeout = new Promise<void>(resolve => setTimeout(resolve, DUR[3] + 150));
+  return Promise.race([done, timeout]);
 }
 
 interface UseSheet {
@@ -116,6 +122,9 @@ export function useSheet({ open, onClose }: { open: boolean; onClose: () => void
       onCloseRef.current();
     });
   }, []);
+  /* The system back (browser, Android) closes an open sheet the way its own
+     close button does — see lib/backStack.ts. */
+  useBackLayer(open, requestClose);
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (!isSheetLayout() || e.button !== 0 || leaving.current) return;

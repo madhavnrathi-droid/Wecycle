@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useBackLayer } from '../../lib/backStack';
 import {
   ChevronLeft, MoreHorizontal, ArrowUp, ArrowDown, ShieldCheck, ChevronRight, Package,
   User as UserIcon, Flag, Ban, Copy, RotateCw,
@@ -256,6 +257,7 @@ export default function ChatThread({ conversationId, onBack, onOpenProfile, onOp
 
   /* ── Menu, report, block ── */
   const [menuOpen, setMenuOpen] = useState(false);
+  useBackLayer(menuOpen, () => setMenuOpen(false));
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menuOpen) return;

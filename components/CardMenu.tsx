@@ -21,6 +21,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { useBackLayer } from '../lib/backStack';
 import { EyeOff, Flag, Share2, UserX } from '@/lib/icons';
 import { haptics } from '../lib/haptics';
 
@@ -37,6 +38,7 @@ export interface CardMenuProps {
 export default function CardMenu({
   title, sellerName, onNotInterested, onHideSeller, onShare, onReport, onClose,
 }: CardMenuProps) {
+  useBackLayer(true, onClose);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

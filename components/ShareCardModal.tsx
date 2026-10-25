@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../lib/backStack';
 import * as Dialog from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { X, Share2, Download, Link2, Loader2, Check } from '@/lib/icons';
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
+  useBackLayer(open, () => onOpenChange(false));
   /* Style choice, for the card kinds that have one. Held here rather than in
      the spec so the caller does not have to care: a storefront card is the
      only thing with a look worth choosing, and the poster picks it at the

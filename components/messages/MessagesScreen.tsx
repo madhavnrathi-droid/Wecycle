@@ -6,6 +6,7 @@ import { useBreakpoint } from '../../lib/useBreakpoint';
 import { track, EVT } from '../../lib/analytics';
 import { haptics } from '../../lib/haptics';
 import { lockBodyScroll } from '../../lib/bodyLock';
+import { useBackLayer } from '../../lib/backStack';
 import type { DeepLinkPost } from '../../lib/liveData';
 import Inbox from './Inbox';
 import ChatThread from './ChatThread';
@@ -99,6 +100,11 @@ export default function MessagesScreen({
     if (enteredOnThread.current) { onClose(); return; }
     setSelected(null);
   };
+  /* On a phone the open chat is a step of its own: Back (the arrow, the
+     browser, Android) returns to the inbox, as in every messenger. Opened
+     straight into a chat from a post, there is no inbox to return to — Back
+     leaves Messages, which the screen's own stack entry already does. */
+  useBackLayer(!isDesktop && !!selected && !enteredOnThread.current, () => setSelected(null));
 
   return (
     /* data-fbs marks a full-page surface: the desktop post theatre and the
@@ -109,7 +115,7 @@ export default function MessagesScreen({
         {isDesktop ? (
           <>
             <div className="dm-pane dm-pane--list">
-              <Inbox selectedId={selected} onSelect={select} onClose={onClose} closeStyle="close" onBrowse={onBrowse} />
+              <Inbox selectedId={selected} onSelect={select} onClose={onClose} closeStyle="back" onBrowse={onBrowse} />
             </div>
             {selected ? (
               <ChatThread
@@ -128,18 +134,23 @@ export default function MessagesScreen({
               </div>
             )}
           </>
-        ) : selected ? (
-          <ChatThread
-            key={selected}
-            conversationId={selected}
-            onBack={backFromThread}
-            onOpenProfile={onOpenProfile}
-            onOpenPost={openPost}
-          />
         ) : (
-          <div className="dm-pane">
-            <Inbox selectedId={null} onSelect={select} onClose={onClose} closeStyle="back" onBrowse={onBrowse} />
-          </div>
+          <>
+            {/* The inbox stays mounted under an open chat, so Back finds it
+                with its search and scroll position as they were. */}
+            <div className="dm-pane" hidden={!!selected}>
+              <Inbox selectedId={null} onSelect={select} onClose={onClose} closeStyle="back" onBrowse={onBrowse} />
+            </div>
+            {selected && (
+              <ChatThread
+                key={selected}
+                conversationId={selected}
+                onBack={backFromThread}
+                onOpenProfile={onOpenProfile}
+                onOpenPost={openPost}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

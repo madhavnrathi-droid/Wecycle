@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBackLayer } from '../lib/backStack';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from '@/lib/icons';
 
@@ -377,6 +378,8 @@ export function PhotoViewer({
 }: { photos: string[]; index: number; onClose: () => void }) {
   const [i, setI] = useState(index);
   const [mounted, setMounted] = useState(false);
+  /* Back closes the full-screen photo before anything under it. */
+  useBackLayer(true, onClose);
 
   useEffect(() => { setMounted(true); }, []);
 

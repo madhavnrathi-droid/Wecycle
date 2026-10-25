@@ -72,6 +72,8 @@ import { withdrawFormResponse, fetchEventForm } from '../lib/eventForms';
 import { hasSupabaseEnv } from '../lib/supabase';
 import { lockBodyScroll } from '../lib/bodyLock';
 import { Z_LAYER } from '../lib/zLayers';
+import { useBackLayer, installBackStack, setBaseUrl, backIsExternal } from '../lib/backStack';
+import NavLayer, { navMotionStyle, edgeSwipeAvailable } from '../components/nav/NavLayer';
 import { supabase } from '../lib/supabase';
 import { deleteDemoPost, demoOwnedIds } from '../lib/demoInventory';
 import type { WecycleAlert } from '../lib/alerts';
@@ -93,6 +95,50 @@ import {
  * the scroll-restore logic below runs flush-before-paint on the client only. */
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
+/* ── The navigation stack ─────────────────────────────────────────────────
+ * Every screen or sheet opened over the tabs, in the order it was opened.
+ * Back closes the top one; whatever is under it is still mounted, exactly as it
+ * was left. See components/nav/NavLayer.tsx and lib/backStack.ts. */
+type SubScreen = 'settings' | 'notifications' | 'feedback' | 'password';
+type Route =
+  | { kind: 'item'; item: MarketplaceItem }
+  | { kind: 'event'; event: CommunityEvent }
+  | { kind: 'lf'; lf: LostItem }
+  | { kind: 'store'; user: User }
+  | { kind: 'register'; event: CommunityEvent; edit: boolean }
+  | { kind: 'insights'; event: CommunityEvent }
+  | { kind: 'messages'; conversationId: string | null; entry: 'inbox' | 'thread' }
+  | { kind: 'sub'; screen: SubScreen };
+type Entry = Route & { key: number };
+type Leaving = Entry & { instant: boolean };
+let navSeq = 0;
+
+/* Tabs that can sit in the URL (`?tab=`), so a refresh on the web stays put. */
+const TAB_PARAM: Partial<Record<Screen, string>> = {
+  events: 'events', lost_found: 'lost-found', inventory: 'inventory',
+  activity: 'activity', account: 'account', market: 'market', impact: 'impact',
+};
+const tabFromParam = (v: string | null): Screen | null =>
+  (Object.entries(TAB_PARAM).find(([, p]) => p === v)?.[0] as Screen | undefined) ?? null;
+
+/** The page URL with one deep-link param set, keeping anything else it had
+ *  (the demo flag, UTM tags). */
+function urlWith(base: string, key: string, value: string): string {
+  try {
+    const u = new URL(base, window.location.origin);
+    ['p', 'u', 'b', 'tab'].forEach(k => u.searchParams.delete(k));
+    u.searchParams.set(key, value);
+    return u.pathname + u.search;
+  } catch { return `/?${key}=${encodeURIComponent(value)}`; }
+}
+
+/** Registers one open screen with the back stack. Rendered just before the
+ *  screen, so it registers before anything the screen itself opens. */
+function BackEntry({ onBack, url }: { onBack: () => void; url?: string | null }) {
+  useBackLayer(true, onBack, url);
+  return null;
+}
+
 type ModalKind =
   | null
   | 'post-picker'
@@ -111,42 +157,66 @@ export default function WecycleApp() {
    * The L&F sheet already branches internally; the others wrap below. */
   const { isDesktop } = useBreakpoint();
   const storageMode = isDemo ? 'demo' as const : 'supabase' as const;
-  const [activeScreen, setActiveScreen] = useState<Screen>('feed');
+  const [activeScreen, setActiveScreenRaw] = useState<Screen>('feed');
+  /* Every tab change goes through here, so the tab being left has its scroll
+     position written down at that moment — not only from scroll events, which
+     a backgrounded page never fires. */
+  const tabScroll = useRef<Partial<Record<Screen, number>>>({});
+  const activeTabRef = useRef<Screen>('feed');
+  const setActiveScreen = (s: Screen) => {
+    const m = typeof document !== 'undefined' ? document.getElementById('main') : null;
+    if (m) tabScroll.current[activeTabRef.current] = m.scrollTop;
+    setActiveScreenRaw(s);
+  };
   const [modal, setModal] = useState<ModalKind>(null);
   /* Set when the auth modal is opened from "I don't know my current password",
      so it lands on the emailed-code reset with the address already filled in
      rather than on a sign-in form asking for that same password. */
   const [authReset, setAuthReset] = useState<{ email: string } | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [openItem, setOpenItem] = useState<MarketplaceItem | null>(null);
-  const [openEvent, setOpenEvent] = useState<CommunityEvent | null>(null);
-  /* L&F detail is a bottom sheet (not a full screen) — lifted to app-level
-   * so the same sheet can be opened from LostFoundScreen AND InventoryScreen. */
-  const [openLF, setOpenLF] = useState<LostItem | null>(null);
-  /* Storefront takes over the viewport when set — clicking any author avatar
-     or owner card lands here. Cleared on back. */
-  const [openStorefront, setOpenStorefront] = useState<User | null>(null);
-  /* The store a product was opened from. Back from that product goes back to
-     the store — how Amazon and Swiggy behave, and the only way browsing a
-     brand's range one product at a time is bearable. */
-  const [storeReturn, setStoreReturn] = useState<User | null>(null);
-  const openItemFromStore = (item: MarketplaceItem) => {
-    setStoreReturn(openStorefront);
-    setOpenStorefront(null);
-    setOpenItem(item);
+  /* ── The stack ── */
+  const [stack, setStack] = useState<Entry[]>([]);
+  const [leaving, setLeaving] = useState<Leaving[]>([]);
+  /* Screens that have finished arriving — only those hide what is under them. */
+  const [entered, setEntered] = useState<Set<number>>(() => new Set());
+  /* Written eagerly as well as through state, so several opens or closes in
+     one tick (a popstate closing two layers, close-then-open) see each other. */
+  const stackRef = useRef<Entry[]>([]);
+  const commitStack = (next: Entry[]) => { stackRef.current = next; setStack(next); };
+
+  /* What had focus when each screen opened, so closing it hands focus back —
+     to the card that was tapped, not to the top of the page. */
+  const openedFrom = useRef(new Map<number, HTMLElement>());
+  const push = (r: Route) => {
+    setDrawerOpen(false);
+    const key = ++navSeq;
+    const from = typeof document !== 'undefined' ? document.activeElement : null;
+    if (from instanceof HTMLElement && from !== document.body) openedFrom.current.set(key, from);
+    commitStack([...stackRef.current, { ...r, key } as Entry]);
   };
-  const closeItem = () => {
-    setOpenItem(null);
-    if (storeReturn) { setOpenStorefront(storeReturn); setStoreReturn(null); }
+  /** Close this entry and everything opened above it. */
+  const closeEntry = (key: number, opts?: { instant?: boolean }) => {
+    const s = stackRef.current;
+    const i = s.findIndex(e => e.key === key);
+    if (i < 0) return;
+    const removed = s.slice(i);
+    /* iOS Safari already animated its own swipe-back; doing ours as well would
+       slide the page out twice. */
+    const instant = opts?.instant ?? (backIsExternal() && navMotionStyle() === 'ios' && !edgeSwipeAvailable());
+    commitStack(s.slice(0, i));
+    setLeaving(l => [...l, ...removed.map(e => ({ ...e, instant }))]);
   };
-  /* Opening a storefront must clear any open item/event first — otherwise the
-     `if (openItem)` early-return below wins and the storefront never renders.
-     This is THE fix for "clicking a user's name does nothing". */
+  const closeAll = () => { const first = stackRef.current[0]; if (first) closeEntry(first.key); };
+  const updateEntries = (fn: (e: Entry) => Entry) => commitStack(stackRef.current.map(fn));
+  const topEntry: Entry | null = stack[stack.length - 1] ?? null;
+
+  const openItem = (item: MarketplaceItem) => push({ kind: 'item', item });
+  const openEvent = (event: CommunityEvent) => push({ kind: 'event', event });
+  const openLF = (lf: LostItem) => push({ kind: 'lf', lf });
+  /* A profile opens ON TOP of wherever it was tapped — a post, a chat, an
+     insights list — so Back returns there, the way every app does it. */
   const openStorefrontFor = (u: User) => {
-    setOpenItem(null);
-    setOpenEvent(null);
-    setStoreReturn(null);
-    setOpenStorefront(u);
+    push({ kind: 'store', user: u });
     /* THE second-most-important conversion event after contact_clicked —
      * if users browse storefronts, the marketplace has the "people" texture
      * we want. Tag `self_view` so we can split "I'm checking my own
@@ -165,16 +235,8 @@ export default function WecycleApp() {
   const [editingAlert, setEditingAlert] = useState<WecycleAlert | null>(null);
 
   /* ── Direct messages ──────────────────────────────────────────────────────
-     The Messages screen is an overlay rather than another early-return
-     takeover: it opens from on top of a post, a profile or the feed, and
-     closing it has to land exactly where the member was — scroll position,
-     open post and all. A takeover would unmount the screen underneath. */
-  type MessagesView = { conversationId: string | null; entry: 'inbox' | 'thread' };
-  const [messagesOpen, setMessagesOpen] = useState<MessagesView | null>(null);
-  /* Set while a profile or post opened FROM a chat is on screen, so closing
-     it returns to that chat, the way Back works in every messenger. */
-  const [messagesReturn, setMessagesReturn] = useState<MessagesView | null>(null);
-
+     Messages is one more screen on the stack: a profile or a post opened from
+     a chat goes on top of it, and Back lands in the chat as it was. */
   /* One store for the badge, the inbox and the open thread; started once a
      member is known. Deferred a moment on sign-in so its queries do not
      compete with the feed's first paint. */
@@ -194,11 +256,20 @@ export default function WecycleApp() {
       conversationId = openConversationWith(target.peer.id, target.context ?? null);
       if (!conversationId) return;
     }
-    setDrawerOpen(false);
-    setMessagesReturn(null);
-    setMessagesOpen({ conversationId, entry: target ? 'thread' : 'inbox' });
+    showConversation(conversationId, target ? 'thread' : 'inbox');
   };
-  const closeMessages = () => { setMessagesOpen(null); setMessagesReturn(null); };
+  /* Messages already open somewhere down the stack (a chat → their profile →
+     "Message")? Go back to it and show this conversation, rather than opening
+     a second Messages on top of the first. */
+  const showConversation = (conversationId: string | null, entry: 'inbox' | 'thread') => {
+    setDrawerOpen(false);
+    const s = stackRef.current;
+    const at = s.findIndex(e => e.kind === 'messages');
+    if (at < 0) { push({ kind: 'messages', conversationId, entry }); return; }
+    if (at < s.length - 1) closeEntry(s[at + 1].key);
+    updateEntries(e => (e.key === s[at].key && e.kind === 'messages'
+      ? { ...e, conversationId: conversationId ?? e.conversationId } : e));
+  };
 
   /* "Message seller" and friends — one per kind of post. */
   const messageAboutItem = (it: MarketplaceItem) => openMessages(
@@ -225,9 +296,7 @@ export default function WecycleApp() {
     startMessaging(user.id);
     const conversationId = openConversationWith(conversationPeerId, null);
     if (!conversationId) return;
-    setDrawerOpen(false);
-    setMessagesReturn(null);
-    setMessagesOpen({ conversationId, entry: 'thread' });
+    showConversation(conversationId, 'thread');
   };
   const orderItemFlow = (it: MarketplaceItem) => {
     if (!user) { setModal('auth'); return; }
@@ -238,14 +307,6 @@ export default function WecycleApp() {
     setOrderItem(it);
   };
 
-
-  /* Back from a profile or post that was opened from a chat → the chat. */
-  useEffect(() => {
-    if (!messagesReturn) return;
-    if (openItem || openEvent || openLF || openStorefront) return;
-    setMessagesOpen(messagesReturn);
-    setMessagesReturn(null);
-  }, [messagesReturn, openItem, openEvent, openLF, openStorefront]);
 
   /* Open a member's storefront from just their id — a search hit, a chat.
      Fetches a fresh row so it never carries stale data from wherever the id
@@ -323,10 +384,10 @@ export default function WecycleApp() {
     return () => { cancelled = true; };
   }, [user, isDemo]);
 
-  /* Registration form-fill + organizer insights sub-surfaces. */
-  const [registerEvent, setRegisterEvent] = useState<CommunityEvent | null>(null);
-  const [registerEditMode, setRegisterEditMode] = useState(false);
-  const [insightsEvent, setInsightsEvent] = useState<CommunityEvent | null>(null);
+  /* Registration form-fill + organizer insights: screens on the stack, above
+     the event they belong to. */
+  const openRegistration = (event: CommunityEvent, edit: boolean) => push({ kind: 'register', event, edit });
+  const openInsights = (event: CommunityEvent) => push({ kind: 'insights', event });
 
   /* Idempotent local RSVP write: no-ops (and doesn't bump the attendee
      count) when the state already matches, so optimistic-then-reconcile
@@ -336,9 +397,9 @@ export default function WecycleApp() {
     const next = new Set(rsvpdRef.current);
     if (going) next.add(id); else next.delete(id);
     applyRsvpSet(next);
-    setOpenEvent(prev => (prev && prev.id === id
-      ? { ...prev, attendees: Math.max(0, prev.attendees + (going ? 1 : -1)) }
-      : prev));
+    updateEntries(e => (e.kind === 'event' && e.event.id === id
+      ? { ...e, event: { ...e.event, attendees: Math.max(0, e.event.attendees + (going ? 1 : -1)) } }
+      : e));
   };
 
   /* THE central RSVP entry point — every RSVP button routes here.
@@ -354,8 +415,7 @@ export default function WecycleApp() {
 
     if (!going) {
       if (event.hasForm) {
-        setRegisterEditMode(false);
-        setRegisterEvent(event);
+        openRegistration(event, false);
         return;
       }
       /* The event object can be a stale snapshot (feed cache) that predates
@@ -363,8 +423,7 @@ export default function WecycleApp() {
       if (!isDemoMode() && hasSupabaseEnv) {
         const form = await fetchEventForm(event.id).catch(() => null);
         if (form && form.fields.length > 0) {
-          setRegisterEditMode(false);
-          setRegisterEvent({ ...event, hasForm: true });
+          openRegistration({ ...event, hasForm: true }, false);
           return;
         }
       }
@@ -416,11 +475,9 @@ export default function WecycleApp() {
 
   /* Registration submitted → make sure the RSVP is confirmed. Edit mode
      never touches the RSVP (they're already going). */
-  const handleRegistrationSubmitted = async () => {
-    const ev = registerEvent;
-    const wasEdit = registerEditMode;
-    setRegisterEvent(null);
-    if (!ev || wasEdit) return;
+  const handleRegistrationSubmitted = async (entryKey: number, ev: CommunityEvent, wasEdit: boolean) => {
+    closeEntry(entryKey);
+    if (wasEdit) return;
     setRsvpLocal(ev.id, true);
     if (isDemoMode() || !hasSupabaseEnv) return;
     try {
@@ -448,11 +505,13 @@ export default function WecycleApp() {
   const [lfDefaultStatus, setLfDefaultStatus] = useState<'lost' | 'found' | undefined>();
 
 
-  /* Sub-screens that take over the viewport. We keep a stack so "back" always
-     returns to the previous screen (e.g. Settings → Notifications → back → Settings),
-     and entering one directly from the drawer pops back to the main app. */
-  type SubScreen = 'settings' | 'notifications' | 'feedback' | 'password';
-  const [subStack, setSubStack] = useState<SubScreen[]>([]);
+  /* Settings and its sub-screens are screens on the stack too, so
+     Settings → Notifications → Back lands on Settings. */
+  const pushSub = (screen: SubScreen) => push({ kind: 'sub', screen });
+  const closeSubs = () => {
+    const first = stackRef.current.find(e => e.kind === 'sub');
+    if (first) closeEntry(first.key);
+  };
 
   /* ── The app's page_view ───────────────────────────────────────────────
      One route, many screens, so GA4 has to be told what is on screen or its
@@ -463,20 +522,17 @@ export default function WecycleApp() {
      not the tab behind it. Fires on mount too — gtag's automatic page_view is
      switched off in the layout precisely so this owns all of them, which also
      makes a deep link report the post rather than the feed. */
-  const currentView =
-      openItem  ? 'listing_detail'
-    : openEvent ? 'event_detail'
-    : openLF    ? 'lostfound_detail'
-    : subStack.length ? subStack[subStack.length - 1]
+  const VIEW_NAME: Record<Route['kind'], string> = {
+    item: 'listing_detail', event: 'event_detail', lf: 'lostfound_detail', store: 'storefront',
+    register: 'event_registration', insights: 'event_insights', messages: 'messages', sub: 'settings',
+  };
+  const currentView = topEntry
+    ? (topEntry.kind === 'sub' ? topEntry.screen : VIEW_NAME[topEntry.kind])
     : activeScreen;
 
   useEffect(() => {
     trackScreenView(String(currentView));
   }, [currentView]);
-  const subScreen: SubScreen | null = subStack[subStack.length - 1] ?? null;
-  const pushSub = (s: SubScreen) => setSubStack(prev => [...prev, s]);
-  const popSub  = () => setSubStack(prev => prev.slice(0, -1));
-  const clearSubStack = () => setSubStack([]);
 
   /* Appearance — Wecycle is light-only now (dark mode retired). We still pin
    * the browser/PWA chrome to the light surface and apply the "larger text"
@@ -492,23 +548,42 @@ export default function WecycleApp() {
     return off;
   }, []);
 
-  /* Detail / storefront / settings sub-screens share the same <main id="main">
-   * scroll container as the feed. React keeps that DOM node's scrollTop across
-   * the swap, so tapping a product while scrolled down used to open the detail
-   * halfway down the page. Force every full-screen takeover to open at the very
-   * top — the product photo + name first — flush before paint so there's no
-   * visible jump. */
+  /* Each tab keeps its own scroll position. All tabs share #main, so the
+     offset is remembered per tab as it scrolls and put back when the tab
+     returns — the way Instagram's feed is where you left it after a look at
+     your profile. */
+  const rememberTabScroll = (e: React.UIEvent<HTMLElement>) => {
+    tabScroll.current[activeTabRef.current] = e.currentTarget.scrollTop;
+  };
   useIsoLayoutEffect(() => {
-    /* Desktop overlays are modals with their own scroll shells — EXCEPT the
-       registration fill, which is a full #main takeover on every breakpoint
-       and would otherwise inherit the previous screen's scroll offset
-       (opening mid-form, above-the-fold required fields unseen). */
-    if (isDesktop && !registerEvent) return;
-    const overlay = !!(openItem || openEvent || openStorefront || subScreen || registerEvent || insightsEvent);
-    if (!overlay) return;
+    activeTabRef.current = activeScreen;
     const main = document.getElementById('main');
-    if (main) main.scrollTop = 0;
-  }, [isDesktop, openItem, openEvent, openStorefront, subScreen, registerEvent, insightsEvent]);
+    if (main) main.scrollTop = tabScroll.current[activeScreen] ?? 0;
+  }, [activeScreen]);
+
+  /* Tabs mount the first time they are visited and then stay mounted, hidden,
+     so switching back finds them as they were — filters, search, loaded posts. */
+  const [visitedTabs, setVisitedTabs] = useState<Set<Screen>>(() => new Set<Screen>(['feed']));
+  useEffect(() => {
+    setVisitedTabs(v => (v.has(activeScreen) ? v : new Set(v).add(activeScreen)));
+  }, [activeScreen]);
+
+  /* Tap the tab you are on → back to its top, like every tab bar on iOS and
+     Android. */
+  const selectTab = (s: Screen) => {
+    if (s === activeScreen && !stackRef.current.length) {
+      document.getElementById('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    closeAll();
+    setActiveScreen(s);
+  };
+
+  /* Back from any tab but Home goes to Home, and Back on Home leaves — the
+     Android rule for bottom navigation, and what Instagram does on the web.
+     One entry however many tabs were visited in between. */
+  useBackLayer(activeScreen !== 'feed', () => setActiveScreen('feed'),
+    TAB_PARAM[activeScreen] ? urlWith(typeof window === 'undefined' ? '/' : window.location.pathname + window.location.search, 'tab', TAB_PARAM[activeScreen]!) : null);
 
   /* Service worker.
    *
@@ -591,10 +666,21 @@ export default function WecycleApp() {
       track(EVT.app_open as never, { ...utm, kind: 'utm_detected' });
     }
 
-    /* Deep link: `/?p=<id>` opens that post's detail directly (powers the
-       shareable product links). We fetch the single post by id and route it
-       to the right screen, then strip the param so refresh/back is clean. */
-    /* `/?b=<handle>` (what /b/<handle> redirects to) opens a brand's store. */
+    /* Deep links. `/?p=<id>` opens a post, `/?u=<id>` a member's profile,
+       `/?b=<handle>` (what /b/<handle> redirects to) a brand's store, and
+       `/?tab=` a tab. The page underneath becomes the plain URL first, so
+       Back from a shared link lands on the feed rather than leaving the site —
+       and the opened screen then puts its own URL back on top, so the address
+       bar still names what is on screen. */
+    const deepTab = tabFromParam(params.get('tab'));
+    if (deepTab) setActiveScreen(deepTab);
+    try {
+      const u = new URL(window.location.href);
+      ['p', 'u', 'b', 'tab'].forEach(k => u.searchParams.delete(k));
+      installBackStack();
+      setBaseUrl(u.pathname + u.search + u.hash);
+    } catch { /* ignore */ }
+
     const brandHandle = params.get('b');
     const linkedBrand = brandByHandle(brandHandle);
     if (linkedBrand) {
@@ -602,26 +688,16 @@ export default function WecycleApp() {
         if (ok) track(EVT.brand_opened, { brand: linkedBrand.handle, source: 'link' });
       }).catch(() => { /* ignore */ });
     }
-    if (brandHandle) {
-      try {
-        const u = new URL(window.location.href);
-        u.searchParams.delete('b');
-        window.history.replaceState({}, '', u.toString());
-      } catch { /* ignore */ }
-    }
+    const linkedUser = params.get('u');
+    if (linkedUser && !linkedBrand) void openUserById(linkedUser).catch(() => { /* ignore */ });
 
     const postId = params.get('p');
     if (postId) {
       fetchPostById(postId).then(found => {
         if (!found) return;
-        if (found.kind === 'item' || found.kind === 'request') setOpenItem(found.data);
-        else if (found.kind === 'event') setOpenEvent(found.data);
-        else if (found.kind === 'lostfound') setOpenLF(found.data);
-        try {
-          const u = new URL(window.location.href);
-          u.searchParams.delete('p');
-          window.history.replaceState({}, '', u.toString());
-        } catch { /* ignore */ }
+        if (found.kind === 'item' || found.kind === 'request') openItem(found.data);
+        else if (found.kind === 'event') openEvent(found.data);
+        else if (found.kind === 'lostfound') openLF(found.data);
       }).catch(() => { /* ignore — invalid id */ });
     }
   }, []);
@@ -685,7 +761,7 @@ export default function WecycleApp() {
      If signed-out, prompt auth first. */
   const goToAccount = () => {
     if (!user) { setModal('auth'); return; }
-    clearSubStack();
+    closeAll();
     setActiveScreen('account');
   };
 
@@ -706,9 +782,9 @@ export default function WecycleApp() {
     setTimeout(() => {
       if (id === 'account')   { goToAccount(); return; }
       if (id === 'messages')  { openMessages(); return; }
-      if (id === 'settings')  { setSubStack(['settings']);      return; }
-      if (id === 'notifs')    { setSubStack(['notifications']); return; }
-      if (id === 'feedback')  { setSubStack(['feedback']);      return; }
+      if (id === 'settings')  { pushSub('settings');      return; }
+      if (id === 'notifs')    { pushSub('notifications'); return; }
+      if (id === 'feedback')  { pushSub('feedback');      return; }
       if (id === 'invite') {
         inviteFriends();
         return;
@@ -721,513 +797,412 @@ export default function WecycleApp() {
     }, 80);
   };
 
-  /* Messages sits over whichever of the views above is showing — see the
-     note on messagesOpen for why it is not one more of them. */
-  const messagesOverlay = messagesOpen && user ? (
-    <MessagesScreen
-      initialConversationId={messagesOpen.conversationId}
-      entry={messagesOpen.entry}
-      onClose={closeMessages}
-      onOpenProfile={async (peerId) => {
-        const convId = conversationIdFor(user.id, peerId);
-        const back = { conversationId: convId, entry: messagesOpen.entry };
-        if (await openUserById(peerId)) { setMessagesOpen(null); setMessagesReturn(back); }
-      }}
-      onOpenPost={(post, convId) => {
-        setOpenItem(null); setOpenEvent(null); setOpenStorefront(null); setOpenLF(null); setStoreReturn(null);
-        if (post.kind === 'item' || post.kind === 'request') setOpenItem(post.data);
-        else if (post.kind === 'event') setOpenEvent(post.data);
-        else setOpenLF(post.data);
-        setMessagesReturn({ conversationId: convId, entry: messagesOpen.entry });
-        setMessagesOpen(null);
-      }}
-      onBrowse={() => {
-        closeMessages();
-        clearSubStack();
-        setOpenItem(null); setOpenEvent(null); setOpenStorefront(null); setOpenLF(null); setStoreReturn(null);
-        setActiveScreen('feed');
-      }}
-    />
-  ) : null;
+  /* ── One screen of the stack ── */
+  const eventOwner = (ev: CommunityEvent) =>
+    (isDemoMode() && MY_EVENT_IDS.includes(ev.id)) || (!!user && ev.organizer.id === user.id);
+  const entryUrl = (e: Entry): string | null => {
+    if (typeof window === 'undefined') return null;
+    const here = window.location.pathname + window.location.search;
+    if (e.kind === 'item') return urlWith(here, 'p', e.item.id);
+    if (e.kind === 'event') return urlWith(here, 'p', e.event.id);
+    if (e.kind === 'lf') return urlWith(here, 'p', e.lf.id);
+    if (e.kind === 'store') {
+      const brand = brandForUser(e.user.id);
+      return brand ? urlWith(here, 'b', brand.handle) : urlWith(here, 'u', e.user.id);
+    }
+    return null;
+  };
+  const entryLabel = (e: Entry): string => {
+    switch (e.kind) {
+      case 'item': return e.item.title;
+      case 'event': return e.event.title;
+      case 'lf': return e.lf.title;
+      case 'store': return brandForUser(e.user.id)?.name ?? e.user.shop ?? `${e.user.name}'s storefront`;
+      case 'register': return `Register for ${e.event.title}`;
+      case 'insights': return `Insights for ${e.event.title}`;
+      case 'messages': return 'Messages';
+      case 'sub': return e.screen === 'notifications' ? 'Notifications' : e.screen === 'feedback' ? 'Feedback'
+        : e.screen === 'password' ? 'Change password' : 'Settings';
+    }
+  };
+  /* Desktop shows posts, events, profiles and insights as windows over the
+     page; phones push them as full screens. Registration and Settings are full
+     screens everywhere; Lost & Found is a sheet and Messages draws its own. */
+  const layerKind = (e: Entry): 'screen' | 'overlay' => {
+    if (e.kind === 'lf' || e.kind === 'messages') return 'overlay';
+    if (isDesktop && (e.kind === 'item' || e.kind === 'event' || e.kind === 'store' || e.kind === 'insights')) return 'overlay';
+    return 'screen';
+  };
 
-  const view = (() => {
-    /* Item detail screen takes over the viewport on MOBILE. On desktop we
-     * fall through and render it as a modal-theatre overlay at the bottom of
-     * the JSX (after the main shell) so the underlying feed stays visible —
-     * matching the Lost & Found pattern the user picked as the canonical
-     * desktop look. */
-    if (openItem && !isDesktop) {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <ItemDetailScreen
-                item={openItem}
-                onBack={closeItem}
-                onRequireAuth={() => setModal('auth')}
-                onOpenStorefront={openStorefrontFor}
-                onOpenItem={setOpenItem}
-                onOpenLF={setOpenLF}
-                onMessage={messageAboutItem}
-                onOrder={orderItemFlow}
-                /* Owner edits inline (no Edit button — fields are editable
-                   in place). Admin gets Delete on any post for moderation. */
-                isOwner={ownsItem(openItem)}
-                isAdmin={isAdmin}
-                onDelete={(ownsItem(openItem) || isAdmin) ? async () => {
-                  if (isDemoMode()) { deleteDemoPost(openItem.id); return; }
-                  await deletePostById(openItem.id, openItem.isRequest ? 'request' : 'listing');
-                } : undefined}
-              />
-            </main>
-          </div>
-          <AuthModal
-            open={modal === 'auth'}
-            onClose={closeModal}
-            startInReset={!!authReset}
-            initialEmail={authReset?.email}
+  const TAB_LABEL: Record<Screen, string> = {
+    feed: 'Home', events: 'Events', lost_found: 'Lost & Found', inventory: 'Your inventory',
+    activity: 'Activity', account: 'Account', market: 'Marketplace', impact: 'Impact',
+  } as Record<Screen, string>;
+  /** What Back from this entry returns to, in words. */
+  const backLabelFor = (key: number): string => {
+    const i = stack.findIndex(x => x.key === key);
+    return i > 0 ? entryLabel(stack[i - 1]) : (TAB_LABEL[activeScreen] ?? 'Home');
+  };
+
+  const renderEntry = (e: Entry) => {
+    const back = () => closeEntry(e.key);
+    switch (e.kind) {
+      case 'item': {
+        const screen = (
+          <ItemDetailScreen
+            item={e.item}
+            onBack={back}
+            backLabel={backLabelFor(e.key)}
+            onRequireAuth={() => setModal('auth')}
+            onOpenStorefront={openStorefrontFor}
+            onOpenItem={openItem}
+            onOpenLF={openLF}
+            onMessage={messageAboutItem}
+            onOrder={orderItemFlow}
+            /* Owner edits inline (no Edit button — fields are editable
+               in place). Admin gets Delete on any post for moderation. */
+            isOwner={ownsItem(e.item)}
+            isAdmin={isAdmin}
+            onDelete={(ownsItem(e.item) || isAdmin) ? async () => {
+              if (isDemoMode()) { deleteDemoPost(e.item.id); return; }
+              await deletePostById(e.item.id, e.item.isRequest ? 'request' : 'listing');
+            } : undefined}
           />
-        </>
-      );
-    }
-
-    /* Storefront — same split. Modal on desktop, full takeover on mobile. */
-    if (openStorefront && !isDesktop) {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <StorefrontScreen
-                user={openStorefront}
-                onBack={() => setOpenStorefront(null)}
-                onOpenItem={openItemFromStore}
-                onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
-                onOpenLF={(lf) => { setOpenStorefront(null); setOpenLF(lf); }}
-                onMessage={messageUser}
-                onOrder={orderItemFlow}
-              />
-            </main>
-          </div>
-        </>
-      );
-    }
-
-
-    /* Settings sub-screens take over the viewport. `popSub` walks the stack back
-       one level so cross-links (Settings → Feedback) return to where you came from. */
-    if (subScreen === 'settings') {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <SettingsScreen
-                onBack={popSub}
-                onOpenNotifications={() => pushSub('notifications')}
-                onOpenFeedback={() => pushSub('feedback')}
-                onOpenAccount={() => { clearSubStack(); goToAccount(); }}
-                onOpenPassword={() => pushSub('password')}
-              />
-            </main>
-          </div>
-        </>
-      );
-    }
-    if (subScreen === 'notifications') {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <NotificationsScreen
-                onBack={popSub}
-                onOpenAccount={() => { clearSubStack(); goToAccount(); }}
-              />
-            </main>
-          </div>
-        </>
-      );
-    }
-    if (subScreen === 'feedback') {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <FeedbackScreen onBack={popSub} />
-            </main>
-          </div>
-        </>
-      );
-    }
-    if (subScreen === 'password') {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <ChangePasswordScreen
-                onBack={popSub}
-                /* "I don't know my current password" → sign out and use the
-                   emailed-code reset, which is the only way in without it. */
-                onForgot={async () => {
-                  const addr = (user as { email?: string } | null)?.email ?? profile?.email ?? '';
-                  clearSubStack();
-                  await signOut();
-                  setAuthReset({ email: addr });
-                  setModal('auth');
-                }}
-              />
-            </main>
-          </div>
-        </>
-      );
-    }
-
-    /* Event registration (form-fill) — a dedicated full page on EVERY
-       breakpoint (no nav, no dock, nothing but the form). Stacks ABOVE the
-       event detail so Back returns to the event exactly as it was. */
-    if (registerEvent) {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <EventRegistrationScreen
-                event={registerEvent}
-                editMode={registerEditMode}
-                onBack={() => setRegisterEvent(null)}
-                onSubmitted={handleRegistrationSubmitted}
-              />
-            </main>
-          </div>
-        </>
-      );
-    }
-
-    /* Organizer insights — stacks above the event detail takeover. */
-    if (insightsEvent && !isDesktop) {
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <EventInsightsScreen
-                event={insightsEvent}
-                onBack={() => setInsightsEvent(null)}
-                onOpenUser={(u) => { setInsightsEvent(null); setOpenEvent(null); openStorefrontFor(u); }}
-              />
-            </main>
-          </div>
-        </>
-      );
-    }
-
-    /* Event detail — full takeover on mobile, modal overlay on desktop. */
-    if (openEvent && !isDesktop) {
-      /* Ownership: demo flag relies on MY_EVENT_IDS; live mode trusts the
-         organizer.id matching the signed-in user. */
-      const isOwner = (isDemoMode() && MY_EVENT_IDS.includes(openEvent.id))
-        || (!!user && openEvent.organizer.id === user.id);
-      return (
-        <>
-          <a href="#main" className="skip-link">Skip to main content</a>
-          <div className="app-container">
-            <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-              <EventDetailScreen
-                event={openEvent}
-                isRsvpd={rsvpdEvents.has(openEvent.id)}
-                isOwner={isOwner}
-                isAdmin={isAdmin}
-                onBack={() => setOpenEvent(null)}
-                onRsvp={() => requestRsvp(openEvent)}
-                onRequireAuth={() => setModal('auth')}
-                onOpenStorefront={openStorefrontFor}
-                onMessage={messageAboutEvent}
-                onDelete={(isOwner || isAdmin) ? async () => {
-                  if (isDemoMode()) { deleteDemoPost(openEvent.id); return; }
-                  await deleteEvent(openEvent.id);
-                } : undefined}
-                onOpenInsights={(isOwner || isAdmin) ? () => setInsightsEvent(openEvent) : undefined}
-                onEditRegistration={() => { setRegisterEditMode(true); setRegisterEvent(openEvent); }}
-                onOpenItem={(it) => { setOpenEvent(null); setOpenItem(it); }}
-                onBrowseAll={() => { setOpenEvent(null); setActiveScreen('feed'); }}
-              />
-            </main>
-          </div>
-          <AuthModal
-            open={modal === 'auth'}
-            onClose={closeModal}
-            startInReset={!!authReset}
-            initialEmail={authReset?.email}
+        );
+        return isDesktop ? <DesktopDetailModal onClose={back} ariaLabel={e.item.title}>{screen}</DesktopDetailModal> : screen;
+      }
+      case 'store': {
+        const screen = (
+          <StorefrontScreen
+            user={e.user}
+            onBack={back}
+            onOpenItem={openItem}
+            onOpenEvent={openEvent}
+            onOpenLF={openLF}
+            onMessage={messageUser}
+            onOrder={orderItemFlow}
           />
-        </>
-      );
+        );
+        return isDesktop
+          ? <DesktopDetailModal onClose={back} ariaLabel={entryLabel(e)}>{screen}</DesktopDetailModal>
+          : screen;
+      }
+      case 'event': {
+        const isOwner = eventOwner(e.event);
+        const screen = (
+          <EventDetailScreen
+            event={e.event}
+            isRsvpd={rsvpdEvents.has(e.event.id)}
+            isOwner={isOwner}
+            isAdmin={isAdmin}
+            onBack={back}
+            onRsvp={() => requestRsvp(e.event)}
+            onRequireAuth={() => setModal('auth')}
+            onOpenStorefront={openStorefrontFor}
+            onMessage={messageAboutEvent}
+            onDelete={(isOwner || isAdmin) ? async () => {
+              if (isDemoMode()) { deleteDemoPost(e.event.id); return; }
+              await deleteEvent(e.event.id);
+            } : undefined}
+            onOpenInsights={(isOwner || isAdmin) ? () => openInsights(e.event) : undefined}
+            onEditRegistration={() => openRegistration(e.event, true)}
+            onOpenItem={openItem}
+            onBrowseAll={() => { closeAll(); setActiveScreen('feed'); }}
+          />
+        );
+        return isDesktop ? <DesktopDetailModal onClose={back} ariaLabel={e.event.title}>{screen}</DesktopDetailModal> : screen;
+      }
+      case 'insights': {
+        const screen = <EventInsightsScreen event={e.event} onBack={back} onOpenUser={openStorefrontFor} />;
+        return isDesktop
+          ? <DesktopDetailModal onClose={back} ariaLabel={entryLabel(e)} width={920}>{screen}</DesktopDetailModal>
+          : screen;
+      }
+      case 'register':
+        return (
+          <EventRegistrationScreen
+            event={e.event}
+            editMode={e.edit}
+            onBack={back}
+            onSubmitted={() => handleRegistrationSubmitted(e.key, e.event, e.edit)}
+          />
+        );
+      case 'lf':
+        return (
+          <LostFoundDetailSheet
+            item={e.lf}
+            onClose={back}
+            onRequireAuth={() => setModal('auth')}
+            onOpenStorefront={openStorefrontFor}
+            onMessage={messageAboutLF}
+            viewerName={profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined}
+            isOwner={!!user && e.lf.user.id === user.id}
+            onSaveChanges={isDemoMode() ? undefined : async (patch: LFSavePatch) => {
+              await updateLostFoundFields(e.lf.id, patch);
+            }}
+            onSaveAndRepost={isDemoMode() ? undefined : async (patch: LFSavePatch) => {
+              await repostLostFound(e.lf.id, patch);
+            }}
+            onDelete={(!!user && e.lf.user.id === user.id) || isAdmin ? async () => {
+              if (isDemoMode()) { back(); return; }
+              await deletePostById(e.lf.id, 'lostfound');
+            } : undefined}
+          />
+        );
+      case 'messages':
+        if (!user) return null;
+        return (
+          <MessagesScreen
+            initialConversationId={e.conversationId}
+            entry={e.entry}
+            onClose={back}
+            onOpenProfile={(peerId) => { void openUserById(peerId); }}
+            onOpenPost={(post) => {
+              if (post.kind === 'item' || post.kind === 'request') openItem(post.data);
+              else if (post.kind === 'event') openEvent(post.data);
+              else openLF(post.data);
+            }}
+            onBrowse={() => { closeAll(); setActiveScreen('feed'); }}
+          />
+        );
+      case 'sub':
+        if (e.screen === 'settings') return (
+          <SettingsScreen
+            onBack={back}
+            onOpenNotifications={() => pushSub('notifications')}
+            onOpenFeedback={() => pushSub('feedback')}
+            onOpenAccount={goToAccount}
+            onOpenPassword={() => pushSub('password')}
+          />
+        );
+        if (e.screen === 'notifications') return <NotificationsScreen onBack={back} onOpenAccount={goToAccount} />;
+        if (e.screen === 'feedback') return <FeedbackScreen onBack={back} />;
+        return (
+          <ChangePasswordScreen
+            onBack={back}
+            /* "I don't know my current password" → sign out and use the
+               emailed-code reset, which is the only way in without it. */
+            onForgot={async () => {
+              const addr = (user as { email?: string } | null)?.email ?? profile?.email ?? '';
+              closeSubs();
+              await signOut();
+              setAuthReset({ email: addr });
+              setModal('auth');
+            }}
+          />
+        );
     }
+  };
 
-    return (
-      <>
+  /* The tab screens, by name. */
+  const renderTab = (t: Screen) => {
+    switch (t) {
+      case 'feed': return (
+        <FeedScreen
+          onRequireAuth={() => setModal('auth')}
+          onPost={() => requireAuth('post-picker')}
+          /* The storefront's "Post a job" CTA already knows the post type,
+             so it skips the picker and opens the service composer. */
+          onPostService={openOfferService}
+          /* Same shortcut for the sell nudge under the shop window: it
+             asked about a thing you own, so the picker has nothing left
+             to ask. */
+          onSellItem={openShareItem}
+          onOpenMenu={() => setDrawerOpen(true)}
+          onOpenAccount={goToAccount}
+          onOpenMessages={() => openMessages()}
+          onOpenItem={openItem}
+          onOpenEvent={openEvent}
+          onOpenLF={openLF}
+          onBannerAction={(kind) => {
+            if (kind === 'share')       openShareItem();
+            else if (kind === 'request') openPostRequest();
+            else if (kind === 'events')  setActiveScreen('events');
+            else if (kind === 'lost-found') setActiveScreen('lost_found');
+            else if (kind === 'invite')  inviteFriends();
+          }}
+          onOpenUser={(userId) => { void openUserById(userId); }}
+        />
+      );
+      case 'events': return (
+        <EventsScreen
+          onOpenMenu={() => setDrawerOpen(true)}
+          onOpenAccount={goToAccount}
+          onOpenMessages={() => openMessages()}
+          onCreate={openSubmitEvent}
+          onOpenEvent={openEvent}
+          rsvpdEvents={rsvpdEvents}
+          onToggleRsvp={requestRsvp}
+        />
+      );
+      case 'lost_found': return (
+        <LostFoundScreen
+          onReport={openReportLF}
+          onOpenMenu={() => setDrawerOpen(true)}
+          onOpenAccount={goToAccount}
+          onOpenMessages={() => openMessages()}
+          onRequireAuth={() => setModal('auth')}
+          onOpenStorefront={openStorefrontFor}
+          onOpenLF={openLF}
+        />
+      );
+      /* Activity is still reachable via Settings → Notifications hint flows or
+         the alerts CTA on the home feed, but it's no longer in the bottom nav. */
+      case 'activity': return (
+        <ActivityScreen
+          onOpenMenu={() => setDrawerOpen(true)}
+          onBack={() => setActiveScreen('feed')}
+          onOpenAccount={goToAccount}
+          onOpenMessages={() => openMessages()}
+          onCreateAlert={openCreateAlert}
+          onEditAlert={openEditAlert}
+        />
+      );
+      case 'inventory': return (
+        <InventoryScreen
+          onOpenMenu={() => setDrawerOpen(true)}
+          onOpenAccount={goToAccount}
+          onOpenMessages={() => openMessages()}
+          onPostNew={() => requireAuth('post-picker')}
+          onOpenItem={openItem}
+          onOpenEvent={openEvent}
+          onOpenEventInsights={openInsights}
+          onOpenLF={openLF}
+          onOpenOrderChat={openOrderChat}
+        />
+      );
+      case 'account': return (
+        <AccountScreen
+          onBack={() => setActiveScreen('feed')}
+          onSignedOut={() => setActiveScreen('feed')}
+        />
+      );
+      /* Desktop-only auxiliary screens */
+      case 'market': return <MarketplaceScreen />;
+      case 'impact': return <ImpactScreen />;
+      default: return null;
+    }
+  };
+
+  /* Underneath an open screen, the tabs take no focus and no clicks. */
+  const baseEl = useRef<HTMLDivElement | null>(null);
+  const baseRef = (el: HTMLDivElement | null) => { baseEl.current = el; };
+  useIsoLayoutEffect(() => {
+    const el = baseEl.current;
+    if (!el) return;
+    if (stack.length) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+  }, [stack.length]);
+
+  /* Everything currently drawn: the stack, then whatever is still leaving. */
+  const drawn: (Entry & { leavingInstant?: boolean })[] = [
+    ...stack,
+    ...leaving.map(l => ({ ...l, leavingInstant: l.instant })),
+  ].sort((x, y) => x.key - y.key);
+  const live = new Set(stack.map(e => e.key));
+  const topLiveKey = stack.length ? stack[stack.length - 1].key : null;
+  /* A full screen that has finished arriving hides everything below it. */
+  let coveringIndex = -1;
+  for (let i = drawn.length - 1; i >= 0; i--) {
+    const d = drawn[i];
+    if (live.has(d.key) && entered.has(d.key) && layerKind(d) === 'screen') { coveringIndex = i; break; }
+  }
+  const baseCovered = coveringIndex >= 0;
+
+  return (
+    <>
+      {/* ── The tabs and the bar under them: always mounted, so Back finds
+             them exactly as they were left. ── */}
+      <div
+        data-nav-base=""
+        className="nav-base"
+        data-covered={baseCovered || undefined}
+        ref={baseRef}
+        aria-hidden={stack.length ? true : undefined}
+      >
         <a href="#main" className="skip-link">Skip to main content</a>
-
         <div className="app-container">
-          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }}>
-            {/* key={activeScreen} re-mounts on screen change so the Liquid-Glass
-                spring entrance (.motion-rise) replays for each view. */}
-            <div key={activeScreen} className="motion-rise">
-            {activeScreen === 'feed' && (
-              <FeedScreen
-                onRequireAuth={() => setModal('auth')}
-                onPost={() => requireAuth('post-picker')}
-                /* The storefront's "Post a job" CTA already knows the post type,
-                   so it skips the picker and opens the service composer. */
-                onPostService={openOfferService}
-                /* Same shortcut for the sell nudge under the shop window: it
-                   asked about a thing you own, so the picker has nothing left
-                   to ask. */
-                onSellItem={openShareItem}
-                onOpenMenu={() => setDrawerOpen(true)}
-                onOpenAccount={goToAccount}
-                onOpenMessages={() => openMessages()}
-                onOpenItem={setOpenItem}
-                onOpenEvent={setOpenEvent}
-                onOpenLF={(lf) => setOpenLF(lf)}
-                onBannerAction={(kind) => {
-                  if (kind === 'share')       openShareItem();
-                  else if (kind === 'request') openPostRequest();
-                  else if (kind === 'events')  setActiveScreen('events');
-                  else if (kind === 'lost-found') setActiveScreen('lost_found');
-                  else if (kind === 'invite')  inviteFriends();
-                }}
-                onOpenUser={(userId) => { void openUserById(userId); }}
-              />
-            )}
-            {activeScreen === 'events' && (
-              <EventsScreen
-                onOpenMenu={() => setDrawerOpen(true)}
-                onOpenAccount={goToAccount}
-                onOpenMessages={() => openMessages()}
-                onCreate={openSubmitEvent}
-                onOpenEvent={setOpenEvent}
-                rsvpdEvents={rsvpdEvents}
-                onToggleRsvp={requestRsvp}
-              />
-            )}
-            {activeScreen === 'lost_found' && (
-              <LostFoundScreen
-                onReport={openReportLF}
-                onOpenMenu={() => setDrawerOpen(true)}
-                onOpenAccount={goToAccount}
-                onOpenMessages={() => openMessages()}
-                onRequireAuth={() => setModal('auth')}
-                onOpenStorefront={openStorefrontFor}
-                onOpenLF={(it) => setOpenLF(it)}
-              />
-            )}
-            {/* Activity is still reachable via Settings → Notifications hint
-               flows or the alerts CTA on the home feed, but it's no longer in
-               the bottom nav. */}
-            {activeScreen === 'activity' && (
-              <ActivityScreen
-                onOpenMenu={() => setDrawerOpen(true)}
-                onOpenAccount={goToAccount}
-                onOpenMessages={() => openMessages()}
-                onCreateAlert={openCreateAlert}
-                onEditAlert={openEditAlert}
-              />
-            )}
-            {activeScreen === 'inventory' && (
-              <InventoryScreen
-                onOpenMenu={() => setDrawerOpen(true)}
-                onOpenAccount={goToAccount}
-                onOpenMessages={() => openMessages()}
-                onPostNew={() => requireAuth('post-picker')}
-                onOpenItem={setOpenItem}
-                onOpenEvent={setOpenEvent}
-                onOpenEventInsights={setInsightsEvent}
-                onOpenLF={(lf) => setOpenLF(lf)}
-                onOpenOrderChat={openOrderChat}
-              />
-            )}
-            {activeScreen === 'account' && (
-              <AccountScreen
-                onBack={() => setActiveScreen('feed')}
-                onSignedOut={() => setActiveScreen('feed')}
-              />
-            )}
-            {/* Desktop-only auxiliary screens */}
-            {activeScreen === 'market'     && <MarketplaceScreen />}
-            {activeScreen === 'impact'     && <ImpactScreen />}
-            </div>
+          <main id="main" className="scroll-shell" style={{ overflowY: 'auto', height: '100svh' }} onScroll={rememberTabScroll}>
+            {TABS.filter(t => visitedTabs.has(t) || t === activeScreen).map(t => (
+              <div key={t} className="motion-rise" hidden={t !== activeScreen}>
+                {renderTab(t)}
+              </div>
+            ))}
           </main>
 
           <BottomNav
             active={activeScreen}
-            onChange={setActiveScreen}
+            onChange={selectTab}
             onPost={() => requireAuth('post-picker')}
             postOpen={modal === 'post-picker'}
           />
-
-          {/* ── DRAWER ── */}
-          <Drawer
-            open={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
-            onSignIn={() => { setDrawerOpen(false); setTimeout(() => setModal('auth'), 80); }}
-            onNavigate={handleDrawerNavigate}
-          />
-
-          {/* ── POST PICKER ── */}
-          {modal === 'post-picker' && (
-            <PostSheet onClose={closeModal} onSelect={handlePostPickerSelect} />
-          )}
-
-          {/* ── FORM MODALS ── */}
-          {/* onPosted opens the finished listing. Posting used to end on the
-              feed with nothing to show for it — see the note on the prop. */}
-          <ShareItemModal open={modal === 'share-item'} onClose={closeModal} onPosted={setOpenItem} />
-          <ShareItemModal open={modal === 'offer-service'} onClose={closeModal} mode="service" onPosted={setOpenItem} />
-          <PostRequestModal open={modal === 'post-request'} onClose={closeModal} />
-          <ReportLostFoundModal open={modal === 'report-lf'} onClose={closeModal} defaultStatus={lfDefaultStatus} />
-          <SubmitEventModal open={modal === 'submit-event'} onClose={closeModal} />
-          {/* EditItemModal removed — owners edit their posts inline directly
-             on the detail screen. Save changes / Save & repost CTAs swap in
-             when the form is dirty. */}
-          {user && (
-            <AlertFormModal
-              open={modal === 'alert-form'}
-              onClose={() => { closeModal(); setEditingAlert(null); }}
-              userId={user.id}
-              mode={storageMode}
-              alert={editingAlert}
-            />
-          )}
-          <AuthModal
-            open={modal === 'auth'}
-            onClose={closeModal}
-            startInReset={!!authReset}
-            initialEmail={authReset?.email}
-          />
-
-          {/* ── LOST & FOUND DETAIL SHEET ──
-             Lifted from LostFoundScreen so it can also be opened from Inventory.
-             Owner-aware: when the signed-in user is the reporter, the sheet
-             renders inline-editable fields with Save changes / Save & repost
-             / Delete CTAs. Otherwise it shows the contact buttons. */}
-          {openLF && (
-            <LostFoundDetailSheet
-              item={openLF}
-              onClose={() => setOpenLF(null)}
-              onRequireAuth={() => setModal('auth')}
-              onOpenStorefront={openStorefrontFor}
-              onMessage={messageAboutLF}
-              viewerName={profile?.full_name ?? (user as { email?: string } | null)?.email ?? undefined}
-              isOwner={!!user && openLF.user.id === user.id}
-              onSaveChanges={isDemoMode() ? undefined : async (patch: LFSavePatch) => {
-                await updateLostFoundFields(openLF.id, patch);
-              }}
-              onSaveAndRepost={isDemoMode() ? undefined : async (patch: LFSavePatch) => {
-                await repostLostFound(openLF.id, patch);
-              }}
-              onDelete={(!!user && openLF.user.id === user.id) || isAdmin ? async () => {
-                if (isDemoMode()) { setOpenLF(null); return; }
-                await deletePostById(openLF.id, 'lostfound');
-              } : undefined}
-            />
-          )}
-
-          {/* ── DESKTOP MODAL THEATRE ──
-             On desktop ≥1024px the item / event / storefront detail surfaces
-             render as a centered modal overlay — same vibe as the Lost &
-             Found sheet — instead of replacing the full app shell. The feed
-             stays visible (dimmed) behind so the user keeps spatial context.
-             On mobile these branches don't render (the early-return takeover
-             up top fires instead). */}
-          {isDesktop && openItem && (
-            <DesktopDetailModal onClose={closeItem} ariaLabel={openItem.title}>
-              <ItemDetailScreen
-                item={openItem}
-                onBack={closeItem}
-                onRequireAuth={() => setModal('auth')}
-                onOpenStorefront={openStorefrontFor}
-                onOpenItem={setOpenItem}
-                onOpenLF={(lf) => { setOpenItem(null); setOpenLF(lf); }}
-                onMessage={messageAboutItem}
-                onOrder={orderItemFlow}
-                isOwner={ownsItem(openItem)}
-                isAdmin={isAdmin}
-                onDelete={(ownsItem(openItem) || isAdmin) ? async () => {
-                  if (isDemoMode()) { deleteDemoPost(openItem.id); return; }
-                  await deletePostById(openItem.id, openItem.isRequest ? 'request' : 'listing');
-                } : undefined}
-              />
-            </DesktopDetailModal>
-          )}
-
-          {isDesktop && openEvent && (() => {
-            const isOwner = (isDemoMode() && MY_EVENT_IDS.includes(openEvent.id))
-              || (!!user && openEvent.organizer.id === user.id);
-            return (
-              <DesktopDetailModal onClose={() => setOpenEvent(null)} ariaLabel={openEvent.title}>
-                <EventDetailScreen
-                  event={openEvent}
-                  isRsvpd={rsvpdEvents.has(openEvent.id)}
-                  isOwner={isOwner}
-                  isAdmin={isAdmin}
-                  onBack={() => setOpenEvent(null)}
-                  onRsvp={() => requestRsvp(openEvent)}
-                  onRequireAuth={() => setModal('auth')}
-                  onOpenStorefront={openStorefrontFor}
-                  onMessage={messageAboutEvent}
-                  onDelete={(isOwner || isAdmin) ? async () => {
-                    if (isDemoMode()) { deleteDemoPost(openEvent.id); return; }
-                    await deleteEvent(openEvent.id);
-                  } : undefined}
-                  onOpenInsights={(isOwner || isAdmin) ? () => setInsightsEvent(openEvent) : undefined}
-                  onEditRegistration={() => { setRegisterEditMode(true); setRegisterEvent(openEvent); }}
-                />
-              </DesktopDetailModal>
-            );
-          })()}
-
-          {/* Organizer insights (desktop). */}
-          {isDesktop && insightsEvent && (
-            <DesktopDetailModal
-              onClose={() => setInsightsEvent(null)}
-              ariaLabel={`Insights for ${insightsEvent.title}`}
-              width={920}
-              layer={Z_LAYER.content + 20}
-            >
-              <EventInsightsScreen
-                event={insightsEvent}
-                onBack={() => setInsightsEvent(null)}
-                onOpenUser={(u) => { setInsightsEvent(null); setOpenEvent(null); openStorefrontFor(u); }}
-              />
-            </DesktopDetailModal>
-          )}
-
-          {isDesktop && openStorefront && (
-            <DesktopDetailModal onClose={() => setOpenStorefront(null)} ariaLabel={brandForUser(openStorefront.id)?.name ?? openStorefront.shop ?? `${openStorefront.name}'s storefront`}>
-              <StorefrontScreen
-                user={openStorefront}
-                onBack={() => setOpenStorefront(null)}
-                onOpenItem={openItemFromStore}
-                onOpenEvent={(ev) => { setOpenStorefront(null); setOpenEvent(ev); }}
-                onOpenLF={(lf) => { setOpenStorefront(null); setOpenLF(lf); }}
-                onMessage={messageUser}
-                onOrder={orderItemFlow}
-              />
-            </DesktopDetailModal>
-          )}
         </div>
-      </>
-    );
-  })();
+      </div>
 
-  return (
-    <>
-      {view}
-      {messagesOverlay}
+      {/* ── The stack ── */}
+      {drawn.map((e, i) => {
+        const isLive = live.has(e.key);
+        return (
+          <NavSlot key={e.key}>
+            {isLive && <BackEntry onBack={() => closeEntry(e.key)} url={entryUrl(e)} />}
+            <NavLayer
+              kind={layerKind(e)}
+              z={Z_LAYER.content + 2 + i * 3}
+              phase={!isLive ? 'leaving' : entered.has(e.key) ? 'idle' : 'entering'}
+              instantLeave={e.leavingInstant}
+              inert={!isLive || e.key !== topLiveKey}
+              covered={i < coveringIndex}
+              swipeable={isLive && e.key === topLiveKey}
+              onSwipeBack={() => closeEntry(e.key, { instant: true })}
+              onEntered={() => setEntered(s => (s.has(e.key) ? s : new Set(s).add(e.key)))}
+              onLeft={() => {
+                const back = openedFrom.current.get(e.key);
+                openedFrom.current.delete(e.key);
+                if (back?.isConnected && !back.closest('[inert]')) back.focus({ preventScroll: true });
+                setLeaving(l => l.filter(x => x.key !== e.key));
+                setEntered(s => { if (!s.has(e.key)) return s; const n = new Set(s); n.delete(e.key); return n; });
+              }}
+              label={entryLabel(e)}
+            >
+              {renderEntry(e)}
+            </NavLayer>
+          </NavSlot>
+        );
+      })}
+
+      {/* ── Over everything: the drawer, the composers, sign-in, ordering. ── */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onSignIn={() => { setDrawerOpen(false); setTimeout(() => setModal('auth'), 80); }}
+        onNavigate={handleDrawerNavigate}
+      />
+
+      {modal === 'post-picker' && (
+        <PostSheet onClose={closeModal} onSelect={handlePostPickerSelect} />
+      )}
+
+      {/* onPosted opens the finished listing. Posting used to end on the
+          feed with nothing to show for it — see the note on the prop. */}
+      <ShareItemModal open={modal === 'share-item'} onClose={closeModal} onPosted={openItem} />
+      <ShareItemModal open={modal === 'offer-service'} onClose={closeModal} mode="service" onPosted={openItem} />
+      <PostRequestModal open={modal === 'post-request'} onClose={closeModal} />
+      <ReportLostFoundModal open={modal === 'report-lf'} onClose={closeModal} defaultStatus={lfDefaultStatus} />
+      <SubmitEventModal open={modal === 'submit-event'} onClose={closeModal} />
+      {user && (
+        <AlertFormModal
+          open={modal === 'alert-form'}
+          onClose={() => { closeModal(); setEditingAlert(null); }}
+          userId={user.id}
+          mode={storageMode}
+          alert={editingAlert}
+        />
+      )}
+      <AuthModal
+        open={modal === 'auth'}
+        onClose={closeModal}
+        startInReset={!!authReset}
+        initialEmail={authReset?.email}
+      />
       {orderItem && (
         <OrderSheet
           item={orderItem}
@@ -1241,6 +1216,13 @@ export default function WecycleApp() {
       )}
     </>
   );
+}
+
+const TABS: Screen[] = ['feed', 'events', 'lost_found', 'activity', 'inventory', 'account', 'market', 'impact'];
+
+/** A stack entry: its back registration, then its layer. */
+function NavSlot({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
 
 /* ── DesktopDetailModal ──

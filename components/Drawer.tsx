@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useBackLayer } from '../lib/backStack';
 import {
   X, User, Settings, MessageSquare, Send, Bell, Heart, LogOut, ChevronRight, MessageCircle,
 } from '@/lib/icons';
@@ -44,6 +45,8 @@ export default function Drawer({
   const { user, profile, signOut } = useAuth();
   const ref = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  /* Back closes the drawer, before it closes anything else. */
+  useBackLayer(open, onClose);
 
   useEffect(() => {
     if (!open) return;
