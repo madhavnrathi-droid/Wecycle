@@ -3,29 +3,43 @@
 /*
  * ShareCardModal — the "your card is ready" moment.
  *
- * Renders the post into a PNG (lib/shareCard) and previews it with a snappy
- * GSAP entrance, a diagonal light-sweep when it's ready, + synthesised sound.
- *   • Share  → shares the CARD IMAGE with the product link in the caption
- *              (native sheet); falls back to a PNG download + link copy.
- *   • Save   → downloads the card PNG.
- *   • Copy   → copies the product link.
+ * The preview is the card ALIVE: a ShaderGradient moving behind the card's own
+ * layers (lib/shareCard), so what someone is about to send feels made rather
+ * than generated. Sharing freezes the frame on screen into a 1080 × 1080 JPEG
+ * — the still is the moment they saw — and lays it over the preview while the
+ * share sheet is up, so there is no doubt which picture went.
+ *
+ *   • Share → the image with the post's link in the caption (OS share sheet;
+ *             in the apps, through Capacitor; else download + copied link).
+ *   • Save  → the image alone.
+ *   • Copy  → the link.
+ *
+ * Nothing here can leave a spinner forever: building the card is capped
+ * inside lib/shareCard, a failure says so with a retry, and Share still sends
+ * the link while the image is not ready.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useBackLayer } from '../lib/backStack';
 import * as Dialog from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { X, Share2, Download, Link2, Loader2, Check } from '@/lib/icons';
-import gsap from 'gsap';
+import { X, Share2, Download, Link2, Loader2, Check, RotateCcw } from '@/lib/icons';
 import {
-  renderShareCard, downloadCardBlob, shareCardBlob,
-  STOREFRONT_STYLES,
-  type ShareCardSpec, type StorefrontStyle,
+  buildCardLayers, composeCard, cardBlob, downloadCardBlob, shareCardBlob, CARD_GRAIN_ALPHA,
+  type ShareCardSpec, type CardLayers,
 } from '../lib/shareCard';
+import {
+  CARD_PALETTES, defaultPaletteFor, paletteById, type CardPaletteId,
+} from '../lib/cardPalettes';
+import type { CardGradientHandle } from './CardGradient';
 import { shareLink } from '../lib/share';
 import { sfxOpen, sfxShare, sfxTap } from '../lib/sfx';
 import { haptics } from '../lib/haptics';
 import { Z_LAYER, zPanel } from '../lib/zLayers';
+
+/* three.js is ~150 KB gzipped and only this sheet uses it. */
+const CardGradient = dynamic(() => import('./CardGradient'), { ssr: false });
 
 interface Props {
   open: boolean;
@@ -33,135 +47,133 @@ interface Props {
   spec: ShareCardSpec | null;
 }
 
+interface Preview { scrim: string; grain: string; content: string }
+
+function hasWebGL(): boolean {
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch { return false; }
+}
+
 export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
   useBackLayer(open, () => onOpenChange(false));
-  /* Style choice, for the card kinds that have one. Held here rather than in
-     the spec so the caller does not have to care: a storefront card is the
-     only thing with a look worth choosing, and the poster picks it at the
-     moment of sharing, not while filling in a form. */
-  const [style, setStyle] = useState<StorefrontStyle>(STOREFRONT_STYLES[0].id);
-  const hasStyles = spec?.kind === 'storefront';
-  const effectiveSpec = hasStyles && spec ? { ...spec, cardStyle: style } : spec;
 
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const [blob, setBlob] = useState<Blob | null>(null);
+  const [paletteId, setPaletteId] = useState<CardPaletteId>(() => defaultPaletteFor(spec?.kind ?? 'item'));
+  const palette = paletteById(paletteId);
+
+  const [layers, setLayers] = useState<CardLayers | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [still, setStill] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [gl, setGl] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [size, setSize] = useState(380);
 
-  const cardRef = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const shineRef = useRef<HTMLDivElement>(null);
-  const playedRef = useRef(false);
+  const gradientRef = useRef<CardGradientHandle>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const announced = useRef(false);
 
-  /* Render whenever the modal opens with a spec. */
+  /* A fresh post opens on its own board's colour. */
   useEffect(() => {
-    if (!open || !effectiveSpec) return;
-    let cancelled = false;
-    setDataUrl(null);
-    setBlob(null);
-    setToast(null);
-    playedRef.current = false;
-    (async () => {
-      try {
-        const r = await renderShareCard(effectiveSpec!);
-        if (cancelled) return;
-        setDataUrl(r.dataUrl);
-        setBlob(r.blob);
-      } catch { /* leave empty */ }
-    })();
-    return () => { cancelled = true; };
-    /* `style` is in the deps on purpose: picking a swatch has to re-render the
-       card, and it is the only control on this sheet that changes the image. */
-  }, [open, spec?.kind, spec?.title, spec?.imageUrls?.join('|'), spec?.price, spec?.priceLine, spec?.badge, spec?.dateLine, spec?.location, spec?.byName, style]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (open && spec) setPaletteId(defaultPaletteFor(spec.kind));
+  }, [open, spec?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Snappy entrance for the whole sheet when it mounts. */
   useEffect(() => {
-    if (!open || !cardRef.current) return;
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) { gsap.set(cardRef.current, { clearProps: 'all' }); return; }
-    gsap.fromTo(
-      cardRef.current,
-      { scale: 0.9, y: 26, autoAlpha: 0 },
-      { scale: 1, y: 0, autoAlpha: 1, duration: 0.55, ease: 'back.out(1.6)' },
-    );
+    if (!open) return;
+    setGl(hasWebGL());
+    setReduceMotion(!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   }, [open]);
 
-  /* When the card image lands, pop it in + play the bloom sound (once). */
+  /* The preview's real width, so the shader's buffer can be aimed at 1080px. */
   useEffect(() => {
-    if (!dataUrl || !previewRef.current || playedRef.current) return;
-    playedRef.current = true;
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    sfxOpen();
-    if (!reduce) {
-      gsap.fromTo(
-        previewRef.current,
-        { scale: 0.96, autoAlpha: 0.4 },
-        { scale: 1, autoAlpha: 1, duration: 0.5, ease: 'back.out(2)' },
-      );
-      /* A light sweeps diagonally across the finished card — "it's ready". */
-      if (shineRef.current) {
-        gsap.fromTo(
-          shineRef.current,
-          { xPercent: -180, skewX: -14, opacity: 0 },
-          {
-            xPercent: 240, skewX: -14, opacity: 1, duration: 1.0, ease: 'power2.inOut', delay: 0.34,
-            onComplete: () => { if (shineRef.current) gsap.to(shineRef.current, { opacity: 0, duration: 0.2 }); },
-          },
-        );
+    if (!open || !frameRef.current) return;
+    const el = frameRef.current;
+    const ro = new ResizeObserver(() => setSize(el.clientWidth || 380));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
+
+  /* Build the card's layers whenever the post, the palette or a retry asks. */
+  useEffect(() => {
+    if (!open || !spec) return;
+    let cancelled = false;
+    setFailed(false);
+    setStill(null);
+    (async () => {
+      try {
+        const l = await buildCardLayers(spec, palette);
+        if (cancelled) return;
+        setLayers(l);
+        setPreview({
+          scrim: l.scrim.toDataURL('image/png'),
+          grain: l.grain.toDataURL('image/png'),
+          content: l.content.toDataURL('image/png'),
+        });
+        if (!announced.current) { announced.current = true; sfxOpen(); }
+      } catch (err) {
+        console.error('[share card] build failed', err);
+        if (!cancelled) setFailed(true);
       }
-    }
-  }, [dataUrl]);
+    })();
+    return () => { cancelled = true; };
+  }, [open, spec?.kind, spec?.title, spec?.imageUrls?.join('|'), spec?.price, spec?.priceLine, spec?.badge, spec?.dateLine, spec?.location, spec?.byName, spec?.description, paletteId, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Closing forgets the card, so the next post never flashes the last one. */
+  useEffect(() => {
+    if (open) return;
+    setLayers(null); setPreview(null); setStill(null); setToast(null);
+    announced.current = false;
+  }, [open]);
 
   const flashToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2200);
+    setTimeout(() => setToast(null), 2400);
   };
 
-  const successPop = () => {
-    if (!previewRef.current) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    gsap.fromTo(previewRef.current, { scale: 1 }, { scale: 1.045, duration: 0.13, ease: 'power2.out', yoyo: true, repeat: 1 });
-  };
+  /** Freeze the frame on screen into the finished JPEG. */
+  const makeStill = useCallback(async (): Promise<Blob | null> => {
+    if (!layers) return null;
+    const field = gl ? gradientRef.current?.canvas() ?? null : null;
+    const card = composeCard(layers, field, palette);
+    const blob = await cardBlob(card);
+    if (blob) setStill(URL.createObjectURL(blob));
+    return blob;
+  }, [layers, gl, palette]);
+
+  /* Let the still go a moment after the share sheet closes. */
+  useEffect(() => {
+    if (!still) return;
+    const t = setTimeout(() => setStill(null), 2600);
+    return () => { clearTimeout(t); URL.revokeObjectURL(still); };
+  }, [still]);
 
   const onShare = async () => {
     if (!spec || busy) return;
     setBusy(true);
     haptics.medium();
-    /* Share the CARD IMAGE, with the link in the caption.
-     *
-     * The old version shared only text + URL and trusted link unfurling to
-     * supply the picture. It doesn't, in exactly the places that matter:
-     *   - WhatsApp builds a link preview on the SENDER's device while you type
-     *     a URL. A share-sheet payload arrives pre-composed, so it never
-     *     unfurls — you get a bare blue link. (Verified: /s/<id> serves correct
-     *     absolute og:image for both listings and events, 200 to a WhatsApp UA,
-     *     ~210KB — the tags were never the problem.)
-     *   - Instagram has no link preview at all, ever. An image is the only
-     *     thing it can carry.
-     *   - Most email clients don't unfurl either.
-     * Attaching the PNG works in all three. The OG tags still do their job when
-     * someone pastes the link by hand.
-     *
-     * Falls back to the link when the card hasn't finished rendering, and
-     * shareCardBlob itself falls back to a download + copied link on desktop
-     * browsers that can't share files. */
+    const blob = await makeStill();
     const res = blob
-      ? await shareCardBlob(blob, effectiveSpec!)
-      : await shareLink({ title: spec.title, text: shareText(spec), url: spec.url });
+      ? await shareCardBlob(blob, spec)
+      : await shareLink({ title: spec.title, text: spec.title, url: spec.url });
     setBusy(false);
-    if (res === 'shared') { sfxShare(); successPop(); flashToast('Shared!'); }
-    else if (res === 'downloaded') { sfxShare(); successPop(); flashToast('Card saved — attach it anywhere'); }
-    else if (res === 'copied') { sfxShare(); successPop(); flashToast('Link copied'); }
-    else flashToast("Couldn't share");
+    if (res === 'shared') { sfxShare(); flashToast('Shared'); }
+    else if (res === 'downloaded') { sfxShare(); flashToast('Card saved · link copied'); }
+    else if (res === 'copied') { sfxShare(); flashToast('Link copied'); }
+    else flashToast('Couldn’t share');
   };
 
   const onSave = async () => {
-    if (!spec || busy) return;
+    if (!spec || busy || !layers) return;
     setBusy(true);
     sfxTap();
-    const res = await downloadCardBlob(blob, effectiveSpec!);
+    const blob = await makeStill();
+    const res = await downloadCardBlob(blob, spec);
     setBusy(false);
-    flashToast(res === 'downloaded' ? 'Saved to your device' : "Couldn't save");
+    flashToast(res === 'downloaded' ? 'Saved to your device' : res === 'shared' ? 'Saved' : 'Couldn’t save');
   };
 
   const onCopy = async () => {
@@ -173,193 +185,113 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
       haptics.success();
       flashToast('Link copied');
     } catch {
-      flashToast("Couldn't copy");
+      flashToast('Couldn’t copy');
     }
   };
+
+  const [f0, f1, f2] = palette.fallback;
+  const ready = !!preview;
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-          zIndex: Z_LAYER.shareCard,
-        }} />
+        <Dialog.Overlay className="sc-overlay" style={{ zIndex: Z_LAYER.shareCard }} />
         <Dialog.Content
           aria-describedby={undefined}
-          style={{
-            position: 'fixed', left: '50%', top: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 'min(420px, 94vw)',
-            /* Must sit ABOVE its own overlay. This was a hardcoded 301 while the
-               overlay above uses Z_LAYER.shareCard (500), so the card rendered
-               BEHIND its own dark blur — the whole sheet appeared washed out and
-               unreadable. Derive it from the same constant so the two can never
-               invert again. */
-            zIndex: zPanel(Z_LAYER.shareCard),
-          }}
+          className="sc-sheet"
+          style={{ zIndex: zPanel(Z_LAYER.shareCard) }}
         >
-          <div ref={cardRef} style={{
-            maxHeight: '94svh', overflowY: 'auto',
-            background: 'var(--bg-card)',
-            borderRadius: 24,
-            padding: '18px 18px 22px',
-            boxShadow: '0 30px 80px rgba(0,0,0,0.4)',
-            display: 'flex', flexDirection: 'column', gap: 16,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 'calc(17px * var(--text-scale))', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-                Share card
-              </span>
+          <div className="sc-panel">
+            <div className="sc-head">
+              <Dialog.Title className="sc-title">Share card</Dialog.Title>
               <Dialog.Close asChild>
-                <button aria-label="Close" className="theme-toggle" style={{ width: 34, height: 34 }}>
-                  <X size={17} strokeWidth={2} />
-                </button>
+                <button aria-label="Close" className="sc-close"><X size={18} /></button>
               </Dialog.Close>
             </div>
-            <VisuallyHidden><Dialog.Title>Share this post</Dialog.Title></VisuallyHidden>
+            <VisuallyHidden><p>Preview of the image that will be shared</p></VisuallyHidden>
 
-            {/* Preview — exact generated image (whole card, its own rounded
-                corners + baked drop shadow shown via the transparent margin). */}
-            <div ref={previewRef} style={{
-              position: 'relative',
-              width: '100%', minHeight: 320,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {dataUrl ? (
-                <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden', maxWidth: '100%', maxHeight: '62vh', lineHeight: 0 }}>
+            {/* ── The card, alive ── */}
+            <div
+              ref={frameRef}
+              className="sc-frame"
+              data-ready={ready ? '' : undefined}
+              style={{ background: `radial-gradient(120% 90% at 85% 8%, ${f2} 0%, transparent 55%), linear-gradient(160deg, ${f1}, ${f0})` }}
+            >
+              {gl && (
+                <CardGradient ref={gradientRef} palette={palette} animate={!reduceMotion} cssSize={size} />
+              )}
+              {preview && (
+                <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={dataUrl} alt="Shareable card preview" style={{ maxWidth: '100%', maxHeight: '62vh', display: 'block' }} />
-                  <div ref={shineRef} aria-hidden="true" style={{
-                    position: 'absolute', top: 0, bottom: 0, left: 0, width: '55%',
-                    transform: 'translateX(-180%) skewX(-14deg)', opacity: 0, pointerEvents: 'none',
-                    background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%)',
-                  }} />
+                  <img className="sc-layer" src={preview.scrim} alt="" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="sc-layer sc-grain" src={preview.grain} alt="" style={{ opacity: CARD_GRAIN_ALPHA }} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="sc-layer sc-content" src={preview.content} alt={`Share card for ${spec?.title ?? 'this post'}`} />
+                </>
+              )}
+              {still && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="sc-layer sc-still" src={still} alt="" />
+              )}
+              {!ready && !failed && (
+                <div className="sc-making" role="status">
+                  <Loader2 size={18} className="sc-spin" /> Making your card…
                 </div>
-              ) : (
-                <Loader2 size={28} strokeWidth={2} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--text-muted)' }} />
+              )}
+              {failed && (
+                <div className="sc-making" role="alert">
+                  Couldn’t build the card.
+                  <button type="button" className="sc-retry" onClick={() => setAttempt(a => a + 1)}>
+                    <RotateCcw size={15} /> Try again
+                  </button>
+                </div>
               )}
               {toast && (
-                <div role="status" style={{
-                  position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
-                  background: 'rgba(12,14,18,0.86)', color: '#fff',
-                  padding: '8px 14px', borderRadius: 999,
-                  fontSize: 'calc(12.5px * var(--text-scale))', fontWeight: 600,
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  whiteSpace: 'nowrap',
-                }}>
-                  <Check size={13} strokeWidth={2.5} /> {toast}
-                </div>
+                <div role="status" className="sc-toast"><Check size={14} /> {toast}</div>
               )}
             </div>
 
-            {/* ── Style picker ──
-                Only where a choice exists, which today is the storefront card.
-                A horizontal row of swatches rather than a dropdown: the thing
-                being chosen is a LOOK, so it has to be shown rather than named,
-                and two options fit without scrolling at any width.
+            {/* ── Colour ── shown as the colour, not named in a menu. */}
+            <div role="radiogroup" aria-label="Card colour" className="sc-palettes">
+              {CARD_PALETTES.map(p => {
+                const on = p.id === paletteId;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    className="sc-swatch"
+                    onClick={() => { if (!on) { haptics.selection(); sfxTap(); setPaletteId(p.id); } }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="sc-chip"
+                      style={{ background: `radial-gradient(90% 90% at 75% 20%, ${p.colors[2]} 0%, transparent 60%), linear-gradient(150deg, ${p.colors[0]}, ${p.colors[1]})` }}
+                    />
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
 
-                Placed under the preview and above the actions, because it
-                changes what you are about to send and therefore belongs in the
-                path between seeing it and sending it. */}
-            {hasStyles && (
-              <div
-                role="radiogroup"
-                aria-label="Card style"
-                style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}
-              >
-                {STOREFRONT_STYLES.map(st => {
-                  const on = st.id === style;
-                  return (
-                    <button
-                      key={st.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => { haptics.selection(); sfxTap(); setStyle(st.id); }}
-                      style={{
-                        flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 8,
-                        minHeight: 44, padding: '8px 14px 8px 8px',
-                        borderRadius: 999, cursor: 'pointer',
-                        background: on ? 'var(--text-primary)' : 'var(--bg-inset)',
-                        color: on ? '#fff' : 'var(--text-secondary)',
-                        border: 'none',
-                        fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-                        transition: 'background 160ms',
-                      }}
-                    >
-                      {/* The swatch IS the palette — two stops of the actual
-                          wash, so the button previews the card rather than
-                          describing it. */}
-                      <span aria-hidden="true" style={{
-                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                        background: `linear-gradient(135deg, ${st.wash[1]}, ${st.wash[3]})`,
-                        boxShadow: `inset 0 0 0 2px ${on ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.08)'}`,
-                      }} />
-                      {st.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                type="button"
-                onClick={onShare}
-                disabled={busy}
-                style={{
-                  flex: 1, height: 50, borderRadius: 14, border: 'none',
-                  background: 'var(--accent-lime, #C4F649)', color: '#0C1B0C',
-                  fontSize: 'calc(14.5px * var(--text-scale))', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  opacity: busy ? 0.6 : 1,
-                }}
-              >
-                {busy
-                  ? <Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />
-                  : <Share2 size={16} strokeWidth={2.2} />}
-                Share link
+            <div className="sc-actions">
+              <button type="button" onClick={onShare} disabled={busy} className="sc-primary">
+                {busy ? <Loader2 size={17} className="sc-spin" /> : <Share2 size={17} />}
+                Share card
               </button>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={!dataUrl || busy}
-                aria-label="Save image"
-                className="theme-toggle"
-                style={{ width: 50, height: 50, borderRadius: 14 }}
-              >
-                <Download size={18} strokeWidth={1.9} />
+              <button type="button" onClick={onSave} disabled={!ready || busy} aria-label="Save image" className="sc-icon">
+                <Download size={19} />
               </button>
-              <button
-                type="button"
-                onClick={onCopy}
-                aria-label="Copy link"
-                className="theme-toggle"
-                style={{ width: 50, height: 50, borderRadius: 14 }}
-              >
-                <Link2 size={18} strokeWidth={1.9} />
+              <button type="button" onClick={onCopy} aria-label="Copy link" className="sc-icon">
+                <Link2 size={19} />
               </button>
             </div>
+            <p className="sc-note">1080 × 1080 — the size WhatsApp sends whole.</p>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
   );
-}
-
-function shareText(spec: ShareCardSpec): string {
-  /* A partner post carries its own message. The generic event line —
-     "<title> · <date> — on Wecycle" — says nothing about the discount, which
-     is the entire reason anyone would forward this. */
-  if (spec.partnerMessage) return spec.partnerMessage;
-  switch (spec.kind) {
-    case 'request': return `Looking for "${spec.title}" on Wecycle`;
-    case 'event':   return `${spec.title}${spec.dateLine ? ` · ${spec.dateLine}` : ''} — on Wecycle`;
-    case 'lost':    return `Lost: "${spec.title}" — seen it? Help out on Wecycle`;
-    case 'found':   return `Found: "${spec.title}" — is it yours? On Wecycle`;
-    default:        return `"${spec.title}"${spec.price != null ? ` — ₹${spec.price}` : ''} on Wecycle`;
-  }
 }

@@ -1480,3 +1480,106 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
   font-size: calc(12px * var(--text-scale)); font-weight: 700; letter-spacing: -0.01em;
 }
 .pt-hero-tag img { width: 22px; height: 22px; border-radius: 50%; display: block; }
+
+/* ═══ Share card sheet (components/ShareCardModal.tsx) ═════════════════════
+   The card is the whole show: a dark, moving square with the sheet's chrome
+   kept quiet around it. Palette chips are the colours themselves. */
+.sc-overlay {
+  position: fixed; inset: 0;
+  background: rgba(8, 8, 12, 0.62);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.sc-sheet {
+  position: fixed; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, 94vw);
+}
+.sc-panel {
+  max-height: 94svh; overflow-y: auto;
+  background: #FFFFFF;
+  border-radius: 28px;
+  padding: 16px 16px 18px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+  display: flex; flex-direction: column; gap: 14px;
+  animation: sc-in 420ms var(--ease-standard, cubic-bezier(.2,.8,.2,1)) both;
+}
+@keyframes sc-in { from { opacity: 0; transform: translateY(18px) scale(0.97); } to { opacity: 1; transform: none; } }
+.sc-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 0 6px; }
+.sc-title { margin: 0; font-size: calc(17px * var(--text-scale)); font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); }
+.sc-close {
+  width: 36px; height: 36px; border: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-inset); color: var(--text-primary); cursor: pointer;
+}
+.sc-close:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sc-frame {
+  position: relative; width: 100%; aspect-ratio: 1 / 1;
+  border-radius: 22px; overflow: hidden; isolation: isolate;
+  box-shadow: 0 18px 50px rgba(10, 10, 20, 0.28);
+}
+.sc-layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.sc-layer.sc-content, .sc-layer:not(.sc-grain):not(.sc-still) { animation: sc-fade 360ms ease both; }
+.sc-grain { mix-blend-mode: overlay; }
+.sc-still { animation: sc-freeze 520ms ease both; }
+@keyframes sc-fade { from { opacity: 0; } to { opacity: 1; } }
+/* The freeze: a quick white flash, then the exact still that was sent. */
+@keyframes sc-freeze { 0% { opacity: 0; filter: brightness(1.8); } 40% { opacity: 1; filter: brightness(1.25); } 100% { opacity: 1; filter: none; } }
+.sc-making {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: calc(14px * var(--text-scale)); font-weight: 500; letter-spacing: -0.01em;
+}
+.sc-making:not([role="alert"]) { flex-direction: row; gap: 8px; }
+.sc-retry {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 16px; border: none; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16); color: #FFFFFF;
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+.sc-spin { animation: spin 0.9s linear infinite; }
+.sc-toast {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 8px 14px; border-radius: 999px;
+  background: rgba(10, 10, 14, 0.82); color: #FFFFFF;
+  font-size: calc(12.5px * var(--text-scale)); font-weight: 600;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.sc-palettes { display: flex; gap: 8px; overflow-x: auto; padding: 0 2px 2px; scrollbar-width: none; }
+.sc-palettes::-webkit-scrollbar { display: none; }
+.sc-swatch {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 6px 14px 6px 6px; border: none; border-radius: 999px;
+  background: var(--bg-inset); color: var(--text-secondary);
+  font: inherit; font-size: calc(13.5px * var(--text-scale)); font-weight: 500; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-2, 160ms) var(--ease-standard), color var(--dur-2, 160ms) var(--ease-standard), transform var(--dur-1, 100ms) var(--ease-standard);
+}
+.sc-swatch:active { transform: scale(0.96); }
+.sc-swatch[aria-checked="true"] { background: var(--ink); color: #FFFFFF; }
+.sc-swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sc-chip { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.sc-swatch[aria-checked="true"] .sc-chip { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.9); }
+.sc-actions { display: flex; gap: 10px; }
+.sc-primary {
+  flex: 1; height: 52px; border: none; border-radius: 16px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--ink); color: #FFFFFF;
+  font: inherit; font-size: calc(15px * var(--text-scale)); font-weight: 600; letter-spacing: -0.01em;
+  cursor: pointer; transition: transform var(--dur-1, 100ms) var(--ease-standard), opacity 160ms;
+}
+.sc-primary:active { transform: scale(0.98); }
+.sc-primary:disabled { opacity: 0.6; cursor: progress; }
+.sc-icon {
+  width: 52px; height: 52px; border: none; border-radius: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-inset); color: var(--text-primary); cursor: pointer;
+}
+.sc-icon:disabled { opacity: 0.45; cursor: not-allowed; }
+.sc-primary:focus-visible, .sc-icon:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sc-note { margin: -4px 0 0; text-align: center; font-size: calc(12px * var(--text-scale)); color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .sc-panel, .sc-layer, .sc-still { animation: none !important; }
+  .sc-swatch, .sc-primary { transition: none; }
+}

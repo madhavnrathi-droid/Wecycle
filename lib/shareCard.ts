@@ -1,144 +1,73 @@
 'use client';
 
 /*
- * Shareable cards — editorial, brand-forward (Spotify / NFT-card energy).
+ * Share cards — the image that travels when someone shares a post.
  *
- * A card rendered on a transparent canvas with a soft drop shadow, for any
- * Wecycle post — item, request, event, lost & found. Drawn entirely on an
- * offscreen <canvas>, no deps. The card is BUILT AROUND THE PHOTO: the image
- * area takes the photo's exact aspect ratio (no crop, no letterbox fill) and
- * the card grows/shrinks to fit, so a post always reads the way it was shot.
+ * 1080 × 1080. Square because WhatsApp is where these go: it sends a square
+ * image whole, at full width in the bubble, and 1080 is the size it keeps
+ * without recompressing it into mush. (The old 1080 × 1350 card was cropped in
+ * the chat preview, and that preview is all most people ever see of it.)
  *
- * Design (from the in-house mockups):
- *   • Whole card is a soft per-kind gradient — green→blue (marketplace),
- *     amber→auburn (request), pink→purple (event), orange→red (lost & found).
- *     All copy is white.
- *   • A white kind pill (top-left) + the logomark in a white circle (top-right).
- *   • Photo inset on a WHITE base (a bg-removed cut-out always sits on white,
- *     never the dark UI behind it).
- *   • Footer: title + price, location, description, a translucent reward pill /
- *     event stat-chips, a clean person row (avatar · name · verified) and the
- *     Wecycle wordmark centred as the signature. No fake buttons — the
- *     card is shared as an image alongside the real product link.
+ * The art direction, in one line: a deep, moving ShaderGradient field with a
+ * light travelling through it — green and yellow, purple and yellow, ember —
+ * and white type on top. Geist Pixel for the one headline, Satoshi for every
+ * other word.
  *
- * Shared as an IMAGE via the Web Share files API; falls back to PNG download +
- * link copy. Never throws — a tainted canvas re-renders without remote photos.
+ * HOW IT IS BUILT. Three transparent layers are drawn here on 2D canvases:
+ *
+ *   scrim   — the darkness that makes white type safe: a wash over the whole
+ *             field, deeper behind each block of text;
+ *   grain   — monochrome film grain (ShaderGradient's own grain is an RGB dot
+ *             screen that turns purple blue, so it is off and this replaces it);
+ *   content — photo, words, marks.
+ *
+ * The share sheet stacks them over a LIVE ShaderGradient, so the card moves
+ * while someone looks at it. Sharing freezes the frame on screen and composes
+ * the same layers over it (composeCard), so the still is the moment they saw.
+ * Where WebGL is missing, a flat painted gradient stands in.
+ *
+ * Contrast is measured, not hoped for: at export the field under every text
+ * zone is sampled, and if the frame happens to be bright there, that zone's
+ * scrim is drawn again until white text clears 4.5:1 against its brightest
+ * likely pixel.
+ *
+ * Never throws to the caller for a missing photo or font — a card without its
+ * photo still says what it needs to; a card that never appears says nothing.
  */
 
 import { corsFresh } from './corsImage';
-import { getActiveRoom } from './rooms';
 import { haptics } from './haptics';
+import { ensureCardFonts, cardFont, PIXEL, SANS } from './cardFonts';
+import type { CardPalette } from './cardPalettes';
 
 export type ShareCardKind = 'item' | 'request' | 'job' | 'event' | 'lost' | 'found' | 'storefront';
 
-/* ── Storefront card styles ────────────────────────────────────────────────
- *
- * A storefront card is an advert for a PERSON, not for one object, so it gets
- * its own look and its own pair of palettes to pick between. Two, not six: a
- * carousel of six is a decision, and the poster came here to share a shop, not
- * to art-direct. Two is a glance.
- *
- * Both are dark-led, which is the one thing every profile card in the
- * references had in common and the reason they read as a brand rather than as
- * a form. Amber is the loud one; Forest is the Wecycle-green one for people who
- * want it to look like the app it came from. */
-export type StorefrontStyle = 'amber' | 'forest';
-
-interface StoreTheme {
-  id: StorefrontStyle;
-  label: string;
-  wash: Stops;
-  panel: string;
-  ink: string;
-  inkMuted: string;
-  accent: string;
-  /** Ink that sits ON the accent — checked, not guessed. */
-  onAccent: string;
-}
-
-export const STOREFRONT_STYLES: StoreTheme[] = [
-  {
-    id: 'amber', label: 'Ember',
-    /* Orange into near-black. The panel stays black so the accent has somewhere
-       dark to be bright against; an orange panel would flatten the whole card. */
-    wash: ['#7C2D12', '#C2410C', '#EA580C', '#F59E0B'],
-    panel: '#141210', ink: '#FFFFFF', inkMuted: 'rgba(255,255,255,0.62)',
-    accent: '#FB923C', onAccent: '#1A0F06',
-  },
-  {
-    id: 'forest', label: 'Forest',
-    wash: ['#04170E', '#07301C', '#0A5C36', '#0E7A47'],
-    panel: '#0B0F0C', ink: '#FFFFFF', inkMuted: 'rgba(255,255,255,0.60)',
-    /* The app's own lime. On #0B0F0C it clears 13:1, so it can carry the CTA
-       label in black and still be the brightest thing on the card. */
-    accent: '#A8DD00', onAccent: '#0A1200',
-  },
-];
-
 /* ── A partner-branded card ────────────────────────────────────────────────
- *
- * Overrides the palette and adds a second logo, for a post that belongs to
- * someone else's brand as well as to Wecycle. Deliberately not a new
- * ShareCardKind: the LAYOUT is identical to an event card and a new kind would
- * mean a new entry in THEME, in the meta switch and in every exhaustive branch
- * — five places to keep in step for a change that is purely cosmetic.
- *
- * The partner's own mark is drawn beside the Wecycle wordmark rather than
- * instead of it. A card that carries only the partner's brand is an advert
- * Wecycle paid to distribute; a card carrying both is a collaboration, which
- * is what this actually is. */
+ * A post that belongs to someone else's brand as well as to Wecycle: the pill
+ * names the partner and the offer takes the price's place. */
 export interface PartnerBrand {
   /** Pill label, e.g. "UXINDIA 2026". */
   label: string;
-  /** Four-stop wash, darkest first. */
-  colors: Stops;
-  /** Must clear 2.58:1 on the lightest stop — same bar as every THEME accent. */
-  accent: string;
-  /** Transparent PNG, drawn white-on-dark beside the Wecycle wordmark. */
+  /** Kept for callers; the card's colour comes from its palette now. */
+  colors?: [string, string, string, string];
+  accent?: string;
   logoUrl?: string;
-  /** Aspect ratio (w/h) of that logo, so it can be sized without a load race. */
   logoAspect?: number;
-  /**
-   * Source rect, in the asset's own pixels, when only PART of the supplied
-   * artwork is the logo.
-   *
-   * Partners send a combination mark: their symbol and wordmark, then a
-   * strapline, then often the dates and the city, all in one PNG. Drawn whole
-   * at lockup size the strapline lands about three pixels tall and turns into
-   * a grey smear next to a clean Wecycle wordmark — and it repeats what the
-   * poster underneath already says. Crop to the symbol and wordmark, which is
-   * the logo; the rest is layout somebody else did.
-   */
   logoCrop?: { x: number; y: number; w: number; h: number };
 }
 
 export interface ShareCardSpec {
   kind: ShareCardKind;
   title: string;
-  /** Present only for co-branded posts. See PartnerBrand. */
   partner?: PartnerBrand;
   /** Overrides the caption pasted alongside the image. */
   partnerMessage?: string;
-  /**
-   * The offer, in the money slot.
-   *
-   * An event has no price, so on a normal event card that row is empty and the
-   * panel ends in a band of dead white. On a partner card there IS a number,
-   * and it is the whole reason the card is being shared — so it goes exactly
-   * where a price would go, in a price's typography. "25% off" is the answer
-   * to the same question a price answers, which is why it belongs in the same
-   * slot rather than in a badge bolted somewhere else.
-   *
-   * `ink` because the accent that survives on a dark wash is usually too pale
-   * to read on the white panel; the caller passes the darker sibling.
-   */
-  offer?: { headline: string; qualifier: string; ink: string };
+  /** The offer, in the slot where a listing shows its price. */
+  offer?: { headline: string; qualifier: string; ink?: string };
   imageUrls?: string[];
   price?: number;
   /** The money exactly as it should read — "₹200 / day", "Swap for a
-   *  calculator", "Free". Built by lib/dealTypes so the card, the feed and the
-   *  detail page cannot render the same listing three different ways. Falls
-   *  back to `price` when absent. */
+   *  calculator", "Free". Built by lib/dealTypes. */
   priceLine?: string;
   badge?: string;
   location?: string;
@@ -155,244 +84,56 @@ export interface ShareCardSpec {
   dateBadge?: { mon: string; day: string; dow: string };
   eventChips?: string[];
   url?: string;
-  /* Panel-only facts. Kept separate from `badge` so the bottom pill and the
-     stats panel never show the same string twice. */
-  /* ── Storefront cards ── */
-  /** @handle under the name. */
+  /** Storefront: @handle under the name. */
   storeHandle?: string;
-  /** Up to three "12 shared" style facts. More than three stops being a glance
-   *  and starts being a table. */
+  /** Storefront: up to three "12 shared" facts. */
   storeStats?: { label: string; value: string }[];
-  /** Which of STOREFRONT_STYLES to paint. Defaults to the first. */
-  cardStyle?: StorefrontStyle;
   roleLabel?: string;       // job: 'Hiring' | 'Offering'
   conditionLabel?: string;  // item: 'Like new' | 'Good' | 'Fair'
 }
 
-/* ── Palette ──────────────────────────────────────────────────────────────
- * Each board gets its own grainy multi-stop wash, in the spirit of a
- * shader-gradient: three colours pooled in different corners, then film grain
- * over the top. `light` says whether the wash is pale enough to need dark ink —
- * a white-and-green card with white text would be unreadable, so ink is a
- * per-theme decision rather than a global assumption.
- */
-type Stops = [string, string, string, string];
+/* ── Geometry ──────────────────────────────────────────────────────────── */
 
-interface Theme {
-  label: string;                        // pill over the media's top edge
-  colors: Stops;                        // 4-stop diagonal sweep
-  light: boolean;                       // pale wash → dark ink
-  glyph: string;                        // stand-in when there's no photo
-  person: string;                       // attribution sub-label
-  accent: string;                        // verified tick, dots, wordmark tint
+export const CARD_SIZE = 1080;
+const S = CARD_SIZE;
+const M = 64;                       // outer margin
+const HEAD_Y = 64;                  // top of the brand row
+const HEAD_H = 56;
+const BODY_Y = 156;                 // where the photo and the column start
+const FOOT_Y = 836;                 // hairline above the footer
+const WHITE = '#FFFFFF';
+/* Secondary inks, set against the scrim's ceiling (MAX_FIELD_LUM). Canvas
+   blends in sRGB, so 78% white over that field measured only ~3.7:1; 90% is
+   ~4.9:1 for body copy, and 80% clears 3:1 for the bold small-caps labels. */
+const MUTED = 'rgba(255,255,255,0.90)';
+const QUIET = 'rgba(255,255,255,0.80)';
+
+type Layout = 'portrait' | 'landscape' | 'type';
+
+interface Box { x: number; y: number; w: number; h: number }
+
+/** A region of the card whose scrim can be drawn again, stronger, if the
+ *  gradient under it turns out to be bright. */
+interface Zone {
+  /** The text it protects — what gets measured. */
+  box: Box;
+  paint: (ctx: CanvasRenderingContext2D, alpha: number) => void;
 }
 
-/* Four-stop diagonal sweeps. Four rather than two because the reference
- * gradients travel — purple through magenta into orange before they reach
- * yellow — and a two-stop ramp reads as a flat CSS gradient no matter how much
- * grain you put on it.
- *
- * Marketplace = white → green. Requests share it (same board) and are told
- * apart by the pill. Jobs = green → yellow. Events = purple most of the way,
- * with yellow only arriving in the last third. Lost & Found = white → orange →
- * pinkish red.
- */
-/* Every stop is dark enough for white text. Measured, not eyeballed — white on
- * each stop, and the 74%-white muted ink on each stop:
- *
- *              white   muted            white   muted
- *   MARKET  #04301B 14.55  8.55   #0A5C36  8.09  5.23
- *           #0E7A47  5.39  3.69   #128850  4.50  3.19
- *   WORK    #14330E 13.91  8.28   #1E4A12 10.28  6.43
- *           #356B14  6.43  4.35   #867710  4.51  3.26
- *   EVENTS  #2E1065 15.24  8.77   #5B21B6  8.98  5.56
- *           #9D2B8A  6.67  4.36   #996F1F  4.52  3.26
- *   FINDS   #4A1505 14.99  8.67   #7E2609  9.68  5.99
- *           #B83C10  5.69  3.79   #C42340  5.74  3.73
- *
- * Worst case across all sixteen stops is 4.50:1 for white and 3.19:1 for the
- * muted ink, so the whole surface clears WCAG AA for body text — not just the
- * 2.5:1 that was asked for.
- *
- * The events palette used to end on #F5B331, a bright amber that gave white
- * only 1.85:1: the one card already using white ink had a region that failed
- * the brief it was the model for. Its amber is now a deep gold. That is the
- * unavoidable cost of white-on-amber — amber has to be dark to carry white,
- * and there is no clever way around the physics.
- *
- * Each ramp keeps a luminance spread of 0.115–0.163, so the gradients still
- * visibly travel rather than reading as one flat dark field. */
-const MARKET: Stops = ['#04301B', '#0A5C36', '#0E7A47', '#128850'];
-const WORK:   Stops = ['#14330E', '#1E4A12', '#356B14', '#867710'];
-const EVENTS: Stops = ['#2E1065', '#5B21B6', '#9D2B8A', '#996F1F'];
-const FINDS:  Stops = ['#4A1505', '#7E2609', '#B83C10', '#C42340'];
-
-const THEME: Record<ShareCardKind, Theme> = {
-  /* `light: false` throughout now — every board carries white ink, which is
-     what the events card was already doing and the look to match. The accents
-     are the dot in the pill and the verified tick, so they moved up-key to stay
-     visible on a dark wash; the old #0B7A46 green would have disappeared into
-     its own background. Each clears 2.58:1 or better against the lightest stop
-     of its own palette. */
-  item:    { label: 'For sale',  colors: MARKET, light: false, glyph: '📦', person: 'Verified member', accent: '#4ADE80' },
-  request: { label: 'Wanted',    colors: MARKET, light: false, glyph: '🙌', person: 'Verified member', accent: '#4ADE80' },
-  job:     { label: 'Hiring',    colors: WORK,   light: false, glyph: '💼', person: 'Posted by',       accent: '#BEF264' },
-  event:   { label: 'Event',     colors: EVENTS, light: false, glyph: '🎉', person: 'Organiser',       accent: '#FFD84D' },
-  lost:    { label: 'Lost',      colors: FINDS,  light: false, glyph: '🔎', person: 'Reported by',     accent: '#FF9A6B' },
-  found:   { label: 'Found',     colors: FINDS,  light: false, glyph: '✅', person: 'Found by',        accent: '#FF9A6B' },
-  /* Present so the map stays exhaustive, but never actually painted: a
-     storefront card takes its palette from STOREFRONT_STYLES and renders on
-     a separate path entirely. Values mirror `item` so any code reading THEME
-     generically gets something sane rather than undefined. */
-  storefront: { label: 'Storefront', colors: MARKET, light: false, glyph: '\u{1F6CD}', person: 'Shop by', accent: '#A8DD00' },
-};
-
-/** Ink tokens derived from the wash's lightness — one place, so every text
- *  colour on the card stays legible against its own background. */
-function inkFor(t: Theme) {
-  return t.light
-    ? {
-        primary: '#111309',
-        muted:   'rgba(17,19,9,0.62)',
-        panel:   'rgba(255,255,255,0.62)',
-        panelHair: 'rgba(17,19,9,0.08)',
-        pillBg:  '#111309',
-        pillInk: '#FFFFFF',
-        valueBg: 'rgba(255,255,255,0.94)',
-        valueInk: '#111309',
-        wordmark: '#111309',
-        /* Pale wash → a solid dark disc reads as the primary action. */
-        arrowFill: '#111309',
-        arrowInk: '#FFFFFF',
-      }
-    : {
-        primary: '#FFFFFF',
-        muted:   'rgba(255,255,255,0.74)',
-        panel:   'rgba(255,255,255,0.14)',
-        panelHair: 'rgba(255,255,255,0.20)',
-        pillBg:  '#FFFFFF',
-        pillInk: '#1A0B33',
-        valueBg: 'rgba(20,8,40,0.86)',
-        valueInk: '#FFFFFF',
-        wordmark: '#FFFFFF',
-        /* Deep wash → a white disc, as in the purple reference card. */
-        arrowFill: '#FFFFFF',
-        arrowInk: '#2A0F55',
-      };
+export interface CardLayers {
+  scrim: HTMLCanvasElement;
+  grain: HTMLCanvasElement;
+  content: HTMLCanvasElement;
+  zones: Zone[];
 }
 
-const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-const WORDMARK_AR = 1719 / 607; // ≈ 2.832
+/* ── Small drawing helpers ─────────────────────────────────────────────── */
 
-const WHITE = '#ffffff';
-
-
-/* ── The wash ─────────────────────────────────────────────────────────────
- * A shader-gradient look, done in 2D canvas: three big soft radial pools of the
- * palette laid over a base fill, then film grain across the whole thing. The
- * grain is what makes it read as printed rather than as a CSS gradient — see the
- * reference swatches, where the noise is heavy enough to be a texture in its own
- * right.
- *
- * The pools are placed on a fixed diagonal rhythm rather than randomly, so a
- * card looks the same every time it's generated (share the same post twice and
- * you get the same picture) while still not looking like a two-stop ramp.
- */
-function paintWash(ctx: CanvasRenderingContext2D, w: number, h: number, colors: Stops) {
-  const [c0, c1, c2, c3] = colors;
-
-  /* The travelling sweep, corner to corner. This is what carries the hue
-     journey the reference gradients have. */
-  const lin = ctx.createLinearGradient(0, 0, w, h);
-  lin.addColorStop(0.00, c0);
-  lin.addColorStop(0.34, c1);
-  lin.addColorStop(0.68, c2);
-  lin.addColorStop(1.00, c3);
-  ctx.fillStyle = lin;
-  ctx.fillRect(0, 0, w, h);
-
-  /* Pools break the ramp's straight banding into something that looks lit
-     rather than interpolated. Fixed positions, so the same post always renders
-     the same card. */
-  const pool = (cx: number, cy: number, r: number, color: string, alpha: number) => {
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, withAlpha(color, alpha));
-    g.addColorStop(0.6, withAlpha(color, alpha * 0.45));
-    g.addColorStop(1, withAlpha(color, 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-  };
-  const long = Math.max(w, h);
-  /* The hot corner has to actually pool, not tint: in the reference the deepest
-     colour is unmistakably concentrated bottom-right while the opposite corner
-     stays near-white. Two overlapping pools get that density; one reads as a
-     wash over the whole card. */
-  pool(w * 0.94, h * 0.92, long * 0.72, c3, 1);
-  pool(w * 0.80, h * 0.78, long * 0.42, c3, 0.85);
-  pool(w * 0.62, h * 0.60, long * 0.46, c2, 0.60);
-  /* And the cool corner has to stay clean, or the title loses contrast. */
-  pool(w * 0.02, h * 0.02, long * 0.52, c0, 0.95);
-  pool(w * 0.24, h * 0.16, long * 0.34, c0, 0.60);
-
-  /* Two passes at different scales: fine grain for the paper texture, a coarser
-     pass to break up the smooth ramps the way the reference swatches do. */
-  paintGrain(ctx, w, h, 0.19);
-  paintGrain(ctx, w, h, 0.07, 2);
-}
-
-/** `#rrggbb` → `rgba(...)`. The pools need per-stop alpha, and canvas gradients
- *  won't take a separate alpha channel. */
-function withAlpha(hex: string, a: number): string {
-  const h = hex.replace('#', '');
-  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
-}
-
-/* One 256px noise tile, generated once per document and repeated. Tiling at 1:1
- * keeps the grain crisp — scaling a small tile up to 1080px would smooth it into
- * mush, and generating noise for every pixel of every card is needless work. */
-let grainTile: HTMLCanvasElement | null = null;
-function getGrainTile(): HTMLCanvasElement {
-  if (grainTile) return grainTile;
-  const S = 256;
+function canvas(): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = S; c.height = S;
-  const g = c.getContext('2d')!;
-  const img = g.createImageData(S, S);
-  for (let i = 0; i < img.data.length; i += 4) {
-    /* Monochrome grain: same value in RGB, varying alpha. Colour noise would
-       tint the wash; luminance noise just roughens it. */
-    const v = 128 + (Math.random() - 0.5) * 255;
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-    img.data[i + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  grainTile = c;
   return c;
 }
-
-function paintGrain(ctx: CanvasRenderingContext2D, w: number, h: number, alpha = 0.14, scale = 1) {
-  const pattern = ctx.createPattern(getGrainTile(), 'repeat');
-  if (!pattern) return;
-  ctx.save();
-  /* overlay keeps the wash's hue and only pushes luminance around, which is how
-     real film grain behaves; 'source-over' would grey the whole card out. */
-  ctx.globalCompositeOperation = 'overlay';
-  ctx.globalAlpha = alpha;
-  if (scale !== 1) {
-    /* Scale the pattern, not the canvas, so the coarse pass lands on the same
-       pixels as the fine one. */
-    ctx.scale(scale, scale);
-    ctx.fillStyle = pattern;
-    ctx.fillRect(0, 0, w / scale, h / scale);
-  } else {
-    ctx.fillStyle = pattern;
-    ctx.fillRect(0, 0, w, h);
-  }
-  ctx.restore();
-}
-
-/* ── geometry helpers ───────────────────────────── */
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2);
@@ -405,40 +146,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-/** Load an image, or give up.
- *
- *  The timeout is the point. onload and onerror between them cover a request
- *  that succeeds and one that fails, but not one that STALLS — and a stalled
- *  image leaves this promise pending forever, which hangs the whole card behind
- *  a Promise.all that never settles. The user then sees a spinner that never
- *  becomes a card, with no error anywhere, because nothing actually threw.
- *
- *  Eight seconds, then resolve null and draw the card without the photo. A
- *  card missing its photo still says what is for sale; a card that never
- *  appears says nothing at all. */
-function loadImage(src: string, cors = true, timeoutMs = 8000): Promise<HTMLImageElement | null> {
-  return new Promise(resolve => {
-    let settled = false;
-    const done = (v: HTMLImageElement | null) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(v);
-    };
-    const timer = setTimeout(() => done(null), timeoutMs);
-    const img = new Image();
-    if (cors) img.crossOrigin = 'anonymous';
-    img.onload = () => done(img);
-    img.onerror = () => done(null);
-    /* A photo already shown on the page sits in the cache as a non-CORS
-       response, and a crossOrigin request for the same URL is answered from
-       it and fails — the card came out without its photo. A distinct URL is a
-       fresh CORS request (lib/corsImage.ts). */
-    img.src = cors ? corsFresh(src) : src;
-  });
-}
-
-function coverDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+function coverDraw(ctx: CanvasRenderingContext2D, img: CanvasImageSource & { width: number; height: number }, x: number, y: number, w: number, h: number) {
   const ir = img.width / img.height;
   const rr = w / h;
   let sx = 0, sy = 0, sw = img.width, sh = img.height;
@@ -447,50 +155,15 @@ function coverDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
-/** object-fit: contain (whole image, never cropped). */
-/** A blurred, scaled-up copy of the image behind a contained one.
- *
- * Used only where the image must not be cropped (see the event case in the
- * renderer). Nothing is cut, and the space beside a poster reads as deliberate
- * rather than as bars.
- *
- * The blur comes from downscaling to a few dozen pixels and letting the canvas
- * smooth it back up, NOT from ctx.filter: filter support in older iOS WebViews
- * is patchy, and a bed that silently fails to blur looks like the image has
- * been printed twice — a worse failure than the space it replaces. */
-function blurredBed(
-  ctx: CanvasRenderingContext2D, img: HTMLImageElement,
-  x: number, y: number, w: number, h: number,
-) {
-  const TINY = 28;
-  const th = Math.max(2, Math.round(TINY * (img.height / img.width)));
-  let tiny: HTMLCanvasElement;
-  try { tiny = document.createElement('canvas'); } catch { return; }
-  tiny.width = TINY; tiny.height = th;
-  const tctx = tiny.getContext('2d');
-  if (!tctx) return;
-  tctx.drawImage(img, 0, 0, TINY, th);
-
-  ctx.save();
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  const ir = TINY / th, rr = w / h;
-  const dw = ir > rr ? h * ir : w;
-  const dh = ir > rr ? h : w / ir;
-  ctx.drawImage(tiny, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
-  ctx.fillStyle = 'rgba(255,255,255,0.34)';
-  ctx.fillRect(x, y, w, h);
-  ctx.restore();
-}
-
-function containDraw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+function containDraw(ctx: CanvasRenderingContext2D, img: CanvasImageSource & { width: number; height: number }, x: number, y: number, w: number, h: number) {
   const ir = img.width / img.height;
   const rr = w / h;
-  let dw: number, dh: number;
-  if (ir > rr) { dw = w; dh = w / ir; } else { dh = h; dw = h * ir; }
+  const dw = ir > rr ? w : h * ir;
+  const dh = ir > rr ? w / ir : h;
   ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
 }
 
+/** Lines that fit `maxWidth`, at most `maxLines`, the last one ellipsised. */
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -517,1536 +190,686 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
   return lines;
 }
 
-/* ── icons (simple, crisp line glyphs) ──────────── */
-
-function setStroke(ctx: CanvasRenderingContext2D, color: string, w: number) {
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = w;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-}
-
-function checkBadge(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill: string, tick: string) {
-  ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
-  setStroke(ctx, tick, r * 0.34);
-  ctx.beginPath(); ctx.moveTo(cx - r * 0.42, cy + r * 0.02); ctx.lineTo(cx - r * 0.08, cy + r * 0.38); ctx.lineTo(cx + r * 0.46, cy - r * 0.36); ctx.stroke();
-  ctx.restore();
-}
-
-function drawAvatar(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, img: HTMLImageElement | null, initials?: string, color?: string) {
-  ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
-  if (img) {
-    coverDraw(ctx, img, cx - r, cy - r, r * 2, r * 2);
-  } else {
-    ctx.fillStyle = color || '#ffffff';
-    ctx.globalAlpha = 0.92;
-    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#14161A';
-    ctx.font = `700 ${r}px ${FONT}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText((initials || '?').slice(0, 2).toUpperCase(), cx, cy + 1);
-    ctx.textAlign = 'left';
+/** Letter-spaced text, for the small caps labels. Drawn glyph by glyph
+ *  because ctx.letterSpacing is missing from the WebViews still in use. */
+function tracked(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, track: number, align: 'left' | 'right' = 'left'): number {
+  let w = 0;
+  for (const ch of text) w += ctx.measureText(ch).width + track;
+  w -= track;
+  let cx = align === 'right' ? x - w : x;
+  for (const ch of text) {
+    ctx.fillText(ch, cx, y);
+    cx += ctx.measureText(ch).width + track;
   }
-  ctx.restore();
-  ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.stroke();
-  ctx.restore();
-}
-
-function tintImage(img: HTMLImageElement, w: number, h: number, color: string): HTMLCanvasElement {
-  const off = document.createElement('canvas');
-  off.width = Math.max(1, Math.ceil(w));
-  off.height = Math.max(1, Math.ceil(h));
-  const o = off.getContext('2d')!;
-  o.drawImage(img, 0, 0, w, h);
-  o.globalCompositeOperation = 'source-in';
-  o.fillStyle = color;
-  o.fillRect(0, 0, off.width, off.height);
-  return off;
-}
-
-/* ── renderer ───────────────────────────────────── */
-
-export interface RenderedCard {
-  blob: Blob | null;
-  dataUrl: string;
-}
-
-interface FooterCtx {
-  W: number; fx: number; imBottom: number;
-  avatar: HTMLImageElement | null; wordmark: HTMLImageElement | null;
-}
-
-/* ── Card parts, shared by the renderer ─────────────────────────────────── */
-
-/** Outlined capsule — the reference's "✦ EVENT" / "● FOR SALE" pill. */
-function outlinePill(
-  ctx: CanvasRenderingContext2D,
-  o: { x: number; y: number; h: number; text: string; ink: string; dot?: string },
-) {
-  ctx.save();
-  const size = Math.round(o.h * 0.40);
-  ctx.font = `700 ${size}px ${FONT}`;
-  const track = size * 0.14;
-  const tw = ctx.measureText(o.text).width + track * (o.text.length - 1);
-  const dotW = o.dot ? size * 0.62 + 14 : 0;
-  const w = Math.round(tw + dotW + o.h * 1.1);
-
-  roundRect(ctx, o.x, o.y, w, o.h, o.h / 2);
-  ctx.strokeStyle = withAlphaCss(o.ink, 0.42);
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  let cursor = o.x + o.h * 0.55;
-  if (o.dot) {
-    ctx.beginPath();
-    ctx.arc(cursor + size * 0.31, o.y + o.h / 2, size * 0.31, 0, Math.PI * 2);
-    ctx.fillStyle = o.dot; ctx.fill();
-    cursor += size * 0.62 + 14;
-  }
-  ctx.fillStyle = o.ink;
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  for (const ch of o.text) {
-    ctx.fillText(ch, cursor, o.y + o.h / 2 + 1);
-    cursor += ctx.measureText(ch).width + track;
-  }
-  ctx.restore();
-  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   return w;
 }
 
-/** The reference's boxed date badge: small caps, big number, small caps. */
-function dateBox(
-  ctx: CanvasRenderingContext2D,
-  o: { x: number; y: number; w: number; h: number; top: string; mid: string; bot: string; ink: string },
-) {
-  roundRect(ctx, o.x, o.y, o.w, o.h, 18);
-  ctx.strokeStyle = withAlphaCss(o.ink, 0.38);
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  ctx.textAlign = 'center';
-  ctx.fillStyle = withAlphaCss(o.ink, 0.8);
-  ctx.font = `700 24px ${FONT}`;
-  ctx.fillText(o.top.toUpperCase(), o.x + o.w / 2, o.y + 40);
-  ctx.fillStyle = o.ink;
-  ctx.font = `800 58px ${FONT}`;
-  ctx.fillText(o.mid, o.x + o.w / 2, o.y + o.h - 42);
-  ctx.fillStyle = withAlphaCss(o.ink, 0.8);
-  ctx.font = `700 24px ${FONT}`;
-  ctx.fillText(o.bot.toUpperCase(), o.x + o.w / 2, o.y + o.h - 14);
-  ctx.textAlign = 'left';
+function hexRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-/** Circular "go" button, bottom-right of the meta row in every reference. */
-function arrowButton(
-  ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill: string, ink: string,
-) {
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = Math.max(3, r * 0.11);
-  ctx.lineCap = 'round';
-  const a = r * 0.42;
-  ctx.beginPath();
-  ctx.moveTo(cx - a, cy); ctx.lineTo(cx + a, cy);
-  ctx.moveTo(cx + a * 0.30, cy - a * 0.62); ctx.lineTo(cx + a, cy);
-  ctx.lineTo(cx + a * 0.30, cy + a * 0.62);
-  ctx.stroke();
-}
+/* ── Images ────────────────────────────────────────────────────────────── */
 
-/** `rgba()` from either a hex or an existing rgba string. */
-function withAlphaCss(color: string, a: number): string {
-  return color.startsWith('#') ? withAlpha(color, a) : color;
-}
+type Bitmap = CanvasImageSource & { width: number; height: number };
 
-/* ── Card geometry ─────────────────────────────────────────────────────────
- *
- * 1080 x 1350 — 4:5 — and fixed, where the old card computed its height from
- * its content and came out somewhere near square.
- *
- * 4:5 is the one aspect ratio that is right in both places these get sent.
- * Instagram's feed crops anything taller and letterboxes anything wider, so 4:5
- * is the largest a post can be without losing pixels: the most screen a card
- * can occupy while someone scrolls past it. WhatsApp shows a 4:5 image whole in
- * the bubble, where a 9:16 story-shaped card gets clipped to a thumbnail and
- * the price stops being readable before anyone taps.
- *
- * The structure inverts the old one. That card gave the top panel to a gradient
- * carrying every word and put the photo second; these cards put the PHOTO
- * first and largest, because a share card competes in a feed of other people's
- * photos and loses on text. The photo is 700 of the card's 1350 — a clear
- * majority of the visual field — and the words sit under it on a white panel
- * where they are read rather than decoded.
- *
- * The brand wash survives as the surround. It is what makes a Wecycle card
- * recognisable at thumbnail size, when the title is far too small to read. */
-const CARD_W = 1080;
-const CARD_H = 1350;
-
-/* ── Storefront card ───────────────────────────────────────────────────────
- *
- * An advert for a PERSON rather than for one object, so the composition is the
- * one every profile card converges on and not the product layout above: a cover
- * band, an avatar breaking the line between cover and panel, the name, a line
- * about them, and a row of numbers that says this shop is real.
- *
- * The avatar overlapping the boundary is the load-bearing detail. It is what
- * makes the card read as one object instead of two stacked rectangles, and it
- * puts the face — the thing a person recognises fastest — exactly on the seam
- * the eye already stops at.
- *
- * The stats row is doing trust work, not decoration. A storefront with "23
- * shared · 41 saved" is a person who has done this before, which is the single
- * fact that decides whether a stranger messages them. */
-async function renderStorefrontCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  const st = STOREFRONT_STYLES.find(x => x.id === spec.cardStyle) ?? STOREFRONT_STYLES[0];
-
-  const canvas = document.createElement('canvas');
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext('2d')!;
-
-  const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
-  const [wordmark, avatar, cover] = await Promise.all([
-    loadImage('/brand/wordmark.png', false),
-    spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
-    urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
-  ]);
-
-  const M = 56;
-  const HEAD = 96;
-  const PANEL_X = M, PANEL_Y = HEAD;
-  const PANEL_W = CARD_W - M * 2;
-  const PANEL_H = CARD_H - HEAD - 84;
-  const PANEL_R = 44;
-  const COVER_H = 470;
-  const AV_R = 92;
-  const FX = PANEL_X + 52;
-  const TEXT_W = PANEL_W - 104;
-
-  const name = (spec.byName || spec.title || 'Storefront').trim();
-  const handle = spec.storeHandle?.trim();
-  const bio = (spec.description ?? '').replace(/\s+/g, ' ').trim();
-  const stats = (spec.storeStats ?? []).slice(0, 3);
-
-  /* Name auto-fit — a shop called "Nayonika Gottimukkula" and one called "Pri"
-     cannot share a font size. */
-  let nameSize = 68;
-  for (const size of [68, 60, 52, 46]) {
-    ctx.font = `800 ${size}px ${FONT}`;
-    nameSize = size;
-    if (ctx.measureText(name).width <= TEXT_W) break;
-  }
-  ctx.font = `400 31px ${FONT}`;
-  const bioLines = bio ? wrapText(ctx, bio, TEXT_W, 3) : [];
-
-  const paint = (withPhotos: boolean) => {
-    ctx.clearRect(0, 0, CARD_W, CARD_H);
-    paintWash(ctx, CARD_W, CARD_H, st.wash);
-    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
-
-    /* Brand strip */
-    if (wordmark) {
-      const wmH = 38;
-      const wmW = wmH * (wordmark.width / wordmark.height);
-      ctx.drawImage(tintImage(wordmark, Math.round(wmW), wmH, '#FFFFFF'), M, (HEAD - wmH) / 2 - 2, wmW, wmH);
-    }
-    ctx.font = `700 24px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.78)';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('STOREFRONT', CARD_W - M, HEAD / 2 - 1);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    /* Panel */
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.42)';
-    ctx.shadowBlur = 48;
-    ctx.shadowOffsetY = 16;
-    ctx.fillStyle = st.panel;
-    roundRect(ctx, PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_R); ctx.fill();
-    ctx.restore();
-
-    /* Cover band, clipped to the panel's top corners only. */
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(PANEL_X, PANEL_Y + COVER_H);
-    ctx.lineTo(PANEL_X, PANEL_Y + PANEL_R);
-    ctx.arcTo(PANEL_X, PANEL_Y, PANEL_X + PANEL_R, PANEL_Y, PANEL_R);
-    ctx.lineTo(PANEL_X + PANEL_W - PANEL_R, PANEL_Y);
-    ctx.arcTo(PANEL_X + PANEL_W, PANEL_Y, PANEL_X + PANEL_W, PANEL_Y + PANEL_R, PANEL_R);
-    ctx.lineTo(PANEL_X + PANEL_W, PANEL_Y + COVER_H);
-    ctx.closePath();
-    ctx.clip();
-    if (withPhotos && cover) {
-      coverDraw(ctx, cover, PANEL_X, PANEL_Y, PANEL_W, COVER_H);
-      /* A scrim under the avatar side so a bright photo cannot swallow it. */
-      const g = ctx.createLinearGradient(0, PANEL_Y + COVER_H - 220, 0, PANEL_Y + COVER_H);
-      g.addColorStop(0, 'rgba(0,0,0,0)');
-      g.addColorStop(1, 'rgba(0,0,0,0.55)');
-      ctx.fillStyle = g;
-      ctx.fillRect(PANEL_X, PANEL_Y + COVER_H - 220, PANEL_W, 220);
-    } else {
-      paintWash(ctx, PANEL_W, COVER_H, st.wash);
-      ctx.save();
-      ctx.translate(PANEL_X, PANEL_Y);
-      paintGrain(ctx, PANEL_W, COVER_H, 0.1, 1);
-      ctx.restore();
-    }
-    ctx.restore();
-
-    /* Avatar, straddling the seam. */
-    const avCx = FX + AV_R;
-    const avCy = PANEL_Y + COVER_H;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(avCx, avCy, AV_R + 10, 0, Math.PI * 2);
-    ctx.fillStyle = st.panel;
-    ctx.fill();
-    ctx.restore();
-    drawAvatar(ctx, avCx, avCy, AV_R, withPhotos ? avatar : null, spec.byInitials, spec.byColor ?? st.accent);
-
-    /* Words */
-    ctx.textBaseline = 'top';
-    let y = avCy + AV_R + 34;
-
-    ctx.fillStyle = st.ink;
-    ctx.font = `800 ${nameSize}px ${FONT}`;
-    ctx.fillText(name, FX, y);
-    y += Math.round(nameSize * 1.12);
-
-    if (handle) {
-      ctx.fillStyle = st.accent;
-      ctx.font = `600 32px ${FONT}`;
-      ctx.fillText(handle.startsWith('@') ? handle : `@${handle}`, FX, y);
-      y += 46;
-    }
-
-    if (bioLines.length) {
-      y += 10;
-      ctx.fillStyle = st.inkMuted;
-      ctx.font = `400 31px ${FONT}`;
-      for (const line of bioLines) { ctx.fillText(line, FX, y); y += 41; }
-    }
-    ctx.textBaseline = 'alphabetic';
-
-    /* Stats row + CTA, pinned to the bottom of the panel. */
-    const CTA_H = 78;
-    const ctaY = PANEL_Y + PANEL_H - 46 - CTA_H;
-
-    if (stats.length) {
-      /* Clearance for the LABEL, not just the number. The row was placed 44px
-         above the button, but the label sits 36px below the row's own top and
-         is itself ~30px tall, so it ran straight into the CTA and read as
-         "23 / shar…". Measured from the bottom of the label instead. */
-      const STAT_VALUE_H = 44;
-      const STAT_LABEL_H = 30;
-      const rowY = ctaY - 26 - STAT_LABEL_H - STAT_VALUE_H;
-      const cellW = (PANEL_W - 104) / stats.length;
-      ctx.textAlign = 'left';
-      stats.forEach((cell, i) => {
-        const cx = FX + cellW * i;
-        if (i > 0) {
-          /* Hairline divider, exactly as the reference profile cards do — it is
-             what turns three numbers into one row rather than three orphans. */
-          ctx.fillStyle = 'rgba(255,255,255,0.14)';
-          ctx.fillRect(Math.round(cx - 18), rowY - 6, 1.5, 62);
-        }
-        ctx.fillStyle = st.ink;
-        ctx.font = `800 40px ${FONT}`;
-        ctx.textBaseline = 'top';
-        ctx.fillText(cell.value, cx, rowY - 8);
-        ctx.fillStyle = st.inkMuted;
-        ctx.font = `500 25px ${FONT}`;
-        ctx.fillText(cell.label, cx, rowY + 36);
-        ctx.textBaseline = 'alphabetic';
-      });
-    }
-
-    /* Full-width CTA — this card has one job and it is the tap. */
-    ctx.fillStyle = st.accent;
-    roundRect(ctx, FX, ctaY, PANEL_W - 104, CTA_H, CTA_H / 2); ctx.fill();
-    ctx.fillStyle = st.onAccent;
-    ctx.font = `700 30px ${FONT}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Visit the storefront', PANEL_X + PANEL_W / 2 - 16, ctaY + CTA_H / 2 + 1);
-    const aw = ctx.measureText('Visit the storefront').width;
-    const ax = PANEL_X + PANEL_W / 2 - 16 + aw / 2 + 26;
-    const ay = ctaY + CTA_H / 2;
-    setStroke(ctx, st.onAccent, 3.2);
-    ctx.beginPath();
-    ctx.moveTo(ax - 13, ay + 7); ctx.lineTo(ax + 3, ay - 9);
-    ctx.moveTo(ax - 6, ay - 9); ctx.lineTo(ax + 3, ay - 9); ctx.lineTo(ax + 3, ay);
-    ctx.stroke();
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    /* Footer */
-    ctx.font = `600 27px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('wecycle.page', CARD_W / 2, PANEL_Y + PANEL_H + (CARD_H - PANEL_Y - PANEL_H) / 2);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-  };
-
-  paint(true);
-  let dataUrl: string;
-  try { dataUrl = canvas.toDataURL('image/png'); }
-  catch { paint(false); dataUrl = canvas.toDataURL('image/png'); }
-  const blob = await new Promise<Blob | null>(res => {
-    try { canvas.toBlob(res, 'image/png', 0.95); } catch { res(null); }
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise(resolve => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then(v => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); resolve(fallback); });
   });
-  return { blob, dataUrl };
 }
 
-/* ── The card ──────────────────────────────────────────────────────────────
- *
- * Photo on top, everything else on the gradient below. The structure the owner
- * chose; what changed is which facts get the room.
- *
- * The version this replaces buried the two things a reader actually decides on
- * — what it costs and where it is — in a three-column micro-row of 28px labels,
- * making them the SMALLEST legible text on a card whose entire job is to
- * communicate them. The title was 92px and the price was 28px, which is a
- * hierarchy exactly upside down: the headline says what the thing is, and the
- * price says whether you care.
- *
- * So price and location are now anchored at fixed positions near the bottom and
- * sized to be read at a glance — the price is the largest text on the card
- * after the title, and the location sits directly beneath it, because "how much"
- * and "where" are one question asked twice.
- *
- * White, not the accent colour, for both. The per-board accents were tuned to
- * clear 2.58:1 against their own lightest stop, which is under the 3:1 WCAG
- * asks even for large text; white clears it on all four washes with room to
- * spare. Size and weight carry the hierarchy instead of hue, which is also what
- * makes the card survive being resized into a WhatsApp thumbnail.
- *
- * No call to action. This is a flat PNG that will sit in a chat — a button
- * drawn on it is a button that cannot be pressed, and a card asking to be
- * tapped when it cannot be is the fastest way to make it feel fake. The action
- * travels as the message pasted alongside it.
- *
- * No description either. It is not one of the five things this card is for, and
- * every line it takes is a line off the price. It rides in the caption instead.
- */
-async function renderClassicCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  /* A partner card borrows the layout and replaces only the colour and the
-     label. Everything below is written against `t` and does not need to know
-     which of the two it got. */
-  const base = THEME[spec.kind];
-  const t: Theme = spec.partner
-    ? { ...base, label: spec.partner.label, colors: spec.partner.colors, accent: spec.partner.accent }
-    : base;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext('2d')!;
-
-  const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
-  const [wordmark, avatar, hero, partnerLogo] = await Promise.all([
-    loadImage('/brand/wordmark.png', false),
-    spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
-    urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
-    spec.partner?.logoUrl ? loadImage(spec.partner.logoUrl, false) : Promise.resolve(null),
-  ]);
-
-  const PHOTO_H = 660;
-  const FX = 72;                       // text gutter
-  const TEXT_W = CARD_W - FX * 2;
-
-  /* Bottom-anchored blocks. Price and location keep the same position on every
-     card no matter how long the title runs, so someone who has seen one Wecycle
-     card knows where to look on the next one. A layout that flows top-down puts
-     them somewhere different each time. */
-  const NAME_CY   = CARD_H - 92;       // poster row, vertical centre
-  const RULE_Y    = NAME_CY - 62;
-  const LOC_TOP   = RULE_Y - 34 - 46;
-  const PRICE_TOP = LOC_TOP - 14 - 98;
-
-  /* Title auto-fit into whatever is left between the photo and the price. */
-  const TITLE_TOP = PHOTO_H + 46;
-  const TITLE_ROOM = PRICE_TOP - 26 - TITLE_TOP;
-  let titleSize = 44;
-  let titleLines: string[] = [spec.title];
-  for (const [size, maxLines] of [[70, 2], [62, 2], [56, 3], [50, 3], [44, 3]] as [number, number][]) {
-    ctx.font = `800 ${size}px ${FONT}`;
-    const lines = wrapText(ctx, spec.title, TEXT_W, maxLines);
-    const lh = Math.round(size * 1.12);
-    if (lines.length * lh <= TITLE_ROOM) {
-      titleSize = size; titleLines = lines;
-      if (!lines[lines.length - 1].endsWith('…')) break;
-    }
-  }
-  const TITLE_LH = Math.round(titleSize * 1.12);
-
-  const money = (spec.priceLine || (spec.price != null && Number.isFinite(spec.price)
-    ? `₹${Number(spec.price).toLocaleString('en-IN')}` : '')).trim();
-  const where = (spec.location ?? '').trim();
-  const when  = (spec.dateLine ?? '').trim();
-
-  const paint = (withPhoto: boolean) => {
-    ctx.clearRect(0, 0, CARD_W, CARD_H);
-    paintWash(ctx, CARD_W, CARD_H, t.colors);
-    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
-
-    /* ── Photo ── */
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, CARD_W, PHOTO_H);
-    ctx.clip();
-    if (withPhoto && hero) {
-      const ir = hero.width / hero.height;
-      if (Math.abs(ir - CARD_W / PHOTO_H) > 0.32) {
-        blurredBed(ctx, hero, 0, 0, CARD_W, PHOTO_H);
-        containDraw(ctx, hero, 0, 0, CARD_W, PHOTO_H);
-      } else {
-        coverDraw(ctx, hero, 0, 0, CARD_W, PHOTO_H);
-      }
-    } else {
-      paintWash(ctx, CARD_W, PHOTO_H, t.colors);
-      paintGrain(ctx, CARD_W, PHOTO_H, 0.1, 1);
-      ctx.font = `400 170px ${FONT}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.globalAlpha = 0.92;
-      ctx.fillText(t.glyph, CARD_W / 2, PHOTO_H / 2);
-      ctx.globalAlpha = 1;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
-    }
-    ctx.restore();
-
-    /* A short scrim at the photo's foot so the join to the gradient reads as
-       one surface rather than two stacked rectangles. */
-    const seam = ctx.createLinearGradient(0, PHOTO_H - 90, 0, PHOTO_H);
-    seam.addColorStop(0, 'rgba(0,0,0,0)');
-    seam.addColorStop(1, withAlpha(t.colors[0], 0.5));
-    ctx.fillStyle = seam;
-    ctx.fillRect(0, PHOTO_H - 90, CARD_W, 90);
-
-    /* ── Badge + wordmark ── */
-    const badgeText = (spec.badge || t.label).toUpperCase();
-    ctx.font = `700 27px ${FONT}`;
-    const bw = ctx.measureText(badgeText).width + 62;
-    const bh = 54;
-    const by = PHOTO_H - bh - 34;
-    ctx.fillStyle = 'rgba(0,0,0,0.42)';
-    roundRect(ctx, FX, by, bw, bh, bh / 2); ctx.fill();
-    setStroke(ctx, 'rgba(255,255,255,0.42)', 1.6);
-    roundRect(ctx, FX, by, bw, bh, bh / 2); ctx.stroke();
-    ctx.fillStyle = t.accent;
-    ctx.beginPath(); ctx.arc(FX + 28, by + bh / 2, 7, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(badgeText, FX + 46, by + bh / 2 + 1);
-    ctx.textBaseline = 'alphabetic';
-
-    /* The partner's own mark, top-left of the photo — but ONLY when the
-       artwork does not already carry it.
-     *
-       For UXINDIA the hero IS their poster, and their logo is printed on it.
-       Stamping it again would put the same mark on the same image twice, which
-       reads as a mistake rather than as co-branding. So this draws only when
-       there is no hero: a card built from an event with no cover art still
-       says whose event it is. */
-    if (partnerLogo && !hero) {
-      const plH = 44;
-      const plW = plH * (partnerLogo.width / partnerLogo.height);
-      const white = tintImage(partnerLogo, Math.round(plW), plH, '#FFFFFF');
-      ctx.drawImage(white, FX, 44, plW, plH);
-    }
-
-    /* The wordmark, on the photo's bottom-right and twice the size it was.
-       "Wecycle should read better" — it was 28px in a corner of the gradient,
-       competing with body text; here it sits on the scrim at the card's optical
-       centre-right, which is where a maker's mark belongs. */
-    if (wordmark) {
-      const wmH = 46;
-      const wmW = wmH * (wordmark.width / wordmark.height);
-      const white = tintImage(wordmark, Math.round(wmW), wmH, '#FFFFFF');
-      ctx.drawImage(white, CARD_W - FX - wmW, by + (bh - wmH) / 2, wmW, wmH);
-    } else {
-      ctx.font = `800 40px ${FONT}`;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Wecycle', CARD_W - FX, by + bh / 2);
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
-    }
-
-    /* ── Title ── */
-    /* Bottom-anchored, growing upward from just above the price. Anchoring it
-       to the top of the panel instead left a floating band of empty gradient
-       between a two-line title and the price below — the words read as two
-       unrelated groups with a hole between them. Title, price and location are
-       one block making one statement, so they sit together and the slack goes
-       above them where it reads as breathing room against the photo. */
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = `800 ${titleSize}px ${FONT}`;
-    let ty = Math.max(TITLE_TOP, PRICE_TOP - 30 - titleLines.length * TITLE_LH);
-    for (const line of titleLines) { ctx.fillText(line, FX, ty); ty += TITLE_LH; }
-
-    /* ── Price — the largest thing on the card after the headline ── */
-    if (money) {
-      let ps = 98;
-      for (const size of [98, 84, 70, 58, 48, 40]) {
-        ctx.font = `800 ${size}px ${FONT}`;
-        ps = size;
-        if (ctx.measureText(money).width <= TEXT_W) break;
-      }
-      ctx.font = `800 ${ps}px ${FONT}`;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(money, FX, PRICE_TOP + (98 - ps));
-    }
-
-    /* ── Location — directly beneath the price, same gutter, one question ── */
-    const place = where || when;
-    if (place) {
-      ctx.textBaseline = 'middle';
-      const cy = LOC_TOP + 23;
-      /* Filled pin: a stroked one dissolves when the card is scaled into a
-         chat bubble. */
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.beginPath();
-      ctx.arc(FX + 13, cy - 4, 13, Math.PI * 0.82, Math.PI * 0.18, false);
-      ctx.lineTo(FX + 13, cy + 20);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = withAlpha(t.colors[1], 1);
-      ctx.beginPath(); ctx.arc(FX + 13, cy - 5, 5, 0, Math.PI * 2); ctx.fill();
-
-      ctx.font = `600 44px ${FONT}`;
-      ctx.fillStyle = 'rgba(255,255,255,0.94)';
-      const line = wrapText(ctx, where && when ? `${where}  ·  ${when}` : place, TEXT_W - 46, 1)[0];
-      ctx.fillText(line, FX + 40, cy + 1);
-      ctx.textBaseline = 'alphabetic';
-    }
-
-    /* ── Rule ── */
-    ctx.fillStyle = 'rgba(255,255,255,0.20)';
-    ctx.fillRect(FX, RULE_Y, TEXT_W, 1.5);
-
-    /* ── Who posted it — the credibility line ── */
-    const r = 34;
-    drawAvatar(ctx, FX + r, NAME_CY, r, avatar, spec.byInitials, spec.byColor);
-    ctx.textBaseline = 'middle';
-    ctx.font = `700 38px ${FONT}`;
-    ctx.fillStyle = '#FFFFFF';
-    const nameX = FX + r * 2 + 22;
-    const name = spec.byName || 'A Wecycle member';
-    ctx.fillText(name, nameX, NAME_CY - 1);
-    if (spec.verified) {
-      const nw = ctx.measureText(name).width;
-      checkBadge(ctx, nameX + nw + 24, NAME_CY - 1, 15, t.accent, '#0B1F14');
-    }
-
-    /* The domain, right-aligned on the same line. Not a button: it is where the
-       card came from, which is what makes it checkable. */
-    ctx.font = `600 32px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.74)';
-    ctx.textAlign = 'right';
-    ctx.fillText('wecycle.page', CARD_W - FX, NAME_CY - 1);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-  };
-
-  paint(true);
-  let dataUrl: string;
-  try { dataUrl = canvas.toDataURL('image/png'); }
-  catch { paint(false); dataUrl = canvas.toDataURL('image/png'); }
-  const blob = await new Promise<Blob | null>(res => {
-    try { canvas.toBlob(res, 'image/png', 0.95); } catch { res(null); }
+function imgFrom(src: string, cors: boolean): Promise<HTMLImageElement | null> {
+  return new Promise(resolve => {
+    const img = new Image();
+    if (cors) img.crossOrigin = 'anonymous';
+    img.decoding = 'async';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
   });
-  return { blob, dataUrl };
 }
 
-/** Which listing layout ships. Both are maintained; this is the switch.
+/** A photo, ready to draw without tainting the canvas — or null.
  *
- * 'spotlight' — hero photo on top, words on a white panel below.
- * 'classic'   — photo on top, words on the gradient, price and location large.
- *
- * Back on spotlight at the owner's call after seeing both side by side. The
- * classic renderer stays whole and reachable by flipping this one word; neither
- * layout is a branch to be reconstructed. */
-const CARD_LAYOUT: 'classic' | 'spotlight' = 'spotlight';
+ *  Fetched as bytes first and drawn from a local blob URL: a blob is
+ *  same-origin by construction, so the canvas can always be exported, and the
+ *  request never collides with the non-CORS copy of the same photo that the
+ *  page itself has cached (the old cause of photo-less cards). If the fetch is
+ *  refused, an <img> with crossOrigin is the second try. Each try is capped,
+ *  so a stalled request can never hold the card — the cause of the spinner
+ *  that never became a card. */
+const photoCache = new Map<string, Promise<Bitmap | null>>();
 
-export async function renderShareCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  /* A storefront advertises a person and takes a different composition
-     entirely — cover, avatar on the seam, bio, stats — so it renders on its
-     own path rather than through a pile of conditionals. */
-  if (spec.kind === 'storefront') return renderStorefrontCard(spec);
-  /* A co-branded offer is not an event with different colours. It has two
-     brands to introduce, somebody else's artwork to respect, and exactly one
-     number that matters — so it renders on its own path too, rather than as
-     five more conditionals inside a layout built for a listing. */
-  if (spec.partner && spec.offer) return renderPartnerCard(spec);
-  return CARD_LAYOUT === 'classic' ? renderClassicCard(spec) : renderSpotlightCard(spec);
+/** Cached per URL for the page's life, so switching palettes redraws the card
+ *  without fetching its photo again. A failed load is not cached. */
+function loadPhoto(src: string): Promise<Bitmap | null> {
+  const hit = photoCache.get(src);
+  if (hit) return hit;
+  const p = fetchPhoto(src);
+  photoCache.set(src, p);
+  p.then(v => { if (!v) photoCache.delete(src); });
+  return p;
 }
 
-/* ── The co-branded offer card ──────────────────────────────────────────────
- *
- * Three bands: a partnership lockup, the partner's own poster, and the offer.
- * Everything about it follows from one decision — THE POSTER ALREADY SPEAKS.
- *
- * UXINDIA's artwork carries the event name in hand-lettering, the dates, the
- * venue and their logo. The generic card re-set all four of those in system
- * type underneath it, which is how a co-branded card ends up looking like a
- * press release: the same facts twice, once beautifully and once in Helvetica.
- * So this card states only what the poster cannot — that Wecycle members pay
- * less — and gives the rest of its space back to the picture.
- *
- * WHY THE POSTER IS FRAMED AND NOT BLED. `coverDraw` would fill the canvas and
- * crop, and a poster is composed art: cropping it cuts somebody's lettering in
- * half. It is contained instead, on the ember, which also reads better — a
- * cream print floating on near-black looks like a print, where a full bleed
- * just looks like a background.
- *
- * WHY THE LOCKUP IS GROUPED, NOT SPLIT. Two marks at opposite corners read as
- * two logos on the same page. "Wecycle × UXINDIA", set together with the cross
- * between them, reads as a partnership — which is the actual claim.
- */
-async function renderPartnerCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  const partner = spec.partner!;
-  const offer = spec.offer!;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext('2d')!;
-
-  const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
-  const [wordmark, partnerLogo, partnerMark, poster] = await Promise.all([
-    loadImage('/brand/wordmark.png', false),
-    partner.logoUrl ? loadImage(partner.logoUrl, false) : Promise.resolve(null),
-    loadImage('/brand/uxindia-shield-white.png', false),
-    urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
-  ]);
-
-  /* ── Geometry ──
-     The poster is square, so its box is square too and the contain has
-     nothing to letterbox. A non-square poster still fits — containDraw
-     centres it and the ember shows through, which is a deliberate frame
-     rather than a gap. */
-  const GUT = 64;                        // page margin
-  const LOCK_Y = 76;                     // centre of the lockup row
-  const ART_Y = 156;
-  /* 840, not the full 952 the margin allows. The gradient is half the brief —
-     "orange and black" — and at 952 the ember survived only as a thin border
-     round the poster, which reads as a frame rather than as a ground. Giving
-     it another 56px a side is the difference between a card that is orange and
-     a card with an orange edge. */
-  const ART_W = 840;
-  const ART_X = Math.round((CARD_W - ART_W) / 2);
-  const ART_H = ART_W;
-  const ART_R = 26;
-  const ART_BOTTOM = ART_Y + ART_H;      // 996
-
-  const paint = () => {
-    ctx.clearRect(0, 0, CARD_W, CARD_H);
-
-    /* Black into orange, the same four stops as the offer panel and the feed
-       spotlight so all three read as one object seen from three angles. */
-    paintWash(ctx, CARD_W, CARD_H, partner.colors);
-    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
-
-    /* ── Band 1: the partnership lockup ── */
-    ctx.textBaseline = 'middle';
-    let lx = GUT;
-    if (wordmark) {
-      const h = 34;
-      const w = Math.round(h * (wordmark.width / wordmark.height));
-      /* The wordmark art is dark; on this ground it has to be white. */
-      ctx.drawImage(tintImage(wordmark, w, h, '#FFFFFF'), lx, LOCK_Y - h / 2, w, h);
-      lx += w + 22;
-    }
-    ctx.font = `400 27px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.46)';
-    ctx.fillText('\u00D7', lx, LOCK_Y + 1);
-    lx += ctx.measureText('\u00D7').width + 22;
-    if (partnerLogo) {
-      /* Already white artwork — tinting it would be a no-op that costs a
-         canvas, so it is drawn as it is. */
-      const crop = partner.logoCrop
-        ?? { x: 0, y: 0, w: partnerLogo.width, h: partnerLogo.height };
-      const h = 32;
-      const w = Math.round(h * (crop.w / crop.h));
-      ctx.drawImage(partnerLogo, crop.x, crop.y, crop.w, crop.h, lx, LOCK_Y - h / 2, w, h);
-    } else {
-      ctx.font = `800 25px ${FONT}`;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(partner.label.toUpperCase(), lx, LOCK_Y + 1);
-    }
-    ctx.textBaseline = 'alphabetic';
-
-    /* ── Band 2: the poster ── */
-    ctx.save();
-    roundRect(ctx, ART_X, ART_Y, ART_W, ART_H, ART_R);
-    ctx.clip();
-    if (poster) {
-      /* A wash behind it, so a poster that is not square letterboxes onto
-         something intentional instead of onto whatever the gradient is doing
-         at that height. */
-      ctx.fillStyle = 'rgba(12,6,3,0.55)';
-      ctx.fillRect(ART_X, ART_Y, ART_W, ART_H);
-      containDraw(ctx, poster, ART_X, ART_Y, ART_W, ART_H);
-    } else {
-      /* No artwork: the partner's mark on a quieter panel, rather than an
-         empty rectangle or a stock photo of a conference. */
-      ctx.fillStyle = 'rgba(12,6,3,0.5)';
-      ctx.fillRect(ART_X, ART_Y, ART_W, ART_H);
-      if (partnerMark) {
-        const h = Math.round(ART_H * 0.3);
-        const w = Math.round(h * (partnerMark.width / partnerMark.height));
-        ctx.globalAlpha = 0.9;
-        ctx.drawImage(partnerMark, ART_X + (ART_W - w) / 2, ART_Y + (ART_H - h) / 2, w, h);
-        ctx.globalAlpha = 1;
-      }
-    }
-    ctx.restore();
-    /* A hairline, not a border. The poster's own ground is cream and the ember
-       behind it is near-black, so the edge is already obvious — this only
-       stops the rounded corners looking soft where the two meet. */
-    ctx.save();
-    roundRect(ctx, ART_X + 0.5, ART_Y + 0.5, ART_W - 1, ART_H - 1, ART_R);
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
-
-    /* ── Band 3: the offer ──
-       The one thing on this card that is not already on the poster, so it gets
-       the largest type on the card and the only pure white. */
-    ctx.textBaseline = 'top';
-
-    const EYEBROW_Y = ART_BOTTOM + 54;   // 1050
-    ctx.font = `800 23px ${FONT}`;
-    /* The wash accent is chosen to sit on the LIGHTEST stop of the gradient;
-       up here the ground is near-black and it comes out muddy. A step lighter
-       reads as the same orange and actually carries. */
-    ctx.fillStyle = '#FDBA74';
-    ctx.save();
-    /* Tracked out by hand — canvas has no letter-spacing. */
-    let ex = GUT;
-    for (const ch of 'EXCLUSIVE ON WECYCLE') {
-      ctx.fillText(ch, ex, EYEBROW_Y);
-      ex += ctx.measureText(ch).width + 3.4;
-    }
-    ctx.restore();
-
-    /* The number. Auto-fit so a future "30% off" or a longer qualifier cannot
-       run off the edge. */
-    const HEAD_Y = ART_BOTTOM + 112;     // 1108
-    let headSize = 112;
-    for (const size of [112, 96, 84, 72]) {
-      ctx.font = `800 ${size}px ${FONT}`;
-      headSize = size;
-      if (ctx.measureText(offer.headline).width <= CARD_W - GUT * 2 - 300) break;
-    }
-    ctx.font = `800 ${headSize}px ${FONT}`;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(offer.headline, GUT, HEAD_Y);
-    const headW = ctx.measureText(offer.headline).width;
-
-    /* The qualifier sits on the number's baseline, not under it — stacked, it
-       reads as a second headline competing with the first. */
-    ctx.font = `600 33px ${FONT}`;
-    const qualW = ctx.measureText(offer.qualifier).width;
-    if (headW + 22 + qualW <= CARD_W - GUT * 2) {
-      ctx.fillStyle = 'rgba(255,255,255,0.82)';
-      ctx.fillText(offer.qualifier, GUT + headW + 22, HEAD_Y + headSize - 52);
-    }
-
-    /* The order of operations, which is the one thing people get wrong: the
-       code is free but it has to be collected here BEFORE booking, and getting
-       that backwards means paying full price and blaming us. */
-    ctx.font = `600 28px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.66)';
-    /* 262 puts the last line's descenders 64px off the bottom edge — the same
-       64 as the side margin, so the type block sits in an even frame. */
-    ctx.fillText('Get your code on wecycle.page, then book', GUT, ART_BOTTOM + 262);
-
-    ctx.textBaseline = 'alphabetic';
+async function fetchPhoto(src: string): Promise<Bitmap | null> {
+  if (!/^https?:/i.test(src)) return withTimeout(imgFrom(src, false), 8000, null);
+  const viaFetch = async (): Promise<Bitmap | null> => {
+    const r = await fetch(corsFresh(src), { mode: 'cors', credentials: 'omit' });
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    if (!blob.type.startsWith('image/') && blob.size < 100) return null;
+    const url = URL.createObjectURL(blob);
+    const img = await imgFrom(url, false);
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    return img;
   };
-
-  paint();
-
-  const dataUrl = canvas.toDataURL('image/png');
-  const blob = await new Promise<Blob | null>(res => canvas.toBlob(b => res(b), 'image/png'));
-  return { blob, dataUrl };
+  return (await withTimeout(viaFetch(), 9000, null))
+    ?? withTimeout(imgFrom(corsFresh(src), true), 7000, null);
 }
 
-/**
- * Description text for a card, with links taken out.
- *
- * People routinely paste the event's own URL into the description, and on a
- * share card that renders as "https://www.ux-india.org/rising-leaders-forum
- * Design Leadership Forum A flagship…" — a wrapped, truncated link where a
- * sentence should be. A URL is unclickable on a flat PNG anyway, so it is
- * costing two lines of the only description the card has room for and giving
- * nothing back. The link still travels: it is in the caption beside the image.
- */
+/* ── The fallback field ────────────────────────────────────────────────── */
+
+/** A painted stand-in for the shader, for devices without WebGL: the palette's
+ *  deep colour, its field colour pooled across the middle, and its light
+ *  crossing on the same diagonal the shader's light travels. */
+export function paintFallbackField(ctx: CanvasRenderingContext2D, p: CardPalette) {
+  const [deep, field, light] = p.fallback;
+  ctx.fillStyle = deep;
+  ctx.fillRect(0, 0, S, S);
+  const pool = (cx: number, cy: number, r: number, color: string, a: number) => {
+    const [r0, g0, b0] = hexRgb(color);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `rgba(${r0},${g0},${b0},${a})`);
+    g.addColorStop(1, `rgba(${r0},${g0},${b0},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, S, S);
+  };
+  pool(S * 0.15, S * 0.1, S * 0.9, field, 0.9);
+  pool(S * 0.95, S * 0.05, S * 0.55, light, 0.75);
+  pool(S * 0.55, S * 0.45, S * 0.45, light, 0.35);
+}
+
+/* ── Layers ────────────────────────────────────────────────────────────── */
+
+let grainTile: HTMLCanvasElement | null = null;
+function getGrainTile(): HTMLCanvasElement {
+  if (grainTile) return grainTile;
+  const T = 256;
+  const c = document.createElement('canvas');
+  c.width = T; c.height = T;
+  const g = c.getContext('2d')!;
+  const img = g.createImageData(T, T);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 128 + (Math.random() - 0.5) * 255;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  grainTile = c;
+  return c;
+}
+
+/** Neutral-grey film grain, meant to be laid on with an overlay blend: it
+ *  roughens luminance and leaves hue alone. */
+function paintGrainLayer(ctx: CanvasRenderingContext2D) {
+  const pat = ctx.createPattern(getGrainTile(), 'repeat');
+  if (!pat) return;
+  ctx.fillStyle = pat;
+  ctx.fillRect(0, 0, S, S);
+}
+
+function linear(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, stops: [number, number][]) {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  for (const [at, a] of stops) g.addColorStop(at, `rgba(4,4,10,${a})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+}
+
+/* ── What each kind of card says ───────────────────────────────────────── */
+
+interface CardCopy {
+  /** Top-right pill — what this is, in a word or two. */
+  pill: string;
+  /** The small line above the headline. */
+  eyebrow?: string;
+  title: string;
+  body?: string;
+  /** The one number (or date) the card exists to carry. */
+  figure?: { label: string; value: string };
+  /** Storefront only, in the figure's place. */
+  stats?: { label: string; value: string }[];
+  place?: string;
+  /** Footer, bottom-left: what to do next. */
+  cta: string;
+}
+
+/** The description as one clean run of text: URLs out (the links trailer
+ *  among them — they travel in the caption), paragraphs joined with a dash. */
 function descriptionFor(spec: ShareCardSpec): string {
-  /* Paragraphs joined with an em dash, not flattened with a space.
-   *
-   * People paste descriptions in from a website, and those almost always open
-   * with a bare heading line — "Design Leadership Forum", then a blank line,
-   * then the actual sentence. Collapsing every run of whitespace to a single
-   * space welded those together into "Design Leadership Forum A flagship
-   * UXINDIA programme focused on…", which reads as a typo on a card that has
-   * room for one line. Soft wraps inside a paragraph still become spaces; only
-   * a genuine blank-line break becomes a dash, so a single-paragraph
-   * description is untouched. */
   return (spec.description ?? '')
+    .replace(/(^|\n)Links\n[\s\S]*$/, '')
     .replace(/https?:\/\/\S+/gi, '')
     .split(/\n\s*\n/)
-    .map(para => para.replace(/\s+/g, ' ').trim())
+    .map(p => p.replace(/\s+/g, ' ').trim())
     .filter(Boolean)
     .join(' — ');
 }
 
-/* KEPT, NOT DEFAULT.
- *
- * The photo-first layout: hero photo on top, words on a white panel below.
- * Superseded by renderClassicCard, which the owner preferred, but retained
- * whole rather than deleted — it is a working second opinion and the two
- * differ in structure rather than in polish, so a future call between them is
- * a one-line change to CARD_LAYOUT and not a rebuild. */
-async function renderSpotlightCard(spec: ShareCardSpec): Promise<RenderedCard> {
-  /* Partner override — see PartnerBrand. Applied in BOTH renderers on purpose:
-     CARD_LAYOUT decides which one runs, and a partner card that silently lost
-     its branding because someone flipped that constant is exactly the kind of
-     bug that ships. It already did: the override went into renderClassicCard
-     while CARD_LAYOUT was 'spotlight', and the card stayed events-purple. */
-  const base = THEME[spec.kind];
-  const t: Theme = spec.partner
-    ? { ...base, label: spec.partner.label, colors: spec.partner.colors, accent: spec.partner.accent }
-    : base;
+function money(spec: ShareCardSpec): string | undefined {
+  if (spec.priceLine?.trim()) return spec.priceLine.trim();
+  if (spec.price != null) return `₹${spec.price.toLocaleString('en-IN')}`;
+  return spec.badge?.trim() || undefined;
+}
 
-  const canvas = document.createElement('canvas');
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext('2d')!;
+function copyFor(spec: ShareCardSpec): CardCopy {
+  const title = (spec.title || '').trim();
+  const body = descriptionFor(spec) || undefined;
+  const place = spec.location?.trim() || undefined;
+  switch (spec.kind) {
+    case 'request':
+      return { pill: 'Wanted', eyebrow: 'Looking for', title, body, place, cta: 'Help out on Wecycle' };
+    case 'job':
+      return {
+        pill: spec.roleLabel || 'Gig', eyebrow: spec.roleLabel === 'Hiring' ? 'Hiring on campus' : 'Offering a service',
+        title, body, place, cta: 'Get in touch on Wecycle',
+        figure: spec.badge ? { label: 'Rate', value: spec.badge } : undefined,
+      };
+    case 'event': {
+      const offer = spec.offer ? { label: spec.offer.qualifier, value: spec.offer.headline } : undefined;
+      const when = spec.dateBadge
+        ? { label: whenLabel(spec), value: `${spec.dateBadge.dow} ${spec.dateBadge.day} ${spec.dateBadge.mon}` }
+        : spec.dateLine ? { label: 'When', value: spec.dateLine } : undefined;
+      return {
+        pill: spec.partner?.label || 'Event', eyebrow: 'On campus',
+        title: title || 'Campus event', body, place, cta: 'RSVP on Wecycle',
+        figure: offer ?? when,
+      };
+    }
+    case 'lost':
+      return {
+        pill: 'Lost', eyebrow: 'Have you seen this?', title, body, place, cta: 'Seen it? Say so on Wecycle',
+        figure: spec.reward ? { label: 'Reward', value: spec.reward } : undefined,
+      };
+    case 'found':
+      return { pill: 'Found', eyebrow: 'Is this yours?', title, body, place, cta: 'Claim it on Wecycle' };
+    case 'storefront':
+      return {
+        pill: 'Storefront', eyebrow: spec.storeHandle ? `@${spec.storeHandle}` : 'Student seller',
+        title: (spec.byName || title || 'Storefront').trim(), body, cta: 'Visit the store on Wecycle',
+        stats: (spec.storeStats ?? []).slice(0, 3),
+      };
+    default: {
+      const badge = (spec.badge ?? '').toLowerCase();
+      const value = money(spec);
+      const label = badge.includes('rent') ? 'Rent' : badge.includes('swap') ? 'Swap' : 'Price';
+      return {
+        pill: spec.badge || 'For sale',
+        eyebrow: spec.conditionLabel ? `${spec.conditionLabel} condition` : 'Pre-loved',
+        title, body, place, cta: 'Get it on Wecycle',
+        figure: value ? { label, value } : undefined,
+      };
+    }
+  }
+}
 
+/** "When · 3:00 pm" — the time rides in the label so the value stays a date. */
+function whenLabel(spec: ShareCardSpec): string {
+  const time = spec.dateLine?.split('·').map(s => s.trim()).filter(Boolean)[1];
+  return time ? `When · ${time}` : 'When';
+}
+
+/* ── Building the layers ───────────────────────────────────────────────── */
+
+/** Everything except the moving field. Awaits fonts and images (each capped),
+ *  so it resolves in a few seconds at worst and never rejects for a missing
+ *  asset. */
+export async function buildCardLayers(spec: ShareCardSpec, palette: CardPalette): Promise<CardLayers> {
   const urls = (spec.imageUrls ?? []).filter(u => !!u && /^https?:|^\//.test(u));
-  const [wordmark, logo, avatar, hero, partnerLogo] = await Promise.all([
-    loadImage('/brand/wordmark.png', false),
-    loadImage('/brand/logomark.png', false),
-    spec.byAvatar ? loadImage(spec.byAvatar, true) : Promise.resolve(null),
-    urls[0] ? loadImage(urls[0], true) : Promise.resolve(null),
-    spec.partner?.logoUrl ? loadImage(spec.partner.logoUrl, false) : Promise.resolve(null),
+  const [, wordmark, photo, avatar] = await Promise.all([
+    ensureCardFonts(),
+    withTimeout(imgFrom('/brand/wordmark.png', false), 6000, null),
+    urls[0] ? loadPhoto(urls[0]) : Promise.resolve(null),
+    spec.byAvatar ? loadPhoto(spec.byAvatar) : Promise.resolve(null),
   ]);
 
-  /* Panel geometry. The white card floats on the wash with an even margin, and
-     the photo insets again inside it — the double inset is what the reference
-     cards all do and what stops the photo reading as a banner welded to the
-     top edge. */
-  const M = 56;                         // wash margin around the white card
-  const HEAD = 96;                      // brand strip above the card
-  const PANEL_X = M;
-  const PANEL_Y = HEAD;
-  const PANEL_W = CARD_W - M * 2;
-  const PANEL_H = CARD_H - HEAD - 84;   // leaves the footer line on the wash
-  const PANEL_R = 44;
+  const copy = copyFor(spec);
+  const ar = photo ? photo.width / photo.height : 0;
+  const layout: Layout = !photo ? 'type' : ar > 1.05 ? 'landscape' : 'portrait';
 
-  const PP = 22;                        // photo inset inside the panel
-  const PHOTO_X = PANEL_X + PP;
-  const PHOTO_Y = PANEL_Y + PP;
-  const PHOTO_W = PANEL_W - PP * 2;
-  const PHOTO_H = 700;
-  const PHOTO_R = 30;
+  const scrim = canvas();
+  const grain = canvas();
+  const content = canvas();
+  const sctx = scrim.getContext('2d')!;
+  const cctx = content.getContext('2d')!;
+  paintGrainLayer(grain.getContext('2d')!);
 
-  const FX = PANEL_X + 46;              // text gutter inside the panel
-  const TEXT_W = PANEL_W - 92;
+  /* ── Scrim zones ── */
+  const zones: Zone[] = [];
+  const zone = (box: Box, paint: Zone['paint']) => { zones.push({ box, paint }); paint(sctx, 1); };
+  /* A light veil over the whole field first: the shader is lit, and even its
+     deep colours land a little brighter than a white-type card wants. */
+  sctx.fillStyle = 'rgba(4,4,10,0.10)';
+  sctx.fillRect(0, 0, S, S);
+  zone({ x: M, y: HEAD_Y, w: S - 2 * M, h: HEAD_H }, (c, a) =>
+    linear(c, 0, 0, 0, 240, [[0, 0.40 * a], [1, 0]]));
 
-  /* ── Where the bottom-anchored rows begin ──
-     The price sits on the panel's floor and the meta line sits above it, both
-     measured up from the bottom. The title and description flow DOWN from the
-     photo. These constants are the only thing the two halves share, so they
-     live out here rather than inside paint() — the description has to know
-     where the meta line starts before it decides how many lines to wrap to. */
-  const PRICE_H = 84;
-  const ROW_Y = PANEL_Y + PANEL_H - 44 - PRICE_H;
-  const META_SIZE = 34;
-  /* Ink top of the meta line: it is drawn on the 'middle' baseline, so half
-     its size sits above the y it is drawn at. */
-  const META_INK_TOP = ROW_Y - META_SIZE - META_SIZE / 2;
-
-  /* ── Measure the text before drawing any of it ── */
-  const INK = '#12120E';
-  const INK_MUTED = '#5C5C52';
-
-  /* Title auto-fit. The title is the one thing on the card that must never be
-     cut — a card reading "Lost black Casio watch near the libr…" has failed at
-     its only job. Step down through size/line pairs and take the first that
-     fits whole, holding the big size and spending a line before shrinking. */
-  const TITLE_STEPS: [number, number][] = [[64, 2], [58, 2], [52, 3], [46, 3], [40, 3]];
-  let titleSize = 40;
-  let titleLines: string[] = [spec.title];
-  for (const [size, maxLines] of TITLE_STEPS) {
-    ctx.font = `800 ${size}px ${FONT}`;
-    const lines = wrapText(ctx, spec.title, TEXT_W, maxLines);
-    titleSize = size; titleLines = lines;
-    if (!lines[lines.length - 1].endsWith('…')) break;
-  }
-  const TITLE_LH = Math.round(titleSize * 1.14);
-
-  /* Description — asked for on every kind of card, capped at two lines. Two is
-     the honest cap: it is enough for the sentence that makes someone tap, and
-     more would push the price off the panel, which is the one number the card
-     exists to communicate. */
-  const desc = descriptionFor(spec);
-  ctx.font = `400 32px ${FONT}`;
-  const DESC_LH = 42;
-
-  /* How many description lines there is ROOM for.
-   *
-   * Two is the cap, not the promise. The meta line and the price are anchored
-   * to the panel's bottom while the title and description flow down from the
-   * photo, so the two halves meet in the middle and the winner depends on how
-   * long the title wrapped. On the UXINDIA card the title takes two lines and
-   * the second description line landed 9px into the location text, descenders
-   * through the pin.
-   *
-   * The budget is decided HERE, before wrapping, rather than by dropping an
-   * overflowing line at paint time. Dropping it afterwards leaves the sentence
-   * cut off mid-word with no ellipsis, which reads as a rendering bug rather
-   * than as a summary — wrapText only knows to add the '…' if it is told the
-   * real line count up front. */
-  const descTop = PHOTO_Y + PHOTO_H + 44 + titleLines.length * TITLE_LH + 14;
-  const descBudget = Math.min(2, Math.floor((META_INK_TOP - 22 - descTop) / DESC_LH));
-  const descLines = desc && descBudget > 0 ? wrapText(ctx, desc, TEXT_W, descBudget) : [];
-
-  const paint = (withPhoto: boolean) => {
-    ctx.clearRect(0, 0, CARD_W, CARD_H);
-
-    /* ── Brand wash ── */
-    paintWash(ctx, CARD_W, CARD_H, t.colors);
-    paintGrain(ctx, CARD_W, CARD_H, 0.12, 1);
-
-    /* ── Brand strip ──
-       Wecycle is named at the TOP, before the photo, not tucked in a corner at
-       the bottom. On a card that will be seen mid-scroll among other people's
-       photos, the mark has to be where the eye already is. */
-    if (wordmark) {
-      const wmH = 38;
-      const wmW = wmH * (wordmark.width / wordmark.height);
-      ctx.save();
-      /* The wordmark art is dark; on a dark wash it needs to be white. */
-      const white = tintImage(wordmark, Math.round(wmW), wmH, '#FFFFFF');
-      ctx.drawImage(white, M, (HEAD - wmH) / 2 - 2, wmW, wmH);
-      ctx.restore();
-    } else {
-      ctx.font = `800 36px ${FONT}`;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Wecycle', M, HEAD / 2 - 2);
-      ctx.textBaseline = 'alphabetic';
-    }
-
-    /* Kind badge, top right — "FOR RENT", "LOST", "EVENT". */
-    const badgeText = (spec.badge || t.label).toUpperCase();
-    ctx.font = `700 24px ${FONT}`;
-    const bw = ctx.measureText(badgeText).width + 56;
-    const bh = 46;
-    const bx = CARD_W - M - bw;
-    const by = (HEAD - bh) / 2 - 2;
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    roundRect(ctx, bx, by, bw, bh, bh / 2); ctx.fill();
-    setStroke(ctx, 'rgba(255,255,255,0.34)', 1.5);
-    roundRect(ctx, bx, by, bw, bh, bh / 2); ctx.stroke();
-    ctx.fillStyle = t.accent;
-    ctx.beginPath(); ctx.arc(bx + 26, by + bh / 2, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(badgeText, bx + 42, by + bh / 2 + 1);
-    ctx.textBaseline = 'alphabetic';
-
-    /* ── White panel ── */
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.28)';
-    ctx.shadowBlur = 46;
-    ctx.shadowOffsetY = 14;
-    ctx.fillStyle = '#FFFFFF';
-    roundRect(ctx, PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_R); ctx.fill();
-    ctx.restore();
-
-    /* ── The photo, dominant ── */
-    ctx.save();
-    roundRect(ctx, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H, PHOTO_R);
-    ctx.clip();
-    if (withPhoto && hero) {
-      /* A blurred bed behind a contained draw keeps a portrait photo from
-         sitting on dead grey bars — the bed IS the photo, so the fill always
-         relates to the subject. */
-      const ir = hero.width / hero.height;
-      const rr = PHOTO_W / PHOTO_H;
-      if (Math.abs(ir - rr) > 0.32) {
-        blurredBed(ctx, hero, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H);
-        containDraw(ctx, hero, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H);
-      } else {
-        coverDraw(ctx, hero, PHOTO_X, PHOTO_Y, PHOTO_W, PHOTO_H);
-      }
-    } else {
-      /* No photo: the wash again, one shade up, with the kind's glyph. Never a
-         grey box — an empty card still has to look deliberate. */
-      paintWash(ctx, PHOTO_W, PHOTO_H, t.colors);
-      ctx.save();
-      ctx.translate(PHOTO_X, PHOTO_Y);
-      paintGrain(ctx, PHOTO_W, PHOTO_H, 0.10, 1);
-      ctx.restore();
-      if (partnerLogo) {
-        /* The partner's mark instead of a generic glyph — but only here, in
-           the no-photo case. When the event HAS artwork that artwork is the
-           partner's own poster and already carries their logo; stamping it
-           again would put the same mark on the same image twice, which reads
-           as a mistake rather than as co-branding. */
-        const plW = Math.min(PHOTO_W * 0.72, 620);
-        const plH = plW / (spec.partner?.logoAspect ?? (partnerLogo.width / partnerLogo.height));
-        const white = tintImage(partnerLogo, Math.round(plW), Math.round(plH), '#FFFFFF');
-        ctx.drawImage(white, PHOTO_X + (PHOTO_W - plW) / 2, PHOTO_Y + (PHOTO_H - plH) / 2, plW, plH);
-      } else {
-        ctx.font = `400 160px ${FONT}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.globalAlpha = 0.9;
-        ctx.fillText(t.glyph, PHOTO_X + PHOTO_W / 2, PHOTO_Y + PHOTO_H / 2);
-        ctx.globalAlpha = 1;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-      }
-    }
-    ctx.restore();
-
-    /* ── Words ──
-       textBaseline 'top' rather than the default 'alphabetic', so the gap below
-       the photo is the gap you actually SEE. On the alphabetic baseline the
-       measurement runs to the foot of the letters, and a 64px title puts its
-       cap height 46px back up into that space — a nominal 54px gap rendered as
-       about eight, and the title read as welded to the photo. */
-    ctx.textBaseline = 'top';
-    let y = PHOTO_Y + PHOTO_H + 44;
-
-    ctx.fillStyle = INK;
-    ctx.font = `800 ${titleSize}px ${FONT}`;
-    for (const line of titleLines) {
-      ctx.fillText(line, FX, y);
-      y += TITLE_LH;
-    }
-
-    if (descLines.length) {
-      y += 14;
-      ctx.fillStyle = INK_MUTED;
-      ctx.font = `400 32px ${FONT}`;
-      for (const line of descLines) {
-        ctx.fillText(line, FX, y);
-        y += DESC_LH;
-      }
-    }
-    ctx.textBaseline = 'alphabetic';
-
-    /* ── Price + call to action, on one line ──
-       The reference cards all pair them: the number on the left, the action on
-       the right, at the bottom of the panel. It works because those are the two
-       things a reader wants in that order — what does it cost, and how do I get
-       it — and putting them on one line means the eye never has to hunt for the
-       second after finding the first. */
-    const priceText = (spec.price != null && Number.isFinite(spec.price))
-      ? `₹${Number(spec.price).toLocaleString('en-IN')}`
-      : (spec.badge || '');
-    const money = spec.priceLine || priceText;
-
-    /* ── Price ──
-       No call to action beside it any more. This is a flat PNG that will sit in
-       a chat: a button drawn on it is a button that cannot be pressed, and a
-       card asking to be tapped when it cannot be is the fastest way to make it
-       look fake. The action travels as the message pasted alongside, which is
-       where it actually works — so the money gets the full width instead of
-       sharing the row with a decoration. */
-    if (spec.offer) {
-      /* "25% off" carried in the price's own typography, with the qualifier
-         set beside it rather than under it — one line, so the row keeps the
-         same height it has on a listing card and the panel does not change
-         shape between a sofa and a conference. */
-      const { headline, qualifier, ink } = spec.offer;
-      const midY = ROW_Y + PRICE_H / 2 + 1;
-      ctx.textBaseline = 'middle';
-
-      let headSize = 76;
-      for (const size of [76, 64, 54, 46]) {
-        ctx.font = `800 ${size}px ${FONT}`;
-        headSize = size;
-        if (ctx.measureText(headline).width <= PANEL_W - 92) break;
-      }
-      ctx.font = `800 ${headSize}px ${FONT}`;
-      const headW = ctx.measureText(headline).width;
-
-      /* The qualifier only earns its place if it fits WHOLE on the same line.
-         Truncated to "for Wecycle mem…" it would say nothing and cost the
-         cleanliness of the row, so it is dropped instead — the caption beside
-         the image carries the same sentence in full. */
-      let qualSize = 34;
-      ctx.font = `600 ${qualSize}px ${FONT}`;
-      let qualW = ctx.measureText(qualifier).width;
-      if (headW + 18 + qualW > PANEL_W - 92) {
-        qualSize = 28;
-        ctx.font = `600 ${qualSize}px ${FONT}`;
-        qualW = ctx.measureText(qualifier).width;
-      }
-
-      ctx.fillStyle = ink;
-      ctx.font = `800 ${headSize}px ${FONT}`;
-      ctx.fillText(headline, FX, midY);
-
-      if (headW + 18 + qualW <= PANEL_W - 92) {
-        ctx.fillStyle = INK_MUTED;
-        ctx.font = `600 ${qualSize}px ${FONT}`;
-        /* +4: the small text sits on the big text's optical centre, not its
-           geometric one — matched by eye against the cap height of "25%". */
-        ctx.fillText(qualifier, FX + headW + 18, midY + 4);
-      }
-      ctx.textBaseline = 'alphabetic';
-    } else if (money) {
-      /* Auto-fit: "Swap for any scientific calculator" and "₹450" are the same
-         field and cannot share one size. Bigger than before now that nothing
-         competes for the row. */
-      let moneySize = 76;
-      const moneyMax = PANEL_W - 92;
-      for (const size of [76, 64, 54, 44, 36, 30]) {
-        ctx.font = `800 ${size}px ${FONT}`;
-        moneySize = size;
-        if (ctx.measureText(money).width <= moneyMax) break;
-      }
-      ctx.font = `800 ${moneySize}px ${FONT}`;
-      ctx.fillStyle = INK;
-      ctx.textBaseline = 'middle';
-      ctx.fillText(money, FX, ROW_Y + PRICE_H / 2 + 1);
-      ctx.textBaseline = 'alphabetic';
-    }
-
-    /* ── Meta line: location and date, above the price row ── */
-    const metaBits = [spec.location, spec.dateLine].filter(Boolean) as string[];
-    if (metaBits.length) {
-      const metaY = ROW_Y - META_SIZE;
-      /* 34px, not 27. Location was the smallest text on a card that exists in
-         part to say where the thing is — and it is half of the question the
-         price asks. */
-      ctx.font = `600 ${META_SIZE}px ${FONT}`;
-      ctx.fillStyle = INK_MUTED;
-      ctx.textBaseline = 'middle';
-      let mx = FX;
-      /* A FILLED pin, not a stroked one. At this size a 2.4px outline is a
-         couple of device pixels once the card is scaled into a chat bubble,
-         and it dissolves into a grey smudge; a solid shape with a knocked-out
-         centre survives the downscale and still reads as a map pin. */
-      ctx.save();
-      const px = mx + 8, py = metaY - 2;
-      ctx.fillStyle = INK_MUTED;
-      ctx.beginPath();
-      ctx.arc(px, py, 8, Math.PI * 0.82, Math.PI * 0.18, false);
-      ctx.lineTo(px, py + 14);
-      ctx.closePath();
-      ctx.fill();
-      /* The hole. Drawn in the panel's own white rather than punched out with
-         a composite operation, which would also erase the panel beneath it. */
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(px, py - 1, 3.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      mx += 30;
-      const metaText = metaBits.join('  ·  ');
-      const metaLines = wrapText(ctx, metaText, TEXT_W - 34, 1);
-      ctx.fillText(metaLines[0], mx, metaY + 1);
-      ctx.textBaseline = 'alphabetic';
-    }
-
-    /* ── Footer, on the wash ── */
-    ctx.font = `600 27px ${FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const by2 = PANEL_Y + PANEL_H + (CARD_H - PANEL_Y - PANEL_H) / 2;
-    const who = spec.byName ? `${spec.byName}  ·  wecycle.page` : 'wecycle.page';
-    ctx.fillText(who, CARD_W / 2, by2);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    /* Avatar tucked left of the footer line when we have one. */
-    if (avatar || spec.byInitials) {
-      const r = 24;
-      ctx.save();
-      drawAvatar(ctx, M + r, by2, r, avatar, spec.byInitials, spec.byColor);
-      ctx.restore();
-    }
-    void logo;
-  };
-
-  paint(true);
-  let dataUrl: string;
-  try {
-    dataUrl = canvas.toDataURL('image/png');
-  } catch {
-    /* A cross-origin photo taints the canvas and toDataURL throws. Repaint
-       without it rather than returning nothing — a card with the wash and the
-       words still says what is for sale. */
-    paint(false);
-    dataUrl = canvas.toDataURL('image/png');
-  }
-  const blob = await new Promise<Blob | null>(res => {
-    try { canvas.toBlob(res, 'image/png', 0.95); } catch { res(null); }
-  });
-  return { blob, dataUrl };
-}
-
-/** The reference's two-line closing tagline, per board. */
-function taglineFor(kind: ShareCardKind): [string, string] {
-  switch (kind) {
-    case 'event':   return ['Show up.', 'Take part.'];
-    case 'job':     return ['Real work.', 'On campus.'];
-    case 'request': return ['Someone needs this.', 'You might have it.'];
-    case 'lost':    return ['Seen it?', 'Say something.'];
-    case 'found':   return ['Someone lost this.', 'Help it home.'];
-    default:        return ['Don’t buy new.', 'Buy from a batchmate.'];
-  }
-}
-
-/** The instruction on the photo strip — the click driver. */
-function ctaFor(kind: ShareCardKind): string {
-  switch (kind) {
-    case 'event':   return 'Register on Wecycle';
-    case 'job':     return 'Apply on Wecycle';
-    case 'request': return 'Help out on Wecycle';
-    case 'lost':
-    case 'found':   return 'Claim it on Wecycle';
-    default:        return 'Get it on Wecycle';
-  }
-}
-
-/** The meta row: a boxed date for events, otherwise labelled columns. */
-function drawMeta(
-  ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t: Theme,
-  ink: ReturnType<typeof inkFor>,
-  box: { fx: number; top: number; right: number },
-) {
-  const { fx, top } = box;
-  if (spec.kind === 'event' && spec.dateBadge) {
-    dateBox(ctx, {
-      x: fx, y: top, w: 120, h: 140,
-      top: spec.dateBadge.dow, mid: spec.dateBadge.day, bot: spec.dateBadge.mon,
-      ink: ink.primary,
-    });
-    const tx = fx + 150;
-    ctx.font = `700 34px ${FONT}`;
-    ctx.fillStyle = ink.primary;
-    if (spec.dateLine) ctx.fillText(wrapText(ctx, spec.dateLine, box.right - tx, 1)[0], tx, top + 44);
-    ctx.font = `400 32px ${FONT}`;
-    ctx.fillStyle = ink.muted;
-    if (spec.location) {
-      wrapText(ctx, spec.location, box.right - tx, 2)
-        .forEach((ln, i) => ctx.fillText(ln, tx, top + 92 + i * 42));
-    }
-    return;
-  }
-
-  /* Labelled columns — the marketplace reference's POSTED ON / CONDITION /
-     SELLER row. Never more than three, never an empty one. */
-  const cells = metaColumns(spec);
-  const colW = (box.right - fx) / Math.max(1, cells.length);
-  cells.forEach((c, i) => {
-    const cx = fx + colW * i;
-    ctx.font = `700 24px ${FONT}`;
-    ctx.fillStyle = ink.muted;
-    ctx.fillText(c.label.toUpperCase(), cx, top + 36);
-    ctx.font = `700 38px ${FONT}`;
-    ctx.fillStyle = ink.primary;
-    /* Three lines, not two. "MIT Academic Block 2" in a third-of-the-width
-       column needs the third line, and a half-printed location ("MIT Academic
-       B…") is useless to someone trying to find the item. Fits inside META_H
-       with room to spare: last baseline lands at top+170 of 200. */
-    wrapText(ctx, c.value, colW - 24, 3).forEach((ln, j) => ctx.fillText(ln, cx, top + 86 + j * 42));
-  });
-}
-
-function metaColumns(spec: ShareCardSpec): { label: string; value: string }[] {
-  const out: { label: string; value: string }[] = [];
-  const push = (label: string, v?: string | null) => {
-    const val = (v ?? '').trim();
-    if (val && out.length < 3) out.push({ label, value: val });
-  };
-  const price = spec.price != null ? `₹${spec.price.toLocaleString('en-IN')}` : spec.badge;
-
-  if (spec.kind === 'job') {
-    push('Rate', price);
-    push('Type', spec.roleLabel);
-    push('Where', spec.location);
-  } else if (spec.kind === 'lost' || spec.kind === 'found') {
-    /* No 'Posted by' column here: the footer attribution row already carries
-       the name, avatar, and verified tick. Printing it in both places read as
-       a bug ("Arjun Rao" twice, 200px apart) and spent a whole column on a
-       fact the reader had already been given. */
-    push(spec.kind === 'lost' ? 'Last seen' : 'Found at', spec.location);
-    push('Reward', spec.reward);
-  } else {
-    push('Price', price);
-    push('Condition', spec.conditionLabel);
-    push('Where', spec.location);
-  }
-  return out;
-}
-
-/* ── Footer ───────────────────────────────────────────────────────────────
- * One footer for every board (the old code had two that had drifted apart).
- * Order and proportion follow the HAPE reference:
- *   title (heavy, left) → attribution row (small, muted) → two-column stats
- *   panel → wordmark signature.
- *
- * Deliberately short on information. A share card's job is to make someone tap,
- * not to answer every question — the post itself does that. So: what it is, what
- * it costs, who's behind it, where, and the one extra fact that matters for the
- * board. Description, contact details and chips are all left off.
- */
-function layoutFooter(
-  ctx: CanvasRenderingContext2D, spec: ShareCardSpec, t: Theme, f: FooterCtx, draw: boolean,
-): number {
-  const { W, fx, avatar } = f;
-  const ink = inkFor(t);
-  ctx.textAlign = 'left';
+  /* ── Content ── */
+  const ctx = cctx;
   ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.28)';
+  ctx.shadowBlur = 14;
 
-  /* Clear the bottom pill before the title starts. */
-  let y = f.imBottom + 96;
+  drawBrandRow(ctx, wordmark, copy.pill, palette.accent);
 
-  /* ── Title — the biggest thing on the card, 2 lines max ── */
-  const TITLE = 74, LEAD = 82;
-  ctx.font = `800 ${TITLE}px ${FONT}`;
-  const titleLines = wrapText(ctx, spec.title, W - fx * 2, 2);
-  if (draw) {
-    ctx.fillStyle = ink.primary;
-    titleLines.forEach((ln, i) => ctx.fillText(ln, fx, y + i * LEAD));
-  }
-  y += (titleLines.length - 1) * LEAD;
-
-  /* ── Attribution row — reference's small mark + muted caps label ── */
-  if (spec.byName) {
-    y += 62;
-    const ar = 34;
-    if (draw) {
-      drawAvatar(ctx, fx + ar, y - 6, ar, avatar, spec.byInitials, spec.byColor);
-      const nx = fx + ar * 2 + 22;
-      ctx.font = `700 36px ${FONT}`;
-      ctx.fillStyle = ink.primary;
-      ctx.textBaseline = 'middle';
-      const nm = wrapText(ctx, spec.byName, W - nx - fx - 60, 1)[0];
-      ctx.fillText(nm, nx, y - 22);
-      if (spec.verified) {
-        checkBadge(ctx, nx + ctx.measureText(nm).width + 26, y - 22, 16, t.accent, '#ffffff');
-      }
-      ctx.font = `600 26px ${FONT}`;
-      ctx.fillStyle = ink.muted;
-      ctx.fillText(t.person.toUpperCase(), nx, y + 16);
-      ctx.textBaseline = 'alphabetic';
-    }
-    y += ar + 6;
+  let colX = M, colY = BODY_Y + 18, colW = S - 2 * M, colBottom = FOOT_Y - 64;
+  if (photo && layout === 'portrait') {
+    const frame = fitFrame(ar, { x: 560, y: BODY_Y, w: S - M - 560, h: FOOT_Y - 72 - BODY_Y }, spec.kind === 'event');
+    drawPhoto(ctx, photo, frame);
+    colW = 560 - 40 - M;
+    zone({ x: M, y: BODY_Y, w: colW, h: colBottom - BODY_Y }, (c, a) =>
+      linear(c, 0, 0, 700, 0, [[0, 0.55 * a], [0.6, 0.30 * a], [1, 0]]));
+  } else if (photo && layout === 'landscape') {
+    const frame = fitFrame(ar, { x: M, y: BODY_Y, w: S - 2 * M, h: 430 }, spec.kind === 'event');
+    drawPhoto(ctx, photo, frame);
+    colY = BODY_Y + 430 + 44;
+    zone({ x: M, y: colY, w: S - 2 * M, h: colBottom - colY }, (c, a) =>
+      linear(c, 0, colY - 120, 0, FOOT_Y, [[0, 0], [0.35, 0.45 * a], [1, 0.6 * a]]));
+  } else {
+    zone({ x: M, y: BODY_Y, w: S - 2 * M, h: colBottom - BODY_Y }, (c, a) => {
+      c.fillStyle = `rgba(4,4,10,${0.18 * a})`;
+      c.fillRect(0, 0, S, S);
+      linear(c, 0, 0, S, 0, [[0, 0.45 * a], [1, 0.05 * a]]);
+    });
   }
 
-  /* ── Stats panel — two equal columns, label over value (reference exactly) ── */
-  const cells = panelCells(spec, t);
-  if (cells.length) {
-    y += 44;
-    const ph = 150;
-    if (draw) {
-      roundRect(ctx, fx, y, W - fx * 2, ph, 34);
-      ctx.fillStyle = ink.panel;
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = ink.panelHair;
-      ctx.stroke();
-
-      const inner = W - fx * 2 - 64;
-      const colW = inner / cells.length;
-      cells.forEach((c, i) => {
-        const cx = fx + 32 + colW * i;
-        ctx.font = `600 27px ${FONT}`;
-        ctx.fillStyle = ink.muted;
-        ctx.fillText(c.label.toUpperCase(), cx, y + 54);
-        ctx.font = `800 42px ${FONT}`;
-        ctx.fillStyle = ink.primary;
-        ctx.fillText(wrapText(ctx, c.value, colW - 26, 1)[0], cx, y + 108);
-        /* Hairline between columns, like the reference's 80|20 divider. */
-        if (i > 0) {
-          ctx.beginPath();
-          ctx.moveTo(cx - 26, y + 34);
-          ctx.lineTo(cx - 26, y + ph - 34);
-          ctx.strokeStyle = ink.panelHair;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-      });
-    }
-    y += ph;
+  if (layout === 'landscape') {
+    drawLandscapeText(ctx, copy, { x: colX, y: colY, w: colW, bottom: colBottom });
+  } else {
+    drawColumnText(ctx, copy, { x: colX, y: colY, w: colW, bottom: colBottom }, layout === 'type');
   }
 
-  /* ── Signature — wordmark + the address, so the card says where to go ── */
-  y += 54;
-  const wmH = 50, wmW = wmH * WORDMARK_AR;
-  if (draw && f.wordmark) {
-    ctx.drawImage(tintImage(f.wordmark, wmW, wmH, ink.wordmark), (W - wmW) / 2, y, wmW, wmH);
-  }
-  y += wmH + 26;
-  if (draw) {
-    ctx.font = `600 26px ${FONT}`;
-    ctx.fillStyle = ink.muted;
-    ctx.textAlign = 'center';
-    ctx.fillText('wecycle.page', W / 2, y);
-    ctx.textAlign = 'left';
-  }
+  zone({ x: M, y: FOOT_Y, w: S - 2 * M, h: S - FOOT_Y - 40 }, (c, a) =>
+    linear(c, 0, FOOT_Y - 120, 0, S, [[0, 0], [0.3, 0.50 * a], [1, 0.78 * a]]));
+  drawFooter(ctx, spec, copy, avatar);
 
-  return y + 52;
+  return { scrim, grain, content, zones };
 }
 
-/** The two facts worth a panel cell, per board. Keeps the card to essentials:
- *  never more than two, and never a cell with nothing in it. */
-function panelCells(spec: ShareCardSpec, t: Theme): { label: string; value: string }[] {
-  const out: { label: string; value: string }[] = [];
-  const push = (label: string, value?: string | null) => {
-    const v = (value ?? '').trim();
-    if (v && out.length < 2) out.push({ label, value: v });
-  };
+/* ── Content pieces ────────────────────────────────────────────────────── */
 
-  if (spec.kind === 'event') {
-    push('When', spec.dateLine);
-    push('Where', spec.location);
-  } else if (spec.kind === 'lost' || spec.kind === 'found') {
-    push(spec.kind === 'lost' ? 'Last seen' : 'Found at', spec.location);
-    push('Reward', spec.reward);
-  } else if (spec.kind === 'job') {
-    /* The rate is already the bottom pill, so the panel carries direction and
-       place instead of repeating it. */
-    push('Type', spec.roleLabel);
-    push('Where', spec.location);
+function drawBrandRow(ctx: CanvasRenderingContext2D, wordmark: HTMLImageElement | null, pill: string, accent: string) {
+  const midY = HEAD_Y + HEAD_H / 2;
+  if (wordmark) {
+    const h = 44;
+    const w = h * (wordmark.width / wordmark.height);
+    /* The wordmark art is dark; white it, keeping its alpha. */
+    const off = document.createElement('canvas');
+    off.width = Math.ceil(w); off.height = h;
+    const o = off.getContext('2d')!;
+    o.drawImage(wordmark, 0, 0, w, h);
+    o.globalCompositeOperation = 'source-in';
+    o.fillStyle = WHITE;
+    o.fillRect(0, 0, off.width, off.height);
+    ctx.drawImage(off, M, midY - h / 2 - 2, w, h);
   } else {
-    push('Where', spec.location);
-    push('Condition', spec.conditionLabel);
+    ctx.font = cardFont(SANS, 900, 40);
+    ctx.fillStyle = WHITE;
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Wecycle', M, midY);
+    ctx.textBaseline = 'alphabetic';
   }
-  /* One cell alone looks like a mistake next to the reference's paired panel, so
-     fall back to the board name rather than leaving a lopsided box. */
-  if (out.length === 1) out.push({ label: 'On', value: `Wecycle · ${getActiveRoom().university === 'NMIMS' ? getActiveRoom().name : 'MAHE'}` });
+
+  /* The pill: frosted, a dot of the palette's light, the kind in small caps. */
+  const label = pill.toUpperCase();
+  ctx.save();
+  ctx.shadowColor = 'transparent';
+  ctx.font = cardFont(SANS, 700, 23);
+  const track = 2.6;
+  let tw = 0;
+  for (const ch of label) tw += ctx.measureText(ch).width + track;
+  tw -= track;
+  const h = HEAD_H, padL = 26, dot = 10, gap = 14, padR = 28;
+  const w = padL + dot + gap + tw + padR;
+  const x = S - M - w;
+  roundRect(ctx, x, HEAD_Y, w, h, h / 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x + padL + dot / 2, midY, dot / 2, 0, Math.PI * 2);
+  ctx.fillStyle = accent;
+  ctx.fill();
+  ctx.fillStyle = WHITE;
+  ctx.textBaseline = 'middle';
+  tracked(ctx, label, x + padL + dot + gap, midY + 1, track);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
+/** The photo's frame inside `box`, shaped by the photo itself.
+ *  A poster (events) is never cropped — the frame takes its exact shape. Any
+ *  other photo may lose a little to fill the box better, but never more than
+ *  a quarter: past that the crop starts cutting off the thing being sold. */
+function fitFrame(ar: number, box: Box, exact: boolean): Box {
+  const boxAr = box.w / box.h;
+  let fr = ar;
+  if (!exact) fr = Math.min(Math.max(ar, boxAr * 0.8), boxAr * 1.25);
+  const w = fr > boxAr ? box.w : box.h * fr;
+  const h = fr > boxAr ? box.w / fr : box.h;
+  return { x: box.x + (box.w - w), y: box.y + (box.h - h) / 2, w, h };
+}
+
+function drawPhoto(ctx: CanvasRenderingContext2D, img: Bitmap, f: Box) {
+  const r = 34;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 60;
+  ctx.shadowOffsetY = 24;
+  roundRect(ctx, f.x, f.y, f.w, f.h, r);
+  ctx.fillStyle = '#101014';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  roundRect(ctx, f.x, f.y, f.w, f.h, r);
+  ctx.clip();
+  ctx.shadowColor = 'transparent';
+  const ir = img.width / img.height;
+  if (Math.abs(ir - f.w / f.h) < 0.01) ctx.drawImage(img, f.x, f.y, f.w, f.h);
+  else coverDraw(ctx, img, f.x, f.y, f.w, f.h);
+  ctx.restore();
+
+  ctx.save();
+  ctx.shadowColor = 'transparent';
+  roundRect(ctx, f.x + 1, f.y + 1, f.w - 2, f.h - 2, r - 1);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.stroke();
+  ctx.restore();
+}
+
+function eyebrow(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
+  ctx.font = cardFont(SANS, 700, 22);
+  ctx.fillStyle = QUIET;
+  tracked(ctx, text.toUpperCase(), x, y, 2.4);
+}
+
+/** Headline sizes to try, biggest first, each with the lines it may use. */
+type Steps = [number, number][];
+
+function fitTitle(ctx: CanvasRenderingContext2D, title: string, width: number, steps: Steps): { size: number; lines: string[] } {
+  let best = { size: steps[steps.length - 1][0], lines: [title] };
+  for (const [size, maxLines] of steps) {
+    ctx.font = cardFont(PIXEL, 400, size);
+    const lines = wrapText(ctx, title, width, maxLines);
+    best = { size, lines };
+    /* Take the biggest size that fits whole, without breaking a word. */
+    const broke = lines.some(l => ctx.measureText(l).width > width);
+    if (!lines[lines.length - 1].endsWith('…') && !broke) break;
+  }
+  return best;
+}
+
+function drawFigure(ctx: CanvasRenderingContext2D, fig: { label: string; value: string }, x: number, baseline: number, maxW: number, align: 'left' | 'right' = 'left') {
+  let size = 66;
+  ctx.font = cardFont(SANS, 900, size);
+  while (size > 38 && ctx.measureText(fig.value).width > maxW) { size -= 4; ctx.font = cardFont(SANS, 900, size); }
+  const value = wrapText(ctx, fig.value, maxW, 1)[0];
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = align;
+  ctx.fillText(value, x, baseline);
+  ctx.textAlign = 'left';
+  ctx.font = cardFont(SANS, 700, 21);
+  ctx.fillStyle = QUIET;
+  tracked(ctx, fig.label.toUpperCase(), x, baseline - size - 14, 2.2, align);
+}
+
+function drawStats(ctx: CanvasRenderingContext2D, stats: { label: string; value: string }[], x: number, baseline: number, w: number) {
+  const colW = w / Math.max(1, stats.length);
+  stats.forEach((st, i) => {
+    const cx = x + colW * i;
+    ctx.font = cardFont(SANS, 900, 56);
+    ctx.fillStyle = WHITE;
+    ctx.fillText(st.value, cx, baseline);
+    ctx.font = cardFont(SANS, 700, 19);
+    ctx.fillStyle = QUIET;
+    tracked(ctx, st.label.toUpperCase(), cx, baseline - 70, 1.6);
+  });
+}
+
+/** Portrait photo or no photo: everything in one column. */
+function drawColumnText(ctx: CanvasRenderingContext2D, copy: CardCopy, col: { x: number; y: number; w: number; bottom: number }, big: boolean) {
+  let y = col.y + 22;
+  if (copy.eyebrow) { eyebrow(ctx, copy.eyebrow, col.x, y); y += 26; }
+
+  const steps: Steps = big
+    ? [[112, 3], [96, 3], [84, 4], [72, 4], [62, 5]]
+    : [[76, 3], [68, 3], [60, 4], [54, 4], [48, 5], [42, 5]];
+  const t = fitTitle(ctx, copy.title, col.w, steps);
+  const lh = Math.round(t.size * 1.06);
+  ctx.font = cardFont(PIXEL, 400, t.size);
+  ctx.fillStyle = WHITE;
+  y += 14;
+  for (const line of t.lines) { y += lh; ctx.fillText(line, col.x, y); }
+
+  /* The figure (or stats) sits on the column's floor; the body takes what is
+     left between it and the headline, and stops a clear gap above the
+     figure's label — measured from the label's real top, not guessed. */
+  const figTop = copy.stats?.length ? col.bottom - 56 - 70 - 20
+    : copy.figure ? col.bottom - 66 - 14 - 21
+    : col.bottom;
+  if (copy.body) {
+    const size = big ? 32 : 30;
+    const blh = Math.round(size * 1.42);
+    const first = y + 24 + size;
+    const room = Math.floor((figTop - 34 - first) / blh) + 1;
+    ctx.font = cardFont(SANS, 500, size);
+    const lines = room > 0 ? wrapText(ctx, copy.body, col.w, Math.min(4, room)) : [];
+    ctx.fillStyle = MUTED;
+    lines.forEach((line, i) => ctx.fillText(line, col.x, first + i * blh));
+  }
+
+  if (copy.stats?.length) drawStats(ctx, copy.stats, col.x, col.bottom, col.w);
+  else if (copy.figure) drawFigure(ctx, copy.figure, col.x, col.bottom, col.w);
+}
+
+/** Landscape photo: headline left, figure right, body under both. */
+function drawLandscapeText(ctx: CanvasRenderingContext2D, copy: CardCopy, col: { x: number; y: number; w: number; bottom: number }) {
+  const figW = copy.stats?.length ? 420 : copy.figure ? 330 : 0;
+  const textW = col.w - (figW ? figW + 40 : 0);
+  let y = col.y;
+  if (copy.eyebrow) { eyebrow(ctx, copy.eyebrow, col.x, y); y += 18; }
+  const t = fitTitle(ctx, copy.title, textW, [[64, 2], [56, 2], [50, 2], [44, 2], [40, 2]]);
+  const lh = Math.round(t.size * 1.06);
+  ctx.font = cardFont(PIXEL, 400, t.size);
+  ctx.fillStyle = WHITE;
+  for (const line of t.lines) { y += lh; ctx.fillText(line, col.x, y); }
+
+  if (copy.body) {
+    ctx.font = cardFont(SANS, 500, 28);
+    const room = Math.floor((col.bottom - (y + 18)) / 38);
+    const lines = room > 0 ? wrapText(ctx, copy.body, textW, Math.min(2, room)) : [];
+    ctx.fillStyle = MUTED;
+    y += 18;
+    for (const line of lines) { y += 38; ctx.fillText(line, col.x, y); }
+  }
+  if (copy.stats?.length) drawStats(ctx, copy.stats, S - M - figW, col.y + 104, figW);
+  else if (copy.figure) drawFigure(ctx, copy.figure, S - M, col.y + 104, figW, 'right');
+}
+
+function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  ctx.save();
+  ctx.strokeStyle = MUTED;
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.15, s * 0.36, Math.PI * 0.85, Math.PI * 2.15);
+  ctx.lineTo(x, y + s * 0.5);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.15, s * 0.12, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, copy: CardCopy, avatar: Bitmap | null) {
+  /* Hairline, then the person and the place, then the instruction. */
+  ctx.save();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(M, FOOT_Y, S - 2 * M, 2);
+  ctx.restore();
+
+  const rowY = FOOT_Y + 62;
+  const r = 30;
+  let tx = M;
+  if (spec.byName) {
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.beginPath();
+    ctx.arc(M + r, rowY, r, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.save();
+    ctx.clip();
+    if (avatar) coverDraw(ctx, avatar, M, rowY - r, r * 2, r * 2);
+    else {
+      ctx.fillStyle = spec.byColor || '#E9E4FF';
+      ctx.fillRect(M, rowY - r, r * 2, r * 2);
+      ctx.fillStyle = '#14161A';
+      ctx.font = cardFont(SANS, 700, 24);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText((spec.byInitials || spec.byName.slice(0, 1)).slice(0, 2).toUpperCase(), M + r, rowY + 1);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.restore();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.stroke();
+    ctx.restore();
+
+    tx = M + r * 2 + 18;
+    ctx.font = cardFont(SANS, 700, 30);
+    ctx.fillStyle = WHITE;
+    ctx.fillText(wrapText(ctx, spec.byName, 380, 1)[0], tx, rowY - 4);
+    ctx.font = cardFont(SANS, 500, 23);
+    ctx.fillStyle = QUIET;
+    ctx.fillText(spec.verified ? 'Verified student' : 'On Wecycle', tx, rowY + 26);
+  }
+
+  if (copy.place) {
+    const maxW = 420;
+    ctx.font = cardFont(SANS, 600, 27);
+    const lines = wrapText(ctx, copy.place, maxW, 2);
+    ctx.fillStyle = MUTED;
+    ctx.textAlign = 'right';
+    const top = lines.length === 1 ? rowY + 9 : rowY - 8;
+    lines.forEach((ln, i) => ctx.fillText(ln, S - M, top + i * 34));
+    ctx.textAlign = 'left';
+    const widest = Math.max(...lines.map(l => ctx.measureText(l).width));
+    drawPin(ctx, S - M - widest - 22, top - 9, 26);
+  }
+
+  const baseY = S - M + 4;
+  ctx.font = cardFont(SANS, 700, 26);
+  ctx.fillStyle = WHITE;
+  ctx.fillText(copy.cta, M, baseY);
+  ctx.font = cardFont(SANS, 600, 26);
+  ctx.fillStyle = QUIET;
+  ctx.textAlign = 'right';
+  ctx.fillText('wecycle.page', S - M, baseY);
+  ctx.textAlign = 'left';
+}
+
+/* ── Composition ───────────────────────────────────────────────────────── */
+
+const GRAIN_ALPHA = 0.16;
+export const CARD_GRAIN_ALPHA = GRAIN_ALPHA;
+
+function relLum(r: number, g: number, b: number): number {
+  const f = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+/** The 95th-percentile luminance under a box — the bright pixels a reader's
+ *  eye actually fights, without one stray highlight deciding everything. */
+function brightUnder(ctx: CanvasRenderingContext2D, b: Box): number {
+  const data = ctx.getImageData(Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)).data;
+  const lum: number[] = [];
+  for (let i = 0; i < data.length; i += 4 * 7) lum.push(relLum(data[i], data[i + 1], data[i + 2]));
+  lum.sort((a, z) => a - z);
+  return lum[Math.floor(lum.length * 0.95)] ?? 0;
+}
+
+/** White on this luminance must clear 4.5:1 for body copy; aim for 6:1 so
+ *  the muted lines (white at ~70%) clear it too. */
+const MAX_FIELD_LUM = 0.125;
+
+/** Whether the shader has painted anything yet. A WebGL canvas reads back
+ *  as transparent until its first frame (and after a lost context), and a
+ *  card composed over that is a black square with words on it — so a Share
+ *  in the first moment after opening gets the painted field instead. */
+function fieldHasDrawn(field: CanvasImageSource): boolean {
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = 8; probe.height = 8;
+    const p = probe.getContext('2d', { willReadFrequently: true })!;
+    p.drawImage(field, 0, 0, 8, 8);
+    const d = p.getImageData(0, 0, 8, 8).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && d[i] + d[i + 1] + d[i + 2] > 12) lit++;
+    return lit >= 8;
+  } catch {
+    return false;
+  }
+}
+
+/** The finished card: the field (a frozen shader frame, or the painted
+ *  fallback), the scrim — strengthened wherever the frame is bright under
+ *  text — the grain, and the content. */
+export function composeCard(layers: CardLayers, field: CanvasImageSource | null, palette: CardPalette): HTMLCanvasElement {
+  const out = canvas();
+  const ctx = out.getContext('2d', { willReadFrequently: true })!;
+  if (field && fieldHasDrawn(field)) {
+    try { ctx.drawImage(field, 0, 0, S, S); } catch { paintFallbackField(ctx, palette); }
+  } else {
+    paintFallbackField(ctx, palette);
+  }
+  ctx.drawImage(layers.scrim, 0, 0);
+
+  for (const z of layers.zones) {
+    for (let pass = 0; pass < 3; pass++) {
+      let L: number;
+      try { L = brightUnder(ctx, z.box); } catch { break; }
+      if (L <= MAX_FIELD_LUM) break;
+      /* Darkening by alpha a scales luminance by (1 - a); ask for what is
+         missing, then measure again — the zone's gradient is uneven. */
+      z.paint(ctx, Math.min(1.4, (1 - MAX_FIELD_LUM / L) * 1.6));
+    }
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = GRAIN_ALPHA;
+  ctx.drawImage(layers.grain, 0, 0);
+  ctx.restore();
+  ctx.drawImage(layers.content, 0, 0);
   return out;
+}
+
+/** JPEG at 0.92: WhatsApp re-encodes everything as JPEG anyway, and handing it
+ *  one already at this quality and size means it barely touches it — where a
+ *  2–3 MB PNG of film grain gets crushed. */
+export function cardBlob(c: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise(resolve => {
+    try { c.toBlob(b => resolve(b), 'image/jpeg', 0.92); } catch { resolve(null); }
+  });
 }
 
 /* ── The message that travels with the card ────────────────────────────────
@@ -2134,55 +957,81 @@ function lowerFirst(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
+
 export type ShareCardResult = 'shared' | 'downloaded' | 'copied' | 'unavailable';
 
-/** Share the rendered card AS AN IMAGE, with the product link in the caption.
- *  Falls back to a PNG download + link copy where files can't be shared. */
-/** The full message that goes out with the card: the hook, the poster's own
- *  description, then the link.
- *
- *  The description used to be drawn ON the card and is now not — it is not one
- *  of the five things the card exists to show, and every line it took came off
- *  the price. It travels here instead, which is the better home for it anyway:
- *  in a chat bubble it is selectable, searchable and translatable, none of
- *  which is true of words baked into a PNG.
- *
- *  Trimmed to ~220 characters. WhatsApp collapses a long message behind "Read
- *  more", and a hook that has to be expanded to be read has stopped being a
- *  hook. */
+/** The message that goes out with the card: the hook, then the link. The
+ *  description is on the card itself now, so it is not repeated here. */
 function shareMessage(spec: ShareCardSpec, url: string): string {
-  const hook = cardText(spec);
-  /* Only when the card itself does not already show it. The spotlight layout
-     and the storefront card both draw the description; repeating it underneath
-     makes the message read as a copy-paste error rather than as a caption. The
-     classic layout leaves it off the card, so there the message carries it. */
-  const onCard = spec.kind === 'storefront' || CARD_LAYOUT === 'spotlight';
-  const desc = onCard ? '' : descriptionFor(spec);
-  const blurb = desc.length > 220 ? `${desc.slice(0, 219).trimEnd()}…` : desc;
-  return [hook, blurb, url].filter(Boolean).join('\n\n');
+  return [spec.partnerMessage || cardText(spec), url].filter(Boolean).join('\n\n');
 }
 
+function fileName(spec: ShareCardSpec): string {
+  return `wecycle-${spec.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) || spec.kind}.jpg`;
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+/** Inside the installed apps the browser's share and download don't exist
+ *  (Android's WebView has no Web Share at all, and an <a download> there goes
+ *  nowhere), which is how a card could render and then never leave the phone.
+ *  So the app writes the image to its cache and hands the file to the OS
+ *  share sheet through Capacitor. Returns null where that path is not
+ *  available — the web, or an app build from before these plugins. */
+async function shareNative(blob: Blob, spec: ShareCardSpec, url: string): Promise<ShareCardResult | null> {
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform()
+        || !Capacitor.isPluginAvailable('Filesystem')
+        || !Capacitor.isPluginAvailable('Share')) return null;
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+      import('@capacitor/filesystem'),
+      import('@capacitor/share'),
+    ]);
+    const written = await Filesystem.writeFile({
+      path: fileName(spec),
+      data: await blobToBase64(blob),
+      directory: Directory.Cache,
+    });
+    try {
+      await Share.share({ title: spec.title, text: shareMessage(spec, url), files: [written.uri] });
+    } catch (e) {
+      /* Dismissing the sheet rejects; that is a choice, not a failure. */
+      if (!/cancel/i.test(String((e as Error)?.message ?? e))) throw e;
+    }
+    haptics.light();
+    return 'shared';
+  } catch {
+    return null;
+  }
+}
+
+/** Share the card AS AN IMAGE, with the link in the caption. Falls back to a
+ *  download plus a copied link where files can't be shared. */
 export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Promise<ShareCardResult> {
   if (typeof navigator === 'undefined') return 'unavailable';
   const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : 'https://wecycle.page');
 
   if (blob) {
-    const file = new File([blob], `wecycle-${spec.kind}.png`, { type: 'image/png' });
+    const native = await shareNative(blob, spec, url);
+    if (native) return native;
+
+    const file = new File([blob], fileName(spec), { type: blob.type || 'image/jpeg' });
     const nav = navigator as Navigator & {
       canShare?: (d: ShareData) => boolean;
       share?: (d: ShareData) => Promise<void>;
     };
-    /* The link goes in `text` ONLY.
-     *
-     * Passing both `text` (ending in the url) and `url` made WhatsApp print the
-     * link twice — it appends `url` to whatever `text` already says, so the
-     * bubble carried the same 71-character link back to back. Dropping `url`
-     * instead of trimming it from `text` is deliberate: many share targets
-     * silently discard `url` when `files` is present, so keeping it there
-     * risked sharing a card with no link at all. One copy, guaranteed. */
-    const data: ShareData = {
-      files: [file], title: spec.title, text: shareMessage(spec, url),
-    } as ShareData;
+    /* The link goes in `text` ONLY: WhatsApp appends `url` to `text`, so
+       passing both printed the link twice, and many targets drop `url`
+       when files are attached. */
+    const data: ShareData = { files: [file], title: spec.title, text: shareMessage(spec, url) } as ShareData;
     if (typeof nav.share === 'function' && nav.canShare?.(data)) {
       try {
         await nav.share(data);
@@ -2198,16 +1047,20 @@ export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Pro
 
 export async function downloadCardBlob(blob: Blob | null, spec: ShareCardSpec): Promise<ShareCardResult> {
   if (!blob || typeof document === 'undefined') return 'unavailable';
+  const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : '');
+  /* In the app, "save" is the share sheet too — it is where Save Image lives. */
+  const native = await shareNative(blob, spec, url);
+  if (native) return native;
+
   const href = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = href;
-  a.download = `wecycle-${spec.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) || spec.kind}.png`;
+  a.download = fileName(spec);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(href), 1500);
 
-  const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : '');
   try { await navigator.clipboard?.writeText(url); } catch { /* ignore */ }
   haptics.success();
   return 'downloaded';

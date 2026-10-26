@@ -416,6 +416,7 @@ export default function EventDetailScreen({
     description: event.description,
     byName: event.organizer?.name,
     byInitials: event.organizer?.initials,
+    byAvatar: event.organizer?.id ? getAvatar(event.organizer.id, 128) : undefined,
     byColor: event.organizer?.color,
     verified: true,
     byEmail: ownerContact.email,

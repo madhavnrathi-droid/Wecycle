@@ -428,6 +428,7 @@ export function LostFoundDetailSheet({
     description: item.description,
     byName: item.user.name,
     byInitials: item.user.initials,
+    byAvatar: getAvatar(item.user.id, 128),
     byColor: item.user.color,
     verified: item.verified,
     byEmail: ownerContact.email,
