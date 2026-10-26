@@ -12,6 +12,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import ShareRedirect from './ShareRedirect';
 import { isFullUuid, idPrefixBounds } from '../../../lib/shareUrl';
+import { unpackLinks } from '../../../lib/postLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +101,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
    * ended this event's card on "It brings togethe", which reads as a truncated
    * database field rather than a summary. The ellipsis says the sentence
    * continues; a severed word just looks broken. */
-  const raw = (m.description?.trim() || `${m.kindLabel} — circulate what you no longer need.`)
+  /* Without the post's links trailer (lib/postLink.ts): a preview card is
+     the place for the words, and a list of URLs there reads as spam. */
+  const raw = (unpackLinks(m.description).text.trim() || `${m.kindLabel} — circulate what you no longer need.`)
     .replace(/\s+/g, ' ')
     .trim();
   const LIMIT = 180;

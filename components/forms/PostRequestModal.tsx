@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Bell, EmojiGlyph } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import LinksField, { linksFromDrafts, linksError, type LinkDraft } from './LinksField';
 import { createRequest } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
@@ -27,6 +28,8 @@ export interface RequestForm {
   category: string;
   urgency: 'normal' | 'urgent';
   description: string;
+  /** Up to three — "this exact model", a photo of the one you mean. */
+  links: LinkDraft[];
   needByDate: string;
   photos: string[];
   /** Hours until the request auto-expires (24–168). */
@@ -49,7 +52,7 @@ function formatDuration(hours: number): string {
 
 export default function PostRequestModal({ open, onClose, onSubmit }: PostRequestModalProps) {
   const [form, setForm] = useState<RequestForm>({
-    title: '', category: '', urgency: 'normal', description: '',
+    title: '', category: '', urgency: 'normal', description: '', links: [],
     needByDate: '', photos: [],
     /* Default to 3 days — comfortable middle of the 24h–7d range, matches
      * the "request feels active but not eternal" community norm. */
@@ -71,6 +74,8 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
     if (!form.title.trim()) e.title = 'Required';
     if (!form.category) e.category = 'Pick a category';
     if (!form.description.trim()) e.description = 'Help people understand';
+    const badLink = linksError(form.links);
+    if (badLink) e.links = badLink;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -86,6 +91,7 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
           title: form.title,
           category: form.category,
           description: form.description,
+          links: linksFromDrafts(form.links),
           urgency: form.urgency,
           needByDate: form.needByDate,
           durationHours: form.durationHours,
@@ -101,12 +107,13 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
         has_need_by: !!form.needByDate,
         duration_hours: form.durationHours,
         has_description: form.description.trim().length > 0,
+        link_count: linksFromDrafts(form.links).length,
         category: form.category,
       });
       onSubmit?.(form);
       pickerRef.current?.clear();
       setForm({
-        title: '', category: '', urgency: 'normal', description: '',
+        title: '', category: '', urgency: 'normal', description: '', links: [],
         needByDate: '', photos: [], durationHours: 72,
       });
       setNotifyOnEngagement(true);
@@ -211,6 +218,14 @@ export default function PostRequestModal({ open, onClose, onSubmit }: PostReques
           />
           {errors.description && <span className="field-error">{errors.description}</span>}
         </div>
+
+        <LinksField
+          id="rq-link"
+          value={form.links}
+          onChange={next => update('links', next)}
+          showErrors={!!errors.links}
+          hint="The exact model, a listing elsewhere, a photo of the one you mean."
+        />
 
         <fieldset style={{ border: 'none', padding: 0, margin: '0 0 16px' }}>
           <legend className="field-label" style={{ marginBottom: 8 }}>Urgency</legend>

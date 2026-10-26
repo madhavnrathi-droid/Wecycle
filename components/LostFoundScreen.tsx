@@ -11,6 +11,9 @@
  * Cards are clickable and open a lightweight detail sheet. Contact actions
  * gate behind auth via the shared onRequireAuth + onOpenStorefront props. */
 
+import { LinkList } from './PostLink';
+import LinksField, { linkDraftsOf, linksFromDrafts, linksError, linkDraftsKey, type LinkDraft } from './forms/LinksField';
+import type { PostLink } from '../lib/postLink';
 import { getActiveRoom, isPrivateRoom } from '../lib/rooms';
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
@@ -374,6 +377,7 @@ export interface LostFoundDetailSheetProps {
 export interface LFSavePatch {
   title: string;
   description: string;
+  links: PostLink[];
   status: 'lost' | 'found';
   lastSeen: string;
   reward: string;
@@ -438,6 +442,7 @@ export function LostFoundDetailSheet({
   /* Inline-edit state — only meaningful when isOwner. */
   const [eTitle, setETitle] = useState(item.title);
   const [eDescription, setEDescription] = useState(item.description ?? '');
+  const [eLinks, setELinks] = useState<LinkDraft[]>(() => linkDraftsOf(item.links));
   const [eStatus, setEStatus] = useState<'lost' | 'found'>(
     item.status === 'lost' || item.status === 'found' ? item.status : 'lost',
   );
@@ -446,10 +451,11 @@ export function LostFoundDetailSheet({
   useEffect(() => {
     setETitle(item.title);
     setEDescription(item.description ?? '');
+    setELinks(linkDraftsOf(item.links));
     setEStatus(item.status === 'lost' || item.status === 'found' ? item.status : 'lost');
     setELastSeen(item.lastSeen ?? '');
     setEReward(item.reward ?? '');
-  }, [item.id, item.title, item.description, item.status, item.lastSeen, item.reward]);
+  }, [item.id, item.title, item.description, item.links, item.status, item.lastSeen, item.reward]);
 
   /* Escape closes the detail sheet — matches the shared Modal so keyboard users
      aren't trapped (the sheet has a Close button but no key handler otherwise). */
@@ -462,6 +468,7 @@ export function LostFoundDetailSheet({
   const isDirty =
     eTitle !== item.title ||
     eDescription !== (item.description ?? '') ||
+    linkDraftsKey(eLinks) !== linkDraftsKey(linkDraftsOf(item.links)) ||
     eStatus !== item.status ||
     eLastSeen !== (item.lastSeen ?? '') ||
     eReward !== (item.reward ?? '');
@@ -469,11 +476,13 @@ export function LostFoundDetailSheet({
   const [saving, setSaving] = useState<null | 'save' | 'repost'>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const buildPatch = (): LFSavePatch => ({
-    title: eTitle, description: eDescription,
+    title: eTitle, description: eDescription, links: linksFromDrafts(eLinks),
     status: eStatus, lastSeen: eLastSeen, reward: eReward,
   });
   const runSave = async (kind: 'save' | 'repost') => {
     if (!isDirty || saving) return;
+    const badLink = linksError(eLinks);
+    if (badLink) { setSaveError(badLink); return; }
     setSaving(kind);
     setSaveError(null);
     try {
@@ -488,6 +497,7 @@ export function LostFoundDetailSheet({
   const discard = () => {
     setETitle(item.title);
     setEDescription(item.description ?? '');
+    setELinks(linkDraftsOf(item.links));
     setEStatus(item.status === 'lost' || item.status === 'found' ? item.status : 'lost');
     setELastSeen(item.lastSeen ?? '');
     setEReward(item.reward ?? '');
@@ -773,12 +783,24 @@ export function LostFoundDetailSheet({
                 rows={4}
               />
             </LFEditField>
+            <LFEditField label="Links">
+              <LinksField id="lf-ed-link" bare value={eLinks} onChange={setELinks} />
+            </LFEditField>
           </div>
         ) : (
-          <p style={{
-            margin: '0 0 14px', fontSize: 'calc(14px * var(--text-scale))', lineHeight: 1.55, color: 'var(--text-secondary)',
-            whiteSpace: 'pre-wrap',
-          }}>{item.description}</p>
+          <>
+            {item.description && (
+              <p style={{
+                margin: '0 0 14px', fontSize: 'calc(14px * var(--text-scale))', lineHeight: 1.55, color: 'var(--text-secondary)',
+                whiteSpace: 'pre-wrap',
+              }}>{item.description}</p>
+            )}
+            <LinkList
+              links={item.links ?? []}
+              onOpen={(_, i) => track(EVT.post_link_opened, { id: item.id, from: 'lostfound', index: i })}
+              style={{ margin: '0 0 14px' }}
+            />
+          </>
         )}
 
         {/* Reporter card + intro + contact buttons are for VIEWERS only. The

@@ -2,9 +2,10 @@
 
 import { useRef, useState } from 'react';
 import type { MarketplaceItem } from '../../lib/mockData';
-import { normalizeLink, linkHost } from '../../lib/postLink';
+import LinksField, { linksFromDrafts, linksError, type LinkDraft } from './LinksField';
+import { linkHost } from '../../lib/postLink';
 import { findObjectionable, objectionableMessage } from '../../lib/contentFilter';
-import { MapPin, Bell, Link2, ChevronRight, EmojiGlyph } from '@/lib/icons';
+import { MapPin, Bell, ChevronRight, EmojiGlyph } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
 import { createListingWithMedia } from '../../lib/liveData';
@@ -76,10 +77,10 @@ export interface ShareItemForm {
   swapFor: string;
   price?: number;
   photos: string[];
-  /* Optional outbound link, exactly as typed. Normalised on submit, not on
-     every keystroke — rewriting the box while someone is mid-URL is the same
-     mistake the email field made. */
-  link: string;
+  /* Up to three outbound links, exactly as typed. Normalised on submit, not
+     on every keystroke — rewriting the box while someone is mid-URL is the
+     same mistake the email field made. */
+  links: LinkDraft[];
   linkOnPhoto: boolean;
   /* Service (opportunity) compensation — only used in mode="service".
      Every field below `comp` is optional: a paid gig can be posted with no
@@ -101,7 +102,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
   const isService = mode === 'service';
   const [form, setForm] = useState<ShareItemForm>({
     title: '', categories: isService ? ['services'] : [], condition: '', description: '',
-    link: '', linkOnPhoto: false,
+    links: [], linkOnPhoto: false,
     location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '',
     photos: [], comp: 'free', oppRole: 'offering',
   });
@@ -110,10 +111,10 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const pickerRef = useRef<PhotoPickerHandle>(null);
-  /* Host of the link as typed, or null while it isn't a link yet. Drives both
-     the confirmation hint and whether the photo toggle is offered at all. */
-  const normalizedLink = normalizeLink(form.link);
-  const linkPreviewHost = normalizedLink ? linkHost(normalizedLink) : null;
+  /* The links that are links so far. The first one drives whether the photo
+     toggle is offered at all. */
+  const validLinks = linksFromDrafts(form.links);
+  const firstLink = validLinks[0] ?? null;
 
   const update = <K extends keyof ShareItemForm>(key: K, value: ShareItemForm[K]) => {
     setForm(f => ({ ...f, [key]: value }));
@@ -137,9 +138,8 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
        optional and defaults to 'good' on submit. */
     /* An unusable link is an error, never a silent drop. Posting without the
        link someone deliberately attached is worse than telling them it's wrong. */
-    if (form.link.trim() && !normalizeLink(form.link)) {
-      e.link = 'That doesn’t look like a web address. Try example.com/page';
-    }
+    const badLink = linksError(form.links);
+    if (badLink) e.links = badLink;
     /* Guideline 1.2 asks for a method of FILTERING objectionable content, not
        only for reporting it after the fact. Checked here so the refusal is
        attached to the field that caused it; enforced again by a database
@@ -155,7 +155,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
 
   const reset = () => {
     setForm({
-      title: '', categories: isService ? ['services'] : [], condition: '', description: '', link: '', linkOnPhoto: false, location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '', photos: [], comp: 'free', oppRole: 'offering',
+      title: '', categories: isService ? ['services'] : [], condition: '', description: '', links: [], linkOnPhoto: false, location: '', deal: 'free', rentPeriod: DEFAULT_RENT_PERIOD, swapFor: '', photos: [], comp: 'free', oppRole: 'offering',
     });
     setNotifyOnEngagement(true);
   };
@@ -188,7 +188,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
             swapFor:    form.deal === 'swap' ? form.swapFor    : undefined,
           }),
           media: pickerRef.current?.getMedia() ?? [],
-          linkUrl: normalizeLink(form.link),
+          links: validLinks,
           linkOnPhoto: form.linkOnPhoto,
           notifyOnEngagement,
           kind: isService ? 'opportunity' : 'item',
@@ -224,6 +224,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
           has_swap_ask: form.deal === 'swap' && form.swapFor.trim().length > 0,
         }),
         has_description: form.description.trim().length > 0,
+        link_count: validLinks.length,
         category: form.categories[0] ?? '',
         category_count: form.categories.length,
       });
@@ -645,7 +646,7 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
             <ChevronRight size={15} strokeWidth={2.2} className="details-chevron" aria-hidden="true" />
             Add more details
             <span style={{ fontWeight: 400, fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-muted)' }}>
-              condition, pickup, link
+              condition, pickup, links
             </span>
           </summary>
           <div style={{ paddingTop: 12 }}>
@@ -678,73 +679,54 @@ export default function ShareItemModal({ open, onClose, onSubmit, onPosted, mode
           />
           {errors.location && <span className="field-error">{errors.location}</span>}
         </div>
-        {/* Link — optional, and quiet until used. Any URL typed into the
-            description above also becomes tappable on the post; this field is
-            for the one link that deserves its own button. */}
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label htmlFor="si-link" className="field-label">
-            <Link2 size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-            Link <span className="field-hint" style={{ fontWeight: 400 }}>(optional)</span>
-          </label>
-          <input
-            id="si-link"
-            type="url"
-            inputMode="url"
-            className="form-input"
-            placeholder="example.com/page"
-            value={form.link}
-            maxLength={500}
-            onChange={e => update('link', e.target.value)}
-            aria-invalid={!!errors.link}
-            autoComplete="off"
-          />
-          {errors.link ? (
-            <span className="field-error">{errors.link}</span>
-          ) : linkPreviewHost ? (
-            <span className="field-hint">Opens {linkPreviewHost} in a new tab.</span>
-          ) : (
-            <span className="field-hint">A page, form, or portfolio. Shown as a button on your post.</span>
-          )}
-
-          {/* Only offered once both halves exist. A photo-link with no photo is
-              a setting that does nothing, and a toggle that does nothing is
-              worse than no toggle. */}
-          {linkPreviewHost && form.photos.length > 0 && (
-            <button
-              type="button"
-              aria-pressed={form.linkOnPhoto}
-              onClick={() => update('linkOnPhoto', !form.linkOnPhoto)}
+        {/* Links — optional, and quiet until used. Any URL typed into the
+            description above also becomes tappable on the post; these are for
+            the ones that deserve their own row under it. */}
+        <LinksField
+          id="si-link"
+          value={form.links}
+          onChange={next => update('links', next)}
+          showErrors={!!errors.links}
+          hint={isService ? 'Your portfolio, a booking form, past work.' : 'The product page, a spec sheet, a video of it working.'}
+        />
+        {/* Only offered once both halves exist. A photo-link with no photo is
+            a setting that does nothing, and a toggle that does nothing is
+            worse than no toggle. */}
+        {firstLink && form.photos.length > 0 && (
+          <button
+            type="button"
+            aria-pressed={form.linkOnPhoto}
+            onClick={() => update('linkOnPhoto', !form.linkOnPhoto)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              margin: '-4px 0 14px', padding: '10px 12px',
+              borderRadius: 'var(--radius-md)', border: 'none',
+              background: form.linkOnPhoto ? 'rgba(0,137,57,0.10)' : 'var(--bg-inset)',
+              cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <span
+              aria-hidden="true"
               style={{
-                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                marginTop: 10, padding: '10px 12px',
-                borderRadius: 'var(--radius-md)', border: 'none',
-                background: form.linkOnPhoto ? 'rgba(0,137,57,0.10)' : 'var(--bg-inset)',
-                cursor: 'pointer', textAlign: 'left',
+                width: 34, height: 20, borderRadius: 999, flexShrink: 0,
+                background: form.linkOnPhoto ? '#008939' : 'var(--border-default)',
+                position: 'relative', transition: 'background 160ms ease',
               }}
             >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 34, height: 20, borderRadius: 999, flexShrink: 0,
-                  background: form.linkOnPhoto ? '#008939' : 'var(--border-default)',
-                  position: 'relative', transition: 'background 160ms ease',
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 2, left: form.linkOnPhoto ? 16 : 2,
-                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
-                  transition: 'left 160ms ease',
-                }} />
+              <span style={{
+                position: 'absolute', top: 2, left: form.linkOnPhoto ? 16 : 2,
+                width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                transition: 'left 160ms ease',
+              }} />
+            </span>
+            <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
+              {validLinks.length > 1 ? 'Open the first link when the photo is tapped' : 'Open the link when the photo is tapped'}
+              <span style={{ display: 'block', fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 400, color: 'var(--text-muted)' }}>
+                The photo gets a {linkHost(firstLink.url)} badge so people know before they tap.
               </span>
-              <span style={{ fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
-                Open the link when the photo is tapped
-                <span style={{ display: 'block', fontSize: 'calc(11.5px * var(--text-scale))', fontWeight: 400, color: 'var(--text-muted)' }}>
-                  The photo gets a {linkPreviewHost} badge so people know before they tap.
-                </span>
-              </span>
-            </button>
-          )}
-        </div>
+            </span>
+          </button>
+        )}
         {/* ── Engagement notification toggle ── */}
         <NotifyToggle
           checked={notifyOnEngagement}

@@ -38,8 +38,10 @@ const EDITABLE: Record<string, { owner: string; columns: ReadonlySet<string> }> 
   listings: {
     owner: 'user_id',
     /* tags: a listing's extra categories ride there as `cat:<id>`. */
+    /* link_url / link_on_photo: the first of a listing's links (the others
+       travel in the description) — checked below like the client checks it. */
     columns: new Set([...COMMON, 'category_id', 'tags', 'condition', 'location', 'listing_type', 'price',
-      'comp', 'opp_role', 'price_band', 'rate_period', 'price_max']),
+      'comp', 'opp_role', 'price_band', 'rate_period', 'price_max', 'link_url', 'link_on_photo']),
   },
   requests: {
     owner: 'user_id',
@@ -73,6 +75,12 @@ export async function updatePost(uid: string, args: Args) {
     return json({ message: `This can't change ${refused.join(', ')}.`, code: 'invalid' }, 400);
   }
   if (!Object.keys(patch).length) return json({ message: 'Nothing to change', code: 'invalid' }, 400);
+  /* Postgres had a CHECK on link_url; Appwrite has none, so the scheme rule
+     lives here for writes made with the server key. */
+  if ('link_url' in patch && patch.link_url !== null
+      && !(typeof patch.link_url === 'string' && patch.link_url.length <= 500 && /^https?:\/\/[^\s]+$/i.test(patch.link_url))) {
+    return json({ message: 'That link isn’t a web address.', code: 'invalid' }, 400);
+  }
 
   const found = await aw('GET', `${T(table)}/${id}`);
   if (found.status === 404) return json({ message: 'That post no longer exists.', code: 'not_found' }, 404);

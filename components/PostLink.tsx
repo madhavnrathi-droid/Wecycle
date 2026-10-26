@@ -1,9 +1,13 @@
 'use client';
 
-import { ExternalLink, Link2 } from '@/lib/icons';
-import { linkHost, shortLink, linkify } from '../lib/postLink';
+import {
+  ExternalLink, Link2, ArrowUpRight, ClipboardList, InstagramLogo, WhatsappLogo, YoutubeLogo, LinkedinLogo,
+  XLogo, SpotifyLogo, GithubLogo, MapTrifold, GoogleDriveLogo, FileText, Ticket, ShoppingBag, Globe,
+  type LucideIcon,
+} from '@/lib/icons';
+import { linkHost, shortLink, linkify, linkKind, linkTitle, type LinkKind, type PostLink } from '../lib/postLink';
 
-/* Presentation for outbound links on a post. Three pieces, one rule: the
+/* Presentation for outbound links on a post. Several pieces, one rule: the
    destination host is always visible before the tap. See lib/postLink.ts for
    why these are shortened for display rather than redirected through us. */
 
@@ -17,31 +21,44 @@ const OUT = {
   rel: 'noopener noreferrer nofollow',
 } as const;
 
-/** The link as a standalone control, under the description. */
-export function LinkChip({ url, onOpen }: { url: string; onOpen?: () => void }) {
+const GLYPH: Record<LinkKind, LucideIcon> = {
+  form: ClipboardList, instagram: InstagramLogo, whatsapp: WhatsappLogo, youtube: YoutubeLogo,
+  linkedin: LinkedinLogo, x: XLogo, spotify: SpotifyLogo, github: GithubLogo, map: MapTrifold,
+  drive: GoogleDriveLogo, doc: FileText, ticket: Ticket, shop: ShoppingBag, web: Globe,
+};
+
+/** The mark for where a link goes — Instagram's logo, a form, a map — so the
+ *  destination reads before the address does. A plain globe for the rest. */
+export function LinkGlyph({ url, size = 18 }: { url: string; size?: number }) {
+  const Icon = GLYPH[linkKind(url)] ?? Globe;
+  return <Icon size={size} aria-hidden="true" />;
+}
+
+/** A post's links, under its description: one quiet group, a row per link —
+ *  what it is (the poster's name for it, or the service's), then where it
+ *  goes, the host always in full. Rows are real anchors, so long-press, copy
+ *  and open-in-browser all behave as they do everywhere else. */
+export function LinkList({ links, onOpen, style }: {
+  links: readonly PostLink[];
+  onOpen?: (link: PostLink, index: number) => void;
+  style?: React.CSSProperties;
+}) {
+  if (!links.length) return null;
   return (
-    <a
-      href={url}
-      {...OUT}
-      onClick={onOpen}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 8,
-        maxWidth: '100%',
-        padding: '10px 14px',
-        borderRadius: 999,
-        background: 'var(--bg-inset)',
-        color: 'var(--text-primary)',
-        textDecoration: 'none',
-        fontSize: 'calc(13px * var(--text-scale))', fontWeight: 600,
-        letterSpacing: '-0.01em',
-      }}
-    >
-      <Link2 size={14} strokeWidth={2} style={{ flexShrink: 0, opacity: 0.7 }} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {shortLink(url, 28)}
-      </span>
-      <ExternalLink size={13} strokeWidth={2} style={{ flexShrink: 0, opacity: 0.55 }} />
-    </a>
+    <ul className="plinks" aria-label={links.length === 1 ? 'Link' : 'Links'} style={style}>
+      {links.map((l, i) => (
+        <li key={l.url}>
+          <a href={l.url} {...OUT} className="plinks-row" onClick={() => onOpen?.(l, i)}>
+            <span className="plinks-glyph"><LinkGlyph url={l.url} /></span>
+            <span className="plinks-text">
+              <span className="plinks-title">{linkTitle(l)}</span>
+              <span className="plinks-url">{shortLink(l.url, 30)}</span>
+            </span>
+            <ArrowUpRight size={16} className="plinks-go" aria-hidden="true" />
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }
 

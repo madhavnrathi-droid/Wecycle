@@ -10,7 +10,8 @@ import PhotoCarousel from './PhotoCarousel';
 import CommentsSection from './CommentsSection';
 import { useAuth } from '../lib/AuthContext';
 import PartnerOfferPanel from './PartnerOfferPanel';
-import { LinkedText } from './PostLink';
+import { LinkedText, LinkList } from './PostLink';
+import LinksField, { linkDraftsOf, linksFromDrafts, linksError, linkDraftsKey, type LinkDraft } from './forms/LinksField';
 import EventDiscoverShelf from './EventDiscoverShelf';
 import { hasPartnerOffer, MEMBER_TIER, UX_INDIA_EVENT, uxIndiaShareMessage } from '../lib/eventOffer';
 import { buildContactLinks, contactGate, type ContactLink } from '../lib/contactUser';
@@ -234,6 +235,7 @@ export default function EventDetailScreen({
   const [eTitle, setETitle]             = useState(storedTitle);
   const [eUndated, setEUndated]         = useState(!!event.undated);
   const [eDescription, setEDescription] = useState(event.description ?? '');
+  const [eLinks, setELinks]             = useState<LinkDraft[]>(() => linkDraftsOf(event.links));
   const [eLocation, setELocation]       = useState(event.location);
   /* One Schedule, seeded from the raw timestamps — never from the formatted
      display strings, which is what once blanked this form and rescheduled
@@ -252,17 +254,19 @@ export default function EventDetailScreen({
     setETitle(event.untitled ? '' : event.title);
     setEUndated(!!event.undated);
     setEDescription(event.description ?? '');
+    setELinks(linkDraftsOf(event.links));
     setELocation(event.location);
     setESched(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay));
     setEType(event.eventType);
     setEMaxAttendeesStr(event.maxAttendees ? String(event.maxAttendees) : '');
-  }, [event.id, event.title, event.untitled, event.undated, event.description, event.location, event.eventType,
+  }, [event.id, event.title, event.untitled, event.undated, event.description, event.links, event.location, event.eventType,
       event.maxAttendees, event.startsAt, event.endsAt, event.allDay]);
 
   const isDirty =
     eTitle !== storedTitle ||
     eUndated !== !!event.undated ||
     eDescription !== (event.description ?? '') ||
+    linkDraftsKey(eLinks) !== linkDraftsKey(linkDraftsOf(event.links)) ||
     eLocation !== event.location ||
     JSON.stringify(eSched) !== JSON.stringify(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay)) ||
     eType !== event.eventType ||
@@ -278,6 +282,8 @@ export default function EventDetailScreen({
       setSaveError(partner ? 'Add a caption or keep the poster' : 'Give your event a name');
       return;
     }
+    const badLink = linksError(eLinks);
+    if (badLink) { setSaveError(badLink); return; }
     setSaving(true);
     setSaveError(null);
     try {
@@ -297,6 +303,7 @@ export default function EventDetailScreen({
             : { schedule: eSched, ...(event.undated ? { undated: false } : {}) }),
           location: eLocation,
           description: eDescription,
+          links: linksFromDrafts(eLinks),
           maxAttendees: eMaxAttendeesStr ? Number(eMaxAttendeesStr) : undefined,
         });
       }
@@ -305,12 +312,13 @@ export default function EventDetailScreen({
     } finally {
       setSaving(false);
     }
-  }, [isDirty, saving, event.id, event.undated, partner, displayPhotos.length, eTitle, eUndated, eType, eSched, eLocation, eDescription, eMaxAttendeesStr]);
+  }, [isDirty, saving, event.id, event.undated, partner, displayPhotos.length, eTitle, eUndated, eType, eSched, eLocation, eDescription, eLinks, eMaxAttendeesStr]);
 
   const handleDiscard = useCallback(() => {
     setETitle(event.untitled ? '' : event.title);
     setEUndated(!!event.undated);
     setEDescription(event.description ?? '');
+    setELinks(linkDraftsOf(event.links));
     setELocation(event.location);
     setESched(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay));
     setEType(event.eventType);
@@ -1133,6 +1141,13 @@ export default function EventDetailScreen({
               rows={5}
             />
           </EventEditField>
+        ) : null}
+        {canEdit ? (
+          <div style={{ marginTop: 18 }}>
+            <EventEditField label="Links">
+              <LinksField id="ev-ed-link" bare value={eLinks} onChange={setELinks} />
+            </EventEditField>
+          </div>
         ) : (
           <>
             <h3 style={{
@@ -1176,6 +1191,10 @@ export default function EventDetailScreen({
                 {expanded ? 'Show less' : 'Read more'}
               </button>
             )}
+            <LinkList
+              links={event.links ?? []}
+              onOpen={(_, i) => track(EVT.post_link_opened, { id: event.id, from: 'event', index: i })}
+            />
           </>
         )}
       </section>

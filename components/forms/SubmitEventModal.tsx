@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { MapPin, ClipboardList, ChevronRight } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import LinksField, { linksFromDrafts, linksError, type LinkDraft } from './LinksField';
 import FormBuilderScreen from './FormBuilderScreen';
 import { Z_LAYER } from '../../lib/zLayers';
 import { createEvent } from '../../lib/liveData';
@@ -34,6 +35,8 @@ export interface EventForm {
   schedule: Schedule;
   location: string;
   description: string;
+  /** Up to three — tickets, the club's Instagram, a map pin. */
+  links: LinkDraft[];
   maxAttendees?: number;
   photos: string[];
 }
@@ -48,6 +51,7 @@ const emptyForm = (): EventForm => ({
   schedule: defaultSchedule(),
   location: '',
   description: '',
+  links: [],
   photos: [],
 });
 
@@ -110,6 +114,8 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
     if (partner) {
       if (!form.title.trim() && form.photos.length === 0) e.photos = 'Add the poster';
     } else if (!form.title.trim()) e.title = 'Give your event a name';
+    const badLink = linksError(form.links);
+    if (badLink) e.links = badLink;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -138,6 +144,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           schedule: form.schedule,
           location: form.location,
           description: form.description,
+          links: linksFromDrafts(form.links),
           maxAttendees: form.maxAttendees,
           media: pickerRef.current?.getMedia() ?? [],
           undated: partner ? undated : undefined,
@@ -170,6 +177,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         has_location: form.location.trim().length > 0,
         has_max_attendees: typeof form.maxAttendees === 'number',
         has_description: form.description.trim().length > 0,
+        link_count: linksFromDrafts(form.links).length,
         has_photos: form.photos.length > 0,
         has_registration_form: !partner && regFields !== null && regFields.length > 0,
         partner_post: !!partner,
@@ -473,6 +481,18 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           />
           {errors.description && <span className="field-error">{errors.description}</span>}
         </div>
+
+        {/* A repost has no form of its own, so the club's own registration
+            link is usually the most useful thing on it. */}
+        <LinksField
+          id="ev-link"
+          value={form.links}
+          onChange={next => update('links', next)}
+          showErrors={!!errors.links}
+          hint={partner
+            ? 'The club’s registration form, their Instagram, tickets.'
+            : 'Tickets, the club’s Instagram, a map pin.'}
+        />
 
         <div className="field" style={{ marginBottom: 14 }}>
           <label htmlFor="ev-max" className="field-label">

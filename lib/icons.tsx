@@ -62,6 +62,9 @@ import {
   CaretCircleDown as PhCaretCircleDown, TrashSimple as PhTrashSimple, Tray as PhTray, Bug as PhBug,
   Lightbulb as PhLightbulb, Palette as PhPalette, SmileyMeh as PhSmileyMeh, Bed as PhBed,
   Hammer as PhHammer, Plug as PhPlug, ProjectorScreen as PhProjectorScreen,
+  InstagramLogo as PhInstagramLogo, WhatsappLogo as PhWhatsappLogo, YoutubeLogo as PhYoutubeLogo,
+  LinkedinLogo as PhLinkedinLogo, XLogo as PhXLogo, SpotifyLogo as PhSpotifyLogo, GithubLogo as PhGithubLogo,
+  MapTrifold as PhMapTrifold, GoogleDriveLogo as PhGoogleDriveLogo,
 } from '@phosphor-icons/react';
 
 type PhosphorIcon = ComponentType<PhIconProps>;
@@ -280,3 +283,15 @@ export function EmojiGlyph({ emoji, size = 22, ...rest }: { emoji: string } & Ic
   const G = EMOJI_GLYPH[emoji];
   return G ? <G size={size} aria-hidden="true" {...rest} /> : null;
 }
+
+/* Where a post's links go (lib/postLink.ts linkKind) — so a link reads as
+   Instagram or a map pin before anyone reads its address. */
+export const InstagramLogo = make(PhInstagramLogo, 'InstagramLogo');
+export const WhatsappLogo = make(PhWhatsappLogo, 'WhatsappLogo');
+export const YoutubeLogo = make(PhYoutubeLogo, 'YoutubeLogo');
+export const LinkedinLogo = make(PhLinkedinLogo, 'LinkedinLogo');
+export const XLogo = make(PhXLogo, 'XLogo');
+export const SpotifyLogo = make(PhSpotifyLogo, 'SpotifyLogo');
+export const GithubLogo = make(PhGithubLogo, 'GithubLogo');
+export const MapTrifold = make(PhMapTrifold, 'MapTrifold');
+export const GoogleDriveLogo = make(PhGoogleDriveLogo, 'GoogleDriveLogo');

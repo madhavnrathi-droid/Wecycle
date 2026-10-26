@@ -27,6 +27,7 @@ import { assertClean, isServerModerationError } from './contentFilter';
 import { normalizeEventType } from './eventTypes';
 import { type Schedule, toTimestamps } from './eventSchedule';
 import { eventPartnerFor, UNDATED_MARK, UNDATED_LABEL, undatedStartsAt } from './partners';
+import { packLinks, unpackLinks, cleanLinks, type PostLink } from './postLink';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -205,11 +206,59 @@ export function writeFeedCache(data: FeedCache): void {
   }
 }
 
+/* ── Links on posts ──
+ *
+ * Up to three links ride at the end of the description (lib/postLink.ts says
+ * why), so every write of a description is a write of its links too, and every
+ * read splits them back apart. These are the only two places that happens. */
+const DESCRIPTION_MAX = { listings: 2000, requests: 2000, events: 3000, lost_found_reports: 2000 } as const;
+
+function storedDescription(
+  table: keyof typeof DESCRIPTION_MAX,
+  description: string | undefined | null,
+  links: readonly PostLink[] | undefined,
+): string | null {
+  const packed = packLinks(description, links);
+  if (packed.length > DESCRIPTION_MAX[table]) {
+    throw new Error('That’s too long to save with its links. Shorten the description or one of the links.');
+  }
+  return packed || null;
+}
+
+/** A listing's single unlabelled link stays in link_url alone, exactly as
+ *  before — on older app builds a trailer as well would show it twice. */
+function listingTrailer(links: PostLink[]): PostLink[] {
+  return links.length === 1 && !links[0].label ? [] : links;
+}
+
+/** The description column for an edit. `links` undefined means "the links
+ *  aren't part of this edit" — they are read back from the row and kept, so a
+ *  caller that only knows about the text cannot strip them by saving it. */
+async function editedDescription(
+  table: keyof typeof DESCRIPTION_MAX,
+  id: string,
+  description: string,
+  links: readonly PostLink[] | undefined,
+): Promise<string | null> {
+  if (links !== undefined) return storedDescription(table, description, links);
+  const { data } = await supabase.from(table).select('description').eq('id', id).maybeSingle();
+  const kept = unpackLinks((data as { description?: string | null } | null)?.description).links;
+  return storedDescription(table, description, kept);
+}
+
+function descriptionAndLinks(raw: string | null | undefined, linkUrl?: string | null): { description: string; links: PostLink[] } {
+  const { text, links } = unpackLinks(raw);
+  if (links.length === 0 && linkUrl) return { description: text, links: cleanLinks([{ url: linkUrl }]) };
+  return { description: text, links };
+}
+
 export function mapListingRow(row: ListingRow): MarketplaceItem {
+  const body = descriptionAndLinks(row.description, row.link_url);
   return {
     id: row.id,
     title: row.title,
-    description: row.description ?? '',
+    description: body.description,
+    links: body.links,
     category: row.category?.label ?? row.category_id ?? 'Other',
     categoryId: row.category_id ?? undefined,
     kind: row.kind === 'opportunity' ? 'opportunity' : 'item',
@@ -612,9 +661,10 @@ export interface NewListingInput {
   price?: number;
   media: CompressedMedia[];
   notifyOnEngagement?: boolean;
-  /* Already through normalizeLink() at the form; the column's CHECK is what
-     actually guarantees the scheme. */
-  linkUrl?: string | null;
+  /** Up to three, already through normalizeLink() at the form. The first also
+   *  goes in link_url, whose CHECK is what actually guarantees the scheme. */
+  links?: PostLink[];
+  /** Tapping the photo opens the first link. */
   linkOnPhoto?: boolean;
   /* 'item' (default) for a physical listing, 'opportunity' for a service. */
   kind?: 'item' | 'opportunity';
@@ -658,13 +708,14 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
      would simply not go up. */
   const cats = cleanCategoryIds(input.categories?.length ? input.categories : [input.category]);
   const categoryId = cats[0] ?? 'hobbies';
+  const links = cleanLinks(input.links);
   const { data, error } = await supabase
     .from('listings')
     .insert({
       user_id: uid,
       community_id: communityId,
       title: input.title.trim(),
-      description: input.description?.trim() || null,
+      description: storedDescription('listings', input.description, listingTrailer(links)),
       category_id: categoryId,
       kind: input.kind ?? 'item',
       comp: input.kind === 'opportunity' ? (input.comp ?? 'free') : null,
@@ -688,11 +739,11 @@ export async function createListingWithMedia(input: NewListingInput): Promise<Ma
       deposit: input.listingType === 'borrow' ? (input.deposit ?? null) : null,
       swap_for: input.listingType === 'swap' ? (input.swapFor?.trim() || null) : null,
       location: input.location?.trim() || null,
-      link_url: input.linkUrl || null,
+      link_url: links[0]?.url ?? null,
       /* Meaningless without both a link and a photo, so it is never stored on
          its own — otherwise adding a photo later would silently arm a link the
          poster had forgotten about. */
-      link_on_photo: !!(input.linkUrl && input.linkOnPhoto && photoUrls.length > 0),
+      link_on_photo: !!(links.length && input.linkOnPhoto && photoUrls.length > 0),
       photo_urls: photoUrls,
       video_urls: videoUrls,
       tags: tagsWithCategories(cats),
@@ -715,6 +766,8 @@ export interface NewRequestInput {
   title: string;
   category: string;
   description?: string;
+  /** Up to three — they travel in the description (see storedDescription). */
+  links?: PostLink[];
   urgency: 'normal' | 'urgent';
   needByDate?: string;     /* ISO date or '' */
   /** Auto-expire window in hours. Defaults to 168 (7d) when omitted. The
@@ -760,7 +813,7 @@ export async function createRequest(input: NewRequestInput) {
     user_id: uid,
     community_id: communityId,
     title: input.title.trim(),
-    description: input.description?.trim() || null,
+    description: storedDescription('requests', input.description, input.links),
     category_id: normalizeCategory(input.category),
     urgency: input.urgency,
     need_by_date: input.needByDate || null,
@@ -790,6 +843,8 @@ export interface NewEventInput {
   /** Optional: not every event has a fixed venue. */
   location?: string;
   description?: string;
+  /** Up to three — registration, the club's page, a map pin. */
+  links?: PostLink[];
   maxAttendees?: number;
   media: CompressedMedia[];
   /** Partner posts only: no date given — the poster carries it. The schedule is
@@ -832,7 +887,7 @@ export async function createEvent(input: NewEventInput): Promise<string> {
     organizer_id: uid,
     community_id: communityId,
     title: input.title.trim(),
-    description: input.description?.trim() || null,
+    description: storedDescription('events', input.description, input.links),
     event_type: normalizeEventType(input.eventType),
     starts_at: startsAt,
     ends_at: endsAt,
@@ -863,6 +918,8 @@ export interface NewLostFoundInput {
   title: string;
   status: 'lost' | 'found';
   description?: string;
+  /** Up to three — a map pin, a photo album, a post elsewhere. */
+  links?: PostLink[];
   category?: string;
   lastSeen?: string;
   reward?: string;
@@ -891,7 +948,7 @@ export async function createLostFound(input: NewLostFoundInput) {
     user_id: uid,
     community_id: communityId,
     title: input.title.trim(),
-    description: input.description?.trim() || null,
+    description: storedDescription('lost_found_reports', input.description, input.links),
     category_id: normalizeCategory(input.category),
     status: input.status,
     last_seen: input.lastSeen?.trim() || null,
@@ -937,7 +994,7 @@ export function mapRequestRow(row: RequestRowLite): MarketplaceItem {
   return {
     id: row.id,
     title: row.title,
-    description: row.description ?? '',
+    ...descriptionAndLinks(row.description),
     category: row.category_id ? titleCase(row.category_id) : 'Other',
     listingType: 'free',
     condition: 'good',
@@ -1099,7 +1156,7 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
     title: untitled ? (partner?.name ?? 'Event') : row.title,
     undated,
     untitled,
-    description: row.description ?? '',
+    ...descriptionAndLinks(row.description),
     eventType: row.event_type,
     /* The RANGE, formatted here rather than at each display site.
        Every screen already renders these two strings — the detail page, the
@@ -1293,6 +1350,8 @@ export interface EditEventPatch {
   schedule?: Schedule;
   location?: string;
   description?: string;
+  /** Replaces the links. Omitted: an edited description keeps the ones it had. */
+  links?: PostLink[];
   maxAttendees?: number;
   /** Partner posts: true = the date is on the poster (the schedule is ignored
    *  and the post gets a fresh week); false = back to a real date. */
@@ -1306,7 +1365,9 @@ export async function updateEvent(id: string, patch: EditEventPatch) {
   if (patch.title !== undefined)       update.title = patch.title.trim();
   if (patch.eventType !== undefined)   update.event_type = normalizeEventType(patch.eventType);
   if (patch.location !== undefined)    update.location = patch.location.trim() || null;
-  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.description !== undefined || patch.links !== undefined) {
+    update.description = await editedDescription('events', id, patch.description ?? '', patch.links);
+  }
   if (patch.maxAttendees !== undefined) update.max_attendees = patch.maxAttendees ?? null;
   if (patch.undated) {
     update.starts_at = undatedStartsAt();
@@ -1411,7 +1472,7 @@ export function mapLostFoundRow(row: LostFoundRowLite): LostItem & { photoUrls?:
   return {
     id: row.id,
     title: row.title,
-    description: row.description ?? '',
+    ...descriptionAndLinks(row.description),
     category: row.category_id ?? undefined,
     status: (row.status === 'returned' ? 'claimed' : row.status) as LostItem['status'],
     lastSeen: row.last_seen ?? '',
@@ -1482,6 +1543,8 @@ export async function fetchPostById(id: string): Promise<DeepLinkPost | null> {
 export interface EditLostFoundPatch {
   title?: string;
   description?: string;
+  /** Replaces the links. Omitted: an edited description keeps the ones it had. */
+  links?: PostLink[];
   status?: 'lost' | 'found';
   lastSeen?: string;
   reward?: string;
@@ -1492,7 +1555,9 @@ export async function updateLostFoundFields(id: string, patch: EditLostFoundPatc
   assertClean([patch.title, patch.description, patch.lastSeen, patch.reward]);
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
-  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.description !== undefined || patch.links !== undefined) {
+    update.description = await editedDescription('lost_found_reports', id, patch.description ?? '', patch.links);
+  }
   if (patch.status !== undefined)      update.status = patch.status;
   if (patch.lastSeen !== undefined)    update.last_seen = patch.lastSeen.trim() || null;
   if (patch.reward !== undefined)      update.reward = patch.reward.trim() || null;
@@ -1535,6 +1600,11 @@ export interface EditListingPatch {
   tags?: string[];
   condition?: 'like_new' | 'good' | 'fair';
   description?: string;
+  /** Replaces the links (the first also goes in link_url). Omitted: an edited
+   *  description keeps the ones it had. */
+  links?: PostLink[];
+  /** Tapping the photo opens the first link. Only read alongside `links`. */
+  linkOnPhoto?: boolean;
   location?: string;
   listingType?: 'free' | 'sell' | 'borrow' | 'swap';
   price?: number;
@@ -1599,7 +1669,19 @@ export async function updateListingFields(id: string, patch: EditListingPatch) {
     update.category_id = normalizeCategory(patch.category);
   }
   if (patch.condition !== undefined)   update.condition = patch.condition;
-  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.links !== undefined) {
+    const links = cleanLinks(patch.links);
+    update.description = storedDescription('listings', patch.description ?? '', listingTrailer(links));
+    (update as { link_url?: string | null }).link_url = links[0]?.url ?? null;
+    /* The photo stops being a link the moment there is no link; whether there
+       is a photo is the reader's check (mapListingRow), as on create. */
+    (update as { link_on_photo?: boolean }).link_on_photo = !!(links.length && patch.linkOnPhoto);
+  } else if (patch.description !== undefined) {
+    /* Text only: keep the trailer exactly as stored. link_url is untouched. */
+    const { data: row } = await supabase.from('listings').select('description').eq('id', id).maybeSingle();
+    const kept = unpackLinks((row as { description?: string | null } | null)?.description).links;
+    update.description = storedDescription('listings', patch.description, kept);
+  }
   if (patch.location !== undefined)    update.location = patch.location.trim() || null;
   if (patch.listingType !== undefined) {
     update.listing_type = patch.listingType;
@@ -1671,6 +1753,8 @@ export interface EditRequestPatch {
   title?: string;
   category?: string;
   description?: string;
+  /** Replaces the links. Omitted: an edited description keeps the ones it had. */
+  links?: PostLink[];
   urgency?: 'normal' | 'urgent';
   needByDate?: string;     /* ISO date or '' to clear */
 }
@@ -1681,7 +1765,9 @@ export async function updateRequestFields(id: string, patch: EditRequestPatch) {
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined)       update.title = patch.title.trim();
   if (patch.category !== undefined)    update.category_id = patch.category.trim().toLowerCase();
-  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (patch.description !== undefined || patch.links !== undefined) {
+    update.description = await editedDescription('requests', id, patch.description ?? '', patch.links);
+  }
   if (patch.urgency !== undefined)     update.urgency = patch.urgency;
   if (patch.needByDate !== undefined)  update.need_by_date = patch.needByDate || null;
   const { data, error } = await supabase

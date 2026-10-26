@@ -1,4 +1,5 @@
 import { CATEGORIES as CATEGORY_LIST, ALL_CATEGORY } from './categories';
+import type { PostLink } from './postLink';
 /* ═══════════════════════════════════════════════
    WECYCLE — Rich Mock Data
    Wecycle — by students, for students
@@ -146,8 +147,10 @@ export interface MarketplaceItem {
      hardcoded Unsplash sets keyed by id in lib/photos.ts). */
   photoUrls?: string[];
   videoUrls?: string[];
-  /* Optional outbound link, already normalised to http/https. `linkOnPhoto`
-     makes the photo itself follow it — see components/PostLink.tsx. */
+  /* Up to three outbound links, already normalised to http/https. `linkUrl`
+     is the listing's link_url column — the first link — and `linkOnPhoto`
+     makes the photo itself follow it (components/PostLink.tsx). */
+  links?: PostLink[];
   linkUrl?: string;
   linkOnPhoto?: boolean;
   /* Real metric counts from the DB (absent on mock items → deterministic
@@ -227,6 +230,8 @@ export interface CommunityEvent {
   id: string;
   title: string;
   description: string;
+  /** Up to three outbound links (lib/postLink.ts). */
+  links?: PostLink[];
   eventType: 'swap' | 'repair' | 'cleanup' | 'workshop' | 'drive' | 'challenge';
   /** Human-formatted for display, e.g. "Sat, Aug 15, 2026". Never parse these
    *  back — use `startsAt`. Re-parsing the formatted strings is what silently
@@ -270,6 +275,8 @@ export interface LostItem {
   id: string;
   title: string;
   description: string;
+  /** Up to three outbound links (lib/postLink.ts). */
+  links?: PostLink[];
   /* Lowercased category id (e.g. 'electronics', 'sports', 'other') so the
    * home-feed category filter can place a lost/found post correctly. Optional
    * because legacy reports + some demo rows may not carry one. */

@@ -10,7 +10,9 @@ import ReportSheet from './ReportSheet';
 import type { MarketplaceItem, User } from '../lib/mockData';
 import { resolveItemMedia, getAvatar } from '../lib/photos';
 import PhotoCarousel from './PhotoCarousel';
-import { LinkChip, LinkedText, PhotoLinkBadge, openExternal } from './PostLink';
+import { LinkList, LinkedText, PhotoLinkBadge, openExternal } from './PostLink';
+import LinksField, { linkDraftsOf, linksFromDrafts, linksError, linkDraftsKey, type LinkDraft } from './forms/LinksField';
+import type { PostLink } from '../lib/postLink';
 import OnlineBadge from './OnlineBadge';
 import CommentsSection from './CommentsSection';
 import RelatedShelf from './RelatedShelf';
@@ -110,6 +112,16 @@ interface Draft {
    *  reads it is untouched. */
   extraCategories: string[];
   urgent: boolean;
+  /** Up to three, as typed — see components/forms/LinksField. */
+  links: LinkDraft[];
+  /** Listings only: the photo opens the first link. */
+  linkOnPhoto: boolean;
+}
+
+/** A post's links. Rows from before multi-link have only link_url. */
+function postLinksOf(it: MarketplaceItem): PostLink[] {
+  if (it.links?.length) return it.links;
+  return it.linkUrl ? [{ url: it.linkUrl }] : [];
 }
 
 function draftOf(it: MarketplaceItem): Draft {
@@ -125,6 +137,8 @@ function draftOf(it: MarketplaceItem): Draft {
     category: categoryIdOf(it) ?? '',
     extraCategories: it.isRequest ? [] : categoryIdsOf(it).slice(1),
     urgent: !!it.urgent,
+    links: linkDraftsOf(postLinksOf(it)),
+    linkOnPhoto: !!it.linkOnPhoto,
   };
 }
 
@@ -135,9 +149,13 @@ function draftOf(it: MarketplaceItem): Draft {
 function draftsMatch(a: Draft, b: Draft, kind: { isRequest: boolean; isOpportunity: boolean }): boolean {
   if (a.title !== b.title) return false;
   if (a.description !== b.description) return false;
+  /* Compared as links, not as rows: a half-typed paste is not an edit yet,
+     and a blank row is the same as no row. */
+  if (linkDraftsKey(a.links) !== linkDraftsKey(b.links)) return false;
   if (a.category !== b.category) return false;
   if (kind.isRequest) return a.urgent === b.urgent;
   if (a.extraCategories.join(',') !== b.extraCategories.join(',')) return false;
+  if (a.linkOnPhoto !== b.linkOnPhoto) return false;
   if (a.location !== b.location) return false;
   if (kind.isOpportunity) {
     if (a.comp !== b.comp) return false;
@@ -165,6 +183,7 @@ function draftsMatch(a: Draft, b: Draft, kind: { isRequest: boolean; isOpportuni
  * field is holding the save, instead of going quiet and looking broken. */
 function draftBlocker(d: Draft, kind: { isRequest: boolean; isOpportunity: boolean }): string | null {
   if (d.title.trim().length === 0) return 'Add a title to save';
+  if (linksError(d.links)) return 'Fix the link to save';
   if (!kind.isRequest && !kind.isOpportunity && d.priceStr.trim() !== '') {
     const n = Number(d.priceStr);
     /* NaN reaches Postgres as an invalid number and the whole patch fails —
@@ -212,8 +231,11 @@ function itemWithDraft(it: MarketplaceItem, d: Draft): MarketplaceItem {
        direction the demo store's patch has to be mapped in. */
     category: categoryLabel(d.category) || it.category,
     categoryId: d.category || it.categoryId,
+    links: linksFromDrafts(d.links),
   };
   if (it.isRequest) return { ...base, urgent: d.urgent };
+  base.linkUrl = base.links?.[0]?.url;
+  base.linkOnPhoto = d.linkOnPhoto && !!base.linkUrl;
   base.tags = tagsWithCategories([d.category, ...d.extraCategories], it.tags ?? []);
   if (it.kind === 'opportunity') {
     /* compToListing, the same helper the write goes through, so the page
@@ -587,6 +609,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     setEExtraCats(next.slice(1));
   }, []);
   const [eUrgent, setEUrgent]           = useState(!!itemProp.urgent);
+  const [eLinks, setELinks]             = useState<LinkDraft[]>(() => linkDraftsOf(postLinksOf(itemProp)));
+  const [eLinkOnPhoto, setELinkOnPhoto] = useState(!!itemProp.linkOnPhoto);
 
   const isRequestPost = !!itemProp.isRequest;
   const isOpportunityPost = itemProp.kind === 'opportunity';
@@ -601,8 +625,9 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     priceStr: ePriceStr, listingType: eListingType,
     comp: eComp, ratePeriod: eRatePeriod, priceMaxStr: ePriceMaxStr,
     category: eCategory, extraCategories: eExtraCats, urgent: eUrgent,
+    links: eLinks, linkOnPhoto: eLinkOnPhoto,
   }), [eTitle, eDescription, eLocation, ePriceStr, eListingType,
-       eComp, eRatePeriod, ePriceMaxStr, eCategory, eExtraCats, eUrgent]);
+       eComp, eRatePeriod, ePriceMaxStr, eCategory, eExtraCats, eUrgent, eLinks, eLinkOnPhoto]);
 
   /* What is known to be in the database — see the note on Draft. */
   const [baseline, setBaseline] = useState<Draft>(() => draftOf(itemProp));
@@ -631,6 +656,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     setECategory(d.category);
     setEExtraCats(d.extraCategories);
     setEUrgent(d.urgent);
+    setELinks(d.links);
+    setELinkOnPhoto(d.linkOnPhoto);
   }, []);
 
   /* Re-hydrate when a genuinely different post arrives — the related shelf
@@ -686,6 +713,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   const persist = useCallback(async (mode: 'save' | 'repost', snapshot: Draft) => {
     const priceNum = snapshot.priceStr ? Number(snapshot.priceStr) : undefined;
     const isOpp = item.kind === 'opportunity';
+    const snapshotLinks = linksFromDrafts(snapshot.links);
     const svc = isOpp ? compToListing(snapshot.comp, priceNum) : null;
 
     if (isDemoMode()) {
@@ -695,7 +723,10 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
            post starts announcing itself as "electronics". */
         title: snapshot.title, category: categoryLabel(snapshot.category),
         description: snapshot.description,
+        links: snapshotLinks,
         ...(isRequestPost ? {} : {
+          linkUrl: snapshotLinks[0]?.url,
+          linkOnPhoto: snapshot.linkOnPhoto && snapshotLinks.length > 0,
           categoryId: snapshot.category || undefined,
           tags: tagsWithCategories([snapshot.category, ...snapshot.extraCategories], item.tags ?? []),
         }),
@@ -725,6 +756,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
     if (isRequestPost) {
       const patch = {
         title: snapshot.title, category: snapshot.category, description: snapshot.description,
+        links: snapshotLinks,
         urgency: (snapshot.urgent ? 'urgent' : 'normal') as 'urgent' | 'normal',
       };
       if (mode === 'repost') await repostRequest(item.id, patch);
@@ -734,6 +766,7 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
 
     const patch = {
       title: snapshot.title, category: snapshot.category, description: snapshot.description,
+      links: snapshotLinks, linkOnPhoto: snapshot.linkOnPhoto,
       categories: [snapshot.category, ...snapshot.extraCategories].filter(Boolean),
       tags: item.tags ?? [],
       location: snapshot.location,
@@ -1205,6 +1238,8 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
           eCategory, setECategory,
           eExtraCats, setCategories,
           eUrgent, setEUrgent,
+          eLinks, setELinks,
+          eLinkOnPhoto, setELinkOnPhoto,
           isRequestPost,
           isDirty,
           saving,
@@ -1662,6 +1697,18 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
               rows={4}
             />
           </EditFieldRow>
+        ) : null}
+        {canManage ? (
+          <div style={{ marginTop: 18 }}>
+            <EditFieldRow label="Links">
+              <LinksEditor
+                id="ed-link"
+                links={eLinks} onLinks={setELinks}
+                linkOnPhoto={eLinkOnPhoto} onLinkOnPhoto={isRequestPost ? undefined : setELinkOnPhoto}
+                hasPhotos={editorPhotos.length > 0}
+              />
+            </EditFieldRow>
+          </div>
         ) : (
           <>
             {/* LinkedText, not a plain <p>: a URL someone typed into the
@@ -1693,11 +1740,10 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
                 {expanded ? 'Show less' : 'Read more'}
               </button>
             )}
-            {item.linkUrl && (
-              <div style={{ marginTop: 12 }}>
-                <LinkChip url={item.linkUrl} onOpen={() => track(EVT.post_link_opened, { id: item.id, from: 'chip' })} />
-              </div>
-            )}
+            <LinkList
+              links={postLinksOf(item)}
+              onOpen={(_, i) => track(EVT.post_link_opened, { id: item.id, from: 'list', index: i })}
+            />
           </>
         )}
         {isUnpricedSell && !isOpportunity && (
@@ -2099,6 +2145,8 @@ interface EditState {
   eCategory: string;        setECategory: (v: string) => void;
   eExtraCats: string[];     setCategories: (v: string[]) => void;
   eUrgent: boolean;         setEUrgent: (v: boolean) => void;
+  eLinks: LinkDraft[];      setELinks: (v: LinkDraft[]) => void;
+  eLinkOnPhoto: boolean;    setELinkOnPhoto: (v: boolean) => void;
   isRequestPost: boolean;
   isDirty: boolean;
   saving: null | 'save' | 'repost';
@@ -2227,7 +2275,8 @@ function DesktopLayout({
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType,
     eComp, setEComp, eRatePeriod, setERatePeriod, ePriceMaxStr, setEPriceMaxStr, eCategory, setECategory, eExtraCats, setCategories,
-    eUrgent, setEUrgent, isRequestPost, isDirty, saving, saveError, blocker, savedOnce,
+    eUrgent, setEUrgent, eLinks, setELinks, eLinkOnPhoto, setELinkOnPhoto,
+    isRequestPost, isDirty, saving, saveError, blocker, savedOnce,
     canRevert, repostBlocked, onRetrySave,
     handleSaveAndRepost, handleDiscard,
     photoEditOpen, setPhotoEditOpen, editorPhotos, editorVideos, handleSavePhotos,
@@ -2569,7 +2618,7 @@ function DesktopLayout({
             )}
           </div>
 
-          {(canManage || desc) && (
+          {(canManage || desc || postLinksOf(item).length > 0) && (
             <div>
               <h2 style={{
                 margin: '0 0 8px',
@@ -2586,6 +2635,17 @@ function DesktopLayout({
                   aria-label="Description"
                   rows={6}
                 />
+              ) : null}
+              {canManage ? (
+                <div style={{ marginTop: 18 }}>
+                  <LinksEditor
+                    id="ed-link-d"
+                    links={eLinks} onLinks={setELinks}
+                    linkOnPhoto={eLinkOnPhoto} onLinkOnPhoto={isRequestPost ? undefined : setELinkOnPhoto}
+                    hasPhotos={editorPhotos.length > 0}
+                    labelled
+                  />
+                </div>
               ) : (
                 <>
                   <LinkedText text={desc} style={{
@@ -2613,11 +2673,10 @@ function DesktopLayout({
                       {expanded ? 'Show less' : 'Read more'}
                     </button>
                   )}
-                  {item.linkUrl && (
-                    <div style={{ marginTop: 12 }}>
-                      <LinkChip url={item.linkUrl} onOpen={() => track(EVT.post_link_opened, { id: item.id, from: 'chip' })} />
-                    </div>
-                  )}
+                  <LinkList
+                    links={postLinksOf(item)}
+                    onOpen={(_, i) => track(EVT.post_link_opened, { id: item.id, from: 'list', index: i })}
+                  />
                 </>
               )}
             </div>
@@ -2974,6 +3033,35 @@ function DesktopLayout({
 /* Tiny labelled wrapper for an owner-edit field. Renders the field label
  * above the input with consistent vertical rhythm — gives every editable
  * field its own clear "card" rather than letting them stack into a wall. */
+/* The editor's links: the same field the create forms use, plus the photo
+   toggle for a listing, offered only once there is a link and a photo. */
+function LinksEditor({ id, links, onLinks, linkOnPhoto, onLinkOnPhoto, hasPhotos, labelled }: {
+  id: string;
+  links: LinkDraft[];
+  onLinks: (v: LinkDraft[]) => void;
+  linkOnPhoto: boolean;
+  /** Absent for requests, which have no photo-link. */
+  onLinkOnPhoto?: (v: boolean) => void;
+  hasPhotos: boolean;
+  labelled?: boolean;
+}) {
+  const first = linksFromDrafts(links)[0];
+  return (
+    <>
+      <LinksField id={id} value={links} onChange={onLinks} bare={!labelled} />
+      {onLinkOnPhoto && first && hasPhotos && (
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginTop: 10,
+          fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', cursor: 'pointer',
+        }}>
+          <input type="checkbox" checked={linkOnPhoto} onChange={e => onLinkOnPhoto(e.target.checked)} />
+          Tapping the photo opens {links.filter(l => l.url.trim()).length > 1 ? 'the first link' : 'the link'}
+        </label>
+      )}
+    </>
+  );
+}
+
 function EditFieldRow({
   label, icon, children,
 }: {

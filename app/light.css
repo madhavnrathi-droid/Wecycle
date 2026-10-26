@@ -1145,6 +1145,113 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 @media (prefers-reduced-motion: reduce) { .catpick-chip { transition: none; } .catpick-chip:active { transform: none; } }
 .catpick-field[data-bare] { margin-bottom: 0; }
 
+/* ═══ Links on a post ══════════════════════════════════════════════════════
+   The form half (components/forms/LinksField.tsx): one soft fill holding up to
+   three rows with hairlines between them, lifting to white on focus like
+   .form-input. The reading half (PostLink.tsx LinkList): the same fill under
+   the description, a row per link, mark · name · address · arrow. */
+.linksf-field { margin-bottom: 14px; }
+.linksf-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.linksf-count { font-weight: 400; color: var(--text-muted); }
+.linksf {
+  background: var(--bg-inset);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  transition: background var(--dur-2, 160ms) var(--ease-standard), border-color var(--dur-2, 160ms) var(--ease-standard);
+}
+.linksf:hover { background: #F0F0EE; }
+.linksf:focus-within { background: #FFFFFF; border-color: rgba(17, 17, 16, 0.85); }
+.linksf-row { display: flex; align-items: flex-start; gap: 10px; padding: 0 4px 0 14px; position: relative; }
+.linksf-row + .linksf-row::before {
+  content: ''; position: absolute; top: 0; left: 44px; right: 0; height: 1px;
+  background: rgba(17, 17, 16, 0.08);
+}
+.linksf-glyph {
+  flex-shrink: 0; width: 20px; height: 46px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+}
+.linksf-row[data-valid] .linksf-glyph { color: var(--text-primary); }
+.linksf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.linksf-url {
+  width: 100%; height: 46px; padding: 0; border: none; outline: none; background: transparent;
+  font: inherit; font-size: calc(15px * var(--text-scale)); letter-spacing: -0.015em; color: var(--text-primary);
+}
+.linksf-url::placeholder { color: #8C8C87; }
+/* The group draws the focus (.linksf:focus-within), so the inputs inside it
+   don't add a second ring of their own. */
+.linksf .linksf-url:focus, .linksf .linksf-url:focus-visible,
+.linksf .linksf-name input:focus, .linksf .linksf-name input:focus-visible { outline: none; box-shadow: none; border-color: transparent; }
+.linksf-name {
+  display: flex; align-items: center; gap: 8px;
+  margin: -6px 0 10px;
+  font-size: calc(12.5px * var(--text-scale)); color: var(--text-muted);
+}
+.linksf-name > span { flex-shrink: 0; }
+.linksf-name input {
+  flex: 1; min-width: 0; height: 30px; padding: 0 10px;
+  border: none; outline: none; border-radius: 8px;
+  background: rgba(17, 17, 16, 0.05);
+  font: inherit; font-size: calc(13.5px * var(--text-scale)); color: var(--text-primary); letter-spacing: -0.01em;
+}
+.linksf-name input::placeholder { color: #8C8C87; }
+.linksf-name input:focus { background: rgba(17, 17, 16, 0.08); }
+.linksf-err { margin: -4px 0 10px; }
+.linksf-remove {
+  flex-shrink: 0; width: 40px; height: 46px; border: none; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.linksf-remove:hover { color: var(--text-primary); }
+.linksf-remove:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
+.linksf-add {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 14px; border: none; border-radius: 999px;
+  background: var(--bg-inset); color: var(--text-primary);
+  font: inherit; font-size: calc(13.5px * var(--text-scale)); font-weight: 500; letter-spacing: -0.006em;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-2, 160ms) var(--ease-standard), transform var(--dur-1, 100ms) var(--ease-standard);
+  animation: linksf-in var(--dur-3, 220ms) var(--ease-standard, ease) both;
+}
+.linksf-add:hover { background: #ECECE9; }
+.linksf-add:active { transform: scale(0.96); }
+.linksf-add:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.linksf-left { font-weight: 400; color: var(--text-muted); }
+@keyframes linksf-in { from { opacity: 0; } to { opacity: 1; } }
+
+.plinks { list-style: none; margin: 14px 0 0; padding: 0; background: var(--bg-inset); border-radius: 16px; overflow: hidden; }
+.plinks > li { position: relative; }
+.plinks > li + li::before {
+  content: ''; position: absolute; top: 0; left: 60px; right: 0; height: 1px;
+  background: rgba(17, 17, 16, 0.07);
+}
+.plinks-row {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 58px; padding: 10px 14px;
+  color: var(--text-primary); text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-1, 100ms) var(--ease-standard);
+}
+.plinks-row:hover { background: rgba(17, 17, 16, 0.03); }
+.plinks-row:active { background: rgba(17, 17, 16, 0.06); }
+.plinks-row:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; border-radius: 16px; }
+.plinks-glyph {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #FFFFFF; color: var(--text-primary);
+}
+.plinks-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.plinks-title, .plinks-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plinks-title { font-size: calc(14.5px * var(--text-scale)); font-weight: 500; letter-spacing: -0.012em; }
+.plinks-url { font-size: calc(12.5px * var(--text-scale)); color: var(--text-muted); letter-spacing: -0.005em; }
+.plinks-go { flex-shrink: 0; color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .linksf, .linksf-add, .plinks-row { transition: none; animation: none; }
+  .linksf-add:active { transform: none; }
+}
+
 /* ═══ Photo editor (components/MediaEditor.tsx) ═══════════════════════════
    Full page on a phone, a centred panel on desktop. The cover is the big
    tile; everything else is a square. No boxes around the grid — the photos

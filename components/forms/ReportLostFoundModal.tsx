@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MapPin, Bell } from '@/lib/icons';
 import Modal from '../Modal';
 import PhotoPicker, { type PhotoPickerHandle } from '../PhotoPicker';
+import LinksField, { linksFromDrafts, linksError, type LinkDraft } from './LinksField';
 import { createLostFound } from '../../lib/liveData';
 import { isDemoMode } from '../../lib/demoMode';
 import { hasSupabaseEnv } from '../../lib/supabase';
@@ -47,6 +48,8 @@ export interface ReportLFForm {
   location: string;
   dateLastSeen: string;
   description: string;
+  /** Up to three — a map pin, a post about it elsewhere. */
+  links: LinkDraft[];
   contact: string;
   photos: string[];
 }
@@ -58,7 +61,7 @@ export default function ReportLostFoundModal({
 }: ReportLostFoundModalProps) {
   const [form, setForm] = useState<ReportLFForm>({
     name: '', status: defaultStatus ?? '', category: '',
-    location: '', dateLastSeen: '', description: '', contact: '', photos: [],
+    location: '', dateLastSeen: '', description: '', links: [], contact: '', photos: [],
   });
 
   /* When the modal opens (or its defaultStatus changes between opens —
@@ -89,6 +92,8 @@ export default function ReportLostFoundModal({
     if (!form.location.trim()) e.location = 'Required';
     if (!form.dateLastSeen) e.dateLastSeen = 'Required';
     if (!form.description.trim()) e.description = 'Help others identify it';
+    const badLink = linksError(form.links);
+    if (badLink) e.links = badLink;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -104,6 +109,7 @@ export default function ReportLostFoundModal({
           title: form.name,
           status: form.status as 'lost' | 'found',
           description: form.description,
+          links: linksFromDrafts(form.links),
           /* Translated, not raw — see LF_TO_TAXONOMY. */
           category: LF_TO_TAXONOMY[form.category] ?? '',
           lastSeen: form.location,
@@ -119,11 +125,12 @@ export default function ReportLostFoundModal({
         lf_status: form.status,
         category: LF_TO_TAXONOMY[form.category] ?? '',
         has_description: form.description.trim().length > 0,
+        link_count: linksFromDrafts(form.links).length,
         has_photos: form.photos.length > 0,
       });
       onSubmit?.(form);
       pickerRef.current?.clear();
-      setForm({ name: '', status: defaultStatus ?? '', category: '', location: '', dateLastSeen: '', description: '', contact: '', photos: [] });
+      setForm({ name: '', status: defaultStatus ?? '', category: '', location: '', dateLastSeen: '', description: '', links: [], contact: '', photos: [] });
       setNotifyOnEngagement(true);
       onClose();
     } catch (err) {
@@ -266,6 +273,14 @@ export default function ReportLostFoundModal({
           />
           {errors.description && <span className="field-error">{errors.description}</span>}
         </div>
+
+        <LinksField
+          id="lf-link"
+          value={form.links}
+          onChange={next => update('links', next)}
+          showErrors={!!errors.links}
+          hint="A map pin of where it was, or a post about it elsewhere."
+        />
 
         <div className="field" style={{ marginBottom: 14 }}>
           <label htmlFor="lf-contact" className="field-label">
