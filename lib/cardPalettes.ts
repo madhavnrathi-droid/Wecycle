@@ -37,7 +37,7 @@ export interface CardPalette {
 
 export const CARD_PALETTES: CardPalette[] = [
   /* Green × yellow — the marketplace's colour. */
-  { id: 'lime',   label: 'Lime',   colors: ['#FFE600', '#0B7A3E', '#D4F500'], brightness: 1.8, fallback: ['#03200F', '#0B6B36', '#D8F23A'], accent: '#E3F53B' },
+  { id: 'lime',   label: 'Lime',   colors: ['#FFE600', '#1E7A12', '#D4F500'], brightness: 1.8, fallback: ['#03200F', '#0B6B36', '#D8F23A'], accent: '#E3F53B' },
   /* Purple × yellow — events. */
   { id: 'violet', label: 'Violet', colors: ['#B026FF', '#2A0845', '#FFD400'], brightness: 1.6, fallback: ['#14052A', '#5B1FB8', '#F5C842'], accent: '#FFD84D' },
   /* Ember — lost & found, where the card is asking for help. Crimson, not
