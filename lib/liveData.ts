@@ -26,6 +26,7 @@ import { normalizeCategory, cleanCategoryIds, tagsWithCategories, categoryFilter
 import { assertClean, isServerModerationError } from './contentFilter';
 import { normalizeEventType } from './eventTypes';
 import { type Schedule, toTimestamps } from './eventSchedule';
+import { eventPartnerFor, UNDATED_MARK, UNDATED_LABEL, undatedStartsAt } from './partners';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -791,6 +792,9 @@ export interface NewEventInput {
   description?: string;
   maxAttendees?: number;
   media: CompressedMedia[];
+  /** Partner posts only: no date given — the poster carries it. The schedule is
+   *  ignored and the post stays up for a week (lib/partners). */
+  undated?: boolean;
 }
 
 /** Returns the new event's id so callers can attach extras (e.g. a
@@ -800,6 +804,10 @@ export async function createEvent(input: NewEventInput): Promise<string> {
   assertClean([input.title, input.description, input.location]);
   const uid = await currentUserId();
   if (!uid) throw new Error('Please sign in to post');
+  /* Only an event partner may post a poster with nothing else, or no date. */
+  const partner = eventPartnerFor(uid);
+  if (!input.title.trim() && !(partner && input.media.length)) throw new Error('Give your event a name');
+  const undated = !!partner && !!input.undated;
 
   /* One local session read, then the community lookup and the media upload
      run together rather than nose-to-tail — same reasoning as
@@ -816,7 +824,9 @@ export async function createEvent(input: NewEventInput): Promise<string> {
      settled yet — so starts_at holds midnight and `time_unspecified` records
      WHY, since midnight is otherwise a real time and would read back as
      "12:00 am" as though someone had chosen it. */
-  const { startsAt, endsAt, timeUnspecified } = toTimestamps(input.schedule);
+  const { startsAt, endsAt, timeUnspecified } = undated
+    ? { startsAt: undatedStartsAt(), endsAt: null, timeUnspecified: true }
+    : toTimestamps(input.schedule);
 
   const { data, error } = await supabase.from('events').insert({
     organizer_id: uid,
@@ -832,6 +842,7 @@ export async function createEvent(input: NewEventInput): Promise<string> {
     location: input.location?.trim() || null,
     max_attendees: input.maxAttendees ?? null,
     status: 'published',
+    ...(undated ? { color_accent: UNDATED_MARK } : {}),
     cover_url: photoUrls[0] ?? null,
     photo_urls: photoUrls,
     video_urls: videoUrls,
@@ -1077,9 +1088,17 @@ function fmtTime(iso: string): string {
 }
 
 export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: string[]; videoUrls?: string[] } {
+  /* A partner's poster-only post: no caption and/or no date. The flags travel
+     with the event; the strings below are what every older screen reads, so
+     they get a fallback name and an honest label instead of a fake day. */
+  const undated = row.color_accent === UNDATED_MARK;
+  const untitled = !row.title?.trim();
+  const partner = eventPartnerFor(row.organizer_id);
   return {
     id: row.id,
-    title: row.title,
+    title: untitled ? (partner?.name ?? 'Event') : row.title,
+    undated,
+    untitled,
     description: row.description ?? '',
     eventType: row.event_type,
     /* The RANGE, formatted here rather than at each display site.
@@ -1087,11 +1106,11 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
        events list, the share card, the registration screen — so composing the
        end into them is what makes an end time visible everywhere at once,
        instead of five separate edits that drift apart later. */
-    date: fmtDateRange(row.starts_at, row.ends_at),
+    date: undated ? UNDATED_LABEL : fmtDateRange(row.starts_at, row.ends_at),
     /* Empty string when there is no clock time — all-day, or an hour not
        settled. Every display site treats a falsy time as "date only", which for
        an all-day event reads correctly as just the date. */
-    time: row.time_unspecified ? '' : fmtTimeRange(row.starts_at, row.ends_at),
+    time: undated || row.time_unspecified ? '' : fmtTimeRange(row.starts_at, row.ends_at),
     /* Carry the raw timestamp so the organizer's edit form never has to
        re-parse the formatted strings above. */
     startsAt: row.starts_at,
@@ -1100,7 +1119,7 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
     location: row.location ?? '',
     attendees: row.attendee_count ?? 0,
     maxAttendees: row.max_attendees ?? undefined,
-    colorAccent: row.color_accent ?? '#A8DD00',
+    colorAccent: undated ? '#A8DD00' : (row.color_accent ?? '#A8DD00'),
     organizer: profileToUser(row.organizer, row.organizer_id),
     tags: [],
     rsvpd: false,
@@ -1275,6 +1294,9 @@ export interface EditEventPatch {
   location?: string;
   description?: string;
   maxAttendees?: number;
+  /** Partner posts: true = the date is on the poster (the schedule is ignored
+   *  and the post gets a fresh week); false = back to a real date. */
+  undated?: boolean;
 }
 
 export async function updateEvent(id: string, patch: EditEventPatch) {
@@ -1286,7 +1308,13 @@ export async function updateEvent(id: string, patch: EditEventPatch) {
   if (patch.location !== undefined)    update.location = patch.location.trim() || null;
   if (patch.description !== undefined) update.description = patch.description.trim() || null;
   if (patch.maxAttendees !== undefined) update.max_attendees = patch.maxAttendees ?? null;
-  if (patch.schedule) {
+  if (patch.undated) {
+    update.starts_at = undatedStartsAt();
+    update.ends_at = null;
+    update.time_unspecified = true;
+    update.color_accent = UNDATED_MARK;
+  } else if (patch.schedule) {
+    if (patch.undated === false) update.color_accent = null;
     /* Both timestamps together, from a complete object — see EditEventPatch
        above for why this is no longer a merge against the stored row. */
     const { startsAt, endsAt, timeUnspecified } = toTimestamps(patch.schedule);

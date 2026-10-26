@@ -17,6 +17,8 @@ import {
   defaultSchedule, applyChange, durationLabel,
   type Schedule, type ScheduleField,
 } from '../../lib/eventSchedule';
+import { useAuth } from '../../lib/AuthContext';
+import { eventPartnerFor, UNDATED_DAYS } from '../../lib/partners';
 
 interface SubmitEventModalProps {
   open: boolean;
@@ -52,6 +54,13 @@ const emptyForm = (): EventForm => ({
 const MAX_PHOTOS = 3;
 
 export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEventModalProps) {
+  /* An event partner (lib/partners) reposts other clubs' events: the poster is
+     the post, so it comes first and is the only thing needed; the date can be
+     left on the poster; and there is no registration form — that belongs to
+     the club running the event. Everyone else gets the form as it was. */
+  const { user } = useAuth();
+  const partner = eventPartnerFor(user?.id);
+  const [undated, setUndated] = useState(true);
   const [form, setForm] = useState<EventForm>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -98,7 +107,9 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
    * just the poster's. It is the one thing only the organiser can supply. */
   const validate = () => {
     const e: typeof errors = {};
-    if (!form.title.trim()) e.title = 'Give your event a name';
+    if (partner) {
+      if (!form.title.trim() && form.photos.length === 0) e.photos = 'Add the poster';
+    } else if (!form.title.trim()) e.title = 'Give your event a name';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -112,7 +123,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
     event.preventDefault();
     if (!validate()) return;
     /* Registration form (when attached) must be publishable. */
-    if (regFields !== null) {
+    if (regFields !== null && !partner) {
       const bad = validateFields(regFields);
       setRegError(bad);
       if (bad) return;
@@ -129,12 +140,13 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           description: form.description,
           maxAttendees: form.maxAttendees,
           media: pickerRef.current?.getMedia() ?? [],
+          undated: partner ? undated : undefined,
         });
         /* Attach the registration form right after the event exists. This is
            caught SEPARATELY: the event is already live, so surfacing a
            submit-level error here would invite a retry that duplicates the
            event. Tell the user where to add the form instead. */
-        if (regFields !== null && regFields.length > 0) {
+        if (!partner && regFields !== null && regFields.length > 0) {
           try {
             await upsertEventForm(eventId, regFields);
             track(EVT.event_form_saved, { event_id: eventId, field_count: regFields.length, source: 'create' });
@@ -159,7 +171,9 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         has_max_attendees: typeof form.maxAttendees === 'number',
         has_description: form.description.trim().length > 0,
         has_photos: form.photos.length > 0,
-        has_registration_form: regFields !== null && regFields.length > 0,
+        has_registration_form: !partner && regFields !== null && regFields.length > 0,
+        partner_post: !!partner,
+        undated: !!partner && undated,
         registration_field_count: regFields?.length ?? 0,
       });
       onSubmit?.(form);
@@ -167,6 +181,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
       setForm(emptyForm());
       setRegFields(null);
       setRegError(null);
+      setUndated(true);
       onClose();
     } catch (err) {
       haptics.error();
@@ -182,7 +197,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
     <Modal
       open={open}
       onClose={onClose}
-      title="Submit an event"
+      title={partner ? 'Share a campus event' : 'Submit an event'}
       footer={
         <>
           <button type="button" onClick={onClose} className="btn btn-secondary" style={{ flex: 1 }}>
@@ -199,22 +214,48 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         </>
       }
     >
-      <p style={{ margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-        Your event goes live as soon as you post.
-      </p>
+      {partner ? (
+        <div className="pt-post-as" style={{ '--pt-bg': partner.bg, '--pt-ink': partner.ink } as React.CSSProperties}>
+          <img src={partner.logo} alt="" width={36} height={36} />
+          <span>
+            <b>Posting as {partner.handle}</b>
+            <span>Shows in your colours as a 4:5 post. Only the poster is needed — people can RSVP; registration forms stay with the club running it.</span>
+          </span>
+        </div>
+      ) : (
+        <p style={{ margin: '0 0 6px', fontSize: 'calc(13px * var(--text-scale))', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          Your event goes live as soon as you post.
+        </p>
+      )}
 
       <form id="event-form" onSubmit={handleSubmit} noValidate>
+        {partner && (
+          <section style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label className="field-label" style={{ margin: 0 }}>Poster</label>
+              <span className="field-hint">4:5 like Instagram · first is the cover</span>
+            </div>
+            <PhotoPicker
+              ref={pickerRef}
+              photos={form.photos}
+              onChange={next => update('photos', next)}
+              max={MAX_PHOTOS}
+            />
+            {errors.photos && <span className="field-error">{errors.photos}</span>}
+          </section>
+        )}
+
         <div className="field" style={{ marginBottom: 14 }}>
           <label htmlFor="ev-title" className="field-label">
-            Title <span className="required" aria-hidden="true">*</span>
+            {partner ? 'Caption' : <>Title <span className="required" aria-hidden="true">*</span></>}
           </label>
           <input
             id="ev-title"
             className="form-input"
-            placeholder="e.g. Semester-End Swap Drive"
+            placeholder={partner ? 'Optional — e.g. Open Mic Night by Music Club' : 'e.g. Semester-End Swap Drive'}
             value={form.title}
             onChange={e => update('title', e.target.value)}
-            aria-required="true"
+            aria-required={!partner}
             aria-invalid={!!errors.title}
           />
           {errors.title && <span className="field-error">{errors.title}</span>}
@@ -229,6 +270,43 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         <fieldset style={{ border: 0, padding: 0, margin: '0 0 14px' }}>
           <legend className="field-label" style={{ padding: 0, marginBottom: 8 }}>When</legend>
 
+          {partner && (
+            <label style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              minHeight: 44, padding: '0 12px', marginBottom: undated ? 0 : 8, cursor: 'pointer', userSelect: 'none',
+              background: 'var(--surface-muted, rgba(0,0,0,0.03))', borderRadius: 14,
+            }}>
+              <span>
+                <span style={{ display: 'block', fontSize: 'calc(14px * var(--text-scale))', fontWeight: 500 }}>Date is on the poster</span>
+                {undated && (
+                  <span style={{ display: 'block', fontSize: 'calc(12px * var(--text-scale))', color: 'var(--text-muted)' }}>
+                    Stays up for {UNDATED_DAYS} days
+                  </span>
+                )}
+              </span>
+              <span className="pill-switch" style={{ width: 42, height: 25, flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={undated}
+                  onChange={e => { haptics.selection(); setUndated(e.target.checked); }}
+                  aria-label="Date is on the poster"
+                />
+                <span className="pill-switch-track" aria-hidden="true" style={{
+                  position: 'absolute', inset: 0, borderRadius: 999,
+                  background: undated ? 'var(--text-primary)' : 'var(--bg-inset)',
+                  transition: 'background 180ms', pointerEvents: 'none',
+                }} />
+                <span aria-hidden="true" style={{
+                  position: 'absolute', top: 3, left: undated ? 22 : 3,
+                  width: 19, height: 19, borderRadius: '50%',
+                  background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                  transition: 'left 180ms', pointerEvents: 'none',
+                }} />
+              </span>
+            </label>
+          )}
+
+          {!(partner && undated) && (
           <div style={{
             background: 'var(--surface-muted, rgba(0,0,0,0.03))',
             borderRadius: 14,
@@ -341,11 +419,13 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
               </p>
             )}
           </div>
+          )}
         </fieldset>
 
         {/* ── Type ──────────────────────────────────────────────────────
             Sixteen options, grouped into four headings. Grouping is what keeps
             the choice cheap: you scan four headings, not sixteen labels. */}
+        {!partner && (
         <div className="field" style={{ marginBottom: 14 }}>
           <label htmlFor="ev-type" className="field-label">Event type</label>
           <select
@@ -361,6 +441,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
             ))}
           </select>
         </div>
+        )}
 
         <div className="field" style={{ marginBottom: 14 }}>
           <label htmlFor="ev-loc" className="field-label">
@@ -408,7 +489,9 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
         </div>
 
         {/* ── Registration form (optional) — building happens on a dedicated
-           full-page surface; this row is just the doorway + summary. */}
+           full-page surface; this row is just the doorway + summary. Not for
+           partner reposts: the form belongs to the club running the event. */}
+        {!partner && (
         <section style={{ marginBottom: 14 }}>
           <button
             type="button"
@@ -462,8 +545,10 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
           )}
           {regError && <span className="field-error">{regError}</span>}
         </section>
+        )}
 
         {/* ── Event photos (up to 3, drag-reorder, camera or library, auto-compressed) ── */}
+        {!partner && (
         <section>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
             <label className="field-label" style={{ margin: 0 }}>Photos</label>
@@ -478,6 +563,7 @@ export default function SubmitEventModal({ open, onClose, onSubmit }: SubmitEven
             max={MAX_PHOTOS}
           />
         </section>
+        )}
 
         {submitError && (
           <div role="alert" style={{

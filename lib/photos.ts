@@ -8,6 +8,8 @@
  * via `getItemPhoto(id)` which returns a URL or undefined.
  */
 
+import { eventPartnerFor } from './partners';
+
 const u = (id: string, w = 800, q = 80) =>
   `https://images.unsplash.com/photo-${id}?w=${w}&h=${w}&auto=format&fit=crop&q=${q}`;
 
@@ -304,7 +306,11 @@ export function resolveEventPhotos(event: {
   return [];
 }
 
-/* Stable avatar URLs (DiceBear) — deterministic from a seed */
+/* Stable avatar URLs (DiceBear) — deterministic from a seed. Every caller
+   seeds with the user id, so an event partner's logo replaces the generated
+   face everywhere at once: storefront, event pages, comments, messages. */
 export function getAvatar(seed: string, size = 96): string {
+  const partner = eventPartnerFor(seed);
+  if (partner) return partner.logo;
   return `https://api.dicebear.com/9.x/notionists-neutral/png?seed=${encodeURIComponent(seed)}&size=${size}&backgroundColor=eaedf1,d1d4f9,c0aede,b6e3f4,ffd5dc&radius=50`;
 }

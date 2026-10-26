@@ -1307,3 +1307,69 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 .crumb-back { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 .crumb-back:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
 .crumb-back:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+
+/* ═══ Event partner card (lib/partners) ═══════════════════════════════════
+   A repost reads like the Instagram post it came from: logo + handle, the
+   poster at 4:5, caption, RSVP — in the partner's colours. */
+.pt-card {
+  background: var(--pt-bg); color: var(--pt-ink);
+  border-radius: 24px; padding: 12px 12px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-width: 0;
+}
+.pt-card-head { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+.pt-card-logo { width: 34px; height: 34px; border-radius: 50%; display: block; box-shadow: 0 0 0 2px var(--pt-ink); }
+.pt-card-who { display: flex; flex-direction: column; min-width: 0; }
+.pt-card-handle { font-size: calc(14px * var(--text-scale)); font-weight: 700; letter-spacing: -0.01em; }
+.pt-card-sub {
+  font-size: calc(11.5px * var(--text-scale)); font-weight: 500; opacity: 0.78;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pt-card-open {
+  display: flex; flex-direction: column; gap: 8px; width: 100%;
+  padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.pt-card-media {
+  position: relative; display: block; width: 100%; aspect-ratio: 4 / 5;
+  border-radius: 16px; overflow: hidden; background: var(--pt-ink);
+}
+.pt-card-media .nophoto { color: var(--pt-bg); }
+.pt-card-going {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px;
+  background: var(--pt-ink); color: var(--pt-bg);
+  font-size: calc(11px * var(--text-scale)); font-weight: 700;
+}
+.pt-card-title {
+  padding: 0 2px; font-size: calc(16px * var(--text-scale)); font-weight: 700; letter-spacing: -0.02em; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pt-card-meta {
+  padding: 0 2px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  font-size: calc(12.5px * var(--text-scale)); font-weight: 500;
+}
+.pt-card-meta svg { flex: none; }
+.pt-card-meta span { margin-right: 8px; }
+.pt-card-foot { display: flex; align-items: center; gap: 12px; padding: 0 2px; }
+.pt-card-cta {
+  height: 40px; padding: 0 22px; border-radius: 999px; border: 0; cursor: pointer;
+  background: var(--pt-ink); color: var(--pt-bg);
+  font: inherit; font-size: calc(14px * var(--text-scale)); font-weight: 700; letter-spacing: -0.01em;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.pt-card-cta[data-going] { background: transparent; color: var(--pt-ink); box-shadow: inset 0 0 0 2px var(--pt-ink); }
+.pt-card-count { font-size: calc(12.5px * var(--text-scale)); font-weight: 600; }
+.pt-post-as {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 12px 14px; border-radius: 16px;
+  background: var(--pt-bg); color: var(--pt-ink);
+}
+.pt-post-as img { width: 36px; height: 36px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px var(--pt-ink); }
+.pt-post-as b { display: block; font-size: calc(14px * var(--text-scale)); font-weight: 700; }
+.pt-post-as span span { display: block; font-size: calc(12px * var(--text-scale)); line-height: 1.4; opacity: 0.85; margin-top: 2px; }
+.pt-hero-tag {
+  position: absolute; top: 14px; left: 14px; z-index: 4;
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border-radius: 999px;
+  background: var(--pt-bg); color: var(--pt-ink);
+  font-size: calc(12px * var(--text-scale)); font-weight: 700; letter-spacing: -0.01em;
+}
+.pt-hero-tag img { width: 22px; height: 22px; border-radius: 50%; display: block; }

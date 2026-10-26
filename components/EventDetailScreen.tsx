@@ -37,6 +37,7 @@ import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
 import { WA_FILL, WA_INK } from '../lib/whatsapp';
 import { eventTypeGroups, eventTypeText } from '../lib/eventTypes';
+import { eventPartnerFor, UNDATED_DAYS } from '../lib/partners';
 import {
   scheduleFromTimestamps, applyChange, durationLabel,
   type Schedule, type ScheduleField,
@@ -104,6 +105,10 @@ export default function EventDetailScreen({
    * pencil. Nothing is taken away — one tap and the editor appears. */
   const [adminEditOn, setAdminEditOn] = useState(false);
   const canEdit = isOwner || (!!isAdmin && adminEditOn);
+  /* A partner's repost (lib/partners): their logo and handle instead of an
+     event type, the caption and date optional, and no registration form. */
+  const partner = eventPartnerFor(event.organizer?.id);
+  const storedTitle = event.untitled ? '' : event.title;
   /* Prefer the organizer's uploaded photos; mock events fall back to the
      curated Unsplash covers. Real events with no upload → empty array → we
      render the hero block without an image. */
@@ -226,7 +231,8 @@ export default function EventDetailScreen({
   };
 
   /* ── Inline edit state (owner only) ── */
-  const [eTitle, setETitle]             = useState(event.title);
+  const [eTitle, setETitle]             = useState(storedTitle);
+  const [eUndated, setEUndated]         = useState(!!event.undated);
   const [eDescription, setEDescription] = useState(event.description ?? '');
   const [eLocation, setELocation]       = useState(event.location);
   /* One Schedule, seeded from the raw timestamps — never from the formatted
@@ -243,17 +249,19 @@ export default function EventDetailScreen({
   );
 
   useEffect(() => {
-    setETitle(event.title);
+    setETitle(event.untitled ? '' : event.title);
+    setEUndated(!!event.undated);
     setEDescription(event.description ?? '');
     setELocation(event.location);
     setESched(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay));
     setEType(event.eventType);
     setEMaxAttendeesStr(event.maxAttendees ? String(event.maxAttendees) : '');
-  }, [event.id, event.title, event.description, event.location, event.eventType,
+  }, [event.id, event.title, event.untitled, event.undated, event.description, event.location, event.eventType,
       event.maxAttendees, event.startsAt, event.endsAt, event.allDay]);
 
   const isDirty =
-    eTitle !== event.title ||
+    eTitle !== storedTitle ||
+    eUndated !== !!event.undated ||
     eDescription !== (event.description ?? '') ||
     eLocation !== event.location ||
     JSON.stringify(eSched) !== JSON.stringify(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay)) ||
@@ -265,6 +273,11 @@ export default function EventDetailScreen({
 
   const handleSaveChanges = useCallback(async () => {
     if (!isDirty || saving) return;
+    /* A caption can be dropped only on a partner's post that has a poster. */
+    if (!eTitle.trim() && !(partner && displayPhotos.length > 0)) {
+      setSaveError(partner ? 'Add a caption or keep the poster' : 'Give your event a name');
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -277,7 +290,11 @@ export default function EventDetailScreen({
         await updateEvent(event.id, {
           title: eTitle,
           eventType: eType,
-          schedule: eSched,
+          /* An undated partner post keeps its week unless the date is switched
+             on or off here; re-saving it does not push the expiry out. */
+          ...(partner && eUndated
+            ? (event.undated ? {} : { undated: true })
+            : { schedule: eSched, ...(event.undated ? { undated: false } : {}) }),
           location: eLocation,
           description: eDescription,
           maxAttendees: eMaxAttendeesStr ? Number(eMaxAttendeesStr) : undefined,
@@ -288,10 +305,11 @@ export default function EventDetailScreen({
     } finally {
       setSaving(false);
     }
-  }, [isDirty, saving, event.id, eTitle, eType, eSched, eLocation, eDescription, eMaxAttendeesStr]);
+  }, [isDirty, saving, event.id, event.undated, partner, displayPhotos.length, eTitle, eUndated, eType, eSched, eLocation, eDescription, eMaxAttendeesStr]);
 
   const handleDiscard = useCallback(() => {
-    setETitle(event.title);
+    setETitle(event.untitled ? '' : event.title);
+    setEUndated(!!event.undated);
     setEDescription(event.description ?? '');
     setELocation(event.location);
     setESched(scheduleFromTimestamps(event.startsAt, event.endsAt, event.allDay));
@@ -472,7 +490,7 @@ export default function EventDetailScreen({
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           padding: '0 12px',
         }}>
-          {eventTypeText(event.eventType)}
+          {partner ? partner.handle : eventTypeText(event.eventType)}
         </span>
         {/* Header right-side is share only now — "add to calendar" moved down
            beside RSVP, where the other event actions live. */}
@@ -549,6 +567,12 @@ export default function EventDetailScreen({
                 radius={24}
                 overlay={
                   <>
+                    {partner ? (
+                      <div className="pt-hero-tag" style={{ '--pt-bg': partner.bg, '--pt-ink': partner.ink } as React.CSSProperties}>
+                        <img src={partner.logo} alt="" width={22} height={22} />
+                        {partner.handle}
+                      </div>
+                    ) : (
                     <div style={{
                       position: 'absolute', top: 14, left: 14,
                       background: 'rgba(0,0,0,0.55)', color: '#fff',
@@ -560,6 +584,7 @@ export default function EventDetailScreen({
                     }}>
                       {eventTypeText(event.eventType)}
                     </div>
+                    )}
                     {/* Wecycle brand stamp — top-right corner. */}
                     <span aria-hidden="true" style={{
                       position: 'absolute', top: 12, right: 12, zIndex: 6,
@@ -686,6 +711,7 @@ export default function EventDetailScreen({
                     <BarChart3 size={16} strokeWidth={2} /> Insights
                   </button>
                 )}
+                {!partner && (
                 <button
                   onClick={openManageForm}
                   aria-label={effectiveHasForm ? 'Edit registration form' : 'Add registration form'}
@@ -701,6 +727,7 @@ export default function EventDetailScreen({
                 >
                   <ClipboardList size={17} strokeWidth={1.8} />
                 </button>
+                )}
                 {onDelete && (
                   <button
                     onClick={async () => {
@@ -749,6 +776,7 @@ export default function EventDetailScreen({
           {/* Icon actions sit to the RIGHT of RSVP, so RSVP starts flush with the
               poster's left edge and these end flush with its right — the row spans
               exactly the image's width (max-width 560px, see .ev-cta). */}
+          {!event.undated && (
           <button
             aria-label="Add to calendar"
             title="Add to calendar"
@@ -764,6 +792,7 @@ export default function EventDetailScreen({
           >
             <CalendarDays size={18} strokeWidth={1.8} />
           </button>
+          )}
           <button
             aria-label={saved ? 'Unsave event' : 'Save event'}
             aria-pressed={saved}
@@ -879,16 +908,17 @@ export default function EventDetailScreen({
       <section style={{ padding: '24px 20px 0' }}>
         {canEdit ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <EventEditField label="Event title">
+            <EventEditField label={partner ? 'Caption' : 'Event title'}>
               <input
                 value={eTitle}
                 onChange={e => setETitle(e.target.value)}
-                placeholder="What's happening?"
+                placeholder={partner ? 'Optional — the poster can speak for itself' : "What's happening?"}
                 className="inline-edit inline-edit--h1"
                 aria-label="Event title"
               />
             </EventEditField>
 
+            {!partner && (
             <EventEditField label="Type">
               <select
                 value={eType}
@@ -903,7 +933,27 @@ export default function EventDetailScreen({
                 ))}
               </select>
             </EventEditField>
+            )}
 
+            {partner && (
+              <EventEditField label="Date is on the poster" icon={<CalendarDays size={13} strokeWidth={1.8} />}>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={eUndated}
+                  onChange={e => { haptics.selection(); setEUndated(e.target.checked); }}
+                  style={{ width: 42, height: 26, accentColor: 'var(--color-lime, #5C7A00)', cursor: 'pointer' }}
+                  aria-label="Date is on the poster"
+                />
+              </EventEditField>
+            )}
+            {partner && eUndated && (
+              <p style={{ margin: '-8px 0 0', fontSize: 'calc(12.5px * var(--text-scale))', color: 'var(--text-secondary, #6B6B60)' }}>
+                No date shown. {event.undated ? 'Comes down a week after it was posted.' : `Stays up for ${UNDATED_DAYS} days.`}
+              </p>
+            )}
+
+            {!(partner && eUndated) && <>
             {/* Same range editor as the create form, same rules — the end
                 follows the start, and nothing here can be rejected. */}
             <EventEditField label="All day" icon={<Clock size={13} strokeWidth={1.8} />}>
@@ -965,6 +1015,7 @@ export default function EventDetailScreen({
                 {durationLabel(eSched)}
               </p>
             )}
+            </>}
 
             <EventEditField label="Location" icon={<MapPin size={13} strokeWidth={1.8} />}>
               <input
@@ -991,6 +1042,7 @@ export default function EventDetailScreen({
           </div>
         ) : (
           <>
+{!event.untitled && (
             <h1 style={{
               margin: 0,
               fontSize: 'calc(22px * var(--text-scale))', fontWeight: 600,
@@ -1000,6 +1052,7 @@ export default function EventDetailScreen({
             }}>
               {event.title}
             </h1>
+            )}
 
             <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <FactRow
@@ -1167,7 +1220,7 @@ export default function EventDetailScreen({
           letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
           color: 'var(--text-muted)',
         }}>
-          Organized by
+          {partner ? 'Posted by' : 'Organized by'}
         </h3>
         {/* Whole card is tappable — opens the organizer's storefront. */}
         <button

@@ -13,6 +13,7 @@ import { resolveEventPhoto } from '../lib/photos';
 import NoPhoto from './NoPhoto';
 import FitImage from './FitImage';
 import { useAuth } from '../lib/AuthContext';
+import { eventPartnerFor, type EventPartner } from '../lib/partners';
 
 interface EventsScreenProps {
   onOpenMenu: () => void;
@@ -282,15 +283,27 @@ export default function EventsScreen({ onOpenMenu, onOpenAccount, onOpenMessages
             </h3>
           </section>
           <section className="events-list" style={{ padding: '0 16px' }}>
-            {rest.map(event => (
-              <EventListCard
-                key={event.id}
-                event={event}
-                isRsvpd={rsvpd.has(event.id)}
-                onRsvp={() => toggleRsvp(event)}
-                onOpen={() => onOpenEvent(event)}
-              />
-            ))}
+            {rest.map(event => {
+              const partner = eventPartnerFor(event.organizer?.id);
+              return partner ? (
+                <PartnerEventCard
+                  key={event.id}
+                  event={event}
+                  partner={partner}
+                  isRsvpd={rsvpd.has(event.id)}
+                  onRsvp={() => toggleRsvp(event)}
+                  onOpen={() => onOpenEvent(event)}
+                />
+              ) : (
+                <EventListCard
+                  key={event.id}
+                  event={event}
+                  isRsvpd={rsvpd.has(event.id)}
+                  onRsvp={() => toggleRsvp(event)}
+                  onOpen={() => onOpenEvent(event)}
+                />
+              );
+            })}
           </section>
         </>
       )}
@@ -564,12 +577,69 @@ function EventListCard({ event, isRsvpd, onRsvp, onOpen }: { event: CommunityEve
   );
 }
 
+/* ══ PARTNER EVENT CARD ════════════════════════════
+   A repost from an event partner (lib/partners) reads like the Instagram post
+   it usually is: the page's logo and handle on top, the poster at 4:5 — the
+   shape these posters are made in, so nothing is cropped — then the caption,
+   when there is one, and RSVP. In the partner's own colours, so it is obvious
+   at a glance that this is their pick, not a club posting first-hand. */
+function PartnerEventCard({ event, partner, isRsvpd, onRsvp, onOpen }: {
+  event: CommunityEvent; partner: EventPartner; isRsvpd: boolean; onRsvp: () => void; onOpen?: () => void;
+}) {
+  const photo = resolveEventPhoto(event);
+  const when = eventWhenLabel(event);
+  return (
+    <article
+      className="pt-card"
+      style={{ '--pt-bg': partner.bg, '--pt-ink': partner.ink } as React.CSSProperties}
+    >
+      <div className="pt-card-head">
+        <img src={partner.logo} alt="" className="pt-card-logo" width={34} height={34} />
+        <span className="pt-card-who">
+          <span className="pt-card-handle">{partner.handle}</span>
+          <span className="pt-card-sub">Campus pick · {partner.name}</span>
+        </span>
+      </div>
+
+      <button type="button" onClick={onOpen} className="pt-card-open" aria-label={`Open ${event.title}`}>
+        <span className="pt-card-media">
+          {photo ? <FitImage src={photo} /> : <NoPhoto />}
+          {isRsvpd && (
+            <span className="pt-card-going"><Check size={11} strokeWidth={2.6} /> Going</span>
+          )}
+        </span>
+        {!event.untitled && <span className="pt-card-title">{event.title}</span>}
+        {(!event.undated || event.location) && (
+          <span className="pt-card-meta">
+            {!event.undated && <><CalendarDays size={12} strokeWidth={1.9} /><span>{when}</span></>}
+            {event.location && <><MapPin size={12} strokeWidth={1.9} /><span>{event.location}</span></>}
+          </span>
+        )}
+      </button>
+
+      <div className="pt-card-foot">
+        <button
+          onClick={e => { e.stopPropagation(); onRsvp(); }}
+          aria-label={isRsvpd ? 'Cancel RSVP' : 'RSVP'}
+          className="pt-card-cta"
+          data-going={isRsvpd || undefined}
+        >
+          {isRsvpd ? <><Check size={13} strokeWidth={2.6} /> Going</> : 'RSVP'}
+        </button>
+        {event.attendees > 0 && <span className="pt-card-count">{event.attendees} going</span>}
+      </div>
+    </article>
+  );
+}
+
 /* "Fri, 25 Sep · 10:00 AM". Prefers the raw ISO `startsAt` when the row came
    from Supabase; otherwise reuses the already-formatted display strings and
    just drops a redundant current-year suffix. Deliberately does NOT re-parse
    the formatted date into a Date — doing that is what once rescheduled events
    to 1970 (see parseEventDateTime in EventDetailScreen). */
 function eventWhenLabel(event: CommunityEvent): string {
+  /* A poster-only post's starts_at is an expiry, not the event's day. */
+  if (event.undated) return event.date;
   const iso = (event as { startsAt?: string }).startsAt;
   if (iso) {
     const d = new Date(iso);

@@ -256,6 +256,11 @@ export interface CommunityEvent {
   /* True when the organizer attached a registration form — RSVPing routes
      through the form-fill screen before confirming. */
   hasForm?: boolean;
+  /** Posted without a date (a partner's poster carries it) — `date` holds a
+   *  label, not a day, and starts_at is only an expiry. See lib/partners. */
+  undated?: boolean;
+  /** Posted without a caption — `title` holds a display fallback. */
+  untitled?: boolean;
   /* Real metric counts from the DB (absent on mock events → metric fallbacks). */
   viewCount?: number;
   saveCount?: number;
