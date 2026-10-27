@@ -18,7 +18,7 @@ import { getActiveRoom, isPrivateRoom } from '../lib/rooms';
 import TopBar from './TopBar';
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Plus, MapPin, CheckCircle,
-  Mail, X, Trash2, Save, RotateCcw, Loader2, ImagePlus, Share2, MessageCircle,
+  Mail, X, Trash2, Save, RotateCcw, Loader2, ImagePlus, Share2, MessageCircle, Flag,
 } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import { LOST_FOUND_ITEMS, type LostItem, type User } from '../lib/mockData';
@@ -28,6 +28,8 @@ import { fetchLostFound, onPostsChanged, updateLostFoundMedia } from '../lib/liv
 import MediaEditor, { EditPhotosButton } from './MediaEditor';
 import EmptyState from './EmptyState';
 import ShareCardModal from './ShareCardModal';
+import ReportSheet from './ReportSheet';
+import CommentsSection from './CommentsSection';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { Logomark } from './Brand';
 import { useAuth } from '../lib/AuthContext';
@@ -435,6 +437,7 @@ export function LostFoundDetailSheet({
     byPhone: ownerContact.phone,
     url: shareUrl(item.id),
   };
+  const [reportOpen, setReportOpen] = useState(false);
   const handleShareLF = () => {
     track(EVT.share_clicked, { post_id: item.id, post_kind: 'lostfound' });
     setShareCardOpen(true);
@@ -663,6 +666,12 @@ export function LostFoundDetailSheet({
           <button onClick={handleShareLF} aria-label="Share" className="theme-toggle">
             <Share2 size={17} strokeWidth={1.8} />
           </button>
+          {/* Report, as on every listing and event. */}
+          {!isOwner && (
+            <button onClick={() => setReportOpen(true)} aria-label="Report this post" className="theme-toggle">
+              <Flag size={17} strokeWidth={1.8} />
+            </button>
+          )}
           <button onClick={onClose} aria-label="Close" className="theme-toggle">
             <X size={18} strokeWidth={1.8} />
           </button>
@@ -1043,6 +1052,16 @@ export function LostFoundDetailSheet({
           })()}
         </div>
         )}
+        {/* Comments, as on listings and events — "I think I saw it near the
+            library" is what a lost-and-found post most needs to collect. */}
+        <div style={{ marginTop: 20 }}>
+          <CommentsSection
+            postId={item.id}
+            entityType="lost_found"
+            onRequireAuth={onRequireAuth}
+            onOpenStorefront={onOpenStorefront}
+          />
+        </div>
         </div>{/* /right column */}
       </div>
       {isOwner && (
@@ -1056,6 +1075,14 @@ export function LostFoundDetailSheet({
         />
       )}
       <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="lostfound"
+        targetId={item.id}
+        targetUserId={item.user.id}
+        targetLabel={`"${item.title}"`}
+      />
       {viewerOpen && displayPhotoUrl && (
         <PhotoViewer photos={[displayPhotoUrl]} index={0} onClose={() => setViewerOpen(false)} />
       )}

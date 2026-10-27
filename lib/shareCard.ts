@@ -97,10 +97,15 @@ export interface ShareCardSpec {
 export const CARD_SIZE = 1080;
 const S = CARD_SIZE;
 const M = 64;                       // outer margin
-const HEAD_Y = 64;                  // top of the brand row
-const HEAD_H = 56;
-const BODY_Y = 156;                 // where the photo and the column start
-const FOOT_Y = 836;                 // hairline above the footer
+const HEAD_Y = 60;                  // top of the brand row
+const HEAD_H = 64;
+const BODY_Y = 160;                 // where the photo and the column start
+const FOOT_Y = 846;                 // hairline above the footer
+/* Type sizes are set for the size the card is SEEN at, not the size it is
+   made at: in a WhatsApp chat a 1080 image is drawn about 270pt wide — a
+   quarter scale — so nothing here is under 24px (6pt in the bubble, ~9pt
+   when tapped open), and the headline and the price are big enough to read
+   without tapping at all. */
 const WHITE = '#FFFFFF';
 /* Secondary inks, set against the scrim's ceiling (MAX_FIELD_LUM). Canvas
    blends in sRGB, so 78% white over that field measured only ~3.7:1; 90% is
@@ -370,7 +375,7 @@ function copyFor(spec: ShareCardSpec): CardCopy {
   const place = spec.location?.trim() || undefined;
   switch (spec.kind) {
     case 'request':
-      return { pill: 'Wanted', eyebrow: 'Looking for', title, body, place, cta: 'Help out on Wecycle' };
+      return { pill: spec.badge || 'Wanted', eyebrow: 'Looking for', title, body, place, cta: 'Help out on Wecycle' };
     case 'job':
       return {
         pill: spec.roleLabel || 'Gig', eyebrow: spec.roleLabel === 'Hiring' ? 'Hiring on campus' : 'Offering a service',
@@ -464,17 +469,17 @@ export async function buildCardLayers(spec: ShareCardSpec, palette: CardPalette)
 
   drawBrandRow(ctx, wordmark, copy.pill, palette.accent);
 
-  let colX = M, colY = BODY_Y + 18, colW = S - 2 * M, colBottom = FOOT_Y - 64;
+  let colX = M, colY = BODY_Y + 10, colW = S - 2 * M, colBottom = FOOT_Y - 62;
   if (photo && layout === 'portrait') {
-    const frame = fitFrame(ar, { x: 560, y: BODY_Y, w: S - M - 560, h: FOOT_Y - 72 - BODY_Y }, spec.kind === 'event');
+    const frame = fitFrame(ar, { x: 548, y: BODY_Y, w: S - M - 548, h: FOOT_Y - 64 - BODY_Y }, spec.kind === 'event');
     drawPhoto(ctx, photo, frame);
-    colW = 560 - 40 - M;
+    colW = 548 - 40 - M;
     zone({ x: M, y: BODY_Y, w: colW, h: colBottom - BODY_Y }, (c, a) =>
       linear(c, 0, 0, 700, 0, [[0, 0.55 * a], [0.6, 0.30 * a], [1, 0]]));
   } else if (photo && layout === 'landscape') {
-    const frame = fitFrame(ar, { x: M, y: BODY_Y, w: S - 2 * M, h: 430 }, spec.kind === 'event');
+    const frame = fitFrame(ar, { x: M, y: BODY_Y, w: S - 2 * M, h: 400 }, spec.kind === 'event', 'center');
     drawPhoto(ctx, photo, frame);
-    colY = BODY_Y + 430 + 44;
+    colY = BODY_Y + 400 + 40;
     zone({ x: M, y: colY, w: S - 2 * M, h: colBottom - colY }, (c, a) =>
       linear(c, 0, colY - 120, 0, FOOT_Y, [[0, 0], [0.35, 0.45 * a], [1, 0.6 * a]]));
   } else {
@@ -503,7 +508,7 @@ export async function buildCardLayers(spec: ShareCardSpec, palette: CardPalette)
 function drawBrandRow(ctx: CanvasRenderingContext2D, wordmark: HTMLImageElement | null, pill: string, accent: string) {
   const midY = HEAD_Y + HEAD_H / 2;
   if (wordmark) {
-    const h = 44;
+    const h = 52;
     const w = h * (wordmark.width / wordmark.height);
     /* The wordmark art is dark; white it, keeping its alpha. */
     const off = document.createElement('canvas');
@@ -515,7 +520,7 @@ function drawBrandRow(ctx: CanvasRenderingContext2D, wordmark: HTMLImageElement 
     o.fillRect(0, 0, off.width, off.height);
     ctx.drawImage(off, M, midY - h / 2 - 2, w, h);
   } else {
-    ctx.font = cardFont(SANS, 900, 40);
+    ctx.font = cardFont(SANS, 900, 46);
     ctx.fillStyle = WHITE;
     ctx.textBaseline = 'middle';
     ctx.fillText('Wecycle', M, midY);
@@ -526,12 +531,12 @@ function drawBrandRow(ctx: CanvasRenderingContext2D, wordmark: HTMLImageElement 
   const label = pill.toUpperCase();
   ctx.save();
   ctx.shadowColor = 'transparent';
-  ctx.font = cardFont(SANS, 700, 23);
-  const track = 2.6;
+  ctx.font = cardFont(SANS, 700, 28);
+  const track = 2.4;
   let tw = 0;
   for (const ch of label) tw += ctx.measureText(ch).width + track;
   tw -= track;
-  const h = HEAD_H, padL = 26, dot = 10, gap = 14, padR = 28;
+  const h = HEAD_H, padL = 28, dot = 12, gap = 14, padR = 30;
   const w = padL + dot + gap + tw + padR;
   const x = S - M - w;
   roundRect(ctx, x, HEAD_Y, w, h, h / 2);
@@ -551,17 +556,21 @@ function drawBrandRow(ctx: CanvasRenderingContext2D, wordmark: HTMLImageElement 
   ctx.restore();
 }
 
-/** The photo's frame inside `box`, shaped by the photo itself.
- *  A poster (events) is never cropped — the frame takes its exact shape. Any
- *  other photo may lose a little to fill the box better, but never more than
- *  a quarter: past that the crop starts cutting off the thing being sold. */
-function fitFrame(ar: number, box: Box, exact: boolean): Box {
+/** The photo's frame inside `box`.
+ *  A poster (events) is never cropped — the frame takes its exact shape. A
+ *  product photo fills the whole box: a square shot floating in a tall frame
+ *  left bands of empty field above and below it and read as a layout bug.
+ *  Phone photos are already close to the box's 3:4, so the crop is small. */
+function fitFrame(ar: number, box: Box, exact: boolean, align: 'right' | 'center' = 'right'): Box {
   const boxAr = box.w / box.h;
   let fr = ar;
-  if (!exact) fr = Math.min(Math.max(ar, boxAr * 0.8), boxAr * 1.25);
+  if (!exact) fr = boxAr;
   const w = fr > boxAr ? box.w : box.h * fr;
   const h = fr > boxAr ? box.w / fr : box.h;
-  return { x: box.x + (box.w - w), y: box.y + (box.h - h) / 2, w, h };
+  /* Beside a text column it sits against the far edge; across the top of the
+     card it is centred, or a narrow poster leaves the field lopsided. */
+  const x = align === 'right' ? box.x + (box.w - w) : box.x + (box.w - w) / 2;
+  return { x, y: box.y + (box.h - h) / 2, w, h };
 }
 
 function drawPhoto(ctx: CanvasRenderingContext2D, img: Bitmap, f: Box) {
@@ -594,7 +603,7 @@ function drawPhoto(ctx: CanvasRenderingContext2D, img: Bitmap, f: Box) {
 }
 
 function eyebrow(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
-  ctx.font = cardFont(SANS, 700, 22);
+  ctx.font = cardFont(SANS, 700, 26);
   ctx.fillStyle = QUIET;
   tracked(ctx, text.toUpperCase(), x, y, 2.4);
 }
@@ -615,41 +624,46 @@ function fitTitle(ctx: CanvasRenderingContext2D, title: string, width: number, s
   return best;
 }
 
+const FIG_SIZE = 84;
+const FIG_LABEL = 26;
+
 function drawFigure(ctx: CanvasRenderingContext2D, fig: { label: string; value: string }, x: number, baseline: number, maxW: number, align: 'left' | 'right' = 'left') {
-  let size = 66;
+  let size = FIG_SIZE;
   ctx.font = cardFont(SANS, 900, size);
-  while (size > 38 && ctx.measureText(fig.value).width > maxW) { size -= 4; ctx.font = cardFont(SANS, 900, size); }
+  while (size > 48 && ctx.measureText(fig.value).width > maxW) { size -= 4; ctx.font = cardFont(SANS, 900, size); }
   const value = wrapText(ctx, fig.value, maxW, 1)[0];
   ctx.fillStyle = WHITE;
   ctx.textAlign = align;
   ctx.fillText(value, x, baseline);
   ctx.textAlign = 'left';
-  ctx.font = cardFont(SANS, 700, 21);
+  ctx.font = cardFont(SANS, 700, FIG_LABEL);
   ctx.fillStyle = QUIET;
-  tracked(ctx, fig.label.toUpperCase(), x, baseline - size - 14, 2.2, align);
+  tracked(ctx, fig.label.toUpperCase(), x, baseline - size - 16, 2.2, align);
 }
 
 function drawStats(ctx: CanvasRenderingContext2D, stats: { label: string; value: string }[], x: number, baseline: number, w: number) {
   const colW = w / Math.max(1, stats.length);
   stats.forEach((st, i) => {
     const cx = x + colW * i;
-    ctx.font = cardFont(SANS, 900, 56);
+    ctx.font = cardFont(SANS, 900, 68);
     ctx.fillStyle = WHITE;
     ctx.fillText(st.value, cx, baseline);
-    ctx.font = cardFont(SANS, 700, 19);
+    ctx.font = cardFont(SANS, 700, 24);
     ctx.fillStyle = QUIET;
-    tracked(ctx, st.label.toUpperCase(), cx, baseline - 70, 1.6);
+    tracked(ctx, st.label.toUpperCase(), cx, baseline - 84, 1.6);
   });
 }
 
 /** Portrait photo or no photo: everything in one column. */
 function drawColumnText(ctx: CanvasRenderingContext2D, copy: CardCopy, col: { x: number; y: number; w: number; bottom: number }, big: boolean) {
-  let y = col.y + 22;
-  if (copy.eyebrow) { eyebrow(ctx, copy.eyebrow, col.x, y); y += 26; }
+  let y = col.y + 26;
+  if (copy.eyebrow) { eyebrow(ctx, copy.eyebrow, col.x, y); y += 24; }
 
   const steps: Steps = big
-    ? [[112, 3], [96, 3], [84, 4], [72, 4], [62, 5]]
-    : [[76, 3], [68, 3], [60, 4], [54, 4], [48, 5], [42, 5]];
+    ? [[128, 3], [112, 3], [100, 3], [88, 4], [76, 4], [64, 5]]
+    /* Fewer lines beat a bigger size: four ragged lines of a pixel face read
+       as a ransom note, three even ones read as a headline. */
+    : [[92, 2], [84, 2], [76, 3], [68, 3], [62, 3], [56, 4], [50, 4]];
   const t = fitTitle(ctx, copy.title, col.w, steps);
   const lh = Math.round(t.size * 1.06);
   ctx.font = cardFont(PIXEL, 400, t.size);
@@ -660,16 +674,16 @@ function drawColumnText(ctx: CanvasRenderingContext2D, copy: CardCopy, col: { x:
   /* The figure (or stats) sits on the column's floor; the body takes what is
      left between it and the headline, and stops a clear gap above the
      figure's label — measured from the label's real top, not guessed. */
-  const figTop = copy.stats?.length ? col.bottom - 56 - 70 - 20
-    : copy.figure ? col.bottom - 66 - 14 - 21
+  const figTop = copy.stats?.length ? col.bottom - 84 - 24
+    : copy.figure ? col.bottom - FIG_SIZE - 16 - FIG_LABEL
     : col.bottom;
   if (copy.body) {
-    const size = big ? 32 : 30;
+    const size = big ? 40 : 34;
     const blh = Math.round(size * 1.42);
     const first = y + 24 + size;
     const room = Math.floor((figTop - 34 - first) / blh) + 1;
     ctx.font = cardFont(SANS, 500, size);
-    const lines = room > 0 ? wrapText(ctx, copy.body, col.w, Math.min(4, room)) : [];
+    const lines = room > 0 ? wrapText(ctx, copy.body, col.w, Math.min(3, room)) : [];
     ctx.fillStyle = MUTED;
     lines.forEach((line, i) => ctx.fillText(line, col.x, first + i * blh));
   }
@@ -680,26 +694,36 @@ function drawColumnText(ctx: CanvasRenderingContext2D, copy: CardCopy, col: { x:
 
 /** Landscape photo: headline left, figure right, body under both. */
 function drawLandscapeText(ctx: CanvasRenderingContext2D, copy: CardCopy, col: { x: number; y: number; w: number; bottom: number }) {
-  const figW = copy.stats?.length ? 420 : copy.figure ? 330 : 0;
+  /* The figure takes the width it needs and the headline gets the rest — a
+     fixed slot squeezed "₹650" and the title into the same narrow ration. */
+  let figW = 0;
+  if (copy.stats?.length) figW = 440;
+  else if (copy.figure) {
+    ctx.font = cardFont(SANS, 900, FIG_SIZE);
+    const v = ctx.measureText(copy.figure.value).width;
+    ctx.font = cardFont(SANS, 700, FIG_LABEL);
+    const l = ctx.measureText(copy.figure.label.toUpperCase()).width + copy.figure.label.length * 2.2;
+    figW = Math.min(440, Math.max(200, v, l) + 8);
+  }
   const textW = col.w - (figW ? figW + 40 : 0);
   let y = col.y;
-  if (copy.eyebrow) { eyebrow(ctx, copy.eyebrow, col.x, y); y += 18; }
-  const t = fitTitle(ctx, copy.title, textW, [[64, 2], [56, 2], [50, 2], [44, 2], [40, 2]]);
+  if (copy.eyebrow) { eyebrow(ctx, copy.eyebrow, col.x, y + 20); y += 26; }
+  const t = fitTitle(ctx, copy.title, textW, [[84, 2], [76, 2], [68, 2], [60, 2], [52, 2]]);
   const lh = Math.round(t.size * 1.06);
   ctx.font = cardFont(PIXEL, 400, t.size);
   ctx.fillStyle = WHITE;
   for (const line of t.lines) { y += lh; ctx.fillText(line, col.x, y); }
 
   if (copy.body) {
-    ctx.font = cardFont(SANS, 500, 28);
-    const room = Math.floor((col.bottom - (y + 18)) / 38);
+    ctx.font = cardFont(SANS, 500, 32);
+    const room = Math.floor((col.bottom - (y + 14)) / 42);
     const lines = room > 0 ? wrapText(ctx, copy.body, textW, Math.min(2, room)) : [];
     ctx.fillStyle = MUTED;
-    y += 18;
-    for (const line of lines) { y += 38; ctx.fillText(line, col.x, y); }
+    y += 14;
+    for (const line of lines) { y += 42; ctx.fillText(line, col.x, y); }
   }
-  if (copy.stats?.length) drawStats(ctx, copy.stats, S - M - figW, col.y + 104, figW);
-  else if (copy.figure) drawFigure(ctx, copy.figure, S - M, col.y + 104, figW, 'right');
+  if (copy.stats?.length) drawStats(ctx, copy.stats, S - M - figW, col.y + 130, figW);
+  else if (copy.figure) drawFigure(ctx, copy.figure, S - M, col.y + 130, figW, 'right');
 }
 
 function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
@@ -725,8 +749,8 @@ function drawFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, copy: Ca
   ctx.fillRect(M, FOOT_Y, S - 2 * M, 2);
   ctx.restore();
 
-  const rowY = FOOT_Y + 62;
-  const r = 30;
+  const rowY = FOOT_Y + 70;
+  const r = 36;
   let tx = M;
   if (spec.byName) {
     ctx.save();
@@ -741,7 +765,7 @@ function drawFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, copy: Ca
       ctx.fillStyle = spec.byColor || '#E9E4FF';
       ctx.fillRect(M, rowY - r, r * 2, r * 2);
       ctx.fillStyle = '#14161A';
-      ctx.font = cardFont(SANS, 700, 24);
+      ctx.font = cardFont(SANS, 700, 28);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText((spec.byInitials || spec.byName.slice(0, 1)).slice(0, 2).toUpperCase(), M + r, rowY + 1);
@@ -754,33 +778,33 @@ function drawFooter(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, copy: Ca
     ctx.stroke();
     ctx.restore();
 
-    tx = M + r * 2 + 18;
-    ctx.font = cardFont(SANS, 700, 30);
+    tx = M + r * 2 + 20;
+    ctx.font = cardFont(SANS, 700, 34);
     ctx.fillStyle = WHITE;
-    ctx.fillText(wrapText(ctx, spec.byName, 380, 1)[0], tx, rowY - 4);
-    ctx.font = cardFont(SANS, 500, 23);
+    ctx.fillText(wrapText(ctx, spec.byName, 400, 1)[0], tx, rowY - 4);
+    ctx.font = cardFont(SANS, 500, 26);
     ctx.fillStyle = QUIET;
-    ctx.fillText(spec.verified ? 'Verified student' : 'On Wecycle', tx, rowY + 26);
+    ctx.fillText(spec.verified ? 'Verified student' : 'On Wecycle', tx, rowY + 30);
   }
 
   if (copy.place) {
-    const maxW = 420;
-    ctx.font = cardFont(SANS, 600, 27);
+    const maxW = 400;
+    ctx.font = cardFont(SANS, 600, 32);
     const lines = wrapText(ctx, copy.place, maxW, 2);
     ctx.fillStyle = MUTED;
     ctx.textAlign = 'right';
-    const top = lines.length === 1 ? rowY + 9 : rowY - 8;
-    lines.forEach((ln, i) => ctx.fillText(ln, S - M, top + i * 34));
+    const top = lines.length === 1 ? rowY + 11 : rowY - 9;
+    lines.forEach((ln, i) => ctx.fillText(ln, S - M, top + i * 40));
     ctx.textAlign = 'left';
     const widest = Math.max(...lines.map(l => ctx.measureText(l).width));
-    drawPin(ctx, S - M - widest - 22, top - 9, 26);
+    drawPin(ctx, S - M - widest - 26, top - 11, 30);
   }
 
-  const baseY = S - M + 4;
-  ctx.font = cardFont(SANS, 700, 26);
+  const baseY = S - 54;
+  ctx.font = cardFont(SANS, 700, 30);
   ctx.fillStyle = WHITE;
   ctx.fillText(copy.cta, M, baseY);
-  ctx.font = cardFont(SANS, 600, 26);
+  ctx.font = cardFont(SANS, 600, 30);
   ctx.fillStyle = QUIET;
   ctx.textAlign = 'right';
   ctx.fillText('wecycle.page', S - M, baseY);
@@ -985,7 +1009,7 @@ function blobToBase64(blob: Blob): Promise<string> {
  *  So the app writes the image to its cache and hands the file to the OS
  *  share sheet through Capacitor. Returns null where that path is not
  *  available — the web, or an app build from before these plugins. */
-async function shareNative(blob: Blob, spec: ShareCardSpec, url: string): Promise<ShareCardResult | null> {
+export async function shareImageNative(blob: Blob, fileName: string, title: string, text: string): Promise<ShareCardResult | null> {
   try {
     const { Capacitor } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform()
@@ -996,12 +1020,12 @@ async function shareNative(blob: Blob, spec: ShareCardSpec, url: string): Promis
       import('@capacitor/share'),
     ]);
     const written = await Filesystem.writeFile({
-      path: fileName(spec),
+      path: fileName,
       data: await blobToBase64(blob),
       directory: Directory.Cache,
     });
     try {
-      await Share.share({ title: spec.title, text: shareMessage(spec, url), files: [written.uri] });
+      await Share.share({ title, text, files: [written.uri] });
     } catch (e) {
       /* Dismissing the sheet rejects; that is a choice, not a failure. */
       if (!/cancel/i.test(String((e as Error)?.message ?? e))) throw e;
@@ -1020,7 +1044,7 @@ export async function shareCardBlob(blob: Blob | null, spec: ShareCardSpec): Pro
   const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : 'https://wecycle.page');
 
   if (blob) {
-    const native = await shareNative(blob, spec, url);
+    const native = await shareImageNative(blob, fileName(spec), spec.title, shareMessage(spec, url));
     if (native) return native;
 
     const file = new File([blob], fileName(spec), { type: blob.type || 'image/jpeg' });
@@ -1049,7 +1073,7 @@ export async function downloadCardBlob(blob: Blob | null, spec: ShareCardSpec): 
   if (!blob || typeof document === 'undefined') return 'unavailable';
   const url = spec.url ?? (typeof window !== 'undefined' ? window.location.href : '');
   /* In the app, "save" is the share sheet too — it is where Save Image lives. */
-  const native = await shareNative(blob, spec, url);
+  const native = await shareImageNative(blob, fileName(spec), spec.title, shareMessage(spec, url));
   if (native) return native;
 
   const href = URL.createObjectURL(blob);

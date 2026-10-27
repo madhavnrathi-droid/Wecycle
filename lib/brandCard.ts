@@ -26,6 +26,7 @@
 import type { Brand } from './brands';
 import { renderLushGradient } from './lushGradient';
 import { corsFresh } from './corsImage';
+import { ensureCardFonts, FALLBACK } from './cardFonts';
 
 export const BRAND_CARD_SIZE = 1080;
 
@@ -50,7 +51,9 @@ export interface RenderedBrandCard {
   dataUrl: string;
 }
 
-const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+/* Satoshi, like every other share card (lib/cardFonts); the brand's own
+   voice is its wordmark artwork and, for a stall, the serif tagline. */
+const FONT = `"Satoshi", ${FALLBACK}`;
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 function loadImage(src: string, cors: boolean, timeoutMs = 8000): Promise<HTMLImageElement | null> {
@@ -145,6 +148,7 @@ export async function renderBrandCard(spec: BrandCardSpec): Promise<RenderedBran
 
   /* Assets first, in parallel. Brand marks are same-origin; product photos
      are cross-origin and need CORS for the canvas to stay exportable. */
+  await ensureCardFonts();
   const [wordmark, mascot, wecycle, ...photos] = await Promise.all([
     loadImage(brand.assets.wordmark, false),
     brand.assets.mascot ? loadImage(brand.assets.mascot, false) : Promise.resolve(null),

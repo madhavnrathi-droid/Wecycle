@@ -32,7 +32,6 @@ import {
 import {
   CARD_PALETTES, defaultPaletteFor, paletteById, type CardPaletteId,
 } from '../lib/cardPalettes';
-import type { CardGradientHandle } from './CardGradient';
 import { shareLink } from '../lib/share';
 import { sfxOpen, sfxShare, sfxTap } from '../lib/sfx';
 import { haptics } from '../lib/haptics';
@@ -73,7 +72,6 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
   const [reduceMotion, setReduceMotion] = useState(false);
   const [size, setSize] = useState(380);
 
-  const gradientRef = useRef<CardGradientHandle>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const announced = useRef(false);
 
@@ -137,7 +135,10 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
   /** Freeze the frame on screen into the finished JPEG. */
   const makeStill = useCallback(async (): Promise<Blob | null> => {
     if (!layers) return null;
-    const field = gl ? gradientRef.current?.canvas() ?? null : null;
+    /* Found through the preview frame, not a ref: next/dynamic's wrapper
+       does not forward refs, and a ref here was silently null — every export
+       fell back to the flat painted field instead of the frame on screen. */
+    const field = gl ? frameRef.current?.querySelector('canvas') ?? null : null;
     const card = composeCard(layers, field, palette);
     const blob = await cardBlob(card);
     if (blob) setStill(URL.createObjectURL(blob));
@@ -218,7 +219,7 @@ export default function ShareCardModal({ open, onOpenChange, spec }: Props) {
               style={{ background: `radial-gradient(120% 90% at 85% 8%, ${f2} 0%, transparent 55%), linear-gradient(160deg, ${f1}, ${f0})` }}
             >
               {gl && (
-                <CardGradient ref={gradientRef} palette={palette} animate={!reduceMotion} cssSize={size} />
+                <CardGradient palette={palette} animate={!reduceMotion} cssSize={size} />
               )}
               {preview && (
                 <>

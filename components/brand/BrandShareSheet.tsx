@@ -28,6 +28,7 @@ import type { MarketplaceItem } from '../../lib/mockData';
 import { resolveItemMedia } from '../../lib/photos';
 import { picksFor, fromPrice, brandUrl, brandShareMessage, type Brand } from '../../lib/brands';
 import { renderBrandCard } from '../../lib/brandCard';
+import { shareImageNative } from '../../lib/shareCard';
 import { haptics } from '../../lib/haptics';
 import { track, EVT } from '../../lib/analytics';
 import { WA_FILL, WA_INK } from '../../lib/whatsapp';
@@ -111,6 +112,15 @@ export default function BrandShareSheet({ open, onClose, brand, items, ownerName
     return true;
   };
 
+  /* Save: in the apps the OS sheet is where Save Image lives; on the web, a
+     download. */
+  const saveCard = async () => {
+    if (!card?.blob) return;
+    const native = await shareImageNative(card.blob, fileName, `${brand.name} on Wecycle`, message);
+    if (native) { flash('Saved'); return; }
+    if (saveImage()) flash('Card saved');
+  };
+
   const shareCard = async () => {
     if (busy) return;
     setBusy(true);
@@ -118,8 +128,15 @@ export default function BrandShareSheet({ open, onClose, brand, items, ownerName
     const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
     let result: 'shared' | 'cancelled' | 'saved' | 'failed' = 'failed';
     try {
+      /* In the apps: the OS share sheet through Capacitor, the same path
+         every post's card takes (lib/shareCard) — the browser routes below
+         go nowhere inside a WebView. */
       if (card?.blob) {
-        const file = new File([card.blob], fileName, { type: 'image/png' });
+        const native = await shareImageNative(card.blob, fileName, `${brand.name} on Wecycle`, message);
+        if (native) result = 'shared';
+      }
+      if (result === 'failed' && card?.blob) {
+        const file = new File([card.blob], fileName, { type: card.blob.type || 'image/png' });
         /* The link lives in the text only — WhatsApp prints `url` again after
            the text, and many targets drop `url` when files are attached. */
         const data = { files: [file], text: message } as ShareData;
@@ -168,7 +185,7 @@ export default function BrandShareSheet({ open, onClose, brand, items, ownerName
             style={{ background: WA_FILL, color: WA_INK }}>
             <WhatsAppMark size={20} />
           </button>
-          <button type="button" className="bsh-icon ord-press" onClick={() => { haptics.selection(); if (saveImage()) flash('Card saved'); }}
+          <button type="button" className="bsh-icon ord-press" onClick={() => { haptics.selection(); void saveCard(); }}
             disabled={!card?.blob} aria-label="Save the card image">
             <Download size={18} strokeWidth={2} />
           </button>

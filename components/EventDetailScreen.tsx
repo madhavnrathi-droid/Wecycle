@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users, Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, ImagePlus, BarChart3, ClipboardList, Pencil, MessageCircle } from '@/lib/icons';
+import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Users, Heart, Share2, Mail, Check, Tag, Trash2, Save, RotateCcw, Loader2, ImagePlus, BarChart3, ClipboardList, Pencil, MessageCircle, Flag } from '@/lib/icons';
 import { messagingAvailable } from '../lib/messaging/store';
 import type { CommunityEvent, MarketplaceItem, User } from '../lib/mockData';
 import { resolveEventPhotos, getAvatar } from '../lib/photos';
@@ -33,6 +33,7 @@ import FormBuilderScreen from './forms/FormBuilderScreen';
 import MediaEditor, { EditPhotosButton } from './MediaEditor';
 import { isDemoMode } from '../lib/demoMode';
 import ShareCardModal from './ShareCardModal';
+import ReportSheet from './ReportSheet';
 import type { ShareCardSpec } from '../lib/shareCard';
 import { shareUrl } from '../lib/shareUrl';
 import { Logomark } from './Brand';
@@ -457,6 +458,7 @@ export default function EventDetailScreen({
       },
     } : {}),
   };
+  const [reportOpen, setReportOpen] = useState(false);
   const handleShareEvent = () => {
     track(EVT.share_clicked, { post_id: event.id, post_kind: 'event' });
     setShareCardOpen(true);
@@ -531,6 +533,12 @@ export default function EventDetailScreen({
           >
             <Share2 size={17} strokeWidth={1.8} />
           </button>
+          {/* Report, as on every listing — an event is member content too. */}
+          {!isOwner && (
+            <button aria-label="Report this event" className="theme-toggle" onClick={() => setReportOpen(true)}>
+              <Flag size={17} strokeWidth={1.8} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -1344,6 +1352,14 @@ export default function EventDetailScreen({
         />
       )}
       <ShareCardModal open={shareCardOpen} onOpenChange={setShareCardOpen} spec={shareCardSpec} />
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="event"
+        targetId={event.id}
+        targetUserId={event.organizer?.id}
+        targetLabel={`"${event.title}"`}
+      />
     </div>
   );
 }

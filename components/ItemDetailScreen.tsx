@@ -25,7 +25,7 @@ import { useAuth } from '../lib/AuthContext';
 import { buildContactLinks, contactGate, itemAction, opportunityAction, actionLabel, type ContactLink, type ContactGate } from '../lib/contactUser';
 import {
   opportunityCompLabel, compToListing,
-  COMP_META, COMP_OPTIONS, RATE_PERIODS, RATE_BASIS_OPTIONS, oppRoleBadge,
+  COMP_META, COMP_OPTIONS, RATE_PERIODS, RATE_BASIS_OPTIONS,
   type Comp, type RatePeriod,
 } from '../lib/opportunity';
 import { useOwnerContact } from '../lib/useOwnerContact';
@@ -48,13 +48,13 @@ import { normalizeCategory, categoryLabel, categoryIdOf, categoryIdsOf, tagsWith
 import CategoryPicker from './forms/CategoryPicker';
 import ShareCardModal from './ShareCardModal';
 import type { ShareCardSpec } from '../lib/shareCard';
-import { shareUrl } from '../lib/shareUrl';
+import { itemShareSpec } from '../lib/shareSpecs';
 import { transitionStyle } from '../lib/viewTransition';
 import AmbientArt from './AmbientArt';
 import { Logomark } from './Brand';
 import { WA_FILL, WA_INK } from '../lib/whatsapp';
 import {
-  priceLine, fromListingType, toListingType, DEAL_BY_ID, DEAL_TYPES,
+  priceLine, fromListingType, toListingType, DEAL_TYPES,
   RENT_PERIODS, DEFAULT_RENT_PERIOD,
 } from '../lib/dealTypes';
 
@@ -1116,46 +1116,9 @@ export default function ItemDetailScreen({ item: itemProp, onBack, onRequireAuth
   const shareImages = displayPhotos
     .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
     .filter((u): u is string => !!u && /^https?:|^\//.test(u));
-  const shareCardSpec: ShareCardSpec = {
-    /* An opportunity is a job/gig and gets its own share palette; only a
-       physical listing is 'item'. Without this, hiring posts shared with the
-       marketplace's white-and-green wash and a "Condition" cell. */
-    kind: item.isRequest ? 'request' : item.kind === 'opportunity' ? 'job' : 'item',
-    title: item.title,
-    imageUrls: shareImages,
-    /* Opportunities put the FULL rate on the pill ("₹300/hr") — passing `price`
-       instead would drop the period and print a bare "₹300". */
-    price: item.kind === 'opportunity' ? undefined : (isPriced ? item.price : undefined),
-    /* The money, already formatted, so the card never re-derives it. A rental
-       has to arrive as "₹200 / day" and a swap as its ask — passing the bare
-       number would print "₹200" on a card advertising a daily rate, and nothing
-       at all on a swap. Opportunities keep their existing rate label. */
-    priceLine: item.kind === 'opportunity' || item.isRequest
-      ? undefined
-      : priceLine({
-          deal: fromListingType(item.listingType),
-          price: item.price,
-          ratePeriod: item.ratePeriod,
-          swapFor: item.swapFor,
-        }),
-    badge: item.kind === 'opportunity'
-      ? priceLabel
-      : item.isRequest ? priceLabel : DEAL_BY_ID[fromListingType(item.listingType)].badge,
-    roleLabel: item.kind === 'opportunity' ? oppRoleBadge(item.oppRole) : undefined,
-    conditionLabel: item.kind === 'opportunity' || item.isRequest
-      ? undefined
-      : ({ like_new: 'Like new', good: 'Good', fair: 'Fair' } as const)[item.condition],
-    location: item.location,
-    description: item.description,
-    byName: item.user.name,
-    byInitials: item.user.initials,
-    byAvatar: getAvatar(item.user.id, 128),
-    byColor: item.user.color,
-    verified: true,
-    byEmail: ownerContact.email,
-    byPhone: ownerContact.phone,
-    url: shareUrl(item.id),
-  };
+  /* One builder for every place a listing is shared (lib/shareSpecs). */
+  const shareCardSpec: ShareCardSpec = itemShareSpec(item, shareImages);
+
 
   /* Convenience: when only one channel is on, the primary CTA carries the
      action label ("Request to borrow"). When both, we surface two named
@@ -2239,40 +2202,14 @@ function DesktopLayout({
         overlay: <PhotoLinkBadge url={photoLink} />,
       }
     : {};
-  /* Owner contact for the share card — same on-demand resolve as the main
-     component (raw email/phone columns are locked down). */
-  const ownerContact = useOwnerContact(item.user.id, { email: item.user.email, phone: item.user.phone });
   /* Share card (Spotify-style) — preview + share/save modal. */
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const shareImages = photos
     .map(p => (typeof p === 'string' ? p : (p as { poster?: string; src?: string }).poster ?? (p as { src?: string }).src))
     .filter((u): u is string => !!u && /^https?:|^\//.test(u));
-  const shareCardSpec: ShareCardSpec = {
-    /* An opportunity is a job/gig and gets its own share palette; only a
-       physical listing is 'item'. Without this, hiring posts shared with the
-       marketplace's white-and-green wash and a "Condition" cell. */
-    kind: item.isRequest ? 'request' : item.kind === 'opportunity' ? 'job' : 'item',
-    title: item.title,
-    imageUrls: shareImages,
-    /* Opportunities put the FULL rate on the pill ("₹300/hr") — passing `price`
-       instead would drop the period and print a bare "₹300". */
-    price: item.kind === 'opportunity' ? undefined : (isPriced ? item.price : undefined),
-    badge: item.kind === 'opportunity' ? priceLabel : (isPriced ? undefined : priceLabel),
-    roleLabel: item.kind === 'opportunity' ? oppRoleBadge(item.oppRole) : undefined,
-    conditionLabel: item.kind === 'opportunity' || item.isRequest
-      ? undefined
-      : ({ like_new: 'Like new', good: 'Good', fair: 'Fair' } as const)[item.condition],
-    location: item.location,
-    description: item.description,
-    byName: item.user.name,
-    byInitials: item.user.initials,
-    byAvatar: getAvatar(item.user.id, 128),
-    byColor: item.user.color,
-    verified: true,
-    byEmail: ownerContact.email,
-    byPhone: ownerContact.phone,
-    url: shareUrl(item.id),
-  };
+  /* One builder for every place a listing is shared (lib/shareSpecs). */
+  const shareCardSpec: ShareCardSpec = itemShareSpec(item, shareImages);
+
   const {
     eTitle, setETitle, eDescription, setEDescription, eLocation, setELocation,
     ePriceStr, setEPriceStr, eListingType, setEListingType,

@@ -45,8 +45,10 @@ import { priceChip, fromListingType, DEAL_BY_ID } from '../lib/dealTypes';
 import { useFeedEngine } from '../lib/feed/useFeedEngine';
 import { useTap } from '../lib/useTap';
 import { withViewTransition, transitionStyle } from '../lib/viewTransition';
-import { shareLink } from '../lib/share';
-import { shareUrl } from '../lib/shareUrl';
+import dynamic from 'next/dynamic';
+/* Only needed after a long-press → Share, so it stays out of the home bundle. */
+const ShareCardModal = dynamic(() => import('./ShareCardModal'), { ssr: false });
+import { itemShareSpec } from '../lib/shareSpecs';
 import type { SellerSummary, PlacedModule, ModuleId, CardVariant } from '../lib/feed/modules';
 import SellerCard from './SellerCard';
 import { BrandSpotlightSlot } from './brand/BrandPromo';
@@ -182,6 +184,9 @@ export default function FeedScreen({
   /* Which card's long-press sheet is open. One at a time, held here rather than
      inside the card so opening a second closes the first for free. */
   const [menuItem, setMenuItem] = useState<MarketplaceItem | null>(null);
+  /* Sharing from a card's ⋯ menu opens the same share card as the post's own
+     page — a bare link here was the one place a post left without its card. */
+  const [shareItem, setShareItem] = useState<MarketplaceItem | null>(null);
 
   /* Settings: hide-prices toggle (Settings → Marketplace). We subscribe so
      flipping the switch updates every card on the feed live, without reload. */
@@ -1581,10 +1586,15 @@ export default function FeedScreen({
           } : undefined}
           onShare={() => {
             track(EVT.share_clicked, { post_id: menuItem.id, source: 'card_menu' });
-            void shareLink({ title: menuItem.title, url: shareUrl(menuItem.id) });
+            setShareItem(menuItem);
           }}
         />
       )}
+      <ShareCardModal
+        open={!!shareItem}
+        onOpenChange={v => { if (!v) setShareItem(null); }}
+        spec={shareItem ? itemShareSpec(shareItem) : null}
+      />
     </div>
   );
 }
