@@ -22,6 +22,7 @@
 
 import { aw, DB, q, rowsOf, json, type Args, type Row } from './appwrite';
 import { isAdminAccount } from './rooms';
+import { eventIsPurgeable, PURGE_FLOOR_MS } from '../../../lib/eventLifetime';
 
 const T = (table: string) => `/tablesdb/${DB}/tables/${table}/rows`;
 const isId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,35}$/.test(v);
@@ -121,15 +122,85 @@ export async function deletePost(uid: string, args: Args) {
   }
 
   await Promise.all([
+    clearAfter(kind, id, row),
+    admin ? closeReports(spec.report, id, uid) : Promise.resolve(),
+  ]);
+
+  return json({ data: { deleted: true, by: admin ? 'admin' : 'author' } });
+}
+
+/** Everything that pointed at a deleted post: comments, likes, notifications,
+ *  its own children (RSVPs, saves, forms…) and its media. Appwrite has no
+ *  cascade, and most of these rows belong to other members. */
+async function clearAfter(kind: PostKind, id: string, row: Row): Promise<void> {
+  const spec = POSTS[kind];
+  await Promise.all([
     deleteWhere('comments', eq('entity_type', spec.entity), eq('entity_id', id)),
     deleteWhere('reactions', eq('entity_type', spec.entity), eq('entity_id', id)),
     deleteWhere('notifications', eq('entity_type', spec.entity), eq('entity_id', id)),
     ...CHILDREN[kind].map(([table, column]) => deleteWhere(table, eq(column, id))),
     deleteMedia(row),
-    admin ? closeReports(spec.report, id, uid) : Promise.resolve(),
   ]);
+}
 
-  return json({ data: { deleted: true, by: admin ? 'admin' : 'author' } });
+/* ── purge_expired_events ─────────────────────────────────────────────────
+ *
+ * The only thing that deletes an event without someone asking. It replaced a
+ * delete every member's device ran on app open — `starts_at < now` — which
+ * took events down the first time their organiser opened the app after they
+ * STARTED (a fest at its opening hour; a date-only event at the midnight before
+ * its day; a repost posted with the form's default time within the hour), and
+ * left their RSVPs, forms and posters orphaned.
+ *
+ * Here: over by lib/eventLifetime's rule (its end, or the end of its day), for
+ * longer than a week's grace, and never a row dated more than a year back.
+ *
+ * It also takes the raw `delete` permission off every event row. Every
+ * deliberate delete has gone through delete_post (server key) since build 18,
+ * so the permission's only remaining use was that janitor — which installed
+ * apps still run, with the old start-time rule. Without the permission, their
+ * janitor is refused instead of deleting live events. (New rows are created
+ * without it; this catches rows posted from an older app.)
+ *
+ * Any signed-in member's app triggers it, so it is throttled per server
+ * instance; correctness does not depend on how often it runs, since every
+ * reader filters by the same rule on its own clock. */
+let lastPurge = 0;
+const PURGE_EVERY_MS = 2 * 60 * 1000;
+
+export async function purgeExpiredEvents(): Promise<{ deleted: number; protected: number; skipped?: true }> {
+  const now = Date.now();
+  if (now - lastPurge < PURGE_EVERY_MS) return { deleted: 0, protected: 0, skipped: true };
+  lastPurge = now;
+
+  const floor = new Date(now - PURGE_FLOOR_MS).toISOString();
+  let deleted = 0, guarded = 0;
+  let cursor: string | null = null;
+  for (let page = 0; page < 10; page++) {
+    const rows: Row[] = rowsOf(await aw('GET', T('events') + q(
+      { method: 'greaterThan', attribute: 'starts_at', values: [floor] },
+      { method: 'orderAsc', attribute: '$id' },
+      { method: 'limit', values: [100] },
+      ...(cursor ? [{ method: 'cursorAfter', values: [cursor] }] : []),
+    )));
+    for (const row of rows) {
+      const id = String(row.$id);
+      if (eventIsPurgeable(row.starts_at as string, row.ends_at as string | null, now)) {
+        const del = await aw('DELETE', `${T('events')}/${id}`);
+        if (del.ok) { deleted++; await clearAfter('event', id, row); }
+        continue;
+      }
+      const perms = (row.$permissions as string[] | undefined) ?? [];
+      if (perms.some(p => p.startsWith('delete('))) {
+        const keep = perms.filter(p => !p.startsWith('delete('));
+        const r = await aw('PATCH', `${T('events')}/${id}`, { permissions: keep });
+        if (r.ok) guarded++;
+      }
+    }
+    if (rows.length < 100) break;
+    cursor = String(rows[rows.length - 1].$id);
+  }
+  return { deleted, protected: guarded };
 }
 
 /* ── delete_comment { id } ────────────────────────────────────────────────── */

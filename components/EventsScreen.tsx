@@ -356,7 +356,7 @@ function UpcomingRsvpCard({ event, onCancel, onOpen }: { event: CommunityEvent; 
           <p className="rsvp-card-title">{event.title}</p>
           <p className="rsvp-card-when">
             <CalendarDays size={11} strokeWidth={1.8} />
-            {[event.date, event.time].filter(Boolean).join(' · ')}
+            {event.happeningNow ? happeningLabel(event) : [event.date, event.time].filter(Boolean).join(' · ')}
           </p>
         </div>
       </button>
@@ -452,7 +452,7 @@ function FeaturedEventCard({ event, isRsvpd, onRsvp }: { event: CommunityEvent; 
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <CalendarDays size={12} strokeWidth={1.8} />
-            {[event.date, event.time].filter(Boolean).join(' · ')}
+            {event.happeningNow ? happeningLabel(event) : [event.date, event.time].filter(Boolean).join(' · ')}
           </span>
         </div>
         {event.location && (
@@ -640,11 +640,17 @@ function PartnerEventCard({ event, partner, isRsvpd, onRsvp, onOpen }: {
 function eventWhenLabel(event: CommunityEvent): string {
   /* A poster-only post's starts_at is an expiry, not the event's day. */
   if (event.undated) return event.date;
+  /* On now: the start has passed, so saying when it started is less use than
+     saying until when it runs. */
+  if (event.happeningNow) return happeningLabel(event);
   const iso = (event as { startsAt?: string }).startsAt;
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) {
       const date = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      /* A date-only event is stored at 00:00 — printing that clock time told
+         people it started at midnight. */
+      if (event.allDay) return date;
       const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
       return `${date} · ${time}`;
     }
@@ -652,6 +658,17 @@ function eventWhenLabel(event: CommunityEvent): string {
   const thisYear = new Date().getFullYear();
   const date = event.date.replace(new RegExp(`,?\\s*${thisYear}$`), '');
   return event.time ? `${date} · ${event.time}` : date;
+}
+
+/** "Happening now · till 6:00 pm" / "· till Sun, 7 Nov" / "· today". */
+export function happeningLabel(event: CommunityEvent): string {
+  const end = event.endsAt ? new Date(event.endsAt) : null;
+  if (!end || Number.isNaN(end.getTime())) return 'Happening now · today';
+  const sameDay = end.toDateString() === new Date().toDateString();
+  const till = sameDay && !event.allDay
+    ? end.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+    : end.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  return `Happening now · till ${till}`;
 }
 
 function labelForType(t: CommunityEvent['eventType']): string {

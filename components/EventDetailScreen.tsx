@@ -1075,7 +1075,7 @@ export default function EventDetailScreen({
               <FactRow
                 icon={<CalendarDays size={14} strokeWidth={1.8} />}
                 label="Date"
-                value={event.date}
+                value={event.happeningNow ? `${event.date} · happening now` : event.date}
               />
               {/* Omitted rather than shown blank when the organiser gave a
                   date but no start time. */}

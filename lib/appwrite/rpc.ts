@@ -179,6 +179,7 @@ export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>
     case 'sync_rooms':
     case 'delete_post':
     case 'delete_comment':
+    case 'purge_expired_events':
     case 'set_password':
       return await serverRpc<T>(fn, args);
 

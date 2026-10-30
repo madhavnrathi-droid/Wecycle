@@ -153,13 +153,20 @@ export function fillServerDefaults(tableId: string, data: AnyRow): AnyRow {
  * "Public" means public TO THE ROOM. A member of a private room (NMIMS) writes
  * rows readable by that room's label, not by everyone — see lib/rooms.ts.
  */
+const NO_CLIENT_DELETE = new Set(['events']);
+
 export function ownerPermissions(tableId: string, data: AnyRow, rowId?: string): string[] | undefined {
   const col = OWNER_COLUMN[tableId];
   if (!col) return undefined;
   /* profiles is keyed BY the member, so its owner is the row's own id. */
   const owner = col === '$id' ? rowId : data[col];
   if (typeof owner !== 'string' || !owner) return undefined;
+  /* Events carry no delete permission: every deliberate delete goes through
+     the server (delete_post), and the only thing that ever used a browser
+     delete on an event was the old start-time janitor, which installed apps
+     still run — see purge_expired_events in app/api/_lib/deletion.ts. */
+  const del = NO_CLIENT_DELETE.has(tableId) ? [] : [`delete("user:${owner}")`];
   return PRIVATE_TO_OWNER.has(tableId)
-    ? [`read("user:${owner}")`, `update("user:${owner}")`, `delete("user:${owner}")`]
-    : [`read("${roomReadRole()}")`, `update("user:${owner}")`, `delete("user:${owner}")`];
+    ? [`read("user:${owner}")`, `update("user:${owner}")`, ...del]
+    : [`read("${roomReadRole()}")`, `update("user:${owner}")`, ...del];
 }

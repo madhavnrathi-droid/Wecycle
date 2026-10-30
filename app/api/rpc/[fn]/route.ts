@@ -50,7 +50,7 @@ import {
 } from '../../_lib/appwrite';
 import { sendMessage, markConversationRead, canMessage } from '../../_lib/messaging';
 import { roomForNewMember, syncRoomLabels, roomReadPerm } from '../../_lib/rooms';
-import { deletePost, deleteComment } from '../../_lib/deletion';
+import { deletePost, deleteComment, purgeExpiredEvents } from '../../_lib/deletion';
 import { updatePost } from '../../_lib/editing';
 import { createOrder, updateOrder, orderCode } from '../../_lib/orders';
 
@@ -429,6 +429,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ fn: string }> 
 
       case 'delete_comment':
         return await deleteComment(uid, args);
+
+      /* Long-over events, cleared by the server's rule — see _lib/deletion.ts.
+         Any signed-in app open asks; the server decides what (if anything) goes. */
+      case 'purge_expired_events':
+        return json({ data: await purgeExpiredEvents() });
 
       /* Labels follow the member's room (and admin standing) — and the
          response is the rooms this account may view, which is what the

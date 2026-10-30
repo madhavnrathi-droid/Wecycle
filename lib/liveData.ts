@@ -28,6 +28,7 @@ import { normalizeEventType } from './eventTypes';
 import { type Schedule, toTimestamps } from './eventSchedule';
 import { eventPartnerFor, UNDATED_MARK, UNDATED_LABEL, undatedStartsAt } from './partners';
 import { packLinks, unpackLinks, cleanLinks, type PostLink } from './postLink';
+import { eventIsOver, eventIsLive } from './eventLifetime';
 
 /* ── Row → MarketplaceItem ─────────────────────────── */
 
@@ -1173,6 +1174,11 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
     startsAt: row.starts_at,
     endsAt: row.ends_at ?? null,
     allDay: Boolean(row.time_unspecified),
+    /* Started and not over. An event now stays up until it ends, so a list
+       would otherwise show a start time that has already passed with no word
+       that it is on right now. Never for an undated post: its stored date is a
+       placeholder, the real one is on the poster. */
+    happeningNow: !undated && eventIsLive(row.starts_at, row.ends_at),
     location: row.location ?? '',
     attendees: row.attendee_count ?? 0,
     maxAttendees: row.max_attendees ?? undefined,
@@ -1188,15 +1194,14 @@ export function mapEventRow(row: EventRowLite): CommunityEvent & { photoUrls?: s
   };
 }
 
-/* Events past their starts_at are auto-hidden client-side. We don't trust the
-   server clock alone — a viewer hitting the page right after start would still
-   see the event for a few seconds. Filtering here makes it instant. */
+/* An event leaves every list when it ENDS (lib/eventLifetime) — its ends_at,
+   or the end of the day it starts on. It used to leave the moment it started,
+   which hid a fest as it opened and a date-only event at the midnight before
+   its day. Filtered here, on the client's clock, so it is exact to the minute
+   whatever the purge has or hasn't got to yet. */
 function notExpired(rows: EventRowLite[]): EventRowLite[] {
   const now = Date.now();
-  return rows.filter(r => {
-    const ts = new Date(r.starts_at).getTime();
-    return Number.isFinite(ts) && ts > now;
-  });
+  return rows.filter(r => !eventIsOver(r.starts_at, r.ends_at, now));
 }
 
 export async function fetchEvents(): Promise<CommunityEvent[]> {
@@ -1224,20 +1229,20 @@ export async function fetchEventsByUser(userId: string): Promise<CommunityEvent[
   return notRemoved(live.map(mapEventRow));
 }
 
-/** Best-effort cleanup of past-dated events. Fire-and-forget — RLS lets the
- *  organizer delete their own, the admin lets everyone's go. Called by a tiny
- *  client-side janitor on app load. */
+/** Ask the server to clear out events that are long over. Fire-and-forget,
+ *  on app open.
+ *
+ *  This used to be a delete run from every member's own device: `starts_at <
+ *  now`, so an event was deleted the first time its organiser opened the app
+ *  after it STARTED — with its RSVPs, form and poster left orphaned, since
+ *  Appwrite has no cascade and only the server key can reach other members'
+ *  rows. The server (purge_expired_events, app/api/_lib/deletion.ts) now
+ *  applies the end-based rule with a week's grace and cleans up properly; the
+ *  rows no longer carry a delete permission for any browser to use. */
 export async function purgeExpiredEvents() {
-  if (!hasSupabaseEnv) return;
-  const cutoff = new Date().toISOString();
-  /* Floor the window. An unbounded `lt(starts_at, now)` hard-deletes ANY row
-     with a past timestamp — including one corrupted to 1970 by a bad write,
-     which is how a live event could disappear permanently along with its RSVPs
-     and form responses. Anything older than a year is not an expired event, it
-     is a bug or a hand-edit, and it should survive for someone to look at. */
-  const floor = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
-  await supabase.from('events').delete().lt('starts_at', cutoff).gt('starts_at', floor);
-  notifyPostsChanged();
+  if (!hasSupabaseEnv || BACKEND !== 'appwrite') return;
+  const { data } = await rpcUntyped<{ deleted: number }>('purge_expired_events', {});
+  if (data && data.deleted > 0) notifyPostsChanged();
 }
 
 /* ── RSVPs (real persistence — event_rsvps + rpc_toggle_rsvp) ──── */

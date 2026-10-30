@@ -264,6 +264,8 @@ export interface CommunityEvent {
   /** Posted without a date (a partner's poster carries it) — `date` holds a
    *  label, not a day, and starts_at is only an expiry. See lib/partners. */
   undated?: boolean;
+  /** Started and not yet over (lib/eventLifetime). */
+  happeningNow?: boolean;
   /** Posted without a caption — `title` holds a display fallback. */
   untitled?: boolean;
   /* Real metric counts from the DB (absent on mock events → metric fallbacks). */
